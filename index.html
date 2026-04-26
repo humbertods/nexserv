@@ -370,15 +370,28 @@
 
   /* ROLE SWITCHER */
   .role-switcher {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--ink); color: white;
-    padding: 10px 16px; border-radius: var(--radius-pill);
-    font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
-    cursor: pointer; z-index: 100;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    display: flex; align-items: center; gap: 8px;
+    display: none;
   }
   .role-switcher .dot { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+  
+  /* Menú de usuario (avatar arriba derecha) */
+  .user-menu-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 199;
+  }
+  .user-menu-overlay.active { display: block; }
+  .user-menu {
+    display: none; position: absolute; top: 56px; right: 24px; z-index: 200;
+    background: var(--bg-card); border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    padding: 6px; min-width: 180px;
+  }
+  .user-menu.active { display: block; }
+  .user-menu-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 12px; cursor: pointer;
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .user-menu-item:hover, .user-menu-item:active { background: var(--bg); }
 
   .blocked-screen { min-height: 780px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; }
   .blocked-icon { font-size: 64px; margin-bottom: 20px; }
@@ -420,13 +433,22 @@
 
 <div class="phone">
 
+  <!-- Menú de usuario global -->
+  <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
+  <div class="user-menu" id="userMenu">
+    <div id="userMenuName" style="padding: 10px 14px 6px; font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em;"></div>
+    <button class="user-menu-item" onclick="closeUserMenu(); logout();">
+      <span style="font-size: 16px;">🚪</span> Cerrar sesión
+    </button>
+  </div>
+
   <!-- IN-APP NOTIFICATION (sim) -->
   <div class="notification" id="notification" onclick="onNotifClick()">
     <div class="notif-icon" id="notifIcon" style="padding: 4px;"><img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAQ4BDgDASIAAhEBAxEB/8QAHQABAAIDAAMBAAAAAAAAAAAAAAYHBQgJAQIEA//EAE8QAQABAwIDAwYJCAcGBQUBAAABAgMEBREGBxIhMUEIE1FhcYEUFSIyQmKRocEWIzNScpKxwglVc6PD0dIYJEOCovA0lLKz0xclRGOTg//EABoBAQACAwEAAAAAAAAAAAAAAAABBQMEBgL/xAAsEQEAAgEDAwMDAwUBAAAAAAAAAQIDBBESBRMxIUFhIlGBQ5GxFDIzUnHR/9oADAMBAAIRAxEAPwDcsAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//2Q==" style="width: 24px; height: 24px;"></div>
     <div class="notif-content">
       <div class="notif-app">NexServ <span class="notif-time" style="margin-left: 6px;">ahora</span></div>
       <div class="notif-title" id="notifTitle">Nueva clienta en el salón</div>
-      <div class="notif-body" id="notifBody">Andrea Rivas acaba de llegar.</div>
+      <div class="notif-body" id="notifBody">/div>
     </div>
   </div>
 
@@ -467,13 +489,14 @@
         <div class="hello">Buenos días,</div>
         <div class="name">Mikaela</div>
       </div>
-      <div class="avatar">M</div>
+      <div class="avatar" onclick="openUserMenu(this)" style="cursor: pointer;">M</div>
     </div>
 
     <div class="stat-grid" id="mikaelaStats">
       <div class="stat warning"><div class="label">Esperando</div><div class="value" id="mkStatEspera">—</div></div>
       <div class="stat info"><div class="label">En servicio</div><div class="value" id="mkStatServicio">—</div></div>
       <div class="stat purple"><div class="label">Por cobrar</div><div class="value" id="mkStatCobrar">—</div></div>
+      <div class="stat success"><div class="label">Pagados</div><div class="value" id="mkStatPagados">—</div></div>
     </div>
 
     <div class="section-title">Lista de espera <span class="count" id="mkEsperaCount">0</span></div>
@@ -494,7 +517,7 @@
       <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
       <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button><span class="icon">◉</span></button>
+      <button onclick="show('mikaelaServicios')"><span class="icon">✓</span></button>
       <button><span class="icon">◐</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
@@ -537,6 +560,39 @@
   </div>
 
   <!-- CLIENT PROFILE -->
+
+  <!-- MIKAELA: SERVICIOS PAGADOS HOY -->
+  <div class="screen" id="mikaelaServicios">
+    <div class="header">
+      <div class="greeting">
+        <div class="hello">Registro del día</div>
+        <div class="name">Servicios pagados</div>
+      </div>
+      <div class="avatar" onclick="show('mikaelaHome')" style="font-size: 16px;">←</div>
+    </div>
+
+    <!-- Resumen simple -->
+    <div style="background: var(--bg-card); border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-card); text-align: center;">
+      <div style="font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px;">Servicios completados hoy</div>
+      <div id="mkServCountDia" style="font-size: 40px; font-weight: 800; letter-spacing: -0.04em; color: var(--success);">0</div>
+    </div>
+
+    <div class="section-title">Detalle <span class="count" id="mkServListCount">0</span></div>
+    <div id="mkServiciosList">
+      <div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando...</div>
+    </div>
+
+    <nav class="nav">
+      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
+      <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
+      <button class="active"><span class="icon">✓</span><span class="label-dock">Pagados</span></button>
+      <button><span class="icon">◐</span></button>
+      <div class="refresh-toast">✓ Actualizado</div>
+    </nav>
+  </div>
+
+  <!-- CLIENT PROFILE (original) -->
   <div class="screen" id="clientProfile">
     <button class="back-btn" id="profileBackBtn" onclick="show('mikaelaHome')">← Volver</button>
     
@@ -951,6 +1007,28 @@
         <textarea id="arrObs" placeholder="Notas especiales de esta visita..."></textarea>
       </div>
 
+      <!-- Promo opcional -->
+      <div style="margin-top: 16px;">
+        <div id="arrPromoOff" style="display: block;">
+          <button onclick="toggleArrivalPromo(true)" style="width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">🏷 ¿Viene con promo? Aplicar ahora</button>
+        </div>
+        <div id="arrPromoOn" style="display: none;">
+          <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border-radius: 20px; padding: 16px; color: white; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div style="font-size: 13px; font-weight: 700;">🏷 Promo aplicada</div>
+              <button onclick="toggleArrivalPromo(false)" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 12px; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">✕ Quitar</button>
+            </div>
+            <select id="arrPromoSelect" onchange="updateArrivalPromo()" style="width: 100%; padding: 12px; border-radius: 12px; border: none; font-family: inherit; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.95); color: var(--ink);">
+              <option value="">Seleccionar promo...</option>
+            </select>
+            <div id="arrPromoDetail" style="margin-top: 8px; font-size: 12px; font-weight: 500; opacity: 0.9;"></div>
+          </div>
+          <div style="background: var(--warning-bg); border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #7a5a1c; text-align: center;">
+            💵 Recordá: promos solo válidas con efectivo o transferencia
+          </div>
+        </div>
+      </div>
+
       <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
       <div class="double-action">
         <div class="action-btn primary" onclick="goToList()">
@@ -958,7 +1036,7 @@
           <span class="label">Mandar a lista</span>
           <span class="sub">la toma quien se desocupe</span>
         </div>
-        <div class="action-btn" onclick="show('assignDirect')">
+        <div class="action-btn" onclick="loadAssignDirect()">
           <span class="icon">👩</span>
           <span class="label">Asignar directo</span>
           <span class="sub">elegí la chica ahora</span>
@@ -969,49 +1047,34 @@
 
   <!-- ASSIGN DIRECT -->
   <div class="screen" id="assignDirect">
-    <button class="back-btn" onclick="show('newArrival')">← Volver</button>
+    <button class="back-btn" onclick="show('arrivalExisting')">← Volver</button>
     <div class="greeting" style="margin-bottom: 24px;">
       <div class="hello">Asignación directa</div>
       <div class="name" style="font-size: 24px;">¿Quién la atiende?</div>
     </div>
 
-    <div class="card" style="background: var(--top-purple-bg); border-color: #d4b5ff; padding: 14px;">
-      <div style="font-size: 13px; color: var(--top-purple); font-weight: 600;">
-        ⭐ Carmen Molina (TOP) · Limpieza profunda
+    <!-- Info de la clienta y servicio -->
+    <div class="card" id="assignClientInfo" style="padding: 14px; margin-bottom: 16px;">
+      <div style="font-size: 13px; color: var(--ink-soft); font-weight: 600;">
+        <span id="assignClientName" style="font-weight: 800; color: var(--ink); font-size: 15px;"></span>
+        <span id="assignClientTop" style="display: none;"><span class="top-star">⭐</span></span>
       </div>
+      <div id="assignServiceInfo" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
     </div>
 
-    <div class="section-title">Disponibles para Facial</div>
-    <div class="card" style="padding: 8px 20px;">
-      <div class="client-row" onclick="goAssign('Laura')">
-        <div class="client-avatar">L</div>
-        <div class="client-info">
-          <div class="client-name">Laura</div>
-          <div class="client-meta">Cosmetóloga · Disponible</div>
-        </div>
-        <div style="background: var(--success-bg); color: var(--success); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Libre</div>
-      </div>
+    <!-- Lista dinámica de staff -->
+    <div id="assignStaffList">
+      <div style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando staff...</div>
     </div>
 
-    <div class="section-title">Cualquier chica del salón</div>
-    <div class="card" style="padding: 8px 20px;">
-      <div class="client-row" onclick="goAssign('María')">
-        <div class="client-avatar">M</div>
-        <div class="client-info">
-          <div class="client-name">María</div>
-          <div class="client-meta">Cejas · En servicio (Andrea)</div>
-        </div>
-        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
-      </div>
-      <div class="client-row" onclick="goAssign('Yadira')">
-        <div class="client-avatar">Y</div>
-        <div class="client-info">
-          <div class="client-name">Yadira</div>
-          <div class="client-meta">Pestañas · En servicio (Valentina)</div>
-        </div>
-        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
-      </div>
-    </div>
+    <nav class="nav">
+      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
+      <button><span class="icon">📇</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
+      <button><span class="icon">◉</span></button>
+      <button><span class="icon">◐</span></button>
+      <div class="refresh-toast">✓ Actualizado</div>
+    </nav>
   </div>
 
   <!-- STAFF HOME -->
@@ -1021,11 +1084,11 @@
         <div class="hello">Hola,</div>
         <div class="name" id="staffName">María</div>
       </div>
-      <div class="avatar" id="staffAvatar">M</div>
+      <div class="avatar" id="staffAvatar" onclick="openUserMenu(this)" style="cursor: pointer;">M</div>
     </div>
 
     <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2420 100%); color: white; padding: 26px 22px; border-radius: 24px; margin-bottom: 20px; box-shadow: var(--shadow-soft); position: relative;">
-      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px;">Tu comisión · semana 16</div>
+      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px;">Tu comisión acumulada</div>
       <div style="display: flex; align-items: center; gap: 14px;">
         <div id="commValue" style="font-size: 44px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;">****</div>
         <button onclick="toggleComm()" id="commToggle" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; width: 42px; height: 42px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .2s;">👁‍🗨</button>
@@ -1034,9 +1097,9 @@
     </div>
 
     <div class="stat-grid">
-      <div class="stat"><div class="label">Hoy</div><div class="value">4</div></div>
-      <div class="stat success"><div class="label">$ día</div><div class="value comm-hide">****</div></div>
-      <div class="stat warning" id="pendingStat"><div class="label">Espera</div><div class="value">2</div></div>
+      <div class="stat"><div class="label">Hoy</div><div class="value" id="staffStatHoy">0</div></div>
+      <div class="stat success"><div class="label">$ día</div><div class="value" id="staffStatDia">$0</div></div>
+      <div class="stat warning" id="pendingStat"><div class="label">Espera</div><div class="value">0</div></div>
     </div>
 
     <!-- Indicador de atención simultánea (solo cejas) -->
@@ -1059,32 +1122,15 @@
       </div>
     </div>
 
+    <!-- ATENDIENDO AHORA -->
+    <div id="staffAtendiendoSection" style="display: none; margin-bottom: 16px;">
+      <div class="section-title">✂️ Atendiendo ahora</div>
+      <div id="staffAtendiendoList"></div>
+    </div>
+
     <div class="section-title">Servicios de hoy</div>
-    <div class="card" style="padding: 8px 20px;">
-      <div class="client-row">
-        <div class="client-avatar">AR</div>
-        <div class="client-info">
-          <div class="client-name">Andrea Rivas</div>
-          <div class="client-meta">Depilación + pigmento · $17 · 10:35</div>
-        </div>
-        <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--ink-faint);">***</div>
-      </div>
-      <div class="client-row">
-        <div class="client-avatar is-top">DT</div>
-        <div class="client-info">
-          <div class="client-name">Daniela Torres <span class="top-star">⭐</span></div>
-          <div class="client-meta">Brow lamination · $25 · 09:40</div>
-        </div>
-        <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--ink-faint);">***</div>
-      </div>
-      <div class="client-row">
-        <div class="client-avatar is-top">VN</div>
-        <div class="client-info">
-          <div class="client-name">Valentina Núñez <span class="top-star">⭐</span></div>
-          <div class="client-meta">Depilación cejas · $8 · 09:15</div>
-        </div>
-        <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--ink-faint);">***</div>
-      </div>
+    <div id="staffServiciosHoy">
+      <div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios registrados hoy</div>
     </div>
 
     <nav class="nav">
@@ -1140,10 +1186,10 @@
     <button class="back-btn" onclick="show('staffHome')">← Mi panel</button>
     
     <div style="text-align: center; margin-bottom: 24px;">
-      <div class="client-avatar" id="as1Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as1Client || 'isabella')">IL</div>
-      <div id="as1Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Isabella Vera</div>
-      <div id="as1Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">C-0007 · Llegó 10:52</div>
-      <button onclick="openClientProfile(window._as1Client || 'isabella')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
+      <div class="client-avatar" id="as1Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as1Client)">—</div>
+      <div id="as1Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Cargando...</div>
+      <div id="as1Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
+      <button onclick="openClientProfile(window._as1Client)" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
     </div>
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1157,26 +1203,14 @@
         <button onclick="toggleEditObs('obs1')" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--accent-deep); cursor: pointer; padding: 4px 8px;">Editar</button>
       </div>
       <div id="obs1Display" style="font-size: 13px; color: #5a4a2a; line-height: 1.6; font-weight: 500;">
-        Piel sensible en la zona de bikini, usar cera de baja temperatura. Prefiere que le dejen la línea de depilación fina. Última visita: piernas + axilas.
+        Sin observaciones
       </div>
       <textarea id="obs1Edit" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #f0e5c8; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 500; min-height: 80px; resize: vertical; background: white; color: #5a4a2a; box-sizing: border-box;" onfocusout="saveObs('obs1')"></textarea>
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
     </div>
 
-    <div class="section-title">Servicios registrados</div>
-    <div class="card" style="margin-bottom: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-        <div>
-          <div style="font-weight: 700; font-size: 15px;" id="as1ServiceName">Depilación piernas completas</div>
-          <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;" id="as1ServiceArea">Depilación · precio regular</div>
-        </div>
-        <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em;" id="as1ServicePrice">$25</div>
-      </div>
-      <div style="border-top: 1px solid var(--line); padding-top: 12px; display: flex; gap: 8px;">
-        <button onclick="openEditService()" style="flex: 1; padding: 12px; background: var(--bg); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink); transition: all .15s;">✏️ Modificar</button>
-        <button style="flex: 1; padding: 12px; background: var(--danger-bg); border: 1.5px solid transparent; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--danger); transition: all .15s;">🗑 Quitar</button>
-      </div>
-    </div>
+    <div class="section-title">Servicios registrados <span class="count" id="as1SvcCount">0</span></div>
+    <div id="as1ServicesList"></div>
 
     <!-- Banner promo activa (oculto por defecto) -->
     <div id="promoBanner1" style="display: none; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); color: white; border-radius: 20px; padding: 16px 18px; margin-bottom: 14px;">
@@ -1196,7 +1230,7 @@
     <!-- Toggle retiro gratis/pago (visible solo para retiros) -->
     <div id="retiroToggle1" style="display: none; margin-bottom: 14px;">
       <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow-card);">
-        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">¿El retiro es de Rosa Aguilera?</div>
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">¿El retiro es nuestro?</div>
         <div style="display: flex; gap: 8px;">
           <button onclick="setRetiro(true, 1)" id="retiroYes1" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Sí, nuestro · $0</button>
           <button onclick="setRetiro(false, 1)" id="retiroNo1" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">❌ Otro local · $10</button>
@@ -1207,20 +1241,94 @@
     <!-- Ficha rápida pestañas (visible solo para staff de pestañas) -->
     <div id="pestFichaQuick1" style="display: none; margin-bottom: 14px;"></div>
 
-    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-      <button onclick="openAddService()" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft); transition: all .15s;">+ Agregar servicio</button>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;" id="as1ActionBtns">
+      <button onclick="openAddService(1)" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft); transition: all .15s;">+ Agregar servicio</button>
       <button onclick="openPromoSelect(1)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s;" id="promoBtn1">🏷 Aplicar promo</button>
     </div>
 
     <div style="background: var(--bg-card); border-radius: 20px; padding: 18px; box-shadow: var(--shadow-card); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="font-size: 13px; font-weight: 600; color: var(--ink-soft);">Total actual</div>
-        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;" id="as1Total">$25</div>
+        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;" id="as1Total">$0</div>
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot1()">Finalizar servicio</button>
-    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera con motivo.')">Devolver a lista</button>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="openPostServiceOptions(1)">✓ Finalizar servicio</button>
+
+    <!-- Modal: Opciones post-servicio -->
+    <div class="modal-bg" id="postServiceModal1">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">¿Qué hacemos con la clienta?</div>
+        <div id="postServiceClientInfo1" style="text-align: center; margin-bottom: 16px; font-size: 14px; color: var(--ink-soft); font-weight: 500;"></div>
+
+        <!-- Opción 1: Mantener clienta -->
+        <div onclick="postServiceKeep(1)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➕</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Mantener clienta</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">Quiere otro servicio — la sigo atendiendo</div>
+          </div>
+        </div>
+
+        <!-- Opción 2: Devolver a lista -->
+        <div onclick="postServiceReturn(1)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--warning-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">↩️</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Devolver a lista</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">La clienta vuelve a espera para otra chica</div>
+          </div>
+        </div>
+
+        <!-- Opción 3: Continuar promo (visible solo si tiene promo multi-área) -->
+        <div id="postServicePromoOption1" style="display: none;" onclick="postServiceContinuePromo(1)">
+          <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">🏷</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Continuar promo</div>
+              <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;" id="postServicePromoDetail1">Pasa a la siguiente área del combo</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opción: Pasar a otra área (visible si hay servicios de otra área sin promo) -->
+        <div id="postServicePassOption1" style="display: none;" onclick="postServicePassToArea(1)">
+          <div style="background: var(--bg-card); border: 2px solid var(--info); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➡️</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Pasar a otra área</div>
+              <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;" id="postServicePassDetail1">Tiene servicios pendientes de otra área</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Opción directa: Finalizar y cobrar -->
+        <div onclick="postServiceFinish(1)" style="background: var(--success); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">💵</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Finalizar y enviar a cobro</div>
+            <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;">Mikaela procede al cobro</div>
+          </div>
+        </div>
+
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 4px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal: Devolver a lista con motivo -->
+    <div class="modal-bg" id="returnToListModal1">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">↩️ Devolver a lista</div>
+        <div style="text-align: center; color: var(--ink-soft); font-size: 13px; margin-bottom: 14px;">La clienta volverá a la lista de espera para que otra chica la atienda.</div>
+        <div class="input-group">
+          <label>Motivo (opcional)</label>
+          <textarea id="returnMotivo1" placeholder="Ej: La clienta necesita servicio de otra área..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="confirmReturnToList(1)" style="background: var(--warning);">Confirmar devolución</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -1256,29 +1364,26 @@
 
     <!-- Modal agregar servicio -->
     <div class="modal-bg" id="addServiceModal">
-      <div class="modal">
+      <div class="modal" style="max-height: 85%;">
         <div class="modal-handle"></div>
         <div class="modal-title">Agregar servicio</div>
         <div class="input-group">
-          <label>Nuevo servicio</label>
-          <select>
-            <option value="">Seleccionar...</option>
-            <option>Depilación axilas — $5</option>
-            <option>Depilación bikini — $10</option>
-            <option>Depilación labio superior — $4</option>
-            <option>Lifting de pestañas — $25</option>
+          <label>Área</label>
+          <select id="addSvcArea" onchange="loadAddServiceCatalog()">
+            <option value="">Seleccionar área...</option>
           </select>
         </div>
         <div class="input-group">
-          <label>¿Pasa a otra chica?</label>
-          <select>
-            <option selected>No, yo la atiendo</option>
-            <option>Sí, pase a Yadira</option>
-            <option>Sí, pase a Diana</option>
-            <option>Sí, pase a Laura</option>
+          <label>Servicio</label>
+          <select id="addSvcService" onchange="updateAddServicePrice()">
+            <option value="">Primero seleccioná el área</option>
           </select>
         </div>
-        <button class="btn-primary" onclick="closeModal(); alert('✓ Servicio agregado al ticket')">Agregar</button>
+        <div id="addSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
+          <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
+          <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
+        </div>
+        <button class="btn-primary" onclick="confirmAddService()">Agregar al ticket</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -1367,10 +1472,10 @@
     
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--info-bg); color: var(--info); padding: 4px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; margin-bottom: 12px;">Clienta 2 de 2</div>
-      <div class="client-avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile('lucia')">LP</div>
-      <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Lucía Paredes</div>
-      <div style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">C-0009 · Llegó 11:05</div>
-      <button onclick="openClientProfile('lucia')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
+      <div class="client-avatar" id="as2Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as2Client)">—</div>
+      <div id="as2Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Cargando...</div>
+      <div id="as2Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
+      <button onclick="openClientProfile(window._as2Client)" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
     </div>
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1384,7 +1489,7 @@
         <button onclick="toggleEditObs('obs2')" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--accent-deep); cursor: pointer; padding: 4px 8px;">Editar</button>
       </div>
       <div id="obs2Display" style="font-size: 13px; color: #5a4a2a; line-height: 1.6; font-weight: 500;">
-        Primera vez en el salón. No tiene observaciones previas — anotá cualquier detalle importante para su próxima visita.
+        Sin observaciones
       </div>
       <textarea id="obs2Edit" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #f0e5c8; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 500; min-height: 80px; resize: vertical; background: white; color: #5a4a2a; box-sizing: border-box;" onfocusout="saveObs('obs2')"></textarea>
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
@@ -1401,7 +1506,7 @@
       </div>
       <div style="border-top: 1px solid var(--line); padding-top: 12px; display: flex; gap: 8px;">
         <button onclick="openEditService()" style="flex: 1; padding: 12px; background: var(--bg); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink);">✏️ Modificar</button>
-        <button style="flex: 1; padding: 12px; background: var(--danger-bg); border: 1.5px solid transparent; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--danger);">🗑 Quitar</button>
+        <button onclick="removeService(2)" style="flex: 1; padding: 12px; background: var(--danger-bg); border: 1.5px solid transparent; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--danger);">🗑 Quitar</button>
       </div>
     </div>
 
@@ -1432,8 +1537,76 @@
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot2()">Finalizar servicio</button>
-    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera.')">Devolver a lista</button>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="openPostServiceOptions(2)">✓ Finalizar servicio</button>
+
+    <!-- Modal: Opciones post-servicio slot 2 -->
+    <div class="modal-bg" id="postServiceModal2">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">¿Qué hacemos con la clienta?</div>
+        <div id="postServiceClientInfo2" style="text-align: center; margin-bottom: 16px; font-size: 14px; color: var(--ink-soft); font-weight: 500;"></div>
+
+        <div onclick="postServiceKeep(2)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➕</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px;">Mantener clienta</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">Quiere otro servicio — la sigo atendiendo</div>
+          </div>
+        </div>
+
+        <div onclick="postServiceReturn(2)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--warning-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">↩️</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px;">Devolver a lista</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">La clienta vuelve a espera para otra chica</div>
+          </div>
+        </div>
+
+        <div id="postServicePromoOption2" style="display: none;" onclick="postServiceContinuePromo(2)">
+          <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">🏷</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 800; font-size: 15px;">Continuar promo</div>
+              <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;" id="postServicePromoDetail2">Pasa a la siguiente área del combo</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="postServicePassOption2" style="display: none;" onclick="postServicePassToArea(2)">
+          <div style="background: var(--bg-card); border: 2px solid var(--info); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➡️</div>
+            <div style="flex: 1;">
+              <div style="font-weight: 800; font-size: 15px;">Pasar a otra área</div>
+              <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;" id="postServicePassDetail2">Tiene servicios pendientes de otra área</div>
+            </div>
+          </div>
+        </div>
+
+        <div onclick="postServiceFinish(2)" style="background: var(--success); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+          <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">💵</div>
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px;">Finalizar y enviar a cobro</div>
+            <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;">Mikaela procede al cobro</div>
+          </div>
+        </div>
+
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 4px;">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="modal-bg" id="returnToListModal2">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">↩️ Devolver a lista</div>
+        <div style="text-align: center; color: var(--ink-soft); font-size: 13px; margin-bottom: 14px;">La clienta volverá a la lista de espera para que otra chica la atienda.</div>
+        <div class="input-group">
+          <label>Motivo (opcional)</label>
+          <textarea id="returnMotivo2" placeholder="Ej: La clienta necesita servicio de otra área..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="confirmReturnToList(2)" style="background: var(--warning);">Confirmar devolución</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -1478,93 +1651,34 @@
         <div class="hello">Buenos días,</div>
         <div class="name">Humberto</div>
       </div>
-      <div class="avatar">H</div>
+      <div class="avatar" onclick="openUserMenu(this)" style="cursor: pointer;">H</div>
     </div>
 
     <div style="background: linear-gradient(135deg, #1a1a1a 0%, #3d2f1f 100%); color: white; padding: 26px 22px; border-radius: 24px; margin-bottom: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-soft);">
       <div style="position: absolute; top: -50%; right: -20%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 70%);"></div>
-      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación semana 16</div>
-      <div style="font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; position: relative;">$1,847</div>
-      <div style="font-size: 12px; opacity: 0.6; margin-top: 6px; position: relative; font-weight: 500;">↑ 12% vs. semana pasada</div>
+      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación de hoy</div>
+      <div style="font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; position: relative;">$0</div>
+      <div style="font-size: 12px; opacity: 0.6; margin-top: 6px; position: relative; font-weight: 500;">—</div>
     </div>
 
     <div class="stat-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-      <div class="stat"><div class="label">Comisiones</div><div class="value" style="color: var(--danger); font-size: 18px;">$592</div></div>
-      <div class="stat"><div class="label">Neto</div><div class="value" style="color: var(--success); font-size: 18px;">$1,255</div></div>
-      <div class="stat purple"><div class="label">TOP ⭐</div><div class="value" style="font-size: 18px;">12</div></div>
+      <div class="stat"><div class="label">Comisiones</div><div class="value" style="color: var(--danger); font-size: 18px;">$0</div></div>
+      <div class="stat"><div class="label">Neto</div><div class="value" style="color: var(--success); font-size: 18px;">$0</div></div>
+      <div class="stat purple"><div class="label">Servicios</div><div class="value" style="font-size: 18px;">0</div></div>
     </div>
 
     <div class="section-title">Estado del salón ahora</div>
     <div class="stat-grid">
-      <div class="stat warning"><div class="label">Esperando</div><div class="value">2</div></div>
-      <div class="stat info"><div class="label">Servicio</div><div class="value">3</div></div>
-      <div class="stat success"><div class="label">Listas</div><div class="value">7</div></div>
+      <div class="stat warning"><div class="label">Esperando</div><div class="value">0</div></div>
+      <div class="stat info"><div class="label">Servicio</div><div class="value">0</div></div>
+      <div class="stat success"><div class="label">Listas</div><div class="value">0</div></div>
     </div>
 
     <div class="section-title">
       <span>Historial reciente</span>
-      <span style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0; text-transform: none;">Ver todo →</span>
     </div>
-    <div class="card" style="padding: 4px 16px;">
-      <div class="history-row">
-        <div class="history-info">
-          <div class="history-top">
-            <span class="history-time">10:35</span>
-            <span class="history-client">Andrea Rivas</span>
-          </div>
-          <div class="history-service">Depilación + pigmento · Cejas</div>
-          <div class="history-meta">por María · C-0001</div>
-        </div>
-        <div class="history-amount">
-          <div class="history-value">$17</div>
-          <div class="history-comm">+$5.10</div>
-        </div>
-      </div>
-      <div class="history-row">
-        <div class="history-info">
-          <div class="history-top">
-            <span class="history-time">10:30</span>
-            <span class="history-client">Carmen Molina</span>
-            <span class="top-star">⭐</span>
-          </div>
-          <div class="history-service">Limpieza profunda · Facial</div>
-          <div class="history-meta">por Laura · C-0002</div>
-        </div>
-        <div class="history-amount">
-          <div class="history-value">$60</div>
-          <div class="history-comm">+$24.00</div>
-        </div>
-      </div>
-      <div class="history-row">
-        <div class="history-info">
-          <div class="history-top">
-            <span class="history-time">09:55</span>
-            <span class="history-client">Daniela Torres</span>
-            <span class="top-star">⭐</span>
-          </div>
-          <div class="history-service">Brow lamination · Cejas</div>
-          <div class="history-meta">por María · C-0003</div>
-        </div>
-        <div class="history-amount">
-          <div class="history-value">$25</div>
-          <div class="history-comm">+$7.50</div>
-        </div>
-      </div>
-      <div class="history-row">
-        <div class="history-info">
-          <div class="history-top">
-            <span class="history-time">09:15</span>
-            <span class="history-client">Valentina Núñez</span>
-            <span class="top-star">⭐</span>
-          </div>
-          <div class="history-service">Depilación cejas · Cejas</div>
-          <div class="history-meta">por María · C-0005</div>
-        </div>
-        <div class="history-amount">
-          <div class="history-value">$8</div>
-          <div class="history-comm">+$2.40</div>
-        </div>
-      </div>
+    <div class="card" style="padding: 16px; text-align: center; color: var(--ink-faint); font-size: 13px;">
+      Ver historial en 📊 Reportes
     </div>
 
     <nav class="nav">
@@ -1751,15 +1865,15 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Facturado</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px;" id="payTotal">$1,847</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px;" id="payTotal">$0</div>
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Comisiones</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$592</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$0</div>
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Neto salón</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$1,255</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$0</div>
         </div>
       </div>
     </div>
@@ -1810,7 +1924,7 @@
         </div>
         <div style="text-align: center; margin-bottom: 16px;">
           <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500;">Total a pagar en comisiones:</div>
-          <div style="font-size: 36px; font-weight: 800; color: var(--danger); letter-spacing: -0.04em;" id="closeWeekTotal">$592</div>
+          <div style="font-size: 36px; font-weight: 800; color: var(--danger); letter-spacing: -0.04em;" id="closeWeekTotal">$0</div>
         </div>
         <button class="btn-primary" onclick="confirmCloseWeek()" style="background: var(--danger);">Sí, cerrar y pagar</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
@@ -1824,7 +1938,7 @@
         <div class="modal-title" id="payIndTitle">Pagar a María</div>
         <div style="text-align: center; margin-bottom: 16px;">
           <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500;">Comisión acumulada</div>
-          <div style="font-size: 40px; font-weight: 800; color: var(--accent-deep); letter-spacing: -0.04em;" id="payIndAmount">$127.50</div>
+          <div style="font-size: 40px; font-weight: 800; color: var(--accent-deep); letter-spacing: -0.04em;" id="payIndAmount">$0</div>
           <div style="font-size: 12px; color: var(--ink-faint); font-weight: 500; margin-top: 4px;" id="payIndDetail">30% sobre $425 · 28 servicios</div>
         </div>
         <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
@@ -2101,32 +2215,38 @@
     'la2026': { pass: 'la2026', screen: 'staffHome', name: 'Laura', role: 'staff', area: 'facial', maxClients: 1, active: true },
   };
 
-  const PROMOS = [
-    { id: 'P001', name: 'Combo Mirada Perfecta', services: 'Depilación cejas + Pestañas clásicas', price: 52, regular: 58, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 44, comm: '30%' }] },
-    { id: 'P002', name: 'Combo Glow Total', services: 'Limpieza profunda + Depilación cejas', price: 60, regular: 68, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '✨ Facial', staff: 'Laura', monto: 52, comm: '40%' }, { area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }] },
-    { id: 'P003', name: 'Combo Full Rostro', services: 'Cejas pigmento + Dep. bigote + Pestañas híbridas', price: 75, regular: 81, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 21, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 54, comm: '30%' }] },
-  ];
+  let PROMOS = [];
 
   async function renderPromos() {
     const list = document.getElementById('promosList');
     if (!list) return;
     
-    // Intentar cargar del API
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando promos...</div></div>';
+    
+    // Cargar promos del Sheet
     try {
       const result = await apiGet('getPromos');
       if (result.success && result.promos && result.promos.length > 0) {
-        // Actualizar PROMOS con datos del Sheet
-        result.promos.forEach((p, i) => {
-          if (i < PROMOS.length) {
-            PROMOS[i].name = p.nombre;
-            PROMOS[i].services = p.servicios;
-            PROMOS[i].price = Number(p.precioCombo) || PROMOS[i].price;
-            PROMOS[i].regular = Number(p.sumaIndividual) || PROMOS[i].regular;
+        // Reemplazar PROMOS completamente con datos del Sheet
+        PROMOS = result.promos.map(p => {
+          let division = [];
+          if (p.division) {
+            try { division = JSON.parse(p.division); } catch(e) { division = []; }
           }
+          return {
+            id: p.id,
+            name: p.nombre,
+            services: p.servicios,
+            price: Number(p.precioCombo) || 0,
+            regular: Number(p.sumaIndividual) || 0,
+            from: p.desde ? String(p.desde) : '',
+            to: p.hasta ? String(p.hasta) : '',
+            active: p.activa !== false,
+            division: division
+          };
         });
+      } else if (!result.error) {
+        PROMOS = [];
       }
     } catch (err) { console.error('Error promos:', err); }
 
@@ -2168,9 +2288,36 @@
     `).join('');
   }
 
-  function renderStaffPromos() {
+  async function renderStaffPromos() {
     const list = document.getElementById('staffPromosList');
     if (!list) return;
+    
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando promos...</div></div>';
+    
+    // Cargar promos del Sheet
+    try {
+      const result = await apiGet('getPromos');
+      if (result.success && result.promos && result.promos.length > 0) {
+        PROMOS = result.promos.map(p => {
+          let division = [];
+          if (p.division) {
+            try { division = JSON.parse(p.division); } catch(e) {}
+          }
+          return {
+            id: p.id,
+            name: p.nombre,
+            services: p.servicios,
+            price: Number(p.precioCombo) || 0,
+            regular: Number(p.sumaIndividual) || 0,
+            from: p.desde ? String(p.desde) : '',
+            to: p.hasta ? String(p.hasta) : '',
+            active: p.activa !== false,
+            division: division
+          };
+        });
+      }
+    } catch (err) { console.error('Error cargando promos staff:', err); }
+    
     const active = PROMOS.filter(p => p.active);
     if (active.length === 0) {
       list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="font-size: 32px; margin-bottom: 8px;">🏷</div>No hay promos activas esta semana</div>';
@@ -2189,6 +2336,12 @@
           </div>
           <div style="background: var(--success-bg); color: var(--success); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-pill); flex-shrink: 0; margin-left: 8px;">-$${p.regular - p.price}</div>
         </div>
+        ${p.division && p.division.length > 0 ? `
+          <div style="margin-top: 10px; background: var(--bg); border-radius: var(--radius-sm); padding: 8px 10px;">
+            <div style="font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px;">División por área</div>
+            ${p.division.map(d => '<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0;"><span style="font-weight: 600;">' + d.area + '</span><span style="font-weight: 800;">$' + d.monto + '</span></div>').join('')}
+          </div>
+        ` : ''}
       </div>
     `).join('');
   }
@@ -2274,7 +2427,7 @@
     window._editingPromo = idx;
   }
 
-  function savePromo() {
+  async function savePromo() {
     const name = document.getElementById('promoName').value.trim();
     const selected = getSelectedServices();
     const price = parseInt(document.getElementById('promoPrice').value);
@@ -2305,6 +2458,8 @@
       if (!confirm('La suma de las áreas ($' + divTotal + ') no coincide con el precio combo ($' + price + '). ¿Guardar igual?')) return;
     }
 
+    const divisionStr = JSON.stringify(division);
+
     const promo = {
       id: 'P' + String(PROMOS.length + 1).padStart(3, '0'),
       name, services, price, regular,
@@ -2314,28 +2469,68 @@
       _selectedServices: selected
     };
 
-    if (window._editingPromo >= 0) {
-      promo.id = PROMOS[window._editingPromo].id;
-      PROMOS[window._editingPromo] = promo;
-    } else {
-      PROMOS.push(promo);
+    // Guardar en el Sheet
+    try {
+      if (window._editingPromo >= 0) {
+        promo.id = PROMOS[window._editingPromo].id;
+        const result = await apiPost('updatePromo', {
+          id: promo.id,
+          nombre: name,
+          servicios: services,
+          precio: price,
+          regular: regular,
+          desde: promo.from,
+          hasta: promo.to,
+          activa: true,
+          division: divisionStr
+        });
+        if (result.error) { alert('⚠️ Error al guardar: ' + result.error); return; }
+        PROMOS[window._editingPromo] = promo;
+      } else {
+        const result = await apiPost('addPromo', {
+          nombre: name,
+          servicios: services,
+          precio: price,
+          regular: regular,
+          desde: promo.from,
+          hasta: promo.to,
+          activa: true,
+          division: divisionStr
+        });
+        if (result.error) { alert('⚠️ Error al guardar: ' + result.error); return; }
+        if (result.success && result.id) promo.id = result.id;
+        PROMOS.push(promo);
+      }
+    } catch (err) {
+      console.error('Error guardando promo:', err);
+      alert('⚠️ Error de conexión al guardar la promo. Revisá tu internet e intentá de nuevo.');
+      return;
     }
+
     closeModal();
     renderPromos();
-    alert('✓ Promo guardada. Las chicas podrán verla en su sección de promos.');
+    alert('✓ Promo guardada. Las chicas la verán al refrescar su app.');
   }
 
-  function togglePromoActive(idx) {
+  async function togglePromoActive(idx) {
     PROMOS[idx].active = !PROMOS[idx].active;
+    try {
+      await apiPost('updatePromo', {
+        id: PROMOS[idx].id,
+        nombre: PROMOS[idx].name,
+        servicios: PROMOS[idx].services,
+        precio: PROMOS[idx].price,
+        regular: PROMOS[idx].regular,
+        desde: PROMOS[idx].from,
+        hasta: PROMOS[idx].to,
+        activa: PROMOS[idx].active,
+        division: JSON.stringify(PROMOS[idx].division)
+      });
+    } catch (err) { console.error('Error actualizando promo:', err); }
     renderPromos();
   }
 
-  const WAITLIST = [
-    { id: 'LE-0001', code: 'C-0004', name: 'Sofía López', service: 'Pestañas clásicas (consultar)', area: 'pestanas', priority: 'normal', waiting: 8, obs: 'Primera vez con pestañas', isTop: true },
-    { id: 'LE-0004', code: 'C-0005', name: 'Valentina Núñez', service: 'Lifting de pestañas', area: 'retiro_lifting', priority: 'tiempo', waiting: 12, obs: 'Sale a las 11:45', isTop: true },
-    { id: 'LE-0005', code: 'C-0007', name: 'Isabella Vera', service: 'Depilación piernas completas', area: 'depilacion', priority: 'normal', waiting: 3, isTop: false },
-    { id: 'LE-0006', code: 'C-0009', name: 'Lucía Paredes', service: 'Depilación cejas + pigmento', area: 'cejas', priority: 'normal', waiting: 5, isTop: false },
-  ];
+  const WAITLIST = [];
 
   // ÁREAS que cada grupo puede tomar:
   // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
@@ -2356,18 +2551,25 @@
     document.getElementById(id).classList.add('active');
     window.scrollTo(0, 0);
     if (id === 'waitList') renderWaitList();
+    if (id === 'staffHome') loadStaffHome();
     if (id === 'ownerPromos') renderPromos();
     if (id === 'staffPromos') renderStaffPromos();
     if (id === 'ownerReports') renderReport();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
+    if (id === 'mikaelaServicios') { loadMikaelaServicios(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
       document.getElementById('arrivalClientList').innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Escribí al menos 2 letras para buscar</div>';
       document.getElementById('arrivalClientList').style.display = 'block';
       document.getElementById('arrivalForm').style.display = 'none';
+      // Reset promo
+      window._arrPromo = null;
+      document.getElementById('arrPromoOff').style.display = 'block';
+      document.getElementById('arrPromoOn').style.display = 'none';
+      document.getElementById('arrService').value = '';
     }
   }
 
@@ -2509,10 +2711,22 @@
   function logout() {
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
-    document.getElementById('roleLabel').textContent = 'Cambiar de usuario';
     window.currentUser = null;
     commVisible = false;
+    closeUserMenu();
     show('login');
+  }
+
+  function openUserMenu(avatarEl) {
+    const user = window.currentUser;
+    document.getElementById('userMenuName').textContent = user ? user.name : '';
+    document.getElementById('userMenu').classList.add('active');
+    document.getElementById('userMenuOverlay').classList.add('active');
+  }
+
+  function closeUserMenu() {
+    document.getElementById('userMenu').classList.remove('active');
+    document.getElementById('userMenuOverlay').classList.remove('active');
   }
 
   async function renderWaitList() {
@@ -2539,7 +2753,9 @@
             priority: String(w.prioridad || 'normal').toLowerCase(),
             waiting: w.horaLlegada || '?',
             obs: w.observaciones || '',
-            isTop: String(w.esTop || '').toLowerCase().includes('sí')
+            isTop: String(w.esTop || '').toLowerCase().includes('sí'),
+            asignadaA: w.asignadaA || '',
+            estado: String(w.estado || '').toLowerCase()
           };
         });
       }
@@ -2551,7 +2767,15 @@
     if (lista.length === 0) lista = WAITLIST;
 
     const allowed = AREA_FILTER[user.area] || [];
-    const myList = lista.filter(w => allowed.includes(w.area));
+    // Incluir clientas de mi área Y las que están asignadas a mí específicamente
+    const myList = lista.filter(w => {
+      // Si está asignada a otra chica, no la muestro
+      if (w.asignadaA && w.asignadaA !== user.name) return false;
+      // Si está asignada a mí, siempre la muestro
+      if (w.asignadaA === user.name) return true;
+      // Si no está asignada, mostrar si es de mi área
+      return allowed.includes(w.area);
+    });
     
     document.getElementById('waitCountMy').textContent = myList.length;
     document.getElementById('waitCountAll').textContent = lista.length;
@@ -2564,8 +2788,14 @@
       return;
     }
     
+    // Ordenar: asignadas a mí primero, luego por prioridad
     const priOrder = { 'tiempo': 0, 'normal': 1, 'especial': 2 };
-    myList.sort((a, b) => (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1));
+    myList.sort((a, b) => {
+      // Asignadas a mí van primero
+      if (a.asignadaA === user.name && b.asignadaA !== user.name) return -1;
+      if (b.asignadaA === user.name && a.asignadaA !== user.name) return 1;
+      return (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1);
+    });
     
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
@@ -2573,23 +2803,29 @@
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
     
-    content.innerHTML = myList.map(w => `
-      <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}">
+    content.innerHTML = myList.map(w => {
+      const isAssignedToMe = w.asignadaA === user.name;
+      const assignBadge = isAssignedToMe 
+        ? '<div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); color: white; padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; margin-bottom: 12px; text-align: center;">📋 Mikaela te asignó esta clienta</div>'
+        : '';
+      return `
+      <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}" ${isAssignedToMe ? 'style="border-left-color: var(--accent);"' : ''}>
         <div class="waitlist-top">
           <div class="waitlist-client">
             <div class="waitlist-code">${w.code} · llegó ${w.waiting}</div>
             <div class="waitlist-name">${w.name}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
           </div>
-          ${priBadge[w.priority] || priBadge['normal']}
+          ${isAssignedToMe ? '<span class="priority-badge" style="background: var(--accent); color: white;">📋 Para ti</span>' : (priBadge[w.priority] || priBadge['normal'])}
         </div>
+        ${assignBadge}
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${w.obs ? `<div class="waitlist-obs">📝 ${w.obs}</div>` : ''}
         <div class="waitlist-actions">
-          <button class="btn-take" onclick="openTake('${w.id}', '${w.name}', '${w.service}', ${w.isTop})">Tomar clienta</button>
+          <button class="btn-take" onclick="openTake('${w.id}', '${w.name}', '${w.service}', ${w.isTop})">${isAssignedToMe ? 'Tomar mi clienta' : 'Tomar clienta'}</button>
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   function openTake(id, name, service, isTop) {
@@ -2675,18 +2911,37 @@
   async function finishSlot1() {
     const user = window.currentUser;
     const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
-    const serviceName = document.getElementById('as1ServiceName')?.textContent || '';
-    const price = document.getElementById('as1Total')?.textContent?.replace('$', '') || '0';
+    const svcs = slotServices[1] || [];
+    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
+    const promoData = activePromos[clientName];
     
-    // Actualizar Sheet: marcar como "Por cobrar"
+    // Si hay promo + servicios extra, sumar ambos
+    let finalTotal = total;
+    let promoName = '';
+    let regularTotal = total;
+    if (promoData) {
+      // Servicios extra = los que no son la promo
+      const extraSvcs = svcs.filter(s => !s.isPromo);
+      const extraTotal = extraSvcs.reduce((sum, s) => sum + Number(s.price), 0);
+      finalTotal = promoData.promo.price + extraTotal;
+      promoName = promoData.promo.name;
+      regularTotal = promoData.promo.regular + extraTotal;
+    }
+    
     try {
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
-        servicio: serviceName,
-        total: price
+        servicio: svcNames,
+        total: String(finalTotal),
+        promoNombre: promoName,
+        precioRegular: String(regularTotal)
       });
     } catch (err) { console.error(err); }
+
+    if (promoData) delete activePromos[clientName];
+    slotServices[1] = [];
 
     if (user && activeClients[user.name]) {
       activeClients[user.name].splice(0, 1);
@@ -2699,17 +2954,35 @@
   async function finishSlot2() {
     const user = window.currentUser;
     const clientName = document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '';
-    const serviceName = document.getElementById('as2ServiceName')?.textContent || '';
-    const price = document.getElementById('as2Total')?.textContent?.replace('$', '') || '0';
+    const svcs = slotServices[2] || [];
+    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
+    const promoData = activePromos[clientName];
+    
+    let finalTotal = total;
+    let promoName = '';
+    let regularTotal = total;
+    if (promoData) {
+      const extraSvcs = svcs.filter(s => !s.isPromo);
+      const extraTotal = extraSvcs.reduce((sum, s) => sum + Number(s.price), 0);
+      finalTotal = promoData.promo.price + extraTotal;
+      promoName = promoData.promo.name;
+      regularTotal = promoData.promo.regular + extraTotal;
+    }
     
     try {
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
-        servicio: serviceName,
-        total: price
+        servicio: svcNames,
+        total: String(finalTotal),
+        promoNombre: promoName,
+        precioRegular: String(regularTotal)
       });
     } catch (err) { console.error(err); }
+
+    if (promoData) delete activePromos[clientName];
+    slotServices[2] = [];
 
     if (user && activeClients[user.name]) {
       activeClients[user.name].splice(1, 1);
@@ -2719,7 +2992,471 @@
     show('staffHome');
   }
 
+  // ============================================
+  // POST-SERVICE OPTIONS (3 opciones al finalizar)
+  // ============================================
+
+  function openPostServiceOptions(slot) {
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
+    const svcs = slotServices[slot] || [];
+    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    
+    if (svcs.length === 0) {
+      alert('Agregá al menos un servicio antes de finalizar');
+      return;
+    }
+    
+    document.getElementById('postServiceClientInfo' + slot).innerHTML = 
+      '<strong>' + clientName + '</strong> · ' + svcs.length + ' servicio' + (svcs.length > 1 ? 's' : '') + ' · $' + total;
+    
+    const user = window.currentUser;
+    const myArea = user?.area || 'cejas';
+    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    
+    // Mostrar opción de promo si tiene promo multi-área activa
+    const promoData = activePromos[clientName];
+    const promoOption = document.getElementById('postServicePromoOption' + slot);
+    if (promoData && promoData.promo.division && promoData.promo.division.length > 1) {
+      const otherAreas = promoData.promo.division.filter(d => d.area !== areaLabel);
+      if (otherAreas.length > 0) {
+        const nextAreas = otherAreas.map(d => d.area).join(' + ');
+        document.getElementById('postServicePromoDetail' + slot).textContent = 
+          promoData.promo.name + ' → pasa a ' + nextAreas;
+        promoOption.style.display = 'block';
+      } else {
+        promoOption.style.display = 'none';
+      }
+    } else {
+      promoOption.style.display = 'none';
+    }
+    
+    // Mostrar opción "Pasar a otra área" si hay servicios de áreas diferentes a la mía
+    const passOption = document.getElementById('postServicePassOption' + slot);
+    if (passOption) {
+      const myAreaKeys = AREA_FILTER[myArea] || [myArea];
+      const areaKeyMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'depilacion': 'depilacion', 'Pestañas': 'pestanas', 'pestanas': 'pestanas', 'Lifting/Retiro': 'retiro_lifting', 'Facial': 'facial', 'facial': 'facial', 'cejas': 'cejas' };
+      const otherAreaServices = svcs.filter(s => {
+        if (s.isPromo) return false; // La promo se maneja con "Continuar promo"
+        const svcAreaKey = areaKeyMap[s.area] || s.area;
+        return !myAreaKeys.includes(svcAreaKey);
+      });
+      
+      if (otherAreaServices.length > 0) {
+        const otherAreaNames = [...new Set(otherAreaServices.map(s => s.area))].join(' + ');
+        document.getElementById('postServicePassDetail' + slot).textContent = 
+          'Tiene servicios de ' + otherAreaNames + ' pendientes';
+        passOption.style.display = 'block';
+      } else {
+        passOption.style.display = 'none';
+      }
+    }
+    
+    document.getElementById('postServiceModal' + slot).classList.add('active');
+  }
+
+  // Opción 1: Mantener clienta (agregar más servicios)
+  function postServiceKeep(slot) {
+    closeModal();
+    // Simplemente vuelve a la pantalla de atención — la chica puede agregar más servicios
+    alert('✓ Podés seguir agregando servicios a esta clienta.');
+  }
+
+  // Opción 2: Devolver a lista de espera
+  function postServiceReturn(slot) {
+    closeModal();
+    document.getElementById('returnMotivo' + slot).value = '';
+    document.getElementById('returnToListModal' + slot).classList.add('active');
+  }
+
+  async function confirmReturnToList(slot) {
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+    const motivo = document.getElementById('returnMotivo' + slot).value.trim();
+    
+    closeModal();
+    
+    try {
+      await apiPost('devolverALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: clientName,
+        motivo: motivo
+      });
+    } catch (err) { console.error('Error devolviendo a lista:', err); }
+    
+    // Limpiar slot local
+    slotServices[slot] = [];
+    const promoData = activePromos[clientName];
+    if (promoData) delete activePromos[clientName];
+    
+    if (user && activeClients[user.name]) {
+      activeClients[user.name].splice(slot - 1, 1);
+      updateCapacityUI(user.name);
+    }
+    
+    simulateNotif('mikaela', clientName + ' devuelta a espera', 'Por ' + (user?.name || 'staff') + (motivo ? ': ' + motivo : ''), false);
+    alert('↩️ ' + clientName + ' devuelta a la lista de espera.' + (motivo ? '\nMotivo: ' + motivo : ''));
+    show('staffHome');
+  }
+
+  // Opción 3: Continuar promo (pasa a siguiente área via lista de espera)
+  async function postServiceContinuePromo(slot) {
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+    const promoData = activePromos[clientName];
+    
+    if (!promoData) {
+      alert('No hay promo activa para esta clienta');
+      closeModal();
+      return;
+    }
+    
+    closeModal();
+    
+    const myArea = user?.area || 'cejas';
+    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    const myDiv = promoData.promo.division.find(d => d.area === areaLabel);
+    const myPrice = myDiv ? myDiv.monto : 0;
+    
+    // Determinar las áreas que faltan
+    if (!promoData.completedAreas.includes(myArea)) {
+      promoData.completedAreas.push(myArea);
+    }
+    const allPromoAreas = promoData.promo.division.map(d => d.area);
+    const completedLabels = [areaLabel];
+    const pendingAreas = allPromoAreas.filter(a => !completedLabels.includes(a));
+    const nextAreaLabel = pendingAreas.length > 0 ? pendingAreas.join(' + ') : '';
+    
+    // Calcular monto de la siguiente área
+    const pendingDivisions = promoData.promo.division.filter(d => d.area !== areaLabel);
+    const montoSiguiente = pendingDivisions.length > 0 ? pendingDivisions.reduce((sum, d) => sum + (Number(d.monto) || 0), 0) : 0;
+    
+    // Determinar la clave de área de la siguiente parte para el Sheet
+    let nextAreaKey = '';
+    if (pendingAreas.length > 0) {
+      const nextArea = pendingAreas[0];
+      if (nextArea.includes('Cejas') || nextArea.includes('Depilación')) nextAreaKey = 'cejas';
+      else if (nextArea.includes('Pestañas')) nextAreaKey = 'pestanas';
+      else if (nextArea.includes('Facial')) nextAreaKey = 'facial';
+    }
+    
+    // Devolver a lista de espera con info de la promo y qué falta
+    try {
+      await apiPost('continuarPromoALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: clientName,
+        montoChica: String(myPrice),
+        montoSiguienteArea: String(montoSiguiente),
+        nuevaArea: nextAreaKey,
+        areaCompletada: areaLabel,
+        areasFaltantes: nextAreaLabel,
+        servicioActualizado: promoData.promo.name + ' (PROMO) · ✅ ' + areaLabel + ' · Falta: ' + nextAreaLabel
+      });
+    } catch (err) { console.error(err); }
+    
+    // Limpiar slot local
+    slotServices[slot] = [];
+    if (user && activeClients[user.name]) {
+      activeClients[user.name].splice(slot - 1, 1);
+      updateCapacityUI(user.name);
+    }
+    
+    simulateNotif('mikaela', '🏷 ' + clientName + ' → ' + nextAreaLabel, 'Promo: ' + promoData.promo.name + ' · ' + areaLabel + ' completada por ' + (user?.name || ''), false);
+    alert('✓ Tu parte de la promo "' + promoData.promo.name + '" está completa.\nTu comisión: 30% sobre $' + myPrice + ' = $' + (myPrice * 0.3).toFixed(2) + '\n\n➡️ ' + clientName + ' vuelve a la lista de espera para que ' + nextAreaLabel + ' la atienda.');
+    show('staffHome');
+  }
+
+  // Opción 4: Pasar a otra área (servicios mixtos en el ticket)
+  async function postServicePassToArea(slot) {
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+    const svcs = slotServices[slot] || [];
+    const myArea = user?.area || 'cejas';
+    const myAreaKeys = AREA_FILTER[myArea] || [myArea];
+    const myAreaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    
+    // Separar servicios: los míos (incluyendo promo de mi área) y los de otra área
+    const areaKeyMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting/Retiro': 'retiro_lifting', 'Facial': 'facial' };
+    
+    const myServices = [];
+    const otherServices = [];
+    
+    svcs.forEach(s => {
+      if (s.isPromo) {
+        // La promo es mía
+        myServices.push(s);
+      } else {
+        const k = areaKeyMap[s.area] || s.area;
+        if (myAreaKeys.includes(k) || k === myArea) {
+          myServices.push(s);
+        } else {
+          otherServices.push(s);
+        }
+      }
+    });
+    
+    const myTotal = myServices.reduce((sum, s) => sum + Number(s.price), 0);
+    const otherTotal = otherServices.reduce((sum, s) => sum + Number(s.price), 0);
+    const otherAreaNames = [...new Set(otherServices.map(s => s.area))];
+    const mySvcNames = myServices.map(s => s.name).join(' + ');
+    const otherSvcNames = otherServices.map(s => s.name).join(' + ');
+    
+    // Determinar la clave de área para la siguiente
+    let nextAreaKey = '';
+    if (otherAreaNames.length > 0) {
+      const first = otherAreaNames[0];
+      nextAreaKey = areaKeyMap[first] || first;
+    }
+    
+    closeModal();
+    
+    try {
+      await apiPost('continuarPromoALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: clientName,
+        montoChica: String(myTotal),
+        montoSiguienteArea: String(otherTotal),
+        nuevaArea: nextAreaKey,
+        areaCompletada: myAreaLabel,
+        areasFaltantes: otherSvcNames || otherAreaNames.join(' + '),
+        servicioActualizado: mySvcNames + ' ✅ por ' + (user?.name || '')
+      });
+    } catch (err) { console.error(err); }
+    
+    // Limpiar slot local
+    slotServices[slot] = [];
+    const promoData = activePromos[clientName];
+    if (promoData) delete activePromos[clientName];
+    
+    if (user && activeClients[user.name]) {
+      activeClients[user.name].splice(slot - 1, 1);
+      updateCapacityUI(user.name);
+    }
+    
+    const pct = myArea === 'facial' ? 0.4 : 0.3;
+    simulateNotif('mikaela', '➡️ ' + clientName + ' → ' + otherAreaNames.join(' + '), 'Servicios pendientes: ' + otherSvcNames, false);
+    alert('✓ Tus servicios completados.\nTu comisión: ' + (pct*100) + '% sobre $' + myTotal + ' = $' + (myTotal * pct).toFixed(2) + '\n\n➡️ ' + clientName + ' vuelve a lista de espera para:\n' + otherSvcNames);
+    show('staffHome');
+  }
+
+  // Opción directa: Finalizar y enviar a cobro
+  async function postServiceFinish(slot) {
+    closeModal();
+    if (slot === 1) {
+      await finishSlot1();
+    } else {
+      await finishSlot2();
+    }
+  }
+
   // === RETIRO GRATIS / $10 ===
+
+  async function loadStaffHome() {
+    const user = window.currentUser;
+    if (!user || user.role !== 'staff') return;
+    
+    try {
+      const result = await apiGet('getAtenciones', { chica: user.name });
+      const section = document.getElementById('staffAtendiendoSection');
+      const list = document.getElementById('staffAtendiendoList');
+      
+      if (result.success && result.atenciones && result.atenciones.length > 0) {
+        section.style.display = 'block';
+        
+        // Actualizar activeClients para doble atención
+        if (user.maxClients === 2) {
+          activeClients[user.name] = result.atenciones.map(a => ({ name: a.nombre, service: a.servicio }));
+          updateCapacityUI(user.name);
+        }
+        
+        list.innerHTML = result.atenciones.map((a, idx) => {
+          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const slot = idx === 0 ? 'activeService' : 'activeService2';
+          return `
+          <div class="card" style="margin-bottom: 8px; padding: 16px; border-left: 4px solid var(--accent); cursor: pointer;" onclick="loadActiveService(${idx}); show('${slot}');">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink: 0;">${initials}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 16px;">${a.nombre}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}</div>
+                <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${a.servicio} · ${a.area} · desde ${a.horaToma}</div>
+              </div>
+              <div style="background: var(--accent); color: white; padding: 6px 14px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">Ver →</div>
+            </div>
+          </div>`;
+        }).join('');
+        
+        // Precargar datos en activeService
+        const a1 = result.atenciones[0];
+        window._as1Client = a1.codigo;
+        document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+        document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
+        document.getElementById('as1Name').textContent = a1.nombre + (a1.esTop ? ' ⭐' : '');
+        document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
+        document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+        
+        // Inicializar lista de servicios con el servicio tentativo
+        slotServices[1] = [];
+        if (a1.servicio && a1.servicio !== '—') {
+          const svcPrice = Number(a1.total) || 0;
+          const isPromo = a1.promoNombre && a1.promoNombre !== '';
+          slotServices[1].push({ 
+            name: a1.servicio, 
+            price: svcPrice, 
+            area: a1.area,
+            isPromo: isPromo,
+            promoName: a1.promoNombre || ''
+          });
+          
+          // Si tiene promo, registrarla en activePromos
+          if (isPromo) {
+            // Buscar la promo en PROMOS para tener la división
+            if (PROMOS.length === 0) {
+              try {
+                const promoResult = await apiGet('getPromos');
+                if (promoResult.success && promoResult.promos) {
+                  PROMOS = promoResult.promos.map(p => {
+                    let division = [];
+                    if (p.division) { try { division = JSON.parse(p.division); } catch(e) {} }
+                    return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, from: p.desde ? String(p.desde) : '', to: p.hasta ? String(p.hasta) : '', active: p.activa !== false, division: division };
+                  });
+                }
+              } catch(e) {}
+            }
+            const matchedPromo = PROMOS.find(p => a1.promoNombre.includes(p.name) || p.name.includes(a1.promoNombre.replace(' (PROMO)', '')));
+            if (matchedPromo) {
+              activePromos[a1.nombre] = { promo: matchedPromo, startedBy: user.area, completedAreas: [user.area] };
+              showPromoBanner(1, matchedPromo, user.area);
+            }
+          }
+        }
+        renderServicesList(1);
+        
+        if (user.area === 'pestanas') {
+          loadPestFichaQuick(a1.codigo.toLowerCase().replace(/-/g, ''), 1);
+        }
+      } else {
+        section.style.display = 'none';
+      }
+      
+      // Actualizar contadores
+      const waitResult = await apiGet('getListaEspera');
+      if (waitResult.success) {
+        const allowed = AREA_FILTER[user.area] || [];
+        const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
+        const myCount = waitResult.lista.filter(w => {
+          const aKey = areaMap2[String(w.area || '').toLowerCase()] || '';
+          return allowed.includes(aKey);
+        }).length;
+        document.getElementById('navBadge').textContent = myCount;
+        document.getElementById('navBadge2').textContent = myCount;
+        document.getElementById('pendingStat').querySelector('.value').textContent = myCount;
+      }
+
+      // Cargar servicios completados hoy
+      const servResult = await apiGet('getServiciosHoy', { chica: user.name });
+      const servList = document.getElementById('staffServiciosHoy');
+      if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
+        const servicios = servResult.servicios;
+        document.getElementById('staffStatHoy').textContent = servicios.length;
+        
+        const pct = user.area === 'facial' ? 0.4 : 0.3;
+        const myAreaLabel = user.area === 'cejas' ? '💅 Cejas' : user.area === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+        
+        // Cargar promos si necesario para calcular división
+        if (PROMOS.length === 0) {
+          try {
+            const pr = await apiGet('getPromos');
+            if (pr.success && pr.promos) {
+              PROMOS = pr.promos.map(p => {
+                let div = []; if (p.division) { try { div = JSON.parse(p.division); } catch(e) {} }
+                return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: div };
+              });
+            }
+          } catch(e) {}
+        }
+        
+        // Calcular comisión correcta por servicio
+        let totalComisionDia = 0;
+        
+        servList.innerHTML = servicios.map(s => {
+          const initials = s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const svcTotal = Number(s.total) || 0;
+          const metodo = String(s.metodoPago || 'Efectivo');
+          const metodoIcon = metodo.toLowerCase().includes('tarjeta') ? '💳' : metodo.toLowerCase().includes('transfer') ? '📱' : '💵';
+          const promoName = String(s.promoNombre || '');
+          const isPromo = promoName !== '' && promoName !== 'undefined';
+          
+          // Determinar el monto sobre el que esta chica comisiona
+          let montoComisionable = svcTotal;
+          if (isPromo) {
+            const cleanPromoName = promoName.replace(' (PROMO)', '').replace(/\s*·.*$/, '').trim();
+            const matchedPromo = PROMOS.find(p => cleanPromoName.includes(p.name) || p.name.includes(cleanPromoName));
+            if (matchedPromo && matchedPromo.division) {
+              const myDiv = matchedPromo.division.find(d => d.area === myAreaLabel);
+              if (myDiv) {
+                montoComisionable = Number(myDiv.monto) || svcTotal;
+              }
+            }
+          }
+          
+          const svcComision = montoComisionable * pct;
+          totalComisionDia += svcComision;
+          
+          return `
+          <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid var(--success);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="client-avatar" style="flex-shrink: 0;">${initials}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 700; font-size: 14px;">${s.nombre}</div>
+                <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${s.servicio}</div>
+                <div style="font-size: 11px; color: var(--ink-faint); font-weight: 500; margin-top: 2px;">${s.horaToma || '—'} · ${metodoIcon} ${metodo}</div>
+              </div>
+              <div style="text-align: right; flex-shrink: 0;">
+                <div style="font-size: 16px; font-weight: 800; color: var(--success);">+$${svcComision.toFixed(2)}</div>
+                <div style="font-size: 10px; color: var(--ink-faint); font-weight: 600;">${(pct*100).toFixed(0)}% de $${montoComisionable}</div>
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+        
+        document.getElementById('staffStatDia').textContent = '$' + totalComisionDia.toFixed(0);
+      } else {
+        document.getElementById('staffStatHoy').textContent = '0';
+        document.getElementById('staffStatDia').textContent = '$0';
+        servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
+      }
+      
+      // Cargar comisión acumulada de la semana
+      try {
+        const comResult = await apiGet('getComisiones', { chica: user.name });
+        if (comResult.success && comResult.comisiones && comResult.comisiones.length > 0) {
+          const c = comResult.comisiones[0];
+          const comAcum = Number(c.comision) || 0;
+          const facturado = Number(c.facturado) || 0;
+          const numServ = Number(c.servicios) || 0;
+          const porcentaje = c.porcentaje || '30%';
+          
+          COMM_DATA = {
+            value: '$' + comAcum.toFixed(2),
+            detail: porcentaje + ' sobre $' + facturado.toFixed(0) + ' · ' + numServ + ' servicios',
+            day: '$' + comAcum.toFixed(0),
+            items: []
+          };
+          
+          // Auto-mostrar comisión
+          document.getElementById('commValue').textContent = COMM_DATA.value;
+          document.getElementById('commDetail').textContent = COMM_DATA.detail;
+          commVisible = true;
+          document.getElementById('commToggle').style.background = 'rgba(255,255,255,0.35)';
+        }
+      } catch(e) { console.error('Error cargando comisiones:', e); }
+    } catch (err) {
+      console.error('Error cargando staff home:', err);
+    }
+  }
+
+  function loadActiveService(idx) {
+    // Ya precargado en loadStaffHome
+  }
   function setRetiro(isOurs, slot) {
     const yesBtn = document.getElementById('retiroYes' + slot);
     const noBtn = document.getElementById('retiroNo' + slot);
@@ -2891,6 +3628,68 @@
     alert('✅ Nueva ficha creada: ' + modelo + ' · ' + diseno);
   }
 
+  // === PROMO EN LLEGADA (Mikaela) ===
+  async function toggleArrivalPromo(show) {
+    document.getElementById('arrPromoOff').style.display = show ? 'none' : 'block';
+    document.getElementById('arrPromoOn').style.display = show ? 'block' : 'none';
+    
+    if (show) {
+      // Si no hay promos cargadas, traerlas del Sheet
+      if (PROMOS.length === 0) {
+        try {
+          const result = await apiGet('getPromos');
+          if (result.success && result.promos && result.promos.length > 0) {
+            PROMOS = result.promos.map(p => {
+              let division = [];
+              if (p.division) {
+                try { division = JSON.parse(p.division); } catch(e) {}
+              }
+              return {
+                id: p.id,
+                name: p.nombre,
+                services: p.servicios,
+                price: Number(p.precioCombo) || 0,
+                regular: Number(p.sumaIndividual) || 0,
+                from: p.desde ? String(p.desde) : '',
+                to: p.hasta ? String(p.hasta) : '',
+                active: p.activa !== false,
+                division: division
+              };
+            });
+          }
+        } catch (err) { console.error('Error cargando promos:', err); }
+      }
+
+      // Poblar select con promos activas
+      const sel = document.getElementById('arrPromoSelect');
+      sel.innerHTML = '<option value="">Seleccionar promo...</option>';
+      PROMOS.filter(p => p.active).forEach((p, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = p.name + ' — $' + p.price + ' (regular $' + p.regular + ')';
+        sel.appendChild(opt);
+      });
+    } else {
+      window._arrPromo = null;
+      document.getElementById('arrPromoDetail').textContent = '';
+    }
+  }
+
+  function updateArrivalPromo() {
+    const sel = document.getElementById('arrPromoSelect');
+    const idx = sel.value;
+    if (idx === '') { window._arrPromo = null; document.getElementById('arrPromoDetail').textContent = ''; return; }
+    
+    const p = PROMOS[parseInt(idx)];
+    window._arrPromo = p;
+    document.getElementById('arrPromoDetail').innerHTML = 
+      '<strong>' + p.services + '</strong><br>' +
+      'Precio promo: <strong>$' + p.price + '</strong> · Regular: <del>$' + p.regular + '</del> · Ahorro: $' + (p.regular - p.price);
+    
+    // Auto-completar servicio y área
+    document.getElementById('arrService').value = p.name + ' (PROMO)';
+  }
+
   // === LLEGADA: CLIENTA EXISTENTE ===
 
   // === POR COBRAR (Mikaela) ===
@@ -2917,6 +3716,16 @@
         document.getElementById('mkStatEspera').textContent = esperando.length;
         document.getElementById('mkStatServicio').textContent = enServicio.length;
         document.getElementById('mkStatCobrar').textContent = porCobrar.length;
+        
+        // Cargar contador de pagados
+        try {
+          const servResult = await apiGet('getServiciosHoy');
+          if (servResult.success && servResult.servicios) {
+            document.getElementById('mkStatPagados').textContent = servResult.servicios.length;
+          } else {
+            document.getElementById('mkStatPagados').textContent = '0';
+          }
+        } catch(e) { document.getElementById('mkStatPagados').textContent = '0'; }
 
         // Lista de espera
         document.getElementById('mkEsperaCount').textContent = esperando.length;
@@ -2927,14 +3736,16 @@
           esperaList.innerHTML = esperando.map(w => {
             const initials = w.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
             const pri = String(w.prioridad || 'normal').toLowerCase();
+            const tomada = String(w.tomadaPor || '').trim();
+            const isAsignada = tomada !== '';
             return `
-            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}">
+            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}" ${isAsignada ? 'style="border-left-color: var(--accent);"' : ''}>
               <div class="waitlist-top">
                 <div class="waitlist-client">
                   <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
                   <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
                 </div>
-                ${priBadge[pri] || priBadge['normal']}
+                ${isAsignada ? '<span class="priority-badge" style="background: var(--accent); color: white;">📋 → ' + tomada + '</span>' : (priBadge[pri] || priBadge['normal'])}
               </div>
               <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
             </div>`;
@@ -2985,6 +3796,113 @@
       console.error('Error cargando dashboard Mikaela:', err);
     }
   }
+  async function loadMikaelaServicios() {
+    const list = document.getElementById('mkServiciosList');
+    list.innerHTML = '<div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="animation: pulse 1.5s infinite;">⏳ Cargando servicios pagados...</div></div>';
+    
+    // Cargar promos para buscar divisiones
+    if (PROMOS.length === 0) {
+      try {
+        const promoResult = await apiGet('getPromos');
+        if (promoResult.success && promoResult.promos) {
+          PROMOS = promoResult.promos.map(p => {
+            let division = [];
+            if (p.division) { try { division = JSON.parse(p.division); } catch(e) {} }
+            return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: division };
+          });
+        }
+      } catch(e) {}
+    }
+    
+    try {
+      const result = await apiGet('getServiciosHoy');
+      if (result.success && result.servicios && result.servicios.length > 0) {
+        const servicios = result.servicios;
+        
+        document.getElementById('mkServCountDia').textContent = servicios.length;
+        document.getElementById('mkServListCount').textContent = servicios.length;
+        document.getElementById('mkStatPagados').textContent = servicios.length;
+        
+        list.innerHTML = servicios.map(s => {
+          const initials = String(s.nombre || '').split(' ').map(n => n[0]).join('').slice(0, 2);
+          const metodo = String(s.metodoPago || 'Efectivo');
+          const metodoIcon = metodo.toLowerCase().includes('tarjeta') ? '💳' : metodo.toLowerCase().includes('transfer') ? '📱' : '💵';
+          const total = Number(s.total) || 0;
+          const promoName = String(s.promoNombre || '');
+          const isPromo = promoName !== '' && promoName !== 'undefined';
+          
+          // Buscar la división de la promo para el desglose
+          let desgloseHtml = '';
+          let staffList = s.tomadaPor || '—';
+          
+          if (isPromo) {
+            const matchedPromo = PROMOS.find(p => promoName.includes(p.name) || p.name === promoName.replace(' (PROMO)', ''));
+            if (matchedPromo && matchedPromo.division && matchedPromo.division.length > 0) {
+              // Extraer las chicas que participaron de las observaciones
+              const obs = String(s.observaciones || '');
+              const chicasObs = obs.match(/completada por (\w+)/g);
+              let chicasPromo = [];
+              if (chicasObs) {
+                chicasObs.forEach(m => {
+                  const name = m.replace('completada por ', '');
+                  if (!chicasPromo.includes(name)) chicasPromo.push(name);
+                });
+              }
+              if (s.tomadaPor && !chicasPromo.includes(s.tomadaPor)) chicasPromo.push(s.tomadaPor);
+              staffList = chicasPromo.length > 0 ? chicasPromo.join(' + ') : s.tomadaPor;
+              
+              desgloseHtml = '<div style="background: var(--bg); border-radius: 12px; padding: 10px 12px; margin-top: 10px;">' +
+                '<div style="font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px;">Desglose de la promo</div>' +
+                matchedPromo.division.map(d => {
+                  return '<div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--line);">' +
+                    '<span style="font-weight: 600;">' + d.area + '</span>' +
+                    '<span style="font-weight: 800;">$' + d.monto + '</span>' +
+                  '</div>';
+                }).join('') +
+                '<div style="display: flex; justify-content: space-between; padding: 6px 0 0; font-size: 13px;">' +
+                  '<span style="font-weight: 800;">Total promo</span>' +
+                  '<span style="font-weight: 800; color: var(--accent-deep);">$' + matchedPromo.price + '</span>' +
+                '</div>' +
+              '</div>';
+            }
+          }
+          
+          return `
+          <div class="card" style="margin-bottom: 10px; padding: 16px; border-left: 4px solid var(--success);">
+            <div style="display: flex; align-items: flex-start; gap: 12px;">
+              <div class="client-avatar" style="flex-shrink: 0; margin-top: 2px;">${initials}</div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 800; font-size: 16px;">${s.nombre}</div>
+                <div style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">${s.servicio}</div>
+                ${isPromo ? '<div style="display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; padding: 2px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; margin-top: 4px;">🏷 PROMO</div>' : ''}
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--ink-faint); font-weight: 600;">
+                  <span>👩 ${staffList}</span>
+                  <span>·</span>
+                  <span>🕐 ${s.horaToma || '—'}</span>
+                  <span>·</span>
+                  <span>${metodoIcon} ${metodo}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);">
+                  <span style="font-size: 12px; font-weight: 600; color: var(--ink-soft);">Total cobrado</span>
+                  <span style="font-size: 20px; font-weight: 800; color: var(--accent-deep);">$${total}</span>
+                </div>
+                ${desgloseHtml}
+              </div>
+            </div>
+          </div>`;
+        }).join('');
+      } else {
+        document.getElementById('mkServCountDia').textContent = '0';
+        document.getElementById('mkServListCount').textContent = '0';
+        document.getElementById('mkStatPagados').textContent = '0';
+        list.innerHTML = '<div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="font-size: 28px; margin-bottom: 8px;">✨</div>No hay servicios pagados hoy</div>';
+      }
+    } catch (err) {
+      console.error('Error cargando servicios pagados:', err);
+      list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--danger); font-size: 13px;">Error al cargar servicios</div>';
+    }
+  }
+
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
     const countEl = document.getElementById('porCobrarCount');
@@ -3020,6 +3938,8 @@
     window._cobrarTotalPromo = total;
     window._cobrarTotalRegular = precioRegular || total;
     window._cobrarTienePromo = promoNombre && promoNombre !== '' && promoNombre !== 'undefined';
+    window._cobrarChica = chica;
+    window._cobrarPromoNombre = promoNombre || '';
     
     document.getElementById('cobrarClientName').textContent = nombre;
     document.getElementById('cobrarService').textContent = servicio;
@@ -3081,15 +4001,48 @@
     btn.disabled = true;
 
     // Si tiene promo y paga con tarjeta, cobrar precio regular
-    const totalFinal = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
+    const totalFinal = Number((window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
       ? window._cobrarTotalRegular
-      : window._cobrarTotalPromo;
+      : window._cobrarTotalPromo) || 0;
+
+    // Para promos: buscar el monto asignado a la chica que atendió esta parte
+    let montoComision = totalFinal;
+    if (window._cobrarTienePromo && window._cobrarChica) {
+      const chicaName = window._cobrarChica;
+      const promoName = String(window._cobrarPromoNombre || '').replace(' (PROMO)', '').replace(/\s*·.*$/, '').trim();
+      
+      // Cargar promos si están vacías
+      if (PROMOS.length === 0) {
+        try {
+          const pr = await apiGet('getPromos');
+          if (pr.success && pr.promos) {
+            PROMOS = pr.promos.map(p => {
+              let div = []; if (p.division) { try { div = JSON.parse(p.division); } catch(e) {} }
+              return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: div };
+            });
+          }
+        } catch(e) {}
+      }
+      
+      const matchedPromo = PROMOS.find(p => promoName.includes(p.name) || p.name.includes(promoName));
+      if (matchedPromo && matchedPromo.division && matchedPromo.division.length > 0) {
+        const chicaStaff = ALL_STAFF.find(s => s.name === chicaName);
+        if (chicaStaff) {
+          const chicaAreaLabel = chicaStaff.area === 'cejas' ? '💅 Cejas' : chicaStaff.area === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+          const chicaDiv = matchedPromo.division.find(d => d.area === chicaAreaLabel);
+          if (chicaDiv && Number(chicaDiv.monto) > 0) {
+            montoComision = Number(chicaDiv.monto);
+          }
+        }
+      }
+    }
 
     try {
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
         metodoPago: window._cobrarPago,
-        totalCobrado: totalFinal
+        totalCobrado: totalFinal,
+        montoComision: montoComision
       });
     } catch (err) { console.error(err); }
 
@@ -3173,24 +4126,14 @@
   }
 
   // === DIRECTORIO DE CLIENTAS ===
-  const CLIENT_DIRECTORY = [
-    { key: 'sofia', code: 'C-0004', name: 'Sofía López', phone: '0999-456-789', isTop: true, visits: 5, lastVisit: '12/04' },
-    { key: 'isabella', code: 'C-0007', name: 'Isabella Vera', phone: '0998-321-654', isTop: false, visits: 2, lastVisit: '05/04' },
-    { key: 'carmen', code: 'C-0002', name: 'Carmen Molina', phone: '0997-111-222', isTop: true, visits: 8, lastVisit: '19/04' },
-    { key: null, code: 'C-0001', name: 'Andrea Rivas', phone: '0996-333-444', isTop: false, visits: 3, lastVisit: '19/04' },
-    { key: null, code: 'C-0003', name: 'Daniela Torres', phone: '0995-555-666', isTop: true, visits: 4, lastVisit: '19/04' },
-    { key: null, code: 'C-0005', name: 'Valentina Núñez', phone: '0994-777-888', isTop: true, visits: 6, lastVisit: '19/04' },
-    { key: null, code: 'C-0006', name: 'Gabriela Mendoza', phone: '0993-999-000', isTop: false, visits: 1, lastVisit: '15/04' },
-    { key: null, code: 'C-0008', name: 'Paola Reyes', phone: '', isTop: false, visits: 1, lastVisit: '18/04' },
-    { key: null, code: 'C-0009', name: 'Lucía Paredes', phone: '0991-222-333', isTop: false, visits: 1, lastVisit: '19/04' },
-  ];
+  const CLIENT_DIRECTORY = [];
 
   async function renderClientDirectory() {
     const search = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const list = document.getElementById('clientDirectoryList');
     
     // Siempre recargar desde API (no usar cache para el directorio)
-    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas desde Rosa Aguilera...</div></div>';
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas desde nuestro local...</div></div>';
     
     try {
       const result = await apiGet('getClientas');
@@ -3352,13 +4295,13 @@
 
   // === RETIRO DE PESTAÑAS: GRATIS SI ES DE ROSA AGUILERA ===
   // Esta lógica se aplica en los servicios SP025 (Retiro de pestañas), SP031 (Retiro de lifting)
-  // Si la clienta tiene historial de pestañas en Rosa Aguilera → $0
+  // Si la clienta tiene historial de pestañas en nuestro local → $0
   // Si no tiene historial (viene de otro local) → $10
   function getRetiroPrice(clientKey) {
     const client = CLIENT_PROFILES[clientKey];
     if (!client) return 10;
     const pestHistory = client.pestanas?.history || [];
-    // Si tiene al menos 1 servicio de pestañas en nuestro historial, es de Rosa Aguilera
+    // Si tiene al menos 1 servicio de pestañas en nuestro historial, es de nuestro local
     const hasOurService = pestHistory.some(h => 
       !h.service.includes('Retiro') && !h.service.includes('Lifting')
     );
@@ -3367,26 +4310,9 @@
 
   // === PAGOS Y CIERRE SEMANAL ===
   const PAY_STAFF = [
-    { name: 'María', area: 'Cejas', comm: '30%', acumulado: 127.50, servicios: 28, facturado: 425, paid: false,
-      dias: [{ dia: 'Lun', serv: 5, total: 22.50 }, { dia: 'Mar', serv: 4, total: 18.00 }, { dia: 'Mié', serv: 6, total: 25.50 }, { dia: 'Jue', serv: 5, total: 21.00 }, { dia: 'Vie', serv: 4, total: 19.50 }, { dia: 'Sáb', serv: 4, total: 21.00 }] },
-    { name: 'Keyla', area: 'Cejas', comm: '30%', acumulado: 138.00, servicios: 30, facturado: 460, paid: false,
-      dias: [{ dia: 'Lun', serv: 6, total: 28.50 }, { dia: 'Mar', serv: 5, total: 23.00 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 6, total: 27.00 }, { dia: 'Vie', serv: 4, total: 18.50 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
-    { name: 'Lesly', area: 'Cejas', comm: '30%', acumulado: 109.50, servicios: 24, facturado: 365, paid: false,
-      dias: [{ dia: 'Lun', serv: 4, total: 18.00 }, { dia: 'Mar', serv: 4, total: 17.50 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 4, total: 18.00 }, { dia: 'Vie', serv: 3, total: 15.00 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
-    { name: 'Yadira', area: 'Pestañas', comm: '30%', acumulado: 234.00, servicios: 14, facturado: 780, paid: false,
-      dias: [{ dia: 'Lun', serv: 3, total: 45.00 }, { dia: 'Mar', serv: 2, total: 36.00 }, { dia: 'Mié', serv: 3, total: 48.00 }, { dia: 'Jue', serv: 2, total: 39.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
-    { name: 'Diana', area: 'Pestañas', comm: '30%', acumulado: 207.00, servicios: 12, facturado: 690, paid: false,
-      dias: [{ dia: 'Lun', serv: 2, total: 36.00 }, { dia: 'Mar', serv: 2, total: 33.00 }, { dia: 'Mié', serv: 2, total: 39.00 }, { dia: 'Jue', serv: 2, total: 33.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
-    { name: 'Laura', area: 'Facial', comm: '40%', acumulado: 238.00, servicios: 10, facturado: 595, paid: false,
-      dias: [{ dia: 'Lun', serv: 2, total: 44.00 }, { dia: 'Mar', serv: 1, total: 24.00 }, { dia: 'Mié', serv: 2, total: 48.00 }, { dia: 'Jue', serv: 2, total: 44.00 }, { dia: 'Vie', serv: 2, total: 46.00 }, { dia: 'Sáb', serv: 1, total: 32.00 }] },
   ];
 
-  const PAY_HISTORY = [
-    { week: 'Semana 16', dates: 'Abr 7–12', total: 1054, facturado: 3315, closed: '12/04/2026' },
-    { week: 'Semana 15', dates: 'Mar 31 – Abr 5', total: 982, facturado: 3090, closed: '05/04/2026' },
-    { week: 'Semana 14', dates: 'Mar 24–29', total: 1018, facturado: 3200, closed: '29/03/2026' },
-  ];
-
+  const PAY_HISTORY = [];
   let currentWeekClosed = false;
 
   async function renderPayments() {
@@ -3665,96 +4591,6 @@
 
   // === PERFILES DE CLIENTAS ===
   const CLIENT_PROFILES = {
-    sofia: {
-      name: 'Sofía López', code: 'C-0004', initials: 'SL', isTop: true, visits: 5, spent: 310, last: '12/04',
-      obs: 'Clienta frecuente. Siempre puntual. Prefiere que la atiendan Yadira o Diana.',
-      cejas: { 
-        obsArea: 'Cejas pobladas naturales. Solo depilación de forma, no quitar mucho.',
-        history: [
-          { date: '12/04', service: 'Depilación cejas', price: 8, by: 'María' },
-          { date: '28/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { obsArea: '', history: [] },
-      pestanas: {
-        fichas: [
-          { modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13', obs: 'Ojos sensibles, usar pegamento hipoalergénico. Le gusta el rizo C.', fecha: '12/04/2026', activa: true },
-          { modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14', obs: 'Probó muñeca pero prefirió volver a gato.', fecha: '15/03/2026', activa: false },
-          { modelo: 'Volumen ruso', diseno: 'Gato', tallas: '9-12-14', obs: 'Primera vez con volumen ruso, le gustó pero volvió a híbridas.', fecha: '01/02/2026', activa: false },
-        ],
-        history: [
-          { date: '12/04', service: 'Efecto híbridas', price: 60, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
-          { date: '28/03', service: 'Retoque híbridas', price: 35, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
-          { date: '15/03', service: 'Efecto híbridas', price: 60, by: 'Diana', modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14' },
-        ]
-      },
-      facial: { history: [] },
-    },
-    isabella: {
-      name: 'Isabella Vera', code: 'C-0007', initials: 'IV', isTop: false, visits: 2, spent: 55, last: '05/04',
-      obs: 'Piel sensible en zona de bikini, usar cera de baja temperatura.',
-      cejas: { 
-        obsArea: 'Pide cejas definidas pero naturales.',
-        history: [
-          { date: '05/04', service: 'Dep. cejas + maquillaje', price: 12, by: 'Lesly' },
-      ]},
-      depilacion: { 
-        obsArea: 'Piel MUY sensible en bikini. Solo cera baja temperatura. Se irrita fácil, aplicar gel calmante post.',
-        history: [
-          { date: '05/04', service: 'Dep. piernas completas', price: 30, by: 'Lesly' },
-          { date: '20/03', service: 'Dep. media pierna', price: 15, by: 'María' },
-      ]},
-      pestanas: { fichas: [], obsArea: '', history: [] },
-      facial: { obsArea: '', history: [] },
-    },
-    lucia: {
-      name: 'Lucía Paredes', code: 'C-0009', initials: 'LP', isTop: false, visits: 1, spent: 17, last: '20/04',
-      obs: 'Primera visita al salón.',
-      cejas: { obsArea: '', history: [
-        { date: '20/04', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { obsArea: '', history: [] },
-      pestanas: { fichas: [], obsArea: '', history: [] },
-      facial: { obsArea: '', history: [] },
-    },
-    carmen: {
-      name: 'Carmen Molina', code: 'C-0002', initials: 'CM', isTop: true, visits: 8, spent: 520, last: '19/04',
-      obs: 'Clienta VIP. Viene cada 2 semanas. Siempre combina facial con cejas.',
-      cejas: { history: [
-        { date: '05/04', service: 'Dep. cejas + pigmento', price: 17, by: 'María' },
-        { date: '22/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { history: [
-        { date: '22/03', service: 'Dep. bigote', price: 4, by: 'María' },
-      ]},
-      pestanas: { fichas: [], history: [] },
-      facial: {
-        ficha: {
-          fecha: '19/04/2026',
-          biotipo: 'Mixto',
-          fototipo: 'III (Fitzpatrick)',
-          edad: 34,
-          sexo: 'Femenino',
-          tipoPiel: 'Mixta',
-          signosLesiones: 'Comedones en zona T, poro abierto en mejillas',
-          signosHiper: 'Mejillas (leve)',
-          estadoPiel: 'Seborreica en zona T, deshidratada en contorno',
-          antecedentes: {
-            enfermedades: 'Ninguna reportada',
-            familiares: 'Madre con rosácea',
-            alergias: 'Ácido glicólico concentrado (>10%)',
-            medicamentos: 'Ninguno',
-            quirurgicos: 'Ninguno',
-            esteticos: 'Microdermoabrasión (2024), Peeling químico suave (ene 2026)'
-          },
-          obsExtra: 'Responde bien a limpieza con vapor. Evitar productos con fragancia. Prefiere sesiones de 60 min máximo. Zona del mentón tiende a brotes hormonales.'
-        },
-        history: [
-          { date: '19/04', service: 'Limpieza profunda', price: 60, by: 'Laura' },
-          { date: '05/04', service: 'Limpieza prof. + dermaplaning', price: 75, by: 'Laura' },
-          { date: '22/03', service: 'Limpieza prof. + hidratación', price: 67, by: 'Laura' },
-          { date: '08/03', service: 'Limpieza profunda', price: 60, by: 'Laura' },
-        ]},
-    },
   };
 
   let currentProfileClient = null;
@@ -3838,8 +4674,8 @@
     // Determinar si retiro es gratis o $10
     const retiroPrice = currentProfileClient ? getRetiroPrice(currentProfileClient) : 10;
     const retiroBanner = retiroPrice === 0 
-      ? '<div style="background: var(--success-bg); border: 1.5px solid #a3d4b1; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--success);">✅ Retiro de pestañas/lifting: <strong>GRATIS</strong></div><div style="font-size: 11px; color: #2d5a3a; font-weight: 500; margin-top: 2px;">Clienta con historial en Rosa Aguilera</div></div>'
-      : '<div style="background: var(--warning-bg); border: 1.5px solid #e0c89a; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--warning);">💰 Retiro de pestañas/lifting: <strong>$10</strong></div><div style="font-size: 11px; color: #7a5a1c; font-weight: 500; margin-top: 2px;">Sin historial en Rosa Aguilera — viene de otro local</div></div>';
+      ? '<div style="background: var(--success-bg); border: 1.5px solid #a3d4b1; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--success);">✅ Retiro de pestañas/lifting: <strong>GRATIS</strong></div><div style="font-size: 11px; color: #2d5a3a; font-weight: 500; margin-top: 2px;">Clienta con historial en nuestro local</div></div>'
+      : '<div style="background: var(--warning-bg); border: 1.5px solid #e0c89a; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--warning);">💰 Retiro de pestañas/lifting: <strong>$10</strong></div><div style="font-size: 11px; color: #7a5a1c; font-weight: 500; margin-top: 2px;">Sin historial en nuestro local — viene de otro local</div></div>';
     
     el.innerHTML = `
       ${retiroBanner}
@@ -4061,75 +4897,6 @@
   let currentPeriod = 'dia';
 
   const REPORT_DATA = {
-    maria: { name: 'María', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 6, facturado: 87, comision: 26.1, clientas: 5, promos: 1,
-        desglose: [{ area: '💅 Cejas', count: 3, total: 42 }, { area: '🪒 Depilación', count: 2, total: 35 }, { area: 'Lifting/Retiro', count: 1, total: 10 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 2, total: 34 }, { name: 'Dep. piernas completas', count: 1, total: 30 }, { name: 'Retiro de pestañas', count: 1, total: 10 }] },
-      semana: { servicios: 28, facturado: 425, comision: 127.5, clientas: 22, promos: 4,
-        desglose: [{ area: '💅 Cejas', count: 15, total: 195 }, { area: '🪒 Depilación', count: 10, total: 190 }, { area: 'Lifting/Retiro', count: 3, total: 40 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 6, total: 102 }, { name: 'Dep. piernas completas', count: 4, total: 120 }, { name: 'Brow lamination', count: 3, total: 75 }, { name: 'Dep. axilas', count: 3, total: 27 }] },
-      mes: { servicios: 112, facturado: 1720, comision: 516, clientas: 85, promos: 14,
-        desglose: [{ area: '💅 Cejas', count: 58, total: 780 }, { area: '🪒 Depilación', count: 42, total: 760 }, { area: 'Lifting/Retiro', count: 12, total: 180 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 22, total: 374 }, { name: 'Dep. piernas completas', count: 15, total: 450 }, { name: 'Brow lamination', count: 12, total: 300 }, { name: 'Dep. axilas', count: 10, total: 90 }, { name: 'Dep. bikini completo', count: 8, total: 240 }] } },
-    lesly: { name: 'Lesly', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 5, facturado: 72, comision: 21.6, clientas: 4, promos: 0,
-        desglose: [{ area: '💅 Cejas', count: 3, total: 40 }, { area: '🪒 Depilación', count: 2, total: 32 }],
-        top: [{ name: 'Dep. cejas + maquillaje', count: 2, total: 24 }, { name: 'Dep. media pierna', count: 2, total: 30 }] },
-      semana: { servicios: 24, facturado: 365, comision: 109.5, clientas: 19, promos: 3,
-        desglose: [{ area: '💅 Cejas', count: 13, total: 170 }, { area: '🪒 Depilación', count: 9, total: 165 }, { area: 'Lifting/Retiro', count: 2, total: 30 }],
-        top: [{ name: 'Dep. cejas', count: 7, total: 56 }, { name: 'Dep. piernas completas', count: 3, total: 90 }, { name: 'Dep. rostro completo', count: 3, total: 66 }] },
-      mes: { servicios: 98, facturado: 1480, comision: 444, clientas: 74, promos: 11,
-        desglose: [{ area: '💅 Cejas', count: 50, total: 660 }, { area: '🪒 Depilación', count: 38, total: 670 }, { area: 'Lifting/Retiro', count: 10, total: 150 }],
-        top: [{ name: 'Dep. cejas', count: 20, total: 160 }, { name: 'Dep. cejas + pigmento', count: 15, total: 255 }, { name: 'Dep. piernas completas', count: 12, total: 360 }] } },
-    keyla: { name: 'Keyla', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 7, facturado: 95, comision: 28.5, clientas: 6, promos: 1,
-        desglose: [{ area: '💅 Cejas', count: 4, total: 55 }, { area: '🪒 Depilación', count: 2, total: 25 }, { area: 'Lifting/Retiro', count: 1, total: 15 }],
-        top: [{ name: 'Dep. cejas + Brow lam.', count: 2, total: 50 }, { name: 'Lifting de pestañas', count: 1, total: 30 }] },
-      semana: { servicios: 30, facturado: 460, comision: 138, clientas: 24, promos: 5,
-        desglose: [{ area: '💅 Cejas', count: 16, total: 220 }, { area: '🪒 Depilación', count: 11, total: 195 }, { area: 'Lifting/Retiro', count: 3, total: 45 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 7, total: 119 }, { name: 'Dep. cejas + Brow lam.', count: 4, total: 100 }, { name: 'Dep. bikini completo', count: 3, total: 90 }] },
-      mes: { servicios: 120, facturado: 1850, comision: 555, clientas: 90, promos: 16,
-        desglose: [{ area: '💅 Cejas', count: 62, total: 860 }, { area: '🪒 Depilación', count: 44, total: 790 }, { area: 'Lifting/Retiro', count: 14, total: 200 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 25, total: 425 }, { name: 'Dep. cejas + Brow lam.', count: 14, total: 350 }, { name: 'Dep. piernas completas', count: 13, total: 390 }, { name: 'Dep. bikini completo', count: 10, total: 300 }] } },
-    yadira: { name: 'Yadira', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 3, facturado: 165, comision: 49.5, clientas: 3, promos: 1,
-        desglose: [{ area: '👁 Pestañas', count: 3, total: 165 }],
-        top: [{ name: 'Volumen ruso', count: 1, total: 70 }, { name: 'Efecto híbridas', count: 1, total: 60 }, { name: 'Retoque clásicas', count: 1, total: 30 }],
-        modelos: [{ name: 'Volumen ruso', count: 1 }, { name: 'Efecto híbridas', count: 1 }, { name: 'Retoque clásicas', count: 1 }] },
-      semana: { servicios: 14, facturado: 780, comision: 234, clientas: 13, promos: 3,
-        desglose: [{ area: '👁 Pestañas', count: 12, total: 720 }, { area: 'Lifting/Retiro', count: 2, total: 60 }],
-        top: [{ name: 'Volumen ruso', count: 3, total: 210 }, { name: 'Efecto híbridas', count: 3, total: 180 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }, { name: 'Lifting de pestañas', count: 2, total: 60 }],
-        modelos: [{ name: 'Volumen ruso', count: 3 }, { name: 'Efecto híbridas', count: 3 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Volumen ligero wispy', count: 2 }, { name: 'Retoque clásicas', count: 1 }, { name: 'Lifting', count: 2 }] },
-      mes: { servicios: 56, facturado: 3180, comision: 954, clientas: 48, promos: 10,
-        desglose: [{ area: '👁 Pestañas', count: 50, total: 2930 }, { area: 'Lifting/Retiro', count: 6, total: 250 }],
-        top: [{ name: 'Volumen ruso', count: 12, total: 840 }, { name: 'Efecto híbridas', count: 10, total: 600 }, { name: 'Pelo a pelo clásicas', count: 8, total: 400 }, { name: 'Volumen ligero wispy', count: 6, total: 420 }, { name: 'Mega vol. ruso Kylie', count: 4, total: 340 }],
-        modelos: [{ name: 'Volumen ruso', count: 12 }, { name: 'Efecto híbridas', count: 10 }, { name: 'Pelo a pelo clásicas', count: 8 }, { name: 'Volumen ligero wispy', count: 6 }, { name: 'Mega vol. ruso Kylie', count: 4 }, { name: 'Volumen egipcio', count: 3 }, { name: 'Efecto seda', count: 3 }, { name: 'Retoque varios', count: 8 }, { name: 'Lifting', count: 4 }, { name: 'Retiros', count: 2 }] } },
-    diana: { name: 'Diana', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 3, facturado: 155, comision: 46.5, clientas: 3, promos: 0,
-        desglose: [{ area: '👁 Pestañas', count: 3, total: 155 }],
-        top: [{ name: 'Volumen ligero', count: 1, total: 70 }, { name: 'Efecto Aura', count: 1, total: 60 }, { name: 'Retoque tupidas', count: 1, total: 35 }],
-        modelos: [{ name: 'Volumen ligero', count: 1 }, { name: 'Efecto Aura', count: 1 }, { name: 'Retoque tupidas', count: 1 }] },
-      semana: { servicios: 12, facturado: 690, comision: 207, clientas: 11, promos: 2,
-        desglose: [{ area: '👁 Pestañas', count: 11, total: 650 }, { area: 'Lifting/Retiro', count: 1, total: 40 }],
-        top: [{ name: 'Volumen ligero', count: 3, total: 210 }, { name: 'Efecto Aura', count: 2, total: 120 }, { name: 'Tupidas', count: 2, total: 120 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }],
-        modelos: [{ name: 'Volumen ligero', count: 3 }, { name: 'Efecto Aura', count: 2 }, { name: 'Tupidas', count: 2 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Retoque varios', count: 2 }, { name: 'Lifting', count: 1 }] },
-      mes: { servicios: 48, facturado: 2750, comision: 825, clientas: 42, promos: 8,
-        desglose: [{ area: '👁 Pestañas', count: 44, total: 2560 }, { area: 'Lifting/Retiro', count: 4, total: 190 }],
-        top: [{ name: 'Volumen ligero', count: 10, total: 700 }, { name: 'Efecto Aura', count: 8, total: 480 }, { name: 'Tupidas', count: 7, total: 420 }, { name: 'Pelo a pelo clásicas', count: 6, total: 300 }, { name: 'Volumen brasilero', count: 5, total: 300 }],
-        modelos: [{ name: 'Volumen ligero', count: 10 }, { name: 'Efecto Aura', count: 8 }, { name: 'Tupidas', count: 7 }, { name: 'Pelo a pelo clásicas', count: 6 }, { name: 'Volumen brasilero', count: 5 }, { name: 'Efecto seda', count: 4 }, { name: 'Retoque varios', count: 6 }, { name: 'Lifting', count: 3 }, { name: 'Retiros', count: 1 }] } },
-    laura: { name: 'Laura', area: 'Facial',
-      dia: { servicios: 2, facturado: 130, comision: 52, clientas: 2, promos: 0,
-        desglose: [{ area: '✨ Facial', count: 2, total: 130 }],
-        top: [{ name: 'Limpieza profunda', count: 1, total: 60 }, { name: 'Limpieza prof. + vino', count: 1, total: 70 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 1 }, { name: 'Limpieza prof. + vino', count: 1 }] },
-      semana: { servicios: 10, facturado: 595, comision: 238, clientas: 9, promos: 2,
-        desglose: [{ area: '✨ Facial', count: 10, total: 595 }],
-        top: [{ name: 'Limpieza profunda', count: 3, total: 180 }, { name: 'Limpieza prof. + dermaplaning', count: 2, total: 150 }, { name: 'Limpieza prof. + hidratación', count: 2, total: 134 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 3 }, { name: 'Limpieza prof. + dermaplaning', count: 2 }, { name: 'Limpieza prof. + hidratación', count: 2 }, { name: 'Limpieza prof. + vino', count: 1 }, { name: 'Glow skin', count: 1 }, { name: 'Limpieza express', count: 1 }] },
-      mes: { servicios: 42, facturado: 2460, comision: 984, clientas: 38, promos: 6,
-        desglose: [{ area: '✨ Facial', count: 42, total: 2460 }],
-        top: [{ name: 'Limpieza profunda', count: 14, total: 840 }, { name: 'Limpieza prof. + dermaplaning', count: 8, total: 600 }, { name: 'Limpieza prof. + hidratación', count: 6, total: 402 }, { name: 'Limpieza prof. + vino', count: 4, total: 280 }, { name: 'Glow skin', count: 3, total: 120 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 14 }, { name: 'Limpieza prof. + dermaplaning', count: 8 }, { name: 'Limpieza prof. + hidratación', count: 6 }, { name: 'Limpieza prof. + vino', count: 4 }, { name: 'Glow skin', count: 3 }, { name: 'Limpieza express', count: 3 }, { name: 'Limpieza prof. + oxigenación', count: 2 }, { name: 'Limpieza prof. + antiedad', count: 1 }, { name: 'Masaje yoga facial', count: 1 }] } },
   };
 
   function switchPeriod(period, btn) {
@@ -4310,8 +5077,10 @@
     if (activeScreen) {
       const id = activeScreen.id;
       if (id === 'waitList') await renderWaitList();
+      if (id === 'staffHome') await loadStaffHome();
       if (id === 'clientDirectory') await renderClientDirectory();
       if (id === 'mikaelaHome') await loadMikaelaHome();
+      if (id === 'mikaelaServicios') await loadMikaelaServicios();
       if (id === 'ownerPromos') renderPromos();
       if (id === 'staffPromos') renderStaffPromos();
     }
@@ -4328,9 +5097,35 @@
   let activePromos = {};
   // ej: { 'Isabella Vera': { promo: {...}, startedBy: 'cejas', completedAreas: ['cejas'] } }
 
-  function openPromoSelect(slot) {
+  async function openPromoSelect(slot) {
     window._promoSlot = slot;
-    const clientName = slot === 1 ? 'Isabella Vera' : 'Lucía Paredes';
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
+    
+    // Si no hay promos cargadas, traerlas del Sheet
+    if (PROMOS.length === 0) {
+      try {
+        const result = await apiGet('getPromos');
+        if (result.success && result.promos && result.promos.length > 0) {
+          PROMOS = result.promos.map(p => {
+            let division = [];
+            if (p.division) {
+              try { division = JSON.parse(p.division); } catch(e) {}
+            }
+            return {
+              id: p.id,
+              name: p.nombre,
+              services: p.servicios,
+              price: Number(p.precioCombo) || 0,
+              regular: Number(p.sumaIndividual) || 0,
+              from: p.desde ? String(p.desde) : '',
+              to: p.hasta ? String(p.hasta) : '',
+              active: p.activa !== false,
+              division: division
+            };
+          });
+        }
+      } catch (err) { console.error('Error cargando promos:', err); }
+    }
     
     // ¿Hay promo en curso para esta clienta?
     const inProgress = activePromos[clientName];
@@ -4381,7 +5176,7 @@
   function applyPromo(promoIdx) {
     const promo = PROMOS[promoIdx];
     const slot = window._promoSlot;
-    const clientName = slot === 1 ? 'Isabella Vera' : 'Lucía Paredes';
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
     
@@ -4392,16 +5187,35 @@
       completedAreas: [myArea]
     };
     
+    // Determinar el precio que le corresponde a esta chica
+    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    const myDiv = promo.division ? promo.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
+    const myPrice = myDiv ? myDiv.monto : promo.price;
+    
+    // Reemplazar los servicios del slot con la promo
+    slotServices[slot] = [{
+      name: promo.name + ' (PROMO)',
+      price: myPrice,
+      area: promo.services,
+      code: promo.id,
+      isPromo: true,
+      promoName: promo.name
+    }];
+    renderServicesList(slot);
+    
+    // Sincronizar al Sheet para que Mikaela vea la promo
+    syncServicesToSheet(slot);
+    
     // Mostrar banner
     showPromoBanner(slot, promo, myArea);
     closeModal();
     
-    alert('✓ Promo "' + promo.name + '" aplicada. Cuando termines tu parte, la clienta pasa al siguiente área para completar la promo.');
+    alert('✓ Promo "' + promo.name + '" aplicada. Tu parte: $' + myPrice);
   }
 
   function continuePromo() {
     const slot = window._promoSlot;
-    const clientName = slot === 1 ? 'Isabella Vera' : 'Lucía Paredes';
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
     const inProgress = activePromos[clientName];
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
@@ -4484,11 +5298,180 @@
     display.style.display = 'block';
   }
 
+  // === MULTI-SERVICIO (hasta 5 por atención) ===
+  let slotServices = { 1: [], 2: [] }; // { name, price, area, code }
+
+  function renderServicesList(slot) {
+    const list = document.getElementById('as' + slot + 'ServicesList');
+    const svcs = slotServices[slot] || [];
+    document.getElementById('as' + slot + 'SvcCount').textContent = svcs.length;
+    
+    if (svcs.length === 0) {
+      list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Agregá el servicio que vas a realizar</div>';
+    } else {
+      list.innerHTML = svcs.map((s, i) => `
+        <div class="card" style="margin-bottom: 8px; padding: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="flex: 1;">
+              <div style="font-weight: 700; font-size: 14px;">${s.name}</div>
+              <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${s.area || ''}</div>
+            </div>
+            <div style="font-size: 17px; font-weight: 800; color: var(--accent-deep); margin-right: 10px;">$${s.price}</div>
+            <button onclick="removeServiceItem(${slot}, ${i})" style="width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--danger-bg); color: var(--danger); font-size: 14px; cursor: pointer; font-weight: 700;">✕</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    // Actualizar total
+    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    
+    // Ocultar botón agregar si ya tiene 5
+    const addBtn = document.querySelector('#as' + slot + 'ActionBtns button:first-child');
+    if (addBtn) {
+      if (svcs.length >= 5) {
+        addBtn.style.display = 'none';
+      } else {
+        addBtn.style.display = 'block';
+      }
+    }
+    
+    // Guardar nombre del primer servicio para compatibilidad
+    if (svcs.length > 0) {
+      const svcNames = svcs.map(s => s.name).join(' + ');
+      window['_as' + slot + 'ServiceSummary'] = svcNames;
+    }
+  }
+
+  function addServiceToSlot(slot, service) {
+    if (!slotServices[slot]) slotServices[slot] = [];
+    if (slotServices[slot].length >= 5) {
+      alert('Máximo 5 servicios por atención');
+      return false;
+    }
+    slotServices[slot].push(service);
+    renderServicesList(slot);
+    syncServicesToSheet(slot);
+    return true;
+  }
+
+  function removeServiceItem(slot, index) {
+    if (!confirm('¿Quitar este servicio?')) return;
+    slotServices[slot].splice(index, 1);
+    renderServicesList(slot);
+    syncServicesToSheet(slot);
+  }
+
+  // Sincroniza los servicios del slot actual al Sheet (para que Mikaela los vea en tiempo real)
+  async function syncServicesToSheet(slot) {
+    const user = window.currentUser;
+    if (!user) return;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+    if (!clientName) return;
+    
+    const svcs = slotServices[slot] || [];
+    const svcNames = svcs.map(s => s.name).join(' + ') || '—';
+    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    
+    try {
+      await apiPost('updateServiciosAtencion', {
+        chicaNombre: user.name,
+        clienteNombre: clientName,
+        servicios: svcNames,
+        total: String(total)
+      });
+    } catch (err) {
+      console.error('Error sincronizando servicios:', err);
+    }
+  }
+
   function openEditService() {
     document.getElementById('editServiceModal').classList.add('active');
   }
-  function openAddService() {
+  
+  function openAddService(slot) {
+    window._addServiceSlot = slot || 1;
+    const user = window.currentUser;
+    const areaSel = document.getElementById('addSvcArea');
+    areaSel.innerHTML = '<option value="">Seleccionar área...</option>';
+    
+    // Mostrar TODAS las áreas para que cualquier staff pueda agregar servicios de cualquier área al ticket
+    const allAreas = ['cejas', 'depilacion', 'pestanas', 'retiro_lifting', 'facial'];
+    const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting / Retiro', facial: 'Facial' };
+    
+    // Poner primero las áreas del staff actual
+    const myAreas = AREA_FILTER[user?.area] || ['cejas'];
+    const otherAreas = allAreas.filter(a => !myAreas.includes(a));
+    
+    myAreas.forEach(a => {
+      const opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = areaNames[a] || a;
+      areaSel.appendChild(opt);
+    });
+    
+    if (otherAreas.length > 0) {
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '── Otras áreas ──';
+      areaSel.appendChild(sep);
+      otherAreas.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a;
+        opt.textContent = areaNames[a] || a;
+        areaSel.appendChild(opt);
+      });
+    }
+    
+    document.getElementById('addSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
+    document.getElementById('addSvcPriceDisplay').style.display = 'none';
     document.getElementById('addServiceModal').classList.add('active');
+  }
+
+  function loadAddServiceCatalog() {
+    const area = document.getElementById('addSvcArea').value;
+    const sel = document.getElementById('addSvcService');
+    sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
+    document.getElementById('addSvcPriceDisplay').style.display = 'none';
+    
+    if (!area) return;
+    
+    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'pestanas', facial: 'facial' };
+    const catKey = catMap[area] || area;
+    const services = CATALOGO[catKey] || [];
+    
+    services.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ name: s.name, price: s.price, code: s.code, area: area });
+      opt.textContent = s.name + ' — $' + s.price;
+      sel.appendChild(opt);
+    });
+  }
+
+  function updateAddServicePrice() {
+    const val = document.getElementById('addSvcService').value;
+    if (!val) { document.getElementById('addSvcPriceDisplay').style.display = 'none'; return; }
+    const svc = JSON.parse(val);
+    document.getElementById('addSvcPrice').textContent = '$' + svc.price;
+    document.getElementById('addSvcPriceDisplay').style.display = 'block';
+  }
+
+  function confirmAddService() {
+    const val = document.getElementById('addSvcService').value;
+    if (!val) { alert('Seleccioná un servicio'); return; }
+    const svc = JSON.parse(val);
+    const slot = window._addServiceSlot || 1;
+    const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+    svc.area = areaNames[svc.area] || svc.area;
+    
+    if (addServiceToSlot(slot, svc)) {
+      closeModal();
+    }
+  }
+
+  function removeService(slot) {
+    // Legacy - ya no se usa, reemplazado por removeServiceItem
   }
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
@@ -4518,6 +5501,7 @@
     const servicio = document.getElementById('arrService')?.value || '';
     const obs = document.getElementById('arrObs')?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+    const promo = window._arrPromo || null;
 
     // Mapear área a clave interna
     const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
@@ -4527,22 +5511,183 @@
     const priEl = document.querySelector('.priority-option.selected');
     const prioridad = priEl ? priEl.querySelector('.name').textContent : 'Normal';
 
+    const postData = {
+      codigo: codigo, nombre: nombre, servicio: servicio,
+      area: areaKey, prioridad: prioridad, observaciones: obs,
+      esTop: isTop ? 'Sí' : 'No'
+    };
+
+    if (promo) {
+      postData.promoNombre = promo.name;
+      postData.precioPromo = promo.price;
+      postData.precioRegular = promo.regular;
+    }
+
     try {
-      await apiPost('addListaEspera', {
-        codigo: codigo, nombre: nombre, servicio: servicio,
-        area: areaKey, prioridad: prioridad, observaciones: obs,
-        esTop: isTop ? 'Sí' : 'No'
-      });
+      await apiPost('addListaEspera', postData);
     } catch (err) {
       console.error('Error enviando a lista:', err);
     }
 
+    window._arrPromo = null;
     simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + servicio, isTop);
     setTimeout(() => { show('mikaelaHome'); }, 600);
   }
 
-  function goAssign(chica) {
-    alert(`✓ Carmen asignada directamente a ${chica}. Notificación enviada solo a ${chica}.`);
+  // Staff completo del salón con sus áreas
+  const ALL_STAFF = [
+    { name: 'María', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'M', maxClients: 2 },
+    { name: 'Keyla', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'K', maxClients: 2 },
+    { name: 'Lesly', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'L', maxClients: 2 },
+    { name: 'Yadira', area: 'pestanas', areaLabel: '👁 Pestañas', initial: 'Y', maxClients: 1 },
+    { name: 'Diana', area: 'pestanas', areaLabel: '👁 Pestañas', initial: 'D', maxClients: 1 },
+    { name: 'Laura', area: 'facial', areaLabel: '✨ Facial', initial: 'L', maxClients: 1 },
+  ];
+
+  async function loadAssignDirect() {
+    // Datos de la clienta seleccionada
+    const clientName = document.getElementById('arrSelName')?.textContent || 'Clienta';
+    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+    const area = document.getElementById('arrArea')?.value || 'Cejas';
+    const servicio = document.getElementById('arrService')?.value || '';
+    const promo = window._arrPromo || null;
+
+    document.getElementById('assignClientName').textContent = clientName;
+    document.getElementById('assignClientTop').style.display = isTop ? 'inline' : 'none';
+    document.getElementById('assignServiceInfo').textContent = promo 
+      ? '🏷 ' + promo.name + ' — $' + promo.price
+      : servicio + ' · ' + area;
+
+    // Determinar qué áreas necesita este servicio/promo
+    let areasNeeded = [];
+    if (promo && promo.division && promo.division.length > 0) {
+      // Promo: extraer las áreas de la división
+      promo.division.forEach(d => {
+        const aLabel = String(d.area || '').toLowerCase();
+        if (aLabel.includes('cejas') || aLabel.includes('depilación')) areasNeeded.push('cejas');
+        if (aLabel.includes('pestañas')) areasNeeded.push('pestanas');
+        if (aLabel.includes('facial')) areasNeeded.push('facial');
+      });
+    } else {
+      // Servicio normal: usar el área seleccionada
+      const areaMap = { 'Cejas': 'cejas', 'Depilación': 'cejas', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'pestanas', 'Facial': 'facial' };
+      areasNeeded.push(areaMap[area] || 'cejas');
+    }
+    // Eliminar duplicados
+    areasNeeded = [...new Set(areasNeeded)];
+
+    show('assignDirect');
+
+    const listEl = document.getElementById('assignStaffList');
+    listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="animation: pulse 1.5s infinite;">⏳ Cargando disponibilidad del staff...</div></div>';
+
+    // Cargar quién está en servicio desde el Sheet
+    let ocupadas = {};
+    try {
+      const result = await apiGet('getListaCompleta');
+      if (result.success && result.enServicio) {
+        result.enServicio.forEach(a => {
+          const chica = String(a.tomadaPor || '').trim();
+          if (chica) {
+            if (!ocupadas[chica]) ocupadas[chica] = [];
+            ocupadas[chica].push(a.nombre);
+          }
+        });
+      }
+    } catch (err) { console.error('Error cargando disponibilidad:', err); }
+
+    // Filtrar staff por áreas necesitadas
+    const relevantStaff = ALL_STAFF.filter(s => areasNeeded.includes(s.area));
+    const otherStaff = ALL_STAFF.filter(s => !areasNeeded.includes(s.area));
+
+    function renderStaffRow(s) {
+      const clientesAtendiendo = ocupadas[s.name] || [];
+      const count = clientesAtendiendo.length;
+      const isFull = count >= s.maxClients;
+      const isOcupada = count > 0;
+      
+      let statusBadge, statusColor, metaText;
+      if (isFull) {
+        statusBadge = 'Llena';
+        statusColor = 'var(--danger)';
+        metaText = s.areaLabel + ' · ' + clientesAtendiendo.join(', ');
+      } else if (isOcupada) {
+        statusBadge = count + '/' + s.maxClients;
+        statusColor = 'var(--warning)';
+        metaText = s.areaLabel + ' · con ' + clientesAtendiendo.join(', ');
+      } else {
+        statusBadge = 'Libre';
+        statusColor = 'var(--success)';
+        metaText = s.areaLabel + ' · Disponible';
+      }
+
+      return `
+        <div class="client-row" onclick="goAssign('${s.name}')" style="${isFull ? 'opacity: 0.5;' : 'cursor: pointer;'}">
+          <div class="client-avatar">${s.initial}</div>
+          <div class="client-info">
+            <div class="client-name">${s.name}</div>
+            <div class="client-meta">${metaText}</div>
+          </div>
+          <div style="background: ${isOcupada ? (isFull ? 'var(--danger-bg)' : 'var(--warning-bg)') : 'var(--success-bg)'}; color: ${statusColor}; font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">${statusBadge}</div>
+        </div>`;
+    }
+
+    let html = '';
+
+    if (relevantStaff.length > 0) {
+      const areaLabels = areasNeeded.map(a => a === 'cejas' ? 'Cejas / Depilación' : a === 'pestanas' ? 'Pestañas' : 'Facial');
+      html += '<div class="section-title">Staff de ' + areaLabels.join(' + ') + '</div>';
+      html += '<div class="card" style="padding: 8px 20px;">';
+      html += relevantStaff.map(s => renderStaffRow(s)).join('');
+      html += '</div>';
+    }
+
+    if (otherStaff.length > 0) {
+      html += '<div class="section-title">Otras áreas</div>';
+      html += '<div class="card" style="padding: 8px 20px;">';
+      html += otherStaff.map(s => renderStaffRow(s)).join('');
+      html += '</div>';
+    }
+
+    listEl.innerHTML = html;
+  }
+
+  async function goAssign(chica) {
+    const clientName = document.getElementById('arrSelName')?.textContent || 'Clienta';
+    const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
+    const area = document.getElementById('arrArea')?.value || 'Cejas';
+    const servicio = document.getElementById('arrService')?.value || '';
+    const obs = document.getElementById('arrObs')?.value || '';
+    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+    const promo = window._arrPromo || null;
+
+    const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
+    const areaKey = areaMap[area] || 'cejas';
+
+    const priEl = document.querySelector('.priority-option.selected');
+    const prioridad = priEl ? priEl.querySelector('.name').textContent : 'Normal';
+
+    const postData = {
+      codigo: codigo, nombre: clientName, servicio: promo ? promo.name + ' (PROMO)' : servicio,
+      area: areaKey, prioridad: prioridad, observaciones: obs,
+      esTop: isTop ? 'Sí' : 'No',
+      asignadaA: chica
+    };
+
+    if (promo) {
+      postData.promoNombre = promo.name;
+      postData.precioPromo = promo.price;
+      postData.precioRegular = promo.regular;
+    }
+
+    // Agregar a lista de espera con estado "Asignada" — la chica la verá y la toma ella
+    try {
+      await apiPost('addListaEspera', postData);
+    } catch (err) { console.error('Error en asignación directa:', err); }
+
+    window._arrPromo = null;
+    simulateNotif('staff', '📋 Clienta asignada a ' + chica, (isTop ? '⭐ ' : '') + clientName + ' · ' + (promo ? promo.name : servicio), isTop);
+    alert('✓ ' + clientName + ' asignada a ' + chica + '.\n\n' + chica + ' la verá en su lista de espera con un badge "Asignada a ti" y al tomarla pasará a servicio.');
     show('mikaelaHome');
   }
 
