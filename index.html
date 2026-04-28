@@ -2359,12 +2359,7 @@
     renderPromos();
   }
 
-  const WAITLIST = [
-    { id: 'LE-0001', code: 'C-0004', name: 'Sofía López', service: 'Pestañas clásicas (consultar)', area: 'pestanas', priority: 'normal', waiting: 8, obs: 'Primera vez con pestañas', isTop: true },
-    { id: 'LE-0004', code: 'C-0005', name: 'Valentina Núñez', service: 'Lifting de pestañas', area: 'retiro_lifting', priority: 'tiempo', waiting: 12, obs: 'Sale a las 11:45', isTop: true },
-    { id: 'LE-0005', code: 'C-0007', name: 'Isabella Vera', service: 'Depilación piernas completas', area: 'depilacion', priority: 'normal', waiting: 3, isTop: false },
-    { id: 'LE-0006', code: 'C-0009', name: 'Lucía Paredes', service: 'Depilación cejas + pigmento', area: 'cejas', priority: 'normal', waiting: 5, isTop: false },
-  ];
+  const WAITLIST = [];
 
   // ÁREAS que cada grupo puede tomar:
   // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
@@ -2594,8 +2589,7 @@
       console.error('Error cargando lista:', err);
     }
 
-    // Si no hay datos del API, usar datos locales demo
-    if (lista.length === 0) lista = WAITLIST;
+    // Lista siempre viene del API o está vacía
 
     const allowed = AREA_FILTER[user.area] || [];
     const myList = lista.filter(w => allowed.includes(w.area));
@@ -3401,8 +3395,14 @@
       }
       
       if (result.success && result.clientas && result.clientas.length > 0) {
+        console.log('Clientas recibidas:', result.clientas.length);
         CLIENT_DIRECTORY_CACHE = result.clientas
-          .filter(c => c.codigo && c.nombre && /^C-\d{4}$/.test(String(c.codigo).trim()) && String(c.nombre).trim().length > 1)
+          .filter(c => {
+            const hasCode = c.codigo && String(c.codigo).trim().length > 0;
+            const hasName = c.nombre && String(c.nombre).trim().length > 1;
+            console.log('Filtrando clienta:', c.codigo, c.nombre, 'hasCode:', hasCode, 'hasName:', hasName);
+            return hasCode && hasName;
+          })
           .map(c => ({
           key: String(c.codigo).toLowerCase().replace(/-/g, ''),
           code: String(c.codigo),
@@ -3414,6 +3414,7 @@
           cedula: c.cedula ? String(c.cedula) : '',
           correo: c.correo ? String(c.correo) : ''
         }));
+        console.log('Clientas después del filtro:', CLIENT_DIRECTORY_CACHE.length);
       } else {
         // Respuesta exitosa pero sin clientas
         CLIENT_DIRECTORY_CACHE = [];
