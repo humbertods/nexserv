@@ -2130,34 +2130,36 @@
     'la2026': { pass: 'la2026', screen: 'staffHome', name: 'Laura', role: 'staff', area: 'facial', maxClients: 1, active: true },
   };
 
-  const PROMOS = [
-    { id: 'P001', name: 'Combo Mirada Perfecta', services: 'Depilación cejas + Pestañas clásicas', price: 52, regular: 58, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 44, comm: '30%' }] },
-    { id: 'P002', name: 'Combo Glow Total', services: 'Limpieza profunda + Depilación cejas', price: 60, regular: 68, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '✨ Facial', staff: 'Laura', monto: 52, comm: '40%' }, { area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }] },
-    { id: 'P003', name: 'Combo Full Rostro', services: 'Cejas pigmento + Dep. bigote + Pestañas híbridas', price: 75, regular: 81, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 21, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 54, comm: '30%' }] },
-  ];
+  let PROMOS = []; // Se llenarán desde el servidor
 
   async function renderPromos() {
     const list = document.getElementById('promosList');
     if (!list) return;
     
-    // Intentar cargar del API
+    // Cargar promos desde el servidor
     try {
       const result = await apiGet('getPromos');
       if (result.success && result.promos && result.promos.length > 0) {
-        // Actualizar PROMOS con datos del Sheet
-        result.promos.forEach((p, i) => {
-          if (i < PROMOS.length) {
-            PROMOS[i].name = p.nombre;
-            PROMOS[i].services = p.servicios;
-            PROMOS[i].price = Number(p.precioCombo) || PROMOS[i].price;
-            PROMOS[i].regular = Number(p.sumaIndividual) || PROMOS[i].regular;
-          }
-        });
+        // REEMPLAZAR completamente el array PROMOS con los datos del servidor
+        PROMOS = result.promos.map(p => ({
+          id: p.id || '',
+          name: p.nombre || '',
+          services: p.servicios || '',
+          price: Number(p.precioCombo) || 0,
+          regular: Number(p.sumaIndividual) || 0,
+          from: p.desde || '',
+          to: p.hasta || '',
+          active: p.activa === 'Sí' || p.activa === true,
+          division: p.division ? JSON.parse(p.division) : []
+        }));
+      } else {
+        // Si no hay promos en el servidor, dejar el array vacío
+        PROMOS = [];
       }
-    } catch (err) { console.error('Error promos:', err); }
+    } catch (err) { 
+      console.error('Error cargando promos:', err);
+      PROMOS = []; // En caso de error, array vacío
+    }
 
     document.getElementById('promoCount').textContent = PROMOS.filter(p => p.active).length;
     list.innerHTML = PROMOS.map((p, i) => `
