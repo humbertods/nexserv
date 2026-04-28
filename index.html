@@ -1719,6 +1719,7 @@
     <div class="input-group" style="margin-bottom: 20px;">
       <select id="reportStaff" onchange="renderReport()" style="padding: 14px 20px;">
         <option value="all">👥 Todo el equipo</option>
+        <option value="rosa">💅 Rosa</option>
         <option value="maria">💅 María</option>
         <option value="lesly">💅 Lesly</option>
         <option value="keyla">💅 Keyla</option>
@@ -2105,6 +2106,7 @@
   const USERS = {
     'hu0001': { pass: 'hu0001', screen: 'ownerHome', name: 'Humberto', role: 'owner', active: true },
     'mi5678': { pass: 'mi5678', screen: 'mikaelaHome', name: 'Mikaela', role: 'admin', active: true },
+    'ro2026': { pass: 'ro2026', screen: 'staffHome', name: 'Rosa', role: 'staff', area: 'cejas', maxClients: 2, active: true },
     'ma2026': { pass: 'ma2026', screen: 'staffHome', name: 'María', role: 'staff', area: 'cejas', maxClients: 2, active: true },
     'le2026': { pass: 'le2026', screen: 'staffHome', name: 'Lesly', role: 'staff', area: 'cejas', maxClients: 2, active: true },
     'ke2026': { pass: 'ke2026', screen: 'staffHome', name: 'Keyla', role: 'staff', area: 'cejas', maxClients: 2, active: true },
@@ -2114,12 +2116,10 @@
   };
 
   const PROMOS = [
-    { id: 'P001', name: 'Combo Mirada Perfecta', services: 'Depilación cejas + Pestañas clásicas', price: 52, regular: 58, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 44, comm: '30%' }] },
-    { id: 'P002', name: 'Combo Glow Total', services: 'Limpieza profunda + Depilación cejas', price: 60, regular: 68, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '✨ Facial', staff: 'Laura', monto: 52, comm: '40%' }, { area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }] },
-    { id: 'P003', name: 'Combo Full Rostro', services: 'Cejas pigmento + Dep. bigote + Pestañas híbridas', price: 75, regular: 81, from: '2026-04-13', to: '2026-04-19', active: true,
-      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 21, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 54, comm: '30%' }] },
+    { id: 'P001', name: 'Promo 01 · Pigmentación', services: 'Diseño de cejas + Depilación de cejas + Pigmentación de cejas + Depilación de bigote', price: 19, regular: 28, from: '2026-04-27', to: '2026-05-01', active: true,
+      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly / Rosa', monto: 19, comm: '30%' }] },
+    { id: 'P005', name: 'Promo 05 · Cejas efecto polvo', services: 'Cejas efecto polvo (primera sesión) + Kit de brocha GRATIS', price: 120, regular: 140, from: '2026-04-27', to: '2026-05-01', active: true,
+      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly / Rosa', monto: 120, comm: '30%' }] },
   ];
 
   async function renderPromos() {
@@ -3545,25 +3545,23 @@
 
   // === PAGOS Y CIERRE SEMANAL ===
   const PAY_STAFF = [
-    { name: 'María', area: 'Cejas', comm: '30%', acumulado: 127.50, servicios: 28, facturado: 425, paid: false,
-      dias: [{ dia: 'Lun', serv: 5, total: 22.50 }, { dia: 'Mar', serv: 4, total: 18.00 }, { dia: 'Mié', serv: 6, total: 25.50 }, { dia: 'Jue', serv: 5, total: 21.00 }, { dia: 'Vie', serv: 4, total: 19.50 }, { dia: 'Sáb', serv: 4, total: 21.00 }] },
-    { name: 'Keyla', area: 'Cejas', comm: '30%', acumulado: 138.00, servicios: 30, facturado: 460, paid: false,
-      dias: [{ dia: 'Lun', serv: 6, total: 28.50 }, { dia: 'Mar', serv: 5, total: 23.00 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 6, total: 27.00 }, { dia: 'Vie', serv: 4, total: 18.50 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
-    { name: 'Lesly', area: 'Cejas', comm: '30%', acumulado: 109.50, servicios: 24, facturado: 365, paid: false,
-      dias: [{ dia: 'Lun', serv: 4, total: 18.00 }, { dia: 'Mar', serv: 4, total: 17.50 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 4, total: 18.00 }, { dia: 'Vie', serv: 3, total: 15.00 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
-    { name: 'Yadira', area: 'Pestañas', comm: '30%', acumulado: 234.00, servicios: 14, facturado: 780, paid: false,
-      dias: [{ dia: 'Lun', serv: 3, total: 45.00 }, { dia: 'Mar', serv: 2, total: 36.00 }, { dia: 'Mié', serv: 3, total: 48.00 }, { dia: 'Jue', serv: 2, total: 39.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
-    { name: 'Diana', area: 'Pestañas', comm: '30%', acumulado: 207.00, servicios: 12, facturado: 690, paid: false,
-      dias: [{ dia: 'Lun', serv: 2, total: 36.00 }, { dia: 'Mar', serv: 2, total: 33.00 }, { dia: 'Mié', serv: 2, total: 39.00 }, { dia: 'Jue', serv: 2, total: 33.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
-    { name: 'Laura', area: 'Facial', comm: '40%', acumulado: 238.00, servicios: 10, facturado: 595, paid: false,
-      dias: [{ dia: 'Lun', serv: 2, total: 44.00 }, { dia: 'Mar', serv: 1, total: 24.00 }, { dia: 'Mié', serv: 2, total: 48.00 }, { dia: 'Jue', serv: 2, total: 44.00 }, { dia: 'Vie', serv: 2, total: 46.00 }, { dia: 'Sáb', serv: 1, total: 32.00 }] },
+    { name: 'Rosa', area: 'Cejas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'María', area: 'Cejas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'Keyla', area: 'Cejas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'Lesly', area: 'Cejas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'Yadira', area: 'Pestañas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'Diana', area: 'Pestañas', comm: '30%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
+    { name: 'Laura', area: 'Facial', comm: '40%', acumulado: 0, servicios: 0, facturado: 0, paid: false,
+      dias: [{ dia: 'Lun', serv: 0, total: 0 }, { dia: 'Mar', serv: 0, total: 0 }, { dia: 'Mié', serv: 0, total: 0 }, { dia: 'Jue', serv: 0, total: 0 }, { dia: 'Vie', serv: 0, total: 0 }, { dia: 'Sáb', serv: 0, total: 0 }] },
   ];
 
-  const PAY_HISTORY = [
-    { week: 'Semana 16', dates: 'Abr 7–12', total: 1054, facturado: 3315, closed: '12/04/2026' },
-    { week: 'Semana 15', dates: 'Mar 31 – Abr 5', total: 982, facturado: 3090, closed: '05/04/2026' },
-    { week: 'Semana 14', dates: 'Mar 24–29', total: 1018, facturado: 3200, closed: '29/03/2026' },
-  ];
+  const PAY_HISTORY = [];
 
   let currentWeekClosed = false;
 
@@ -4239,75 +4237,37 @@
   let currentPeriod = 'dia';
 
   const REPORT_DATA = {
+    rosa: { name: 'Rosa', area: 'Cejas · Depilación · Lifting',
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
+        desglose: [], top: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
+        desglose: [], top: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
+        desglose: [], top: [] } },
     maria: { name: 'María', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 6, facturado: 87, comision: 26.1, clientas: 5, promos: 1,
-        desglose: [{ area: '💅 Cejas', count: 3, total: 42 }, { area: '🪒 Depilación', count: 2, total: 35 }, { area: 'Lifting/Retiro', count: 1, total: 10 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 2, total: 34 }, { name: 'Dep. piernas completas', count: 1, total: 30 }, { name: 'Retiro de pestañas', count: 1, total: 10 }] },
-      semana: { servicios: 28, facturado: 425, comision: 127.5, clientas: 22, promos: 4,
-        desglose: [{ area: '💅 Cejas', count: 15, total: 195 }, { area: '🪒 Depilación', count: 10, total: 190 }, { area: 'Lifting/Retiro', count: 3, total: 40 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 6, total: 102 }, { name: 'Dep. piernas completas', count: 4, total: 120 }, { name: 'Brow lamination', count: 3, total: 75 }, { name: 'Dep. axilas', count: 3, total: 27 }] },
-      mes: { servicios: 112, facturado: 1720, comision: 516, clientas: 85, promos: 14,
-        desglose: [{ area: '💅 Cejas', count: 58, total: 780 }, { area: '🪒 Depilación', count: 42, total: 760 }, { area: 'Lifting/Retiro', count: 12, total: 180 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 22, total: 374 }, { name: 'Dep. piernas completas', count: 15, total: 450 }, { name: 'Brow lamination', count: 12, total: 300 }, { name: 'Dep. axilas', count: 10, total: 90 }, { name: 'Dep. bikini completo', count: 8, total: 240 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] } },
     lesly: { name: 'Lesly', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 5, facturado: 72, comision: 21.6, clientas: 4, promos: 0,
-        desglose: [{ area: '💅 Cejas', count: 3, total: 40 }, { area: '🪒 Depilación', count: 2, total: 32 }],
-        top: [{ name: 'Dep. cejas + maquillaje', count: 2, total: 24 }, { name: 'Dep. media pierna', count: 2, total: 30 }] },
-      semana: { servicios: 24, facturado: 365, comision: 109.5, clientas: 19, promos: 3,
-        desglose: [{ area: '💅 Cejas', count: 13, total: 170 }, { area: '🪒 Depilación', count: 9, total: 165 }, { area: 'Lifting/Retiro', count: 2, total: 30 }],
-        top: [{ name: 'Dep. cejas', count: 7, total: 56 }, { name: 'Dep. piernas completas', count: 3, total: 90 }, { name: 'Dep. rostro completo', count: 3, total: 66 }] },
-      mes: { servicios: 98, facturado: 1480, comision: 444, clientas: 74, promos: 11,
-        desglose: [{ area: '💅 Cejas', count: 50, total: 660 }, { area: '🪒 Depilación', count: 38, total: 670 }, { area: 'Lifting/Retiro', count: 10, total: 150 }],
-        top: [{ name: 'Dep. cejas', count: 20, total: 160 }, { name: 'Dep. cejas + pigmento', count: 15, total: 255 }, { name: 'Dep. piernas completas', count: 12, total: 360 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] } },
     keyla: { name: 'Keyla', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 7, facturado: 95, comision: 28.5, clientas: 6, promos: 1,
-        desglose: [{ area: '💅 Cejas', count: 4, total: 55 }, { area: '🪒 Depilación', count: 2, total: 25 }, { area: 'Lifting/Retiro', count: 1, total: 15 }],
-        top: [{ name: 'Dep. cejas + Brow lam.', count: 2, total: 50 }, { name: 'Lifting de pestañas', count: 1, total: 30 }] },
-      semana: { servicios: 30, facturado: 460, comision: 138, clientas: 24, promos: 5,
-        desglose: [{ area: '💅 Cejas', count: 16, total: 220 }, { area: '🪒 Depilación', count: 11, total: 195 }, { area: 'Lifting/Retiro', count: 3, total: 45 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 7, total: 119 }, { name: 'Dep. cejas + Brow lam.', count: 4, total: 100 }, { name: 'Dep. bikini completo', count: 3, total: 90 }] },
-      mes: { servicios: 120, facturado: 1850, comision: 555, clientas: 90, promos: 16,
-        desglose: [{ area: '💅 Cejas', count: 62, total: 860 }, { area: '🪒 Depilación', count: 44, total: 790 }, { area: 'Lifting/Retiro', count: 14, total: 200 }],
-        top: [{ name: 'Dep. cejas + pigmento', count: 25, total: 425 }, { name: 'Dep. cejas + Brow lam.', count: 14, total: 350 }, { name: 'Dep. piernas completas', count: 13, total: 390 }, { name: 'Dep. bikini completo', count: 10, total: 300 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] } },
     yadira: { name: 'Yadira', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 3, facturado: 165, comision: 49.5, clientas: 3, promos: 1,
-        desglose: [{ area: '👁 Pestañas', count: 3, total: 165 }],
-        top: [{ name: 'Volumen ruso', count: 1, total: 70 }, { name: 'Efecto híbridas', count: 1, total: 60 }, { name: 'Retoque clásicas', count: 1, total: 30 }],
-        modelos: [{ name: 'Volumen ruso', count: 1 }, { name: 'Efecto híbridas', count: 1 }, { name: 'Retoque clásicas', count: 1 }] },
-      semana: { servicios: 14, facturado: 780, comision: 234, clientas: 13, promos: 3,
-        desglose: [{ area: '👁 Pestañas', count: 12, total: 720 }, { area: 'Lifting/Retiro', count: 2, total: 60 }],
-        top: [{ name: 'Volumen ruso', count: 3, total: 210 }, { name: 'Efecto híbridas', count: 3, total: 180 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }, { name: 'Lifting de pestañas', count: 2, total: 60 }],
-        modelos: [{ name: 'Volumen ruso', count: 3 }, { name: 'Efecto híbridas', count: 3 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Volumen ligero wispy', count: 2 }, { name: 'Retoque clásicas', count: 1 }, { name: 'Lifting', count: 2 }] },
-      mes: { servicios: 56, facturado: 3180, comision: 954, clientas: 48, promos: 10,
-        desglose: [{ area: '👁 Pestañas', count: 50, total: 2930 }, { area: 'Lifting/Retiro', count: 6, total: 250 }],
-        top: [{ name: 'Volumen ruso', count: 12, total: 840 }, { name: 'Efecto híbridas', count: 10, total: 600 }, { name: 'Pelo a pelo clásicas', count: 8, total: 400 }, { name: 'Volumen ligero wispy', count: 6, total: 420 }, { name: 'Mega vol. ruso Kylie', count: 4, total: 340 }],
-        modelos: [{ name: 'Volumen ruso', count: 12 }, { name: 'Efecto híbridas', count: 10 }, { name: 'Pelo a pelo clásicas', count: 8 }, { name: 'Volumen ligero wispy', count: 6 }, { name: 'Mega vol. ruso Kylie', count: 4 }, { name: 'Volumen egipcio', count: 3 }, { name: 'Efecto seda', count: 3 }, { name: 'Retoque varios', count: 8 }, { name: 'Lifting', count: 4 }, { name: 'Retiros', count: 2 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] } },
     diana: { name: 'Diana', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 3, facturado: 155, comision: 46.5, clientas: 3, promos: 0,
-        desglose: [{ area: '👁 Pestañas', count: 3, total: 155 }],
-        top: [{ name: 'Volumen ligero', count: 1, total: 70 }, { name: 'Efecto Aura', count: 1, total: 60 }, { name: 'Retoque tupidas', count: 1, total: 35 }],
-        modelos: [{ name: 'Volumen ligero', count: 1 }, { name: 'Efecto Aura', count: 1 }, { name: 'Retoque tupidas', count: 1 }] },
-      semana: { servicios: 12, facturado: 690, comision: 207, clientas: 11, promos: 2,
-        desglose: [{ area: '👁 Pestañas', count: 11, total: 650 }, { area: 'Lifting/Retiro', count: 1, total: 40 }],
-        top: [{ name: 'Volumen ligero', count: 3, total: 210 }, { name: 'Efecto Aura', count: 2, total: 120 }, { name: 'Tupidas', count: 2, total: 120 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }],
-        modelos: [{ name: 'Volumen ligero', count: 3 }, { name: 'Efecto Aura', count: 2 }, { name: 'Tupidas', count: 2 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Retoque varios', count: 2 }, { name: 'Lifting', count: 1 }] },
-      mes: { servicios: 48, facturado: 2750, comision: 825, clientas: 42, promos: 8,
-        desglose: [{ area: '👁 Pestañas', count: 44, total: 2560 }, { area: 'Lifting/Retiro', count: 4, total: 190 }],
-        top: [{ name: 'Volumen ligero', count: 10, total: 700 }, { name: 'Efecto Aura', count: 8, total: 480 }, { name: 'Tupidas', count: 7, total: 420 }, { name: 'Pelo a pelo clásicas', count: 6, total: 300 }, { name: 'Volumen brasilero', count: 5, total: 300 }],
-        modelos: [{ name: 'Volumen ligero', count: 10 }, { name: 'Efecto Aura', count: 8 }, { name: 'Tupidas', count: 7 }, { name: 'Pelo a pelo clásicas', count: 6 }, { name: 'Volumen brasilero', count: 5 }, { name: 'Efecto seda', count: 4 }, { name: 'Retoque varios', count: 6 }, { name: 'Lifting', count: 3 }, { name: 'Retiros', count: 1 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], modelos: [] } },
     laura: { name: 'Laura', area: 'Facial',
-      dia: { servicios: 2, facturado: 130, comision: 52, clientas: 2, promos: 0,
-        desglose: [{ area: '✨ Facial', count: 2, total: 130 }],
-        top: [{ name: 'Limpieza profunda', count: 1, total: 60 }, { name: 'Limpieza prof. + vino', count: 1, total: 70 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 1 }, { name: 'Limpieza prof. + vino', count: 1 }] },
-      semana: { servicios: 10, facturado: 595, comision: 238, clientas: 9, promos: 2,
-        desglose: [{ area: '✨ Facial', count: 10, total: 595 }],
-        top: [{ name: 'Limpieza profunda', count: 3, total: 180 }, { name: 'Limpieza prof. + dermaplaning', count: 2, total: 150 }, { name: 'Limpieza prof. + hidratación', count: 2, total: 134 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 3 }, { name: 'Limpieza prof. + dermaplaning', count: 2 }, { name: 'Limpieza prof. + hidratación', count: 2 }, { name: 'Limpieza prof. + vino', count: 1 }, { name: 'Glow skin', count: 1 }, { name: 'Limpieza express', count: 1 }] },
-      mes: { servicios: 42, facturado: 2460, comision: 984, clientas: 38, promos: 6,
-        desglose: [{ area: '✨ Facial', count: 42, total: 2460 }],
-        top: [{ name: 'Limpieza profunda', count: 14, total: 840 }, { name: 'Limpieza prof. + dermaplaning', count: 8, total: 600 }, { name: 'Limpieza prof. + hidratación', count: 6, total: 402 }, { name: 'Limpieza prof. + vino', count: 4, total: 280 }, { name: 'Glow skin', count: 3, total: 120 }],
-        topFacial: [{ name: 'Limpieza profunda', count: 14 }, { name: 'Limpieza prof. + dermaplaning', count: 8 }, { name: 'Limpieza prof. + hidratación', count: 6 }, { name: 'Limpieza prof. + vino', count: 4 }, { name: 'Glow skin', count: 3 }, { name: 'Limpieza express', count: 3 }, { name: 'Limpieza prof. + oxigenación', count: 2 }, { name: 'Limpieza prof. + antiedad', count: 1 }, { name: 'Masaje yoga facial', count: 1 }] } },
+      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], topFacial: [] },
+      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], topFacial: [] },
+      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [], topFacial: [] } },
   };
 
   function switchPeriod(period, btn) {
