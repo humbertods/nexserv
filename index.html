@@ -2303,7 +2303,7 @@
     window._editingPromo = idx;
   }
 
-  function savePromo() {
+  async function savePromo() {
     const name = document.getElementById('promoName').value.trim();
     const selected = getSelectedServices();
     const price = parseInt(document.getElementById('promoPrice').value);
@@ -2343,19 +2343,75 @@
       _selectedServices: selected
     };
 
+    // Preparar datos para enviar al servidor
+    const dataToSave = {
+      nombre: name,
+      servicios: services,
+      precio: price,
+      regular: regular || price,
+      desde: promo.from || '',
+      hasta: promo.to || '',
+      activa: true,
+      division: JSON.stringify(division)
+    };
+
     if (window._editingPromo >= 0) {
+      // Actualizar promo existente
       promo.id = PROMOS[window._editingPromo].id;
+      dataToSave.id = promo.id;
+      
+      const result = await apiPost('updatePromo', dataToSave);
+      if (result.error) {
+        alert('❌ Error al actualizar la promo en el servidor: ' + result.error);
+        return;
+      }
+      
       PROMOS[window._editingPromo] = promo;
     } else {
+      // Crear nueva promo
+      const result = await apiPost('addPromo', dataToSave);
+      if (result.error) {
+        alert('❌ Error al guardar la promo en el servidor: ' + result.error);
+        return;
+      }
+      
+      // Actualizar el ID con el que devolvió el servidor
+      if (result.id) {
+        promo.id = result.id;
+      }
+      
       PROMOS.push(promo);
     }
+    
     closeModal();
     renderPromos();
-    alert('✓ Promo guardada. Las chicas podrán verla en su sección de promos.');
+    alert('✓ Promo guardada en el servidor. Las chicas podrán verla en su sección de promos.');
   }
 
-  function togglePromoActive(idx) {
+  async function togglePromoActive(idx) {
     PROMOS[idx].active = !PROMOS[idx].active;
+    
+    // Actualizar en el servidor
+    const promo = PROMOS[idx];
+    const dataToUpdate = {
+      id: promo.id,
+      nombre: promo.name,
+      servicios: promo.services,
+      precio: promo.price,
+      regular: promo.regular,
+      desde: promo.from || '',
+      hasta: promo.to || '',
+      activa: promo.active,
+      division: JSON.stringify(promo.division || [])
+    };
+    
+    const result = await apiPost('updatePromo', dataToUpdate);
+    if (result.error) {
+      alert('❌ Error al actualizar el estado de la promo: ' + result.error);
+      // Revertir el cambio local si hubo error
+      PROMOS[idx].active = !PROMOS[idx].active;
+    }
+    
     renderPromos();
   }
 
