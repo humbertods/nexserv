@@ -448,7 +448,7 @@
     <div class="notif-content">
       <div class="notif-app">NexServ <span class="notif-time" style="margin-left: 6px;">ahora</span></div>
       <div class="notif-title" id="notifTitle">Nueva clienta en el salón</div>
-      <div class="notif-body" id="notifBody">/div>
+      <div class="notif-body" id="notifBody">Andrea Rivas acaba de llegar.</div>
     </div>
   </div>
 
@@ -496,7 +496,6 @@
       <div class="stat warning"><div class="label">Esperando</div><div class="value" id="mkStatEspera">—</div></div>
       <div class="stat info"><div class="label">En servicio</div><div class="value" id="mkStatServicio">—</div></div>
       <div class="stat purple"><div class="label">Por cobrar</div><div class="value" id="mkStatCobrar">—</div></div>
-      <div class="stat success"><div class="label">Pagados</div><div class="value" id="mkStatPagados">—</div></div>
     </div>
 
     <div class="section-title">Lista de espera <span class="count" id="mkEsperaCount">0</span></div>
@@ -517,7 +516,7 @@
       <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
       <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('mikaelaServicios')"><span class="icon">✓</span></button>
+      <button><span class="icon">◉</span></button>
       <button><span class="icon">◐</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
@@ -560,39 +559,6 @@
   </div>
 
   <!-- CLIENT PROFILE -->
-
-  <!-- MIKAELA: SERVICIOS PAGADOS HOY -->
-  <div class="screen" id="mikaelaServicios">
-    <div class="header">
-      <div class="greeting">
-        <div class="hello">Registro del día</div>
-        <div class="name">Servicios pagados</div>
-      </div>
-      <div class="avatar" onclick="show('mikaelaHome')" style="font-size: 16px;">←</div>
-    </div>
-
-    <!-- Resumen simple -->
-    <div style="background: var(--bg-card); border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: var(--shadow-card); text-align: center;">
-      <div style="font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px;">Servicios completados hoy</div>
-      <div id="mkServCountDia" style="font-size: 40px; font-weight: 800; letter-spacing: -0.04em; color: var(--success);">0</div>
-    </div>
-
-    <div class="section-title">Detalle <span class="count" id="mkServListCount">0</span></div>
-    <div id="mkServiciosList">
-      <div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando...</div>
-    </div>
-
-    <nav class="nav">
-      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
-      <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">✓</span><span class="label-dock">Pagados</span></button>
-      <button><span class="icon">◐</span></button>
-      <div class="refresh-toast">✓ Actualizado</div>
-    </nav>
-  </div>
-
-  <!-- CLIENT PROFILE (original) -->
   <div class="screen" id="clientProfile">
     <button class="back-btn" id="profileBackBtn" onclick="show('mikaelaHome')">← Volver</button>
     
@@ -1036,7 +1002,7 @@
           <span class="label">Mandar a lista</span>
           <span class="sub">la toma quien se desocupe</span>
         </div>
-        <div class="action-btn" onclick="loadAssignDirect()">
+        <div class="action-btn" onclick="show('assignDirect')">
           <span class="icon">👩</span>
           <span class="label">Asignar directo</span>
           <span class="sub">elegí la chica ahora</span>
@@ -1047,34 +1013,49 @@
 
   <!-- ASSIGN DIRECT -->
   <div class="screen" id="assignDirect">
-    <button class="back-btn" onclick="show('arrivalExisting')">← Volver</button>
+    <button class="back-btn" onclick="show('newArrival')">← Volver</button>
     <div class="greeting" style="margin-bottom: 24px;">
       <div class="hello">Asignación directa</div>
       <div class="name" style="font-size: 24px;">¿Quién la atiende?</div>
     </div>
 
-    <!-- Info de la clienta y servicio -->
-    <div class="card" id="assignClientInfo" style="padding: 14px; margin-bottom: 16px;">
-      <div style="font-size: 13px; color: var(--ink-soft); font-weight: 600;">
-        <span id="assignClientName" style="font-weight: 800; color: var(--ink); font-size: 15px;"></span>
-        <span id="assignClientTop" style="display: none;"><span class="top-star">⭐</span></span>
+    <div class="card" style="background: var(--top-purple-bg); border-color: #d4b5ff; padding: 14px;">
+      <div style="font-size: 13px; color: var(--top-purple); font-weight: 600;">
+        ⭐ Carmen Molina (TOP) · Limpieza profunda
       </div>
-      <div id="assignServiceInfo" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
     </div>
 
-    <!-- Lista dinámica de staff -->
-    <div id="assignStaffList">
-      <div style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando staff...</div>
+    <div class="section-title">Disponibles para Facial</div>
+    <div class="card" style="padding: 8px 20px;">
+      <div class="client-row" onclick="goAssign('Laura')">
+        <div class="client-avatar">L</div>
+        <div class="client-info">
+          <div class="client-name">Laura</div>
+          <div class="client-meta">Cosmetóloga · Disponible</div>
+        </div>
+        <div style="background: var(--success-bg); color: var(--success); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Libre</div>
+      </div>
     </div>
 
-    <nav class="nav">
-      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
-      <button><span class="icon">📇</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button><span class="icon">◉</span></button>
-      <button><span class="icon">◐</span></button>
-      <div class="refresh-toast">✓ Actualizado</div>
-    </nav>
+    <div class="section-title">Cualquier chica del salón</div>
+    <div class="card" style="padding: 8px 20px;">
+      <div class="client-row" onclick="goAssign('María')">
+        <div class="client-avatar">M</div>
+        <div class="client-info">
+          <div class="client-name">María</div>
+          <div class="client-meta">Cejas · En servicio (Andrea)</div>
+        </div>
+        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
+      </div>
+      <div class="client-row" onclick="goAssign('Yadira')">
+        <div class="client-avatar">Y</div>
+        <div class="client-info">
+          <div class="client-name">Yadira</div>
+          <div class="client-meta">Pestañas · En servicio (Valentina)</div>
+        </div>
+        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
+      </div>
+    </div>
   </div>
 
   <!-- STAFF HOME -->
@@ -1088,7 +1069,7 @@
     </div>
 
     <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2420 100%); color: white; padding: 26px 22px; border-radius: 24px; margin-bottom: 20px; box-shadow: var(--shadow-soft); position: relative;">
-      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px;">Tu comisión acumulada</div>
+      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px;">Tu comisión · semana 16</div>
       <div style="display: flex; align-items: center; gap: 14px;">
         <div id="commValue" style="font-size: 44px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;">****</div>
         <button onclick="toggleComm()" id="commToggle" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; width: 42px; height: 42px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .2s;">👁‍🗨</button>
@@ -1097,9 +1078,9 @@
     </div>
 
     <div class="stat-grid">
-      <div class="stat"><div class="label">Hoy</div><div class="value" id="staffStatHoy">0</div></div>
-      <div class="stat success"><div class="label">$ día</div><div class="value" id="staffStatDia">$0</div></div>
-      <div class="stat warning" id="pendingStat"><div class="label">Espera</div><div class="value">0</div></div>
+      <div class="stat"><div class="label">Hoy</div><div class="value">4</div></div>
+      <div class="stat success"><div class="label">$ día</div><div class="value comm-hide">****</div></div>
+      <div class="stat warning" id="pendingStat"><div class="label">Espera</div><div class="value">2</div></div>
     </div>
 
     <!-- Indicador de atención simultánea (solo cejas) -->
@@ -1186,10 +1167,10 @@
     <button class="back-btn" onclick="show('staffHome')">← Mi panel</button>
     
     <div style="text-align: center; margin-bottom: 24px;">
-      <div class="client-avatar" id="as1Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as1Client)">—</div>
-      <div id="as1Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Cargando...</div>
-      <div id="as1Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
-      <button onclick="openClientProfile(window._as1Client)" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
+      <div class="client-avatar" id="as1Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as1Client || 'isabella')">IL</div>
+      <div id="as1Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Isabella Vera</div>
+      <div id="as1Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">C-0007 · Llegó 10:52</div>
+      <button onclick="openClientProfile(window._as1Client || 'isabella')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
     </div>
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1203,7 +1184,7 @@
         <button onclick="toggleEditObs('obs1')" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--accent-deep); cursor: pointer; padding: 4px 8px;">Editar</button>
       </div>
       <div id="obs1Display" style="font-size: 13px; color: #5a4a2a; line-height: 1.6; font-weight: 500;">
-        Sin observaciones
+        Piel sensible en la zona de bikini, usar cera de baja temperatura. Prefiere que le dejen la línea de depilación fina. Última visita: piernas + axilas.
       </div>
       <textarea id="obs1Edit" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #f0e5c8; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 500; min-height: 80px; resize: vertical; background: white; color: #5a4a2a; box-sizing: border-box;" onfocusout="saveObs('obs1')"></textarea>
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
@@ -1230,7 +1211,7 @@
     <!-- Toggle retiro gratis/pago (visible solo para retiros) -->
     <div id="retiroToggle1" style="display: none; margin-bottom: 14px;">
       <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; box-shadow: var(--shadow-card);">
-        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">¿El retiro es nuestro?</div>
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">¿El retiro es de Rosa Aguilera?</div>
         <div style="display: flex; gap: 8px;">
           <button onclick="setRetiro(true, 1)" id="retiroYes1" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Sí, nuestro · $0</button>
           <button onclick="setRetiro(false, 1)" id="retiroNo1" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">❌ Otro local · $10</button>
@@ -1253,82 +1234,8 @@
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="openPostServiceOptions(1)">✓ Finalizar servicio</button>
-
-    <!-- Modal: Opciones post-servicio -->
-    <div class="modal-bg" id="postServiceModal1">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <div class="modal-title">¿Qué hacemos con la clienta?</div>
-        <div id="postServiceClientInfo1" style="text-align: center; margin-bottom: 16px; font-size: 14px; color: var(--ink-soft); font-weight: 500;"></div>
-
-        <!-- Opción 1: Mantener clienta -->
-        <div onclick="postServiceKeep(1)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➕</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Mantener clienta</div>
-            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">Quiere otro servicio — la sigo atendiendo</div>
-          </div>
-        </div>
-
-        <!-- Opción 2: Devolver a lista -->
-        <div onclick="postServiceReturn(1)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--warning-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">↩️</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Devolver a lista</div>
-            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">La clienta vuelve a espera para otra chica</div>
-          </div>
-        </div>
-
-        <!-- Opción 3: Continuar promo (visible solo si tiene promo multi-área) -->
-        <div id="postServicePromoOption1" style="display: none;" onclick="postServiceContinuePromo(1)">
-          <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">🏷</div>
-            <div style="flex: 1;">
-              <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Continuar promo</div>
-              <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;" id="postServicePromoDetail1">Pasa a la siguiente área del combo</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Opción: Pasar a otra área (visible si hay servicios de otra área sin promo) -->
-        <div id="postServicePassOption1" style="display: none;" onclick="postServicePassToArea(1)">
-          <div style="background: var(--bg-card); border: 2px solid var(--info); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➡️</div>
-            <div style="flex: 1;">
-              <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Pasar a otra área</div>
-              <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;" id="postServicePassDetail1">Tiene servicios pendientes de otra área</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Opción directa: Finalizar y cobrar -->
-        <div onclick="postServiceFinish(1)" style="background: var(--success); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">💵</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px; letter-spacing: -0.01em;">Finalizar y enviar a cobro</div>
-            <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;">Mikaela procede al cobro</div>
-          </div>
-        </div>
-
-        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 4px;">Cancelar</button>
-      </div>
-    </div>
-
-    <!-- Modal: Devolver a lista con motivo -->
-    <div class="modal-bg" id="returnToListModal1">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <div class="modal-title">↩️ Devolver a lista</div>
-        <div style="text-align: center; color: var(--ink-soft); font-size: 13px; margin-bottom: 14px;">La clienta volverá a la lista de espera para que otra chica la atienda.</div>
-        <div class="input-group">
-          <label>Motivo (opcional)</label>
-          <textarea id="returnMotivo1" placeholder="Ej: La clienta necesita servicio de otra área..."></textarea>
-        </div>
-        <button class="btn-primary" onclick="confirmReturnToList(1)" style="background: var(--warning);">Confirmar devolución</button>
-        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
-      </div>
-    </div>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot1()">Finalizar servicio</button>
+    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera con motivo.')">Devolver a lista</button>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -1472,10 +1379,10 @@
     
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--info-bg); color: var(--info); padding: 4px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; margin-bottom: 12px;">Clienta 2 de 2</div>
-      <div class="client-avatar" id="as2Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as2Client)">—</div>
-      <div id="as2Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Cargando...</div>
-      <div id="as2Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
-      <button onclick="openClientProfile(window._as2Client)" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
+      <div class="client-avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile('lucia')">LP</div>
+      <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Lucía Paredes</div>
+      <div style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">C-0009 · Llegó 11:05</div>
+      <button onclick="openClientProfile('lucia')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
     </div>
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -1489,7 +1396,7 @@
         <button onclick="toggleEditObs('obs2')" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--accent-deep); cursor: pointer; padding: 4px 8px;">Editar</button>
       </div>
       <div id="obs2Display" style="font-size: 13px; color: #5a4a2a; line-height: 1.6; font-weight: 500;">
-        Sin observaciones
+        Primera vez en el salón. No tiene observaciones previas — anotá cualquier detalle importante para su próxima visita.
       </div>
       <textarea id="obs2Edit" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #f0e5c8; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 500; min-height: 80px; resize: vertical; background: white; color: #5a4a2a; box-sizing: border-box;" onfocusout="saveObs('obs2')"></textarea>
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
@@ -1537,76 +1444,8 @@
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="openPostServiceOptions(2)">✓ Finalizar servicio</button>
-
-    <!-- Modal: Opciones post-servicio slot 2 -->
-    <div class="modal-bg" id="postServiceModal2">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <div class="modal-title">¿Qué hacemos con la clienta?</div>
-        <div id="postServiceClientInfo2" style="text-align: center; margin-bottom: 16px; font-size: 14px; color: var(--ink-soft); font-weight: 500;"></div>
-
-        <div onclick="postServiceKeep(2)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➕</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px;">Mantener clienta</div>
-            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">Quiere otro servicio — la sigo atendiendo</div>
-          </div>
-        </div>
-
-        <div onclick="postServiceReturn(2)" style="background: var(--bg-card); border: 2px solid var(--line); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--warning-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">↩️</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px;">Devolver a lista</div>
-            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">La clienta vuelve a espera para otra chica</div>
-          </div>
-        </div>
-
-        <div id="postServicePromoOption2" style="display: none;" onclick="postServiceContinuePromo(2)">
-          <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">🏷</div>
-            <div style="flex: 1;">
-              <div style="font-weight: 800; font-size: 15px;">Continuar promo</div>
-              <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;" id="postServicePromoDetail2">Pasa a la siguiente área del combo</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="postServicePassOption2" style="display: none;" onclick="postServicePassToArea(2)">
-          <div style="background: var(--bg-card); border: 2px solid var(--info); border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--info-bg); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">➡️</div>
-            <div style="flex: 1;">
-              <div style="font-weight: 800; font-size: 15px;">Pasar a otra área</div>
-              <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;" id="postServicePassDetail2">Tiene servicios pendientes de otra área</div>
-            </div>
-          </div>
-        </div>
-
-        <div onclick="postServiceFinish(2)" style="background: var(--success); border: none; border-radius: 20px; padding: 18px; margin-bottom: 10px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 14px; color: white;" onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
-          <div style="width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.25); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">💵</div>
-          <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px;">Finalizar y enviar a cobro</div>
-            <div style="font-size: 12px; opacity: 0.85; font-weight: 500; margin-top: 3px;">Mikaela procede al cobro</div>
-          </div>
-        </div>
-
-        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 4px;">Cancelar</button>
-      </div>
-    </div>
-
-    <div class="modal-bg" id="returnToListModal2">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <div class="modal-title">↩️ Devolver a lista</div>
-        <div style="text-align: center; color: var(--ink-soft); font-size: 13px; margin-bottom: 14px;">La clienta volverá a la lista de espera para que otra chica la atienda.</div>
-        <div class="input-group">
-          <label>Motivo (opcional)</label>
-          <textarea id="returnMotivo2" placeholder="Ej: La clienta necesita servicio de otra área..."></textarea>
-        </div>
-        <button class="btn-primary" onclick="confirmReturnToList(2)" style="background: var(--warning);">Confirmar devolución</button>
-        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
-      </div>
-    </div>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot2()">Finalizar servicio</button>
+    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera.')">Devolver a lista</button>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -1656,29 +1495,88 @@
 
     <div style="background: linear-gradient(135deg, #1a1a1a 0%, #3d2f1f 100%); color: white; padding: 26px 22px; border-radius: 24px; margin-bottom: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-soft);">
       <div style="position: absolute; top: -50%; right: -20%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 70%);"></div>
-      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación de hoy</div>
-      <div style="font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; position: relative;">$0</div>
-      <div style="font-size: 12px; opacity: 0.6; margin-top: 6px; position: relative; font-weight: 500;">—</div>
+      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación semana 16</div>
+      <div style="font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; position: relative;">$1,847</div>
+      <div style="font-size: 12px; opacity: 0.6; margin-top: 6px; position: relative; font-weight: 500;">↑ 12% vs. semana pasada</div>
     </div>
 
     <div class="stat-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-      <div class="stat"><div class="label">Comisiones</div><div class="value" style="color: var(--danger); font-size: 18px;">$0</div></div>
-      <div class="stat"><div class="label">Neto</div><div class="value" style="color: var(--success); font-size: 18px;">$0</div></div>
-      <div class="stat purple"><div class="label">Servicios</div><div class="value" style="font-size: 18px;">0</div></div>
+      <div class="stat"><div class="label">Comisiones</div><div class="value" style="color: var(--danger); font-size: 18px;">$592</div></div>
+      <div class="stat"><div class="label">Neto</div><div class="value" style="color: var(--success); font-size: 18px;">$1,255</div></div>
+      <div class="stat purple"><div class="label">TOP ⭐</div><div class="value" style="font-size: 18px;">12</div></div>
     </div>
 
     <div class="section-title">Estado del salón ahora</div>
     <div class="stat-grid">
-      <div class="stat warning"><div class="label">Esperando</div><div class="value">0</div></div>
-      <div class="stat info"><div class="label">Servicio</div><div class="value">0</div></div>
-      <div class="stat success"><div class="label">Listas</div><div class="value">0</div></div>
+      <div class="stat warning"><div class="label">Esperando</div><div class="value">2</div></div>
+      <div class="stat info"><div class="label">Servicio</div><div class="value">3</div></div>
+      <div class="stat success"><div class="label">Listas</div><div class="value">7</div></div>
     </div>
 
     <div class="section-title">
       <span>Historial reciente</span>
+      <span style="font-size: 10px; color: var(--ink-faint); letter-spacing: 0; text-transform: none;">Ver todo →</span>
     </div>
-    <div class="card" style="padding: 16px; text-align: center; color: var(--ink-faint); font-size: 13px;">
-      Ver historial en 📊 Reportes
+    <div class="card" style="padding: 4px 16px;">
+      <div class="history-row">
+        <div class="history-info">
+          <div class="history-top">
+            <span class="history-time">10:35</span>
+            <span class="history-client">Andrea Rivas</span>
+          </div>
+          <div class="history-service">Depilación + pigmento · Cejas</div>
+          <div class="history-meta">por María · C-0001</div>
+        </div>
+        <div class="history-amount">
+          <div class="history-value">$17</div>
+          <div class="history-comm">+$5.10</div>
+        </div>
+      </div>
+      <div class="history-row">
+        <div class="history-info">
+          <div class="history-top">
+            <span class="history-time">10:30</span>
+            <span class="history-client">Carmen Molina</span>
+            <span class="top-star">⭐</span>
+          </div>
+          <div class="history-service">Limpieza profunda · Facial</div>
+          <div class="history-meta">por Laura · C-0002</div>
+        </div>
+        <div class="history-amount">
+          <div class="history-value">$60</div>
+          <div class="history-comm">+$24.00</div>
+        </div>
+      </div>
+      <div class="history-row">
+        <div class="history-info">
+          <div class="history-top">
+            <span class="history-time">09:55</span>
+            <span class="history-client">Daniela Torres</span>
+            <span class="top-star">⭐</span>
+          </div>
+          <div class="history-service">Brow lamination · Cejas</div>
+          <div class="history-meta">por María · C-0003</div>
+        </div>
+        <div class="history-amount">
+          <div class="history-value">$25</div>
+          <div class="history-comm">+$7.50</div>
+        </div>
+      </div>
+      <div class="history-row">
+        <div class="history-info">
+          <div class="history-top">
+            <span class="history-time">09:15</span>
+            <span class="history-client">Valentina Núñez</span>
+            <span class="top-star">⭐</span>
+          </div>
+          <div class="history-service">Depilación cejas · Cejas</div>
+          <div class="history-meta">por María · C-0005</div>
+        </div>
+        <div class="history-amount">
+          <div class="history-value">$8</div>
+          <div class="history-comm">+$2.40</div>
+        </div>
+      </div>
     </div>
 
     <nav class="nav">
@@ -1865,15 +1763,15 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Facturado</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px;" id="payTotal">$0</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px;" id="payTotal">$1,847</div>
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Comisiones</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$0</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$592</div>
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Neto salón</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$0</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$1,255</div>
         </div>
       </div>
     </div>
@@ -1924,7 +1822,7 @@
         </div>
         <div style="text-align: center; margin-bottom: 16px;">
           <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500;">Total a pagar en comisiones:</div>
-          <div style="font-size: 36px; font-weight: 800; color: var(--danger); letter-spacing: -0.04em;" id="closeWeekTotal">$0</div>
+          <div style="font-size: 36px; font-weight: 800; color: var(--danger); letter-spacing: -0.04em;" id="closeWeekTotal">$592</div>
         </div>
         <button class="btn-primary" onclick="confirmCloseWeek()" style="background: var(--danger);">Sí, cerrar y pagar</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
@@ -1938,7 +1836,7 @@
         <div class="modal-title" id="payIndTitle">Pagar a María</div>
         <div style="text-align: center; margin-bottom: 16px;">
           <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500;">Comisión acumulada</div>
-          <div style="font-size: 40px; font-weight: 800; color: var(--accent-deep); letter-spacing: -0.04em;" id="payIndAmount">$0</div>
+          <div style="font-size: 40px; font-weight: 800; color: var(--accent-deep); letter-spacing: -0.04em;" id="payIndAmount">$127.50</div>
           <div style="font-size: 12px; color: var(--ink-faint); font-weight: 500; margin-top: 4px;" id="payIndDetail">30% sobre $425 · 28 servicios</div>
         </div>
         <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
@@ -2215,38 +2113,32 @@
     'la2026': { pass: 'la2026', screen: 'staffHome', name: 'Laura', role: 'staff', area: 'facial', maxClients: 1, active: true },
   };
 
-  let PROMOS = [];
+  const PROMOS = [
+    { id: 'P001', name: 'Combo Mirada Perfecta', services: 'Depilación cejas + Pestañas clásicas', price: 52, regular: 58, from: '2026-04-13', to: '2026-04-19', active: true,
+      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 44, comm: '30%' }] },
+    { id: 'P002', name: 'Combo Glow Total', services: 'Limpieza profunda + Depilación cejas', price: 60, regular: 68, from: '2026-04-13', to: '2026-04-19', active: true,
+      division: [{ area: '✨ Facial', staff: 'Laura', monto: 52, comm: '40%' }, { area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 8, comm: '30%' }] },
+    { id: 'P003', name: 'Combo Full Rostro', services: 'Cejas pigmento + Dep. bigote + Pestañas híbridas', price: 75, regular: 81, from: '2026-04-13', to: '2026-04-19', active: true,
+      division: [{ area: '💅 Cejas', staff: 'María / Keyla / Lesly', monto: 21, comm: '30%' }, { area: '👁 Pestañas', staff: 'Yadira / Diana', monto: 54, comm: '30%' }] },
+  ];
 
   async function renderPromos() {
     const list = document.getElementById('promosList');
     if (!list) return;
     
-    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando promos...</div></div>';
-    
-    // Cargar promos del Sheet
+    // Intentar cargar del API
     try {
       const result = await apiGet('getPromos');
       if (result.success && result.promos && result.promos.length > 0) {
-        // Reemplazar PROMOS completamente con datos del Sheet
-        PROMOS = result.promos.map(p => {
-          let division = [];
-          if (p.division) {
-            try { division = JSON.parse(p.division); } catch(e) { division = []; }
+        // Actualizar PROMOS con datos del Sheet
+        result.promos.forEach((p, i) => {
+          if (i < PROMOS.length) {
+            PROMOS[i].name = p.nombre;
+            PROMOS[i].services = p.servicios;
+            PROMOS[i].price = Number(p.precioCombo) || PROMOS[i].price;
+            PROMOS[i].regular = Number(p.sumaIndividual) || PROMOS[i].regular;
           }
-          return {
-            id: p.id,
-            name: p.nombre,
-            services: p.servicios,
-            price: Number(p.precioCombo) || 0,
-            regular: Number(p.sumaIndividual) || 0,
-            from: p.desde ? String(p.desde) : '',
-            to: p.hasta ? String(p.hasta) : '',
-            active: p.activa !== false,
-            division: division
-          };
         });
-      } else if (!result.error) {
-        PROMOS = [];
       }
     } catch (err) { console.error('Error promos:', err); }
 
@@ -2288,36 +2180,9 @@
     `).join('');
   }
 
-  async function renderStaffPromos() {
+  function renderStaffPromos() {
     const list = document.getElementById('staffPromosList');
     if (!list) return;
-    
-    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando promos...</div></div>';
-    
-    // Cargar promos del Sheet
-    try {
-      const result = await apiGet('getPromos');
-      if (result.success && result.promos && result.promos.length > 0) {
-        PROMOS = result.promos.map(p => {
-          let division = [];
-          if (p.division) {
-            try { division = JSON.parse(p.division); } catch(e) {}
-          }
-          return {
-            id: p.id,
-            name: p.nombre,
-            services: p.servicios,
-            price: Number(p.precioCombo) || 0,
-            regular: Number(p.sumaIndividual) || 0,
-            from: p.desde ? String(p.desde) : '',
-            to: p.hasta ? String(p.hasta) : '',
-            active: p.activa !== false,
-            division: division
-          };
-        });
-      }
-    } catch (err) { console.error('Error cargando promos staff:', err); }
-    
     const active = PROMOS.filter(p => p.active);
     if (active.length === 0) {
       list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="font-size: 32px; margin-bottom: 8px;">🏷</div>No hay promos activas esta semana</div>';
@@ -2336,12 +2201,6 @@
           </div>
           <div style="background: var(--success-bg); color: var(--success); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-pill); flex-shrink: 0; margin-left: 8px;">-$${p.regular - p.price}</div>
         </div>
-        ${p.division && p.division.length > 0 ? `
-          <div style="margin-top: 10px; background: var(--bg); border-radius: var(--radius-sm); padding: 8px 10px;">
-            <div style="font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px;">División por área</div>
-            ${p.division.map(d => '<div style="display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0;"><span style="font-weight: 600;">' + d.area + '</span><span style="font-weight: 800;">$' + d.monto + '</span></div>').join('')}
-          </div>
-        ` : ''}
       </div>
     `).join('');
   }
@@ -2427,7 +2286,7 @@
     window._editingPromo = idx;
   }
 
-  async function savePromo() {
+  function savePromo() {
     const name = document.getElementById('promoName').value.trim();
     const selected = getSelectedServices();
     const price = parseInt(document.getElementById('promoPrice').value);
@@ -2458,8 +2317,6 @@
       if (!confirm('La suma de las áreas ($' + divTotal + ') no coincide con el precio combo ($' + price + '). ¿Guardar igual?')) return;
     }
 
-    const divisionStr = JSON.stringify(division);
-
     const promo = {
       id: 'P' + String(PROMOS.length + 1).padStart(3, '0'),
       name, services, price, regular,
@@ -2469,68 +2326,28 @@
       _selectedServices: selected
     };
 
-    // Guardar en el Sheet
-    try {
-      if (window._editingPromo >= 0) {
-        promo.id = PROMOS[window._editingPromo].id;
-        const result = await apiPost('updatePromo', {
-          id: promo.id,
-          nombre: name,
-          servicios: services,
-          precio: price,
-          regular: regular,
-          desde: promo.from,
-          hasta: promo.to,
-          activa: true,
-          division: divisionStr
-        });
-        if (result.error) { alert('⚠️ Error al guardar: ' + result.error); return; }
-        PROMOS[window._editingPromo] = promo;
-      } else {
-        const result = await apiPost('addPromo', {
-          nombre: name,
-          servicios: services,
-          precio: price,
-          regular: regular,
-          desde: promo.from,
-          hasta: promo.to,
-          activa: true,
-          division: divisionStr
-        });
-        if (result.error) { alert('⚠️ Error al guardar: ' + result.error); return; }
-        if (result.success && result.id) promo.id = result.id;
-        PROMOS.push(promo);
-      }
-    } catch (err) {
-      console.error('Error guardando promo:', err);
-      alert('⚠️ Error de conexión al guardar la promo. Revisá tu internet e intentá de nuevo.');
-      return;
+    if (window._editingPromo >= 0) {
+      promo.id = PROMOS[window._editingPromo].id;
+      PROMOS[window._editingPromo] = promo;
+    } else {
+      PROMOS.push(promo);
     }
-
     closeModal();
     renderPromos();
-    alert('✓ Promo guardada. Las chicas la verán al refrescar su app.');
+    alert('✓ Promo guardada. Las chicas podrán verla en su sección de promos.');
   }
 
-  async function togglePromoActive(idx) {
+  function togglePromoActive(idx) {
     PROMOS[idx].active = !PROMOS[idx].active;
-    try {
-      await apiPost('updatePromo', {
-        id: PROMOS[idx].id,
-        nombre: PROMOS[idx].name,
-        servicios: PROMOS[idx].services,
-        precio: PROMOS[idx].price,
-        regular: PROMOS[idx].regular,
-        desde: PROMOS[idx].from,
-        hasta: PROMOS[idx].to,
-        activa: PROMOS[idx].active,
-        division: JSON.stringify(PROMOS[idx].division)
-      });
-    } catch (err) { console.error('Error actualizando promo:', err); }
     renderPromos();
   }
 
-  const WAITLIST = [];
+  const WAITLIST = [
+    { id: 'LE-0001', code: 'C-0004', name: 'Sofía López', service: 'Pestañas clásicas (consultar)', area: 'pestanas', priority: 'normal', waiting: 8, obs: 'Primera vez con pestañas', isTop: true },
+    { id: 'LE-0004', code: 'C-0005', name: 'Valentina Núñez', service: 'Lifting de pestañas', area: 'retiro_lifting', priority: 'tiempo', waiting: 12, obs: 'Sale a las 11:45', isTop: true },
+    { id: 'LE-0005', code: 'C-0007', name: 'Isabella Vera', service: 'Depilación piernas completas', area: 'depilacion', priority: 'normal', waiting: 3, isTop: false },
+    { id: 'LE-0006', code: 'C-0009', name: 'Lucía Paredes', service: 'Depilación cejas + pigmento', area: 'cejas', priority: 'normal', waiting: 5, isTop: false },
+  ];
 
   // ÁREAS que cada grupo puede tomar:
   // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
@@ -2558,7 +2375,6 @@
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
-    if (id === 'mikaelaServicios') { loadMikaelaServicios(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
@@ -2753,9 +2569,7 @@
             priority: String(w.prioridad || 'normal').toLowerCase(),
             waiting: w.horaLlegada || '?',
             obs: w.observaciones || '',
-            isTop: String(w.esTop || '').toLowerCase().includes('sí'),
-            asignadaA: w.asignadaA || '',
-            estado: String(w.estado || '').toLowerCase()
+            isTop: String(w.esTop || '').toLowerCase().includes('sí')
           };
         });
       }
@@ -2767,15 +2581,7 @@
     if (lista.length === 0) lista = WAITLIST;
 
     const allowed = AREA_FILTER[user.area] || [];
-    // Incluir clientas de mi área Y las que están asignadas a mí específicamente
-    const myList = lista.filter(w => {
-      // Si está asignada a otra chica, no la muestro
-      if (w.asignadaA && w.asignadaA !== user.name) return false;
-      // Si está asignada a mí, siempre la muestro
-      if (w.asignadaA === user.name) return true;
-      // Si no está asignada, mostrar si es de mi área
-      return allowed.includes(w.area);
-    });
+    const myList = lista.filter(w => allowed.includes(w.area));
     
     document.getElementById('waitCountMy').textContent = myList.length;
     document.getElementById('waitCountAll').textContent = lista.length;
@@ -2788,14 +2594,8 @@
       return;
     }
     
-    // Ordenar: asignadas a mí primero, luego por prioridad
     const priOrder = { 'tiempo': 0, 'normal': 1, 'especial': 2 };
-    myList.sort((a, b) => {
-      // Asignadas a mí van primero
-      if (a.asignadaA === user.name && b.asignadaA !== user.name) return -1;
-      if (b.asignadaA === user.name && a.asignadaA !== user.name) return 1;
-      return (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1);
-    });
+    myList.sort((a, b) => (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1));
     
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
@@ -2803,29 +2603,23 @@
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
     
-    content.innerHTML = myList.map(w => {
-      const isAssignedToMe = w.asignadaA === user.name;
-      const assignBadge = isAssignedToMe 
-        ? '<div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); color: white; padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; margin-bottom: 12px; text-align: center;">📋 Mikaela te asignó esta clienta</div>'
-        : '';
-      return `
-      <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}" ${isAssignedToMe ? 'style="border-left-color: var(--accent);"' : ''}>
+    content.innerHTML = myList.map(w => `
+      <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}">
         <div class="waitlist-top">
           <div class="waitlist-client">
             <div class="waitlist-code">${w.code} · llegó ${w.waiting}</div>
             <div class="waitlist-name">${w.name}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
           </div>
-          ${isAssignedToMe ? '<span class="priority-badge" style="background: var(--accent); color: white;">📋 Para ti</span>' : (priBadge[w.priority] || priBadge['normal'])}
+          ${priBadge[w.priority] || priBadge['normal']}
         </div>
-        ${assignBadge}
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${w.obs ? `<div class="waitlist-obs">📝 ${w.obs}</div>` : ''}
         <div class="waitlist-actions">
-          <button class="btn-take" onclick="openTake('${w.id}', '${w.name}', '${w.service}', ${w.isTop})">${isAssignedToMe ? 'Tomar mi clienta' : 'Tomar clienta'}</button>
+          <button class="btn-take" onclick="openTake('${w.id}', '${w.name}', '${w.service}', ${w.isTop})">Tomar clienta</button>
         </div>
-      </div>`;
-    }).join('');
+      </div>
+    `).join('');
   }
 
   function openTake(id, name, service, isTop) {
@@ -2916,27 +2710,14 @@
     const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
     const promoData = activePromos[clientName];
     
-    // Si hay promo + servicios extra, sumar ambos
-    let finalTotal = total;
-    let promoName = '';
-    let regularTotal = total;
-    if (promoData) {
-      // Servicios extra = los que no son la promo
-      const extraSvcs = svcs.filter(s => !s.isPromo);
-      const extraTotal = extraSvcs.reduce((sum, s) => sum + Number(s.price), 0);
-      finalTotal = promoData.promo.price + extraTotal;
-      promoName = promoData.promo.name;
-      regularTotal = promoData.promo.regular + extraTotal;
-    }
-    
     try {
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
         servicio: svcNames,
-        total: String(finalTotal),
-        promoNombre: promoName,
-        precioRegular: String(regularTotal)
+        total: promoData ? String(promoData.promo.price) : String(total),
+        promoNombre: promoData ? promoData.promo.name : '',
+        precioRegular: promoData ? String(promoData.promo.regular) : String(total)
       });
     } catch (err) { console.error(err); }
 
@@ -2954,35 +2735,22 @@
   async function finishSlot2() {
     const user = window.currentUser;
     const clientName = document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '';
-    const svcs = slotServices[2] || [];
-    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
-    const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
+    const serviceName = document.getElementById('as2ServiceName')?.textContent || '';
+    const price = document.getElementById('as2Total')?.textContent?.replace('$', '') || '0';
     const promoData = activePromos[clientName];
-    
-    let finalTotal = total;
-    let promoName = '';
-    let regularTotal = total;
-    if (promoData) {
-      const extraSvcs = svcs.filter(s => !s.isPromo);
-      const extraTotal = extraSvcs.reduce((sum, s) => sum + Number(s.price), 0);
-      finalTotal = promoData.promo.price + extraTotal;
-      promoName = promoData.promo.name;
-      regularTotal = promoData.promo.regular + extraTotal;
-    }
     
     try {
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
-        servicio: svcNames,
-        total: String(finalTotal),
-        promoNombre: promoName,
-        precioRegular: String(regularTotal)
+        servicio: serviceName,
+        total: price,
+        promoNombre: promoData ? promoData.promo.name : '',
+        precioRegular: promoData ? String(promoData.promo.regular) : price
       });
     } catch (err) { console.error(err); }
 
     if (promoData) delete activePromos[clientName];
-    slotServices[2] = [];
 
     if (user && activeClients[user.name]) {
       activeClients[user.name].splice(1, 1);
@@ -2990,262 +2758,6 @@
     }
     alert('✓ Servicio finalizado. Mikaela procederá al cobro.');
     show('staffHome');
-  }
-
-  // ============================================
-  // POST-SERVICE OPTIONS (3 opciones al finalizar)
-  // ============================================
-
-  function openPostServiceOptions(slot) {
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
-    const svcs = slotServices[slot] || [];
-    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
-    
-    if (svcs.length === 0) {
-      alert('Agregá al menos un servicio antes de finalizar');
-      return;
-    }
-    
-    document.getElementById('postServiceClientInfo' + slot).innerHTML = 
-      '<strong>' + clientName + '</strong> · ' + svcs.length + ' servicio' + (svcs.length > 1 ? 's' : '') + ' · $' + total;
-    
-    const user = window.currentUser;
-    const myArea = user?.area || 'cejas';
-    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-    
-    // Mostrar opción de promo si tiene promo multi-área activa
-    const promoData = activePromos[clientName];
-    const promoOption = document.getElementById('postServicePromoOption' + slot);
-    if (promoData && promoData.promo.division && promoData.promo.division.length > 1) {
-      const otherAreas = promoData.promo.division.filter(d => d.area !== areaLabel);
-      if (otherAreas.length > 0) {
-        const nextAreas = otherAreas.map(d => d.area).join(' + ');
-        document.getElementById('postServicePromoDetail' + slot).textContent = 
-          promoData.promo.name + ' → pasa a ' + nextAreas;
-        promoOption.style.display = 'block';
-      } else {
-        promoOption.style.display = 'none';
-      }
-    } else {
-      promoOption.style.display = 'none';
-    }
-    
-    // Mostrar opción "Pasar a otra área" si hay servicios de áreas diferentes a la mía
-    const passOption = document.getElementById('postServicePassOption' + slot);
-    if (passOption) {
-      const myAreaKeys = AREA_FILTER[myArea] || [myArea];
-      const areaKeyMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'depilacion': 'depilacion', 'Pestañas': 'pestanas', 'pestanas': 'pestanas', 'Lifting/Retiro': 'retiro_lifting', 'Facial': 'facial', 'facial': 'facial', 'cejas': 'cejas' };
-      const otherAreaServices = svcs.filter(s => {
-        if (s.isPromo) return false; // La promo se maneja con "Continuar promo"
-        const svcAreaKey = areaKeyMap[s.area] || s.area;
-        return !myAreaKeys.includes(svcAreaKey);
-      });
-      
-      if (otherAreaServices.length > 0) {
-        const otherAreaNames = [...new Set(otherAreaServices.map(s => s.area))].join(' + ');
-        document.getElementById('postServicePassDetail' + slot).textContent = 
-          'Tiene servicios de ' + otherAreaNames + ' pendientes';
-        passOption.style.display = 'block';
-      } else {
-        passOption.style.display = 'none';
-      }
-    }
-    
-    document.getElementById('postServiceModal' + slot).classList.add('active');
-  }
-
-  // Opción 1: Mantener clienta (agregar más servicios)
-  function postServiceKeep(slot) {
-    closeModal();
-    // Simplemente vuelve a la pantalla de atención — la chica puede agregar más servicios
-    alert('✓ Podés seguir agregando servicios a esta clienta.');
-  }
-
-  // Opción 2: Devolver a lista de espera
-  function postServiceReturn(slot) {
-    closeModal();
-    document.getElementById('returnMotivo' + slot).value = '';
-    document.getElementById('returnToListModal' + slot).classList.add('active');
-  }
-
-  async function confirmReturnToList(slot) {
-    const user = window.currentUser;
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
-    const motivo = document.getElementById('returnMotivo' + slot).value.trim();
-    
-    closeModal();
-    
-    try {
-      await apiPost('devolverALista', {
-        chicaNombre: user?.name || '',
-        clienteNombre: clientName,
-        motivo: motivo
-      });
-    } catch (err) { console.error('Error devolviendo a lista:', err); }
-    
-    // Limpiar slot local
-    slotServices[slot] = [];
-    const promoData = activePromos[clientName];
-    if (promoData) delete activePromos[clientName];
-    
-    if (user && activeClients[user.name]) {
-      activeClients[user.name].splice(slot - 1, 1);
-      updateCapacityUI(user.name);
-    }
-    
-    simulateNotif('mikaela', clientName + ' devuelta a espera', 'Por ' + (user?.name || 'staff') + (motivo ? ': ' + motivo : ''), false);
-    alert('↩️ ' + clientName + ' devuelta a la lista de espera.' + (motivo ? '\nMotivo: ' + motivo : ''));
-    show('staffHome');
-  }
-
-  // Opción 3: Continuar promo (pasa a siguiente área via lista de espera)
-  async function postServiceContinuePromo(slot) {
-    const user = window.currentUser;
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
-    const promoData = activePromos[clientName];
-    
-    if (!promoData) {
-      alert('No hay promo activa para esta clienta');
-      closeModal();
-      return;
-    }
-    
-    closeModal();
-    
-    const myArea = user?.area || 'cejas';
-    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-    const myDiv = promoData.promo.division.find(d => d.area === areaLabel);
-    const myPrice = myDiv ? myDiv.monto : 0;
-    
-    // Determinar las áreas que faltan
-    if (!promoData.completedAreas.includes(myArea)) {
-      promoData.completedAreas.push(myArea);
-    }
-    const allPromoAreas = promoData.promo.division.map(d => d.area);
-    const completedLabels = [areaLabel];
-    const pendingAreas = allPromoAreas.filter(a => !completedLabels.includes(a));
-    const nextAreaLabel = pendingAreas.length > 0 ? pendingAreas.join(' + ') : '';
-    
-    // Calcular monto de la siguiente área
-    const pendingDivisions = promoData.promo.division.filter(d => d.area !== areaLabel);
-    const montoSiguiente = pendingDivisions.length > 0 ? pendingDivisions.reduce((sum, d) => sum + (Number(d.monto) || 0), 0) : 0;
-    
-    // Determinar la clave de área de la siguiente parte para el Sheet
-    let nextAreaKey = '';
-    if (pendingAreas.length > 0) {
-      const nextArea = pendingAreas[0];
-      if (nextArea.includes('Cejas') || nextArea.includes('Depilación')) nextAreaKey = 'cejas';
-      else if (nextArea.includes('Pestañas')) nextAreaKey = 'pestanas';
-      else if (nextArea.includes('Facial')) nextAreaKey = 'facial';
-    }
-    
-    // Devolver a lista de espera con info de la promo y qué falta
-    try {
-      await apiPost('continuarPromoALista', {
-        chicaNombre: user?.name || '',
-        clienteNombre: clientName,
-        montoChica: String(myPrice),
-        montoSiguienteArea: String(montoSiguiente),
-        nuevaArea: nextAreaKey,
-        areaCompletada: areaLabel,
-        areasFaltantes: nextAreaLabel,
-        servicioActualizado: promoData.promo.name + ' (PROMO) · ✅ ' + areaLabel + ' · Falta: ' + nextAreaLabel
-      });
-    } catch (err) { console.error(err); }
-    
-    // Limpiar slot local
-    slotServices[slot] = [];
-    if (user && activeClients[user.name]) {
-      activeClients[user.name].splice(slot - 1, 1);
-      updateCapacityUI(user.name);
-    }
-    
-    simulateNotif('mikaela', '🏷 ' + clientName + ' → ' + nextAreaLabel, 'Promo: ' + promoData.promo.name + ' · ' + areaLabel + ' completada por ' + (user?.name || ''), false);
-    alert('✓ Tu parte de la promo "' + promoData.promo.name + '" está completa.\nTu comisión: 30% sobre $' + myPrice + ' = $' + (myPrice * 0.3).toFixed(2) + '\n\n➡️ ' + clientName + ' vuelve a la lista de espera para que ' + nextAreaLabel + ' la atienda.');
-    show('staffHome');
-  }
-
-  // Opción 4: Pasar a otra área (servicios mixtos en el ticket)
-  async function postServicePassToArea(slot) {
-    const user = window.currentUser;
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
-    const svcs = slotServices[slot] || [];
-    const myArea = user?.area || 'cejas';
-    const myAreaKeys = AREA_FILTER[myArea] || [myArea];
-    const myAreaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-    
-    // Separar servicios: los míos (incluyendo promo de mi área) y los de otra área
-    const areaKeyMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting/Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    
-    const myServices = [];
-    const otherServices = [];
-    
-    svcs.forEach(s => {
-      if (s.isPromo) {
-        // La promo es mía
-        myServices.push(s);
-      } else {
-        const k = areaKeyMap[s.area] || s.area;
-        if (myAreaKeys.includes(k) || k === myArea) {
-          myServices.push(s);
-        } else {
-          otherServices.push(s);
-        }
-      }
-    });
-    
-    const myTotal = myServices.reduce((sum, s) => sum + Number(s.price), 0);
-    const otherTotal = otherServices.reduce((sum, s) => sum + Number(s.price), 0);
-    const otherAreaNames = [...new Set(otherServices.map(s => s.area))];
-    const mySvcNames = myServices.map(s => s.name).join(' + ');
-    const otherSvcNames = otherServices.map(s => s.name).join(' + ');
-    
-    // Determinar la clave de área para la siguiente
-    let nextAreaKey = '';
-    if (otherAreaNames.length > 0) {
-      const first = otherAreaNames[0];
-      nextAreaKey = areaKeyMap[first] || first;
-    }
-    
-    closeModal();
-    
-    try {
-      await apiPost('continuarPromoALista', {
-        chicaNombre: user?.name || '',
-        clienteNombre: clientName,
-        montoChica: String(myTotal),
-        montoSiguienteArea: String(otherTotal),
-        nuevaArea: nextAreaKey,
-        areaCompletada: myAreaLabel,
-        areasFaltantes: otherSvcNames || otherAreaNames.join(' + '),
-        servicioActualizado: mySvcNames + ' ✅ por ' + (user?.name || '')
-      });
-    } catch (err) { console.error(err); }
-    
-    // Limpiar slot local
-    slotServices[slot] = [];
-    const promoData = activePromos[clientName];
-    if (promoData) delete activePromos[clientName];
-    
-    if (user && activeClients[user.name]) {
-      activeClients[user.name].splice(slot - 1, 1);
-      updateCapacityUI(user.name);
-    }
-    
-    const pct = myArea === 'facial' ? 0.4 : 0.3;
-    simulateNotif('mikaela', '➡️ ' + clientName + ' → ' + otherAreaNames.join(' + '), 'Servicios pendientes: ' + otherSvcNames, false);
-    alert('✓ Tus servicios completados.\nTu comisión: ' + (pct*100) + '% sobre $' + myTotal + ' = $' + (myTotal * pct).toFixed(2) + '\n\n➡️ ' + clientName + ' vuelve a lista de espera para:\n' + otherSvcNames);
-    show('staffHome');
-  }
-
-  // Opción directa: Finalizar y enviar a cobro
-  async function postServiceFinish(slot) {
-    closeModal();
-    if (slot === 1) {
-      await finishSlot1();
-    } else {
-      await finishSlot2();
-    }
   }
 
   // === RETIRO GRATIS / $10 ===
@@ -3296,37 +2808,7 @@
         // Inicializar lista de servicios con el servicio tentativo
         slotServices[1] = [];
         if (a1.servicio && a1.servicio !== '—') {
-          const svcPrice = Number(a1.total) || 0;
-          const isPromo = a1.promoNombre && a1.promoNombre !== '';
-          slotServices[1].push({ 
-            name: a1.servicio, 
-            price: svcPrice, 
-            area: a1.area,
-            isPromo: isPromo,
-            promoName: a1.promoNombre || ''
-          });
-          
-          // Si tiene promo, registrarla en activePromos
-          if (isPromo) {
-            // Buscar la promo en PROMOS para tener la división
-            if (PROMOS.length === 0) {
-              try {
-                const promoResult = await apiGet('getPromos');
-                if (promoResult.success && promoResult.promos) {
-                  PROMOS = promoResult.promos.map(p => {
-                    let division = [];
-                    if (p.division) { try { division = JSON.parse(p.division); } catch(e) {} }
-                    return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, from: p.desde ? String(p.desde) : '', to: p.hasta ? String(p.hasta) : '', active: p.activa !== false, division: division };
-                  });
-                }
-              } catch(e) {}
-            }
-            const matchedPromo = PROMOS.find(p => a1.promoNombre.includes(p.name) || p.name.includes(a1.promoNombre.replace(' (PROMO)', '')));
-            if (matchedPromo) {
-              activePromos[a1.nombre] = { promo: matchedPromo, startedBy: user.area, completedAreas: [user.area] };
-              showPromoBanner(1, matchedPromo, user.area);
-            }
-          }
+          slotServices[1].push({ name: a1.servicio, price: 0, area: a1.area });
         }
         renderServicesList(1);
         
@@ -3355,100 +2837,23 @@
       const servResult = await apiGet('getServiciosHoy', { chica: user.name });
       const servList = document.getElementById('staffServiciosHoy');
       if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
-        const servicios = servResult.servicios;
-        document.getElementById('staffStatHoy').textContent = servicios.length;
-        
-        const pct = user.area === 'facial' ? 0.4 : 0.3;
-        const myAreaLabel = user.area === 'cejas' ? '💅 Cejas' : user.area === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-        
-        // Cargar promos si necesario para calcular división
-        if (PROMOS.length === 0) {
-          try {
-            const pr = await apiGet('getPromos');
-            if (pr.success && pr.promos) {
-              PROMOS = pr.promos.map(p => {
-                let div = []; if (p.division) { try { div = JSON.parse(p.division); } catch(e) {} }
-                return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: div };
-              });
-            }
-          } catch(e) {}
-        }
-        
-        // Calcular comisión correcta por servicio
-        let totalComisionDia = 0;
-        
-        servList.innerHTML = servicios.map(s => {
+        document.querySelector('#staffHome .stat .value').textContent = servResult.servicios.length; // stat "Hoy"
+        servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servResult.servicios.map(s => {
           const initials = s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          const svcTotal = Number(s.total) || 0;
-          const metodo = String(s.metodoPago || 'Efectivo');
-          const metodoIcon = metodo.toLowerCase().includes('tarjeta') ? '💳' : metodo.toLowerCase().includes('transfer') ? '📱' : '💵';
-          const promoName = String(s.promoNombre || '');
-          const isPromo = promoName !== '' && promoName !== 'undefined';
-          
-          // Determinar el monto sobre el que esta chica comisiona
-          let montoComisionable = svcTotal;
-          if (isPromo) {
-            const cleanPromoName = promoName.replace(' (PROMO)', '').replace(/\s*·.*$/, '').trim();
-            const matchedPromo = PROMOS.find(p => cleanPromoName.includes(p.name) || p.name.includes(cleanPromoName));
-            if (matchedPromo && matchedPromo.division) {
-              const myDiv = matchedPromo.division.find(d => d.area === myAreaLabel);
-              if (myDiv) {
-                montoComisionable = Number(myDiv.monto) || svcTotal;
-              }
-            }
-          }
-          
-          const svcComision = montoComisionable * pct;
-          totalComisionDia += svcComision;
-          
           return `
-          <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid var(--success);">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div class="client-avatar" style="flex-shrink: 0;">${initials}</div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 700; font-size: 14px;">${s.nombre}</div>
-                <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${s.servicio}</div>
-                <div style="font-size: 11px; color: var(--ink-faint); font-weight: 500; margin-top: 2px;">${s.horaToma || '—'} · ${metodoIcon} ${metodo}</div>
+            <div class="client-row">
+              <div class="client-avatar">${initials}</div>
+              <div class="client-info">
+                <div class="client-name">${s.nombre}</div>
+                <div class="client-meta">${s.servicio} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
               </div>
-              <div style="text-align: right; flex-shrink: 0;">
-                <div style="font-size: 16px; font-weight: 800; color: var(--success);">+$${svcComision.toFixed(2)}</div>
-                <div style="font-size: 10px; color: var(--ink-faint); font-weight: 600;">${(pct*100).toFixed(0)}% de $${montoComisionable}</div>
-              </div>
-            </div>
-          </div>`;
-        }).join('');
-        
-        document.getElementById('staffStatDia').textContent = '$' + totalComisionDia.toFixed(0);
+              <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--ink-faint);">✓</div>
+            </div>`;
+        }).join('') + '</div>';
       } else {
-        document.getElementById('staffStatHoy').textContent = '0';
-        document.getElementById('staffStatDia').textContent = '$0';
+        document.querySelector('#staffHome .stat .value').textContent = '0';
         servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
       }
-      
-      // Cargar comisión acumulada de la semana
-      try {
-        const comResult = await apiGet('getComisiones', { chica: user.name });
-        if (comResult.success && comResult.comisiones && comResult.comisiones.length > 0) {
-          const c = comResult.comisiones[0];
-          const comAcum = Number(c.comision) || 0;
-          const facturado = Number(c.facturado) || 0;
-          const numServ = Number(c.servicios) || 0;
-          const porcentaje = c.porcentaje || '30%';
-          
-          COMM_DATA = {
-            value: '$' + comAcum.toFixed(2),
-            detail: porcentaje + ' sobre $' + facturado.toFixed(0) + ' · ' + numServ + ' servicios',
-            day: '$' + comAcum.toFixed(0),
-            items: []
-          };
-          
-          // Auto-mostrar comisión
-          document.getElementById('commValue').textContent = COMM_DATA.value;
-          document.getElementById('commDetail').textContent = COMM_DATA.detail;
-          commVisible = true;
-          document.getElementById('commToggle').style.background = 'rgba(255,255,255,0.35)';
-        }
-      } catch(e) { console.error('Error cargando comisiones:', e); }
     } catch (err) {
       console.error('Error cargando staff home:', err);
     }
@@ -3629,37 +3034,11 @@
   }
 
   // === PROMO EN LLEGADA (Mikaela) ===
-  async function toggleArrivalPromo(show) {
+  function toggleArrivalPromo(show) {
     document.getElementById('arrPromoOff').style.display = show ? 'none' : 'block';
     document.getElementById('arrPromoOn').style.display = show ? 'block' : 'none';
     
     if (show) {
-      // Si no hay promos cargadas, traerlas del Sheet
-      if (PROMOS.length === 0) {
-        try {
-          const result = await apiGet('getPromos');
-          if (result.success && result.promos && result.promos.length > 0) {
-            PROMOS = result.promos.map(p => {
-              let division = [];
-              if (p.division) {
-                try { division = JSON.parse(p.division); } catch(e) {}
-              }
-              return {
-                id: p.id,
-                name: p.nombre,
-                services: p.servicios,
-                price: Number(p.precioCombo) || 0,
-                regular: Number(p.sumaIndividual) || 0,
-                from: p.desde ? String(p.desde) : '',
-                to: p.hasta ? String(p.hasta) : '',
-                active: p.activa !== false,
-                division: division
-              };
-            });
-          }
-        } catch (err) { console.error('Error cargando promos:', err); }
-      }
-
       // Poblar select con promos activas
       const sel = document.getElementById('arrPromoSelect');
       sel.innerHTML = '<option value="">Seleccionar promo...</option>';
@@ -3716,16 +3095,6 @@
         document.getElementById('mkStatEspera').textContent = esperando.length;
         document.getElementById('mkStatServicio').textContent = enServicio.length;
         document.getElementById('mkStatCobrar').textContent = porCobrar.length;
-        
-        // Cargar contador de pagados
-        try {
-          const servResult = await apiGet('getServiciosHoy');
-          if (servResult.success && servResult.servicios) {
-            document.getElementById('mkStatPagados').textContent = servResult.servicios.length;
-          } else {
-            document.getElementById('mkStatPagados').textContent = '0';
-          }
-        } catch(e) { document.getElementById('mkStatPagados').textContent = '0'; }
 
         // Lista de espera
         document.getElementById('mkEsperaCount').textContent = esperando.length;
@@ -3736,16 +3105,14 @@
           esperaList.innerHTML = esperando.map(w => {
             const initials = w.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
             const pri = String(w.prioridad || 'normal').toLowerCase();
-            const tomada = String(w.tomadaPor || '').trim();
-            const isAsignada = tomada !== '';
             return `
-            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}" ${isAsignada ? 'style="border-left-color: var(--accent);"' : ''}>
+            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}">
               <div class="waitlist-top">
                 <div class="waitlist-client">
                   <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
                   <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
                 </div>
-                ${isAsignada ? '<span class="priority-badge" style="background: var(--accent); color: white;">📋 → ' + tomada + '</span>' : (priBadge[pri] || priBadge['normal'])}
+                ${priBadge[pri] || priBadge['normal']}
               </div>
               <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
             </div>`;
@@ -3796,113 +3163,6 @@
       console.error('Error cargando dashboard Mikaela:', err);
     }
   }
-  async function loadMikaelaServicios() {
-    const list = document.getElementById('mkServiciosList');
-    list.innerHTML = '<div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="animation: pulse 1.5s infinite;">⏳ Cargando servicios pagados...</div></div>';
-    
-    // Cargar promos para buscar divisiones
-    if (PROMOS.length === 0) {
-      try {
-        const promoResult = await apiGet('getPromos');
-        if (promoResult.success && promoResult.promos) {
-          PROMOS = promoResult.promos.map(p => {
-            let division = [];
-            if (p.division) { try { division = JSON.parse(p.division); } catch(e) {} }
-            return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: division };
-          });
-        }
-      } catch(e) {}
-    }
-    
-    try {
-      const result = await apiGet('getServiciosHoy');
-      if (result.success && result.servicios && result.servicios.length > 0) {
-        const servicios = result.servicios;
-        
-        document.getElementById('mkServCountDia').textContent = servicios.length;
-        document.getElementById('mkServListCount').textContent = servicios.length;
-        document.getElementById('mkStatPagados').textContent = servicios.length;
-        
-        list.innerHTML = servicios.map(s => {
-          const initials = String(s.nombre || '').split(' ').map(n => n[0]).join('').slice(0, 2);
-          const metodo = String(s.metodoPago || 'Efectivo');
-          const metodoIcon = metodo.toLowerCase().includes('tarjeta') ? '💳' : metodo.toLowerCase().includes('transfer') ? '📱' : '💵';
-          const total = Number(s.total) || 0;
-          const promoName = String(s.promoNombre || '');
-          const isPromo = promoName !== '' && promoName !== 'undefined';
-          
-          // Buscar la división de la promo para el desglose
-          let desgloseHtml = '';
-          let staffList = s.tomadaPor || '—';
-          
-          if (isPromo) {
-            const matchedPromo = PROMOS.find(p => promoName.includes(p.name) || p.name === promoName.replace(' (PROMO)', ''));
-            if (matchedPromo && matchedPromo.division && matchedPromo.division.length > 0) {
-              // Extraer las chicas que participaron de las observaciones
-              const obs = String(s.observaciones || '');
-              const chicasObs = obs.match(/completada por (\w+)/g);
-              let chicasPromo = [];
-              if (chicasObs) {
-                chicasObs.forEach(m => {
-                  const name = m.replace('completada por ', '');
-                  if (!chicasPromo.includes(name)) chicasPromo.push(name);
-                });
-              }
-              if (s.tomadaPor && !chicasPromo.includes(s.tomadaPor)) chicasPromo.push(s.tomadaPor);
-              staffList = chicasPromo.length > 0 ? chicasPromo.join(' + ') : s.tomadaPor;
-              
-              desgloseHtml = '<div style="background: var(--bg); border-radius: 12px; padding: 10px 12px; margin-top: 10px;">' +
-                '<div style="font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px;">Desglose de la promo</div>' +
-                matchedPromo.division.map(d => {
-                  return '<div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-bottom: 1px solid var(--line);">' +
-                    '<span style="font-weight: 600;">' + d.area + '</span>' +
-                    '<span style="font-weight: 800;">$' + d.monto + '</span>' +
-                  '</div>';
-                }).join('') +
-                '<div style="display: flex; justify-content: space-between; padding: 6px 0 0; font-size: 13px;">' +
-                  '<span style="font-weight: 800;">Total promo</span>' +
-                  '<span style="font-weight: 800; color: var(--accent-deep);">$' + matchedPromo.price + '</span>' +
-                '</div>' +
-              '</div>';
-            }
-          }
-          
-          return `
-          <div class="card" style="margin-bottom: 10px; padding: 16px; border-left: 4px solid var(--success);">
-            <div style="display: flex; align-items: flex-start; gap: 12px;">
-              <div class="client-avatar" style="flex-shrink: 0; margin-top: 2px;">${initials}</div>
-              <div style="flex: 1; min-width: 0;">
-                <div style="font-weight: 800; font-size: 16px;">${s.nombre}</div>
-                <div style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 3px;">${s.servicio}</div>
-                ${isPromo ? '<div style="display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; padding: 2px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; margin-top: 4px;">🏷 PROMO</div>' : ''}
-                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--ink-faint); font-weight: 600;">
-                  <span>👩 ${staffList}</span>
-                  <span>·</span>
-                  <span>🕐 ${s.horaToma || '—'}</span>
-                  <span>·</span>
-                  <span>${metodoIcon} ${metodo}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line);">
-                  <span style="font-size: 12px; font-weight: 600; color: var(--ink-soft);">Total cobrado</span>
-                  <span style="font-size: 20px; font-weight: 800; color: var(--accent-deep);">$${total}</span>
-                </div>
-                ${desgloseHtml}
-              </div>
-            </div>
-          </div>`;
-        }).join('');
-      } else {
-        document.getElementById('mkServCountDia').textContent = '0';
-        document.getElementById('mkServListCount').textContent = '0';
-        document.getElementById('mkStatPagados').textContent = '0';
-        list.innerHTML = '<div class="card" style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="font-size: 28px; margin-bottom: 8px;">✨</div>No hay servicios pagados hoy</div>';
-      }
-    } catch (err) {
-      console.error('Error cargando servicios pagados:', err);
-      list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--danger); font-size: 13px;">Error al cargar servicios</div>';
-    }
-  }
-
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
     const countEl = document.getElementById('porCobrarCount');
@@ -3938,8 +3198,6 @@
     window._cobrarTotalPromo = total;
     window._cobrarTotalRegular = precioRegular || total;
     window._cobrarTienePromo = promoNombre && promoNombre !== '' && promoNombre !== 'undefined';
-    window._cobrarChica = chica;
-    window._cobrarPromoNombre = promoNombre || '';
     
     document.getElementById('cobrarClientName').textContent = nombre;
     document.getElementById('cobrarService').textContent = servicio;
@@ -4001,48 +3259,15 @@
     btn.disabled = true;
 
     // Si tiene promo y paga con tarjeta, cobrar precio regular
-    const totalFinal = Number((window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
+    const totalFinal = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
       ? window._cobrarTotalRegular
-      : window._cobrarTotalPromo) || 0;
-
-    // Para promos: buscar el monto asignado a la chica que atendió esta parte
-    let montoComision = totalFinal;
-    if (window._cobrarTienePromo && window._cobrarChica) {
-      const chicaName = window._cobrarChica;
-      const promoName = String(window._cobrarPromoNombre || '').replace(' (PROMO)', '').replace(/\s*·.*$/, '').trim();
-      
-      // Cargar promos si están vacías
-      if (PROMOS.length === 0) {
-        try {
-          const pr = await apiGet('getPromos');
-          if (pr.success && pr.promos) {
-            PROMOS = pr.promos.map(p => {
-              let div = []; if (p.division) { try { div = JSON.parse(p.division); } catch(e) {} }
-              return { id: p.id, name: p.nombre, services: p.servicios, price: Number(p.precioCombo) || 0, regular: Number(p.sumaIndividual) || 0, active: p.activa !== false, division: div };
-            });
-          }
-        } catch(e) {}
-      }
-      
-      const matchedPromo = PROMOS.find(p => promoName.includes(p.name) || p.name.includes(promoName));
-      if (matchedPromo && matchedPromo.division && matchedPromo.division.length > 0) {
-        const chicaStaff = ALL_STAFF.find(s => s.name === chicaName);
-        if (chicaStaff) {
-          const chicaAreaLabel = chicaStaff.area === 'cejas' ? '💅 Cejas' : chicaStaff.area === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-          const chicaDiv = matchedPromo.division.find(d => d.area === chicaAreaLabel);
-          if (chicaDiv && Number(chicaDiv.monto) > 0) {
-            montoComision = Number(chicaDiv.monto);
-          }
-        }
-      }
-    }
+      : window._cobrarTotalPromo;
 
     try {
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
         metodoPago: window._cobrarPago,
-        totalCobrado: totalFinal,
-        montoComision: montoComision
+        totalCobrado: totalFinal
       });
     } catch (err) { console.error(err); }
 
@@ -4126,14 +3351,24 @@
   }
 
   // === DIRECTORIO DE CLIENTAS ===
-  const CLIENT_DIRECTORY = [];
+  const CLIENT_DIRECTORY = [
+    { key: 'sofia', code: 'C-0004', name: 'Sofía López', phone: '0999-456-789', isTop: true, visits: 5, lastVisit: '12/04' },
+    { key: 'isabella', code: 'C-0007', name: 'Isabella Vera', phone: '0998-321-654', isTop: false, visits: 2, lastVisit: '05/04' },
+    { key: 'carmen', code: 'C-0002', name: 'Carmen Molina', phone: '0997-111-222', isTop: true, visits: 8, lastVisit: '19/04' },
+    { key: null, code: 'C-0001', name: 'Andrea Rivas', phone: '0996-333-444', isTop: false, visits: 3, lastVisit: '19/04' },
+    { key: null, code: 'C-0003', name: 'Daniela Torres', phone: '0995-555-666', isTop: true, visits: 4, lastVisit: '19/04' },
+    { key: null, code: 'C-0005', name: 'Valentina Núñez', phone: '0994-777-888', isTop: true, visits: 6, lastVisit: '19/04' },
+    { key: null, code: 'C-0006', name: 'Gabriela Mendoza', phone: '0993-999-000', isTop: false, visits: 1, lastVisit: '15/04' },
+    { key: null, code: 'C-0008', name: 'Paola Reyes', phone: '', isTop: false, visits: 1, lastVisit: '18/04' },
+    { key: null, code: 'C-0009', name: 'Lucía Paredes', phone: '0991-222-333', isTop: false, visits: 1, lastVisit: '19/04' },
+  ];
 
   async function renderClientDirectory() {
     const search = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const list = document.getElementById('clientDirectoryList');
     
     // Siempre recargar desde API (no usar cache para el directorio)
-    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas desde nuestro local...</div></div>';
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas desde Rosa Aguilera...</div></div>';
     
     try {
       const result = await apiGet('getClientas');
@@ -4295,13 +3530,13 @@
 
   // === RETIRO DE PESTAÑAS: GRATIS SI ES DE ROSA AGUILERA ===
   // Esta lógica se aplica en los servicios SP025 (Retiro de pestañas), SP031 (Retiro de lifting)
-  // Si la clienta tiene historial de pestañas en nuestro local → $0
+  // Si la clienta tiene historial de pestañas en Rosa Aguilera → $0
   // Si no tiene historial (viene de otro local) → $10
   function getRetiroPrice(clientKey) {
     const client = CLIENT_PROFILES[clientKey];
     if (!client) return 10;
     const pestHistory = client.pestanas?.history || [];
-    // Si tiene al menos 1 servicio de pestañas en nuestro historial, es de nuestro local
+    // Si tiene al menos 1 servicio de pestañas en nuestro historial, es de Rosa Aguilera
     const hasOurService = pestHistory.some(h => 
       !h.service.includes('Retiro') && !h.service.includes('Lifting')
     );
@@ -4310,9 +3545,26 @@
 
   // === PAGOS Y CIERRE SEMANAL ===
   const PAY_STAFF = [
+    { name: 'María', area: 'Cejas', comm: '30%', acumulado: 127.50, servicios: 28, facturado: 425, paid: false,
+      dias: [{ dia: 'Lun', serv: 5, total: 22.50 }, { dia: 'Mar', serv: 4, total: 18.00 }, { dia: 'Mié', serv: 6, total: 25.50 }, { dia: 'Jue', serv: 5, total: 21.00 }, { dia: 'Vie', serv: 4, total: 19.50 }, { dia: 'Sáb', serv: 4, total: 21.00 }] },
+    { name: 'Keyla', area: 'Cejas', comm: '30%', acumulado: 138.00, servicios: 30, facturado: 460, paid: false,
+      dias: [{ dia: 'Lun', serv: 6, total: 28.50 }, { dia: 'Mar', serv: 5, total: 23.00 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 6, total: 27.00 }, { dia: 'Vie', serv: 4, total: 18.50 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
+    { name: 'Lesly', area: 'Cejas', comm: '30%', acumulado: 109.50, servicios: 24, facturado: 365, paid: false,
+      dias: [{ dia: 'Lun', serv: 4, total: 18.00 }, { dia: 'Mar', serv: 4, total: 17.50 }, { dia: 'Mié', serv: 5, total: 22.00 }, { dia: 'Jue', serv: 4, total: 18.00 }, { dia: 'Vie', serv: 3, total: 15.00 }, { dia: 'Sáb', serv: 4, total: 19.00 }] },
+    { name: 'Yadira', area: 'Pestañas', comm: '30%', acumulado: 234.00, servicios: 14, facturado: 780, paid: false,
+      dias: [{ dia: 'Lun', serv: 3, total: 45.00 }, { dia: 'Mar', serv: 2, total: 36.00 }, { dia: 'Mié', serv: 3, total: 48.00 }, { dia: 'Jue', serv: 2, total: 39.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
+    { name: 'Diana', area: 'Pestañas', comm: '30%', acumulado: 207.00, servicios: 12, facturado: 690, paid: false,
+      dias: [{ dia: 'Lun', serv: 2, total: 36.00 }, { dia: 'Mar', serv: 2, total: 33.00 }, { dia: 'Mié', serv: 2, total: 39.00 }, { dia: 'Jue', serv: 2, total: 33.00 }, { dia: 'Vie', serv: 2, total: 33.00 }, { dia: 'Sáb', serv: 2, total: 33.00 }] },
+    { name: 'Laura', area: 'Facial', comm: '40%', acumulado: 238.00, servicios: 10, facturado: 595, paid: false,
+      dias: [{ dia: 'Lun', serv: 2, total: 44.00 }, { dia: 'Mar', serv: 1, total: 24.00 }, { dia: 'Mié', serv: 2, total: 48.00 }, { dia: 'Jue', serv: 2, total: 44.00 }, { dia: 'Vie', serv: 2, total: 46.00 }, { dia: 'Sáb', serv: 1, total: 32.00 }] },
   ];
 
-  const PAY_HISTORY = [];
+  const PAY_HISTORY = [
+    { week: 'Semana 16', dates: 'Abr 7–12', total: 1054, facturado: 3315, closed: '12/04/2026' },
+    { week: 'Semana 15', dates: 'Mar 31 – Abr 5', total: 982, facturado: 3090, closed: '05/04/2026' },
+    { week: 'Semana 14', dates: 'Mar 24–29', total: 1018, facturado: 3200, closed: '29/03/2026' },
+  ];
+
   let currentWeekClosed = false;
 
   async function renderPayments() {
@@ -4591,6 +3843,96 @@
 
   // === PERFILES DE CLIENTAS ===
   const CLIENT_PROFILES = {
+    sofia: {
+      name: 'Sofía López', code: 'C-0004', initials: 'SL', isTop: true, visits: 5, spent: 310, last: '12/04',
+      obs: 'Clienta frecuente. Siempre puntual. Prefiere que la atiendan Yadira o Diana.',
+      cejas: { 
+        obsArea: 'Cejas pobladas naturales. Solo depilación de forma, no quitar mucho.',
+        history: [
+          { date: '12/04', service: 'Depilación cejas', price: 8, by: 'María' },
+          { date: '28/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
+      ]},
+      depilacion: { obsArea: '', history: [] },
+      pestanas: {
+        fichas: [
+          { modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13', obs: 'Ojos sensibles, usar pegamento hipoalergénico. Le gusta el rizo C.', fecha: '12/04/2026', activa: true },
+          { modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14', obs: 'Probó muñeca pero prefirió volver a gato.', fecha: '15/03/2026', activa: false },
+          { modelo: 'Volumen ruso', diseno: 'Gato', tallas: '9-12-14', obs: 'Primera vez con volumen ruso, le gustó pero volvió a híbridas.', fecha: '01/02/2026', activa: false },
+        ],
+        history: [
+          { date: '12/04', service: 'Efecto híbridas', price: 60, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
+          { date: '28/03', service: 'Retoque híbridas', price: 35, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
+          { date: '15/03', service: 'Efecto híbridas', price: 60, by: 'Diana', modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14' },
+        ]
+      },
+      facial: { history: [] },
+    },
+    isabella: {
+      name: 'Isabella Vera', code: 'C-0007', initials: 'IV', isTop: false, visits: 2, spent: 55, last: '05/04',
+      obs: 'Piel sensible en zona de bikini, usar cera de baja temperatura.',
+      cejas: { 
+        obsArea: 'Pide cejas definidas pero naturales.',
+        history: [
+          { date: '05/04', service: 'Dep. cejas + maquillaje', price: 12, by: 'Lesly' },
+      ]},
+      depilacion: { 
+        obsArea: 'Piel MUY sensible en bikini. Solo cera baja temperatura. Se irrita fácil, aplicar gel calmante post.',
+        history: [
+          { date: '05/04', service: 'Dep. piernas completas', price: 30, by: 'Lesly' },
+          { date: '20/03', service: 'Dep. media pierna', price: 15, by: 'María' },
+      ]},
+      pestanas: { fichas: [], obsArea: '', history: [] },
+      facial: { obsArea: '', history: [] },
+    },
+    lucia: {
+      name: 'Lucía Paredes', code: 'C-0009', initials: 'LP', isTop: false, visits: 1, spent: 17, last: '20/04',
+      obs: 'Primera visita al salón.',
+      cejas: { obsArea: '', history: [
+        { date: '20/04', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
+      ]},
+      depilacion: { obsArea: '', history: [] },
+      pestanas: { fichas: [], obsArea: '', history: [] },
+      facial: { obsArea: '', history: [] },
+    },
+    carmen: {
+      name: 'Carmen Molina', code: 'C-0002', initials: 'CM', isTop: true, visits: 8, spent: 520, last: '19/04',
+      obs: 'Clienta VIP. Viene cada 2 semanas. Siempre combina facial con cejas.',
+      cejas: { history: [
+        { date: '05/04', service: 'Dep. cejas + pigmento', price: 17, by: 'María' },
+        { date: '22/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
+      ]},
+      depilacion: { history: [
+        { date: '22/03', service: 'Dep. bigote', price: 4, by: 'María' },
+      ]},
+      pestanas: { fichas: [], history: [] },
+      facial: {
+        ficha: {
+          fecha: '19/04/2026',
+          biotipo: 'Mixto',
+          fototipo: 'III (Fitzpatrick)',
+          edad: 34,
+          sexo: 'Femenino',
+          tipoPiel: 'Mixta',
+          signosLesiones: 'Comedones en zona T, poro abierto en mejillas',
+          signosHiper: 'Mejillas (leve)',
+          estadoPiel: 'Seborreica en zona T, deshidratada en contorno',
+          antecedentes: {
+            enfermedades: 'Ninguna reportada',
+            familiares: 'Madre con rosácea',
+            alergias: 'Ácido glicólico concentrado (>10%)',
+            medicamentos: 'Ninguno',
+            quirurgicos: 'Ninguno',
+            esteticos: 'Microdermoabrasión (2024), Peeling químico suave (ene 2026)'
+          },
+          obsExtra: 'Responde bien a limpieza con vapor. Evitar productos con fragancia. Prefiere sesiones de 60 min máximo. Zona del mentón tiende a brotes hormonales.'
+        },
+        history: [
+          { date: '19/04', service: 'Limpieza profunda', price: 60, by: 'Laura' },
+          { date: '05/04', service: 'Limpieza prof. + dermaplaning', price: 75, by: 'Laura' },
+          { date: '22/03', service: 'Limpieza prof. + hidratación', price: 67, by: 'Laura' },
+          { date: '08/03', service: 'Limpieza profunda', price: 60, by: 'Laura' },
+        ]},
+    },
   };
 
   let currentProfileClient = null;
@@ -4674,8 +4016,8 @@
     // Determinar si retiro es gratis o $10
     const retiroPrice = currentProfileClient ? getRetiroPrice(currentProfileClient) : 10;
     const retiroBanner = retiroPrice === 0 
-      ? '<div style="background: var(--success-bg); border: 1.5px solid #a3d4b1; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--success);">✅ Retiro de pestañas/lifting: <strong>GRATIS</strong></div><div style="font-size: 11px; color: #2d5a3a; font-weight: 500; margin-top: 2px;">Clienta con historial en nuestro local</div></div>'
-      : '<div style="background: var(--warning-bg); border: 1.5px solid #e0c89a; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--warning);">💰 Retiro de pestañas/lifting: <strong>$10</strong></div><div style="font-size: 11px; color: #7a5a1c; font-weight: 500; margin-top: 2px;">Sin historial en nuestro local — viene de otro local</div></div>';
+      ? '<div style="background: var(--success-bg); border: 1.5px solid #a3d4b1; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--success);">✅ Retiro de pestañas/lifting: <strong>GRATIS</strong></div><div style="font-size: 11px; color: #2d5a3a; font-weight: 500; margin-top: 2px;">Clienta con historial en Rosa Aguilera</div></div>'
+      : '<div style="background: var(--warning-bg); border: 1.5px solid #e0c89a; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;"><div style="font-size: 12px; font-weight: 700; color: var(--warning);">💰 Retiro de pestañas/lifting: <strong>$10</strong></div><div style="font-size: 11px; color: #7a5a1c; font-weight: 500; margin-top: 2px;">Sin historial en Rosa Aguilera — viene de otro local</div></div>';
     
     el.innerHTML = `
       ${retiroBanner}
@@ -4897,6 +4239,75 @@
   let currentPeriod = 'dia';
 
   const REPORT_DATA = {
+    maria: { name: 'María', area: 'Cejas · Depilación · Lifting',
+      dia: { servicios: 6, facturado: 87, comision: 26.1, clientas: 5, promos: 1,
+        desglose: [{ area: '💅 Cejas', count: 3, total: 42 }, { area: '🪒 Depilación', count: 2, total: 35 }, { area: 'Lifting/Retiro', count: 1, total: 10 }],
+        top: [{ name: 'Dep. cejas + pigmento', count: 2, total: 34 }, { name: 'Dep. piernas completas', count: 1, total: 30 }, { name: 'Retiro de pestañas', count: 1, total: 10 }] },
+      semana: { servicios: 28, facturado: 425, comision: 127.5, clientas: 22, promos: 4,
+        desglose: [{ area: '💅 Cejas', count: 15, total: 195 }, { area: '🪒 Depilación', count: 10, total: 190 }, { area: 'Lifting/Retiro', count: 3, total: 40 }],
+        top: [{ name: 'Dep. cejas + pigmento', count: 6, total: 102 }, { name: 'Dep. piernas completas', count: 4, total: 120 }, { name: 'Brow lamination', count: 3, total: 75 }, { name: 'Dep. axilas', count: 3, total: 27 }] },
+      mes: { servicios: 112, facturado: 1720, comision: 516, clientas: 85, promos: 14,
+        desglose: [{ area: '💅 Cejas', count: 58, total: 780 }, { area: '🪒 Depilación', count: 42, total: 760 }, { area: 'Lifting/Retiro', count: 12, total: 180 }],
+        top: [{ name: 'Dep. cejas + pigmento', count: 22, total: 374 }, { name: 'Dep. piernas completas', count: 15, total: 450 }, { name: 'Brow lamination', count: 12, total: 300 }, { name: 'Dep. axilas', count: 10, total: 90 }, { name: 'Dep. bikini completo', count: 8, total: 240 }] } },
+    lesly: { name: 'Lesly', area: 'Cejas · Depilación · Lifting',
+      dia: { servicios: 5, facturado: 72, comision: 21.6, clientas: 4, promos: 0,
+        desglose: [{ area: '💅 Cejas', count: 3, total: 40 }, { area: '🪒 Depilación', count: 2, total: 32 }],
+        top: [{ name: 'Dep. cejas + maquillaje', count: 2, total: 24 }, { name: 'Dep. media pierna', count: 2, total: 30 }] },
+      semana: { servicios: 24, facturado: 365, comision: 109.5, clientas: 19, promos: 3,
+        desglose: [{ area: '💅 Cejas', count: 13, total: 170 }, { area: '🪒 Depilación', count: 9, total: 165 }, { area: 'Lifting/Retiro', count: 2, total: 30 }],
+        top: [{ name: 'Dep. cejas', count: 7, total: 56 }, { name: 'Dep. piernas completas', count: 3, total: 90 }, { name: 'Dep. rostro completo', count: 3, total: 66 }] },
+      mes: { servicios: 98, facturado: 1480, comision: 444, clientas: 74, promos: 11,
+        desglose: [{ area: '💅 Cejas', count: 50, total: 660 }, { area: '🪒 Depilación', count: 38, total: 670 }, { area: 'Lifting/Retiro', count: 10, total: 150 }],
+        top: [{ name: 'Dep. cejas', count: 20, total: 160 }, { name: 'Dep. cejas + pigmento', count: 15, total: 255 }, { name: 'Dep. piernas completas', count: 12, total: 360 }] } },
+    keyla: { name: 'Keyla', area: 'Cejas · Depilación · Lifting',
+      dia: { servicios: 7, facturado: 95, comision: 28.5, clientas: 6, promos: 1,
+        desglose: [{ area: '💅 Cejas', count: 4, total: 55 }, { area: '🪒 Depilación', count: 2, total: 25 }, { area: 'Lifting/Retiro', count: 1, total: 15 }],
+        top: [{ name: 'Dep. cejas + Brow lam.', count: 2, total: 50 }, { name: 'Lifting de pestañas', count: 1, total: 30 }] },
+      semana: { servicios: 30, facturado: 460, comision: 138, clientas: 24, promos: 5,
+        desglose: [{ area: '💅 Cejas', count: 16, total: 220 }, { area: '🪒 Depilación', count: 11, total: 195 }, { area: 'Lifting/Retiro', count: 3, total: 45 }],
+        top: [{ name: 'Dep. cejas + pigmento', count: 7, total: 119 }, { name: 'Dep. cejas + Brow lam.', count: 4, total: 100 }, { name: 'Dep. bikini completo', count: 3, total: 90 }] },
+      mes: { servicios: 120, facturado: 1850, comision: 555, clientas: 90, promos: 16,
+        desglose: [{ area: '💅 Cejas', count: 62, total: 860 }, { area: '🪒 Depilación', count: 44, total: 790 }, { area: 'Lifting/Retiro', count: 14, total: 200 }],
+        top: [{ name: 'Dep. cejas + pigmento', count: 25, total: 425 }, { name: 'Dep. cejas + Brow lam.', count: 14, total: 350 }, { name: 'Dep. piernas completas', count: 13, total: 390 }, { name: 'Dep. bikini completo', count: 10, total: 300 }] } },
+    yadira: { name: 'Yadira', area: 'Pestañas · Lifting/Retiros',
+      dia: { servicios: 3, facturado: 165, comision: 49.5, clientas: 3, promos: 1,
+        desglose: [{ area: '👁 Pestañas', count: 3, total: 165 }],
+        top: [{ name: 'Volumen ruso', count: 1, total: 70 }, { name: 'Efecto híbridas', count: 1, total: 60 }, { name: 'Retoque clásicas', count: 1, total: 30 }],
+        modelos: [{ name: 'Volumen ruso', count: 1 }, { name: 'Efecto híbridas', count: 1 }, { name: 'Retoque clásicas', count: 1 }] },
+      semana: { servicios: 14, facturado: 780, comision: 234, clientas: 13, promos: 3,
+        desglose: [{ area: '👁 Pestañas', count: 12, total: 720 }, { area: 'Lifting/Retiro', count: 2, total: 60 }],
+        top: [{ name: 'Volumen ruso', count: 3, total: 210 }, { name: 'Efecto híbridas', count: 3, total: 180 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }, { name: 'Lifting de pestañas', count: 2, total: 60 }],
+        modelos: [{ name: 'Volumen ruso', count: 3 }, { name: 'Efecto híbridas', count: 3 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Volumen ligero wispy', count: 2 }, { name: 'Retoque clásicas', count: 1 }, { name: 'Lifting', count: 2 }] },
+      mes: { servicios: 56, facturado: 3180, comision: 954, clientas: 48, promos: 10,
+        desglose: [{ area: '👁 Pestañas', count: 50, total: 2930 }, { area: 'Lifting/Retiro', count: 6, total: 250 }],
+        top: [{ name: 'Volumen ruso', count: 12, total: 840 }, { name: 'Efecto híbridas', count: 10, total: 600 }, { name: 'Pelo a pelo clásicas', count: 8, total: 400 }, { name: 'Volumen ligero wispy', count: 6, total: 420 }, { name: 'Mega vol. ruso Kylie', count: 4, total: 340 }],
+        modelos: [{ name: 'Volumen ruso', count: 12 }, { name: 'Efecto híbridas', count: 10 }, { name: 'Pelo a pelo clásicas', count: 8 }, { name: 'Volumen ligero wispy', count: 6 }, { name: 'Mega vol. ruso Kylie', count: 4 }, { name: 'Volumen egipcio', count: 3 }, { name: 'Efecto seda', count: 3 }, { name: 'Retoque varios', count: 8 }, { name: 'Lifting', count: 4 }, { name: 'Retiros', count: 2 }] } },
+    diana: { name: 'Diana', area: 'Pestañas · Lifting/Retiros',
+      dia: { servicios: 3, facturado: 155, comision: 46.5, clientas: 3, promos: 0,
+        desglose: [{ area: '👁 Pestañas', count: 3, total: 155 }],
+        top: [{ name: 'Volumen ligero', count: 1, total: 70 }, { name: 'Efecto Aura', count: 1, total: 60 }, { name: 'Retoque tupidas', count: 1, total: 35 }],
+        modelos: [{ name: 'Volumen ligero', count: 1 }, { name: 'Efecto Aura', count: 1 }, { name: 'Retoque tupidas', count: 1 }] },
+      semana: { servicios: 12, facturado: 690, comision: 207, clientas: 11, promos: 2,
+        desglose: [{ area: '👁 Pestañas', count: 11, total: 650 }, { area: 'Lifting/Retiro', count: 1, total: 40 }],
+        top: [{ name: 'Volumen ligero', count: 3, total: 210 }, { name: 'Efecto Aura', count: 2, total: 120 }, { name: 'Tupidas', count: 2, total: 120 }, { name: 'Pelo a pelo clásicas', count: 2, total: 100 }],
+        modelos: [{ name: 'Volumen ligero', count: 3 }, { name: 'Efecto Aura', count: 2 }, { name: 'Tupidas', count: 2 }, { name: 'Pelo a pelo clásicas', count: 2 }, { name: 'Retoque varios', count: 2 }, { name: 'Lifting', count: 1 }] },
+      mes: { servicios: 48, facturado: 2750, comision: 825, clientas: 42, promos: 8,
+        desglose: [{ area: '👁 Pestañas', count: 44, total: 2560 }, { area: 'Lifting/Retiro', count: 4, total: 190 }],
+        top: [{ name: 'Volumen ligero', count: 10, total: 700 }, { name: 'Efecto Aura', count: 8, total: 480 }, { name: 'Tupidas', count: 7, total: 420 }, { name: 'Pelo a pelo clásicas', count: 6, total: 300 }, { name: 'Volumen brasilero', count: 5, total: 300 }],
+        modelos: [{ name: 'Volumen ligero', count: 10 }, { name: 'Efecto Aura', count: 8 }, { name: 'Tupidas', count: 7 }, { name: 'Pelo a pelo clásicas', count: 6 }, { name: 'Volumen brasilero', count: 5 }, { name: 'Efecto seda', count: 4 }, { name: 'Retoque varios', count: 6 }, { name: 'Lifting', count: 3 }, { name: 'Retiros', count: 1 }] } },
+    laura: { name: 'Laura', area: 'Facial',
+      dia: { servicios: 2, facturado: 130, comision: 52, clientas: 2, promos: 0,
+        desglose: [{ area: '✨ Facial', count: 2, total: 130 }],
+        top: [{ name: 'Limpieza profunda', count: 1, total: 60 }, { name: 'Limpieza prof. + vino', count: 1, total: 70 }],
+        topFacial: [{ name: 'Limpieza profunda', count: 1 }, { name: 'Limpieza prof. + vino', count: 1 }] },
+      semana: { servicios: 10, facturado: 595, comision: 238, clientas: 9, promos: 2,
+        desglose: [{ area: '✨ Facial', count: 10, total: 595 }],
+        top: [{ name: 'Limpieza profunda', count: 3, total: 180 }, { name: 'Limpieza prof. + dermaplaning', count: 2, total: 150 }, { name: 'Limpieza prof. + hidratación', count: 2, total: 134 }],
+        topFacial: [{ name: 'Limpieza profunda', count: 3 }, { name: 'Limpieza prof. + dermaplaning', count: 2 }, { name: 'Limpieza prof. + hidratación', count: 2 }, { name: 'Limpieza prof. + vino', count: 1 }, { name: 'Glow skin', count: 1 }, { name: 'Limpieza express', count: 1 }] },
+      mes: { servicios: 42, facturado: 2460, comision: 984, clientas: 38, promos: 6,
+        desglose: [{ area: '✨ Facial', count: 42, total: 2460 }],
+        top: [{ name: 'Limpieza profunda', count: 14, total: 840 }, { name: 'Limpieza prof. + dermaplaning', count: 8, total: 600 }, { name: 'Limpieza prof. + hidratación', count: 6, total: 402 }, { name: 'Limpieza prof. + vino', count: 4, total: 280 }, { name: 'Glow skin', count: 3, total: 120 }],
+        topFacial: [{ name: 'Limpieza profunda', count: 14 }, { name: 'Limpieza prof. + dermaplaning', count: 8 }, { name: 'Limpieza prof. + hidratación', count: 6 }, { name: 'Limpieza prof. + vino', count: 4 }, { name: 'Glow skin', count: 3 }, { name: 'Limpieza express', count: 3 }, { name: 'Limpieza prof. + oxigenación', count: 2 }, { name: 'Limpieza prof. + antiedad', count: 1 }, { name: 'Masaje yoga facial', count: 1 }] } },
   };
 
   function switchPeriod(period, btn) {
@@ -5080,7 +4491,6 @@
       if (id === 'staffHome') await loadStaffHome();
       if (id === 'clientDirectory') await renderClientDirectory();
       if (id === 'mikaelaHome') await loadMikaelaHome();
-      if (id === 'mikaelaServicios') await loadMikaelaServicios();
       if (id === 'ownerPromos') renderPromos();
       if (id === 'staffPromos') renderStaffPromos();
     }
@@ -5097,35 +4507,9 @@
   let activePromos = {};
   // ej: { 'Isabella Vera': { promo: {...}, startedBy: 'cejas', completedAreas: ['cejas'] } }
 
-  async function openPromoSelect(slot) {
+  function openPromoSelect(slot) {
     window._promoSlot = slot;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
-    
-    // Si no hay promos cargadas, traerlas del Sheet
-    if (PROMOS.length === 0) {
-      try {
-        const result = await apiGet('getPromos');
-        if (result.success && result.promos && result.promos.length > 0) {
-          PROMOS = result.promos.map(p => {
-            let division = [];
-            if (p.division) {
-              try { division = JSON.parse(p.division); } catch(e) {}
-            }
-            return {
-              id: p.id,
-              name: p.nombre,
-              services: p.servicios,
-              price: Number(p.precioCombo) || 0,
-              regular: Number(p.sumaIndividual) || 0,
-              from: p.desde ? String(p.desde) : '',
-              to: p.hasta ? String(p.hasta) : '',
-              active: p.activa !== false,
-              division: division
-            };
-          });
-        }
-      } catch (err) { console.error('Error cargando promos:', err); }
-    }
     
     // ¿Hay promo en curso para esta clienta?
     const inProgress = activePromos[clientName];
@@ -5187,30 +4571,21 @@
       completedAreas: [myArea]
     };
     
-    // Determinar el precio que le corresponde a esta chica
+    // Actualizar precio del servicio y total con el precio de la promo
     const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
     const myDiv = promo.division ? promo.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
     const myPrice = myDiv ? myDiv.monto : promo.price;
     
-    // Reemplazar los servicios del slot con la promo
-    slotServices[slot] = [{
-      name: promo.name + ' (PROMO)',
-      price: myPrice,
-      area: promo.services,
-      code: promo.id,
-      isPromo: true,
-      promoName: promo.name
-    }];
-    renderServicesList(slot);
-    
-    // Sincronizar al Sheet para que Mikaela vea la promo
-    syncServicesToSheet(slot);
+    document.getElementById('as' + slot + 'ServiceName').textContent = promo.name;
+    document.getElementById('as' + slot + 'ServiceArea').textContent = promo.services + ' · PROMO';
+    document.getElementById('as' + slot + 'ServicePrice').textContent = '$' + myPrice;
+    document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
     
     // Mostrar banner
     showPromoBanner(slot, promo, myArea);
     closeModal();
     
-    alert('✓ Promo "' + promo.name + '" aplicada. Tu parte: $' + myPrice);
+    alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
   }
 
   function continuePromo() {
@@ -5352,7 +4727,6 @@
     }
     slotServices[slot].push(service);
     renderServicesList(slot);
-    syncServicesToSheet(slot);
     return true;
   }
 
@@ -5360,30 +4734,6 @@
     if (!confirm('¿Quitar este servicio?')) return;
     slotServices[slot].splice(index, 1);
     renderServicesList(slot);
-    syncServicesToSheet(slot);
-  }
-
-  // Sincroniza los servicios del slot actual al Sheet (para que Mikaela los vea en tiempo real)
-  async function syncServicesToSheet(slot) {
-    const user = window.currentUser;
-    if (!user) return;
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
-    if (!clientName) return;
-    
-    const svcs = slotServices[slot] || [];
-    const svcNames = svcs.map(s => s.name).join(' + ') || '—';
-    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
-    
-    try {
-      await apiPost('updateServiciosAtencion', {
-        chicaNombre: user.name,
-        clienteNombre: clientName,
-        servicios: svcNames,
-        total: String(total)
-      });
-    } catch (err) {
-      console.error('Error sincronizando servicios:', err);
-    }
   }
 
   function openEditService() {
@@ -5396,33 +4746,14 @@
     const areaSel = document.getElementById('addSvcArea');
     areaSel.innerHTML = '<option value="">Seleccionar área...</option>';
     
-    // Mostrar TODAS las áreas para que cualquier staff pueda agregar servicios de cualquier área al ticket
-    const allAreas = ['cejas', 'depilacion', 'pestanas', 'retiro_lifting', 'facial'];
+    const areas = AREA_FILTER[user?.area] || ['cejas'];
     const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting / Retiro', facial: 'Facial' };
-    
-    // Poner primero las áreas del staff actual
-    const myAreas = AREA_FILTER[user?.area] || ['cejas'];
-    const otherAreas = allAreas.filter(a => !myAreas.includes(a));
-    
-    myAreas.forEach(a => {
+    areas.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a;
       opt.textContent = areaNames[a] || a;
       areaSel.appendChild(opt);
     });
-    
-    if (otherAreas.length > 0) {
-      const sep = document.createElement('option');
-      sep.disabled = true;
-      sep.textContent = '── Otras áreas ──';
-      areaSel.appendChild(sep);
-      otherAreas.forEach(a => {
-        const opt = document.createElement('option');
-        opt.value = a;
-        opt.textContent = areaNames[a] || a;
-        areaSel.appendChild(opt);
-      });
-    }
     
     document.getElementById('addSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
     document.getElementById('addSvcPriceDisplay').style.display = 'none';
@@ -5534,160 +4865,8 @@
     setTimeout(() => { show('mikaelaHome'); }, 600);
   }
 
-  // Staff completo del salón con sus áreas
-  const ALL_STAFF = [
-    { name: 'María', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'M', maxClients: 2 },
-    { name: 'Keyla', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'K', maxClients: 2 },
-    { name: 'Lesly', area: 'cejas', areaLabel: '💅 Cejas / Depilación', initial: 'L', maxClients: 2 },
-    { name: 'Yadira', area: 'pestanas', areaLabel: '👁 Pestañas', initial: 'Y', maxClients: 1 },
-    { name: 'Diana', area: 'pestanas', areaLabel: '👁 Pestañas', initial: 'D', maxClients: 1 },
-    { name: 'Laura', area: 'facial', areaLabel: '✨ Facial', initial: 'L', maxClients: 1 },
-  ];
-
-  async function loadAssignDirect() {
-    // Datos de la clienta seleccionada
-    const clientName = document.getElementById('arrSelName')?.textContent || 'Clienta';
-    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
-    const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicio = document.getElementById('arrService')?.value || '';
-    const promo = window._arrPromo || null;
-
-    document.getElementById('assignClientName').textContent = clientName;
-    document.getElementById('assignClientTop').style.display = isTop ? 'inline' : 'none';
-    document.getElementById('assignServiceInfo').textContent = promo 
-      ? '🏷 ' + promo.name + ' — $' + promo.price
-      : servicio + ' · ' + area;
-
-    // Determinar qué áreas necesita este servicio/promo
-    let areasNeeded = [];
-    if (promo && promo.division && promo.division.length > 0) {
-      // Promo: extraer las áreas de la división
-      promo.division.forEach(d => {
-        const aLabel = String(d.area || '').toLowerCase();
-        if (aLabel.includes('cejas') || aLabel.includes('depilación')) areasNeeded.push('cejas');
-        if (aLabel.includes('pestañas')) areasNeeded.push('pestanas');
-        if (aLabel.includes('facial')) areasNeeded.push('facial');
-      });
-    } else {
-      // Servicio normal: usar el área seleccionada
-      const areaMap = { 'Cejas': 'cejas', 'Depilación': 'cejas', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'pestanas', 'Facial': 'facial' };
-      areasNeeded.push(areaMap[area] || 'cejas');
-    }
-    // Eliminar duplicados
-    areasNeeded = [...new Set(areasNeeded)];
-
-    show('assignDirect');
-
-    const listEl = document.getElementById('assignStaffList');
-    listEl.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint); font-size: 13px;"><div style="animation: pulse 1.5s infinite;">⏳ Cargando disponibilidad del staff...</div></div>';
-
-    // Cargar quién está en servicio desde el Sheet
-    let ocupadas = {};
-    try {
-      const result = await apiGet('getListaCompleta');
-      if (result.success && result.enServicio) {
-        result.enServicio.forEach(a => {
-          const chica = String(a.tomadaPor || '').trim();
-          if (chica) {
-            if (!ocupadas[chica]) ocupadas[chica] = [];
-            ocupadas[chica].push(a.nombre);
-          }
-        });
-      }
-    } catch (err) { console.error('Error cargando disponibilidad:', err); }
-
-    // Filtrar staff por áreas necesitadas
-    const relevantStaff = ALL_STAFF.filter(s => areasNeeded.includes(s.area));
-    const otherStaff = ALL_STAFF.filter(s => !areasNeeded.includes(s.area));
-
-    function renderStaffRow(s) {
-      const clientesAtendiendo = ocupadas[s.name] || [];
-      const count = clientesAtendiendo.length;
-      const isFull = count >= s.maxClients;
-      const isOcupada = count > 0;
-      
-      let statusBadge, statusColor, metaText;
-      if (isFull) {
-        statusBadge = 'Llena';
-        statusColor = 'var(--danger)';
-        metaText = s.areaLabel + ' · ' + clientesAtendiendo.join(', ');
-      } else if (isOcupada) {
-        statusBadge = count + '/' + s.maxClients;
-        statusColor = 'var(--warning)';
-        metaText = s.areaLabel + ' · con ' + clientesAtendiendo.join(', ');
-      } else {
-        statusBadge = 'Libre';
-        statusColor = 'var(--success)';
-        metaText = s.areaLabel + ' · Disponible';
-      }
-
-      return `
-        <div class="client-row" onclick="goAssign('${s.name}')" style="${isFull ? 'opacity: 0.5;' : 'cursor: pointer;'}">
-          <div class="client-avatar">${s.initial}</div>
-          <div class="client-info">
-            <div class="client-name">${s.name}</div>
-            <div class="client-meta">${metaText}</div>
-          </div>
-          <div style="background: ${isOcupada ? (isFull ? 'var(--danger-bg)' : 'var(--warning-bg)') : 'var(--success-bg)'}; color: ${statusColor}; font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">${statusBadge}</div>
-        </div>`;
-    }
-
-    let html = '';
-
-    if (relevantStaff.length > 0) {
-      const areaLabels = areasNeeded.map(a => a === 'cejas' ? 'Cejas / Depilación' : a === 'pestanas' ? 'Pestañas' : 'Facial');
-      html += '<div class="section-title">Staff de ' + areaLabels.join(' + ') + '</div>';
-      html += '<div class="card" style="padding: 8px 20px;">';
-      html += relevantStaff.map(s => renderStaffRow(s)).join('');
-      html += '</div>';
-    }
-
-    if (otherStaff.length > 0) {
-      html += '<div class="section-title">Otras áreas</div>';
-      html += '<div class="card" style="padding: 8px 20px;">';
-      html += otherStaff.map(s => renderStaffRow(s)).join('');
-      html += '</div>';
-    }
-
-    listEl.innerHTML = html;
-  }
-
-  async function goAssign(chica) {
-    const clientName = document.getElementById('arrSelName')?.textContent || 'Clienta';
-    const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
-    const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicio = document.getElementById('arrService')?.value || '';
-    const obs = document.getElementById('arrObs')?.value || '';
-    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
-    const promo = window._arrPromo || null;
-
-    const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    const areaKey = areaMap[area] || 'cejas';
-
-    const priEl = document.querySelector('.priority-option.selected');
-    const prioridad = priEl ? priEl.querySelector('.name').textContent : 'Normal';
-
-    const postData = {
-      codigo: codigo, nombre: clientName, servicio: promo ? promo.name + ' (PROMO)' : servicio,
-      area: areaKey, prioridad: prioridad, observaciones: obs,
-      esTop: isTop ? 'Sí' : 'No',
-      asignadaA: chica
-    };
-
-    if (promo) {
-      postData.promoNombre = promo.name;
-      postData.precioPromo = promo.price;
-      postData.precioRegular = promo.regular;
-    }
-
-    // Agregar a lista de espera con estado "Asignada" — la chica la verá y la toma ella
-    try {
-      await apiPost('addListaEspera', postData);
-    } catch (err) { console.error('Error en asignación directa:', err); }
-
-    window._arrPromo = null;
-    simulateNotif('staff', '📋 Clienta asignada a ' + chica, (isTop ? '⭐ ' : '') + clientName + ' · ' + (promo ? promo.name : servicio), isTop);
-    alert('✓ ' + clientName + ' asignada a ' + chica + '.\n\n' + chica + ' la verá en su lista de espera con un badge "Asignada a ti" y al tomarla pasará a servicio.');
+  function goAssign(chica) {
+    alert(`✓ Carmen asignada directamente a ${chica}. Notificación enviada solo a ${chica}.`);
     show('mikaelaHome');
   }
 
