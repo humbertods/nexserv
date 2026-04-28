@@ -3134,20 +3134,36 @@
   }
 
   // === PROMO EN LLEGADA (Mikaela) ===
-  function toggleArrivalPromo(show) {
+  async function toggleArrivalPromo(show) {
     document.getElementById('arrPromoOff').style.display = show ? 'none' : 'block';
     document.getElementById('arrPromoOn').style.display = show ? 'block' : 'none';
     
     if (show) {
+      // Cargar promos desde el servidor si el array está vacío
+      if (PROMOS.length === 0) {
+        await renderPromos(); // Esto carga las promos desde el servidor
+      }
+      
       // Poblar select con promos activas
       const sel = document.getElementById('arrPromoSelect');
       sel.innerHTML = '<option value="">Seleccionar promo...</option>';
-      PROMOS.filter(p => p.active).forEach((p, i) => {
+      
+      const activePromos = PROMOS.filter(p => p.active);
+      
+      if (activePromos.length === 0) {
         const opt = document.createElement('option');
-        opt.value = i;
-        opt.textContent = p.name + ' — $' + p.price + ' (regular $' + p.regular + ')';
+        opt.value = '';
+        opt.textContent = 'No hay promos activas';
+        opt.disabled = true;
         sel.appendChild(opt);
-      });
+      } else {
+        activePromos.forEach((p, i) => {
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = p.name + ' — $' + p.price + ' (regular $' + p.regular + ')';
+          sel.appendChild(opt);
+        });
+      }
     } else {
       window._arrPromo = null;
       document.getElementById('arrPromoDetail').textContent = '';
