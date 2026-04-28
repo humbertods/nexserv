@@ -3063,6 +3063,37 @@
     document.getElementById('newPestFichaModal').classList.add('active');
   }
 
+  function editPestanasFicha(clientKey) {
+    // Abrir modal de pestañas para editar desde el perfil de clienta
+    const client = CLIENT_PROFILES[clientKey];
+    if (!client) return;
+    
+    // Obtener la ficha activa o la más reciente
+    const fichas = client.pestanas?.fichas || [];
+    const ficha = fichas.find(f => f.activa) || fichas[0] || null;
+    
+    // Pre-llenar el formulario si existe ficha
+    if (ficha) {
+      document.getElementById('npfModelo').value = ficha.modelo || '';
+      document.getElementById('npfDiseno').value = ficha.diseno || '';
+      document.getElementById('npfTallas').value = ficha.tallas || '';
+      document.getElementById('npfObs').value = ficha.obs || '';
+    } else {
+      // Limpiar formulario para nueva ficha
+      document.getElementById('npfModelo').value = '';
+      document.getElementById('npfDiseno').value = '';
+      document.getElementById('npfTallas').value = '';
+      document.getElementById('npfObs').value = '';
+    }
+    
+    // Guardar referencia para saveNewPestFicha
+    window._newPestClient = clientKey;
+    window._newPestSlot = null; // No hay slot activo, es desde perfil
+    
+    // Abrir modal
+    document.getElementById('newPestFichaModal').classList.add('active');
+  }
+
   function saveNewPestFicha() {
     const clientKey = window._newPestClient;
     const slot = window._newPestSlot;
@@ -4128,12 +4159,14 @@
             <div style="font-size: 10px; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Observación de pestañas</div>
             <div style="font-size: 12px; font-weight: 500; line-height: 1.5; opacity: 0.95;">${ficha.obs}</div>
           </div>
+          <button class="btn-primary" onclick="editPestanasFicha('${currentProfileClient}')" style="width: 100%; margin-top: 12px;">✏️ Editar ficha de pestañas</button>
         </div>
       ` : `
         <div style="background: var(--bg-card); border: 2px dashed var(--line); border-radius: 22px; padding: 24px; text-align: center; margin-bottom: 16px;">
           <div style="font-size: 28px; margin-bottom: 8px;">👁</div>
           <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Sin ficha de pestañas</div>
-          <div style="font-size: 12px; color: var(--ink-soft);">Se creará en su primer servicio de pestañas</div>
+          <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px;">Se creará en su primer servicio de pestañas</div>
+          <button class="btn-primary" onclick="editPestanasFicha('${currentProfileClient}')" style="width: 100%;">➕ Crear ficha de pestañas</button>
         </div>
       `}
       <div class="section-title">Historial de pestañas${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
