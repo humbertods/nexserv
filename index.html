@@ -1870,13 +1870,14 @@
     if (params) Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
     try {
       const res = await fetch(url.toString(), {
-        cache: 'no-store', // Forzar no usar caché del navegador
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        }
+        method: 'GET',
+        redirect: 'follow'
       });
-      return await res.json();
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      const data = await res.json();
+      return data;
     } catch (err) {
       console.error('API Error:', err);
       return { error: err.message };
@@ -1891,14 +1892,16 @@
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 
-          'Content-Type': 'text/plain;charset=utf-8',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Content-Type': 'text/plain;charset=utf-8'
         },
-        cache: 'no-store',
+        redirect: 'follow',
         body: JSON.stringify(data)
       });
-      return await res.json();
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      const result = await res.json();
+      return result;
     } catch (err) {
       console.error('API Error:', err);
       return { error: err.message };
@@ -3382,11 +3385,20 @@
     const list = document.getElementById('clientDirectoryList');
     
     // Siempre recargar desde API (no usar cache para el directorio)
-    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas desde Rosa Aguilera...</div></div>';
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas...</div></div>';
     
     try {
       const result = await apiGet('getClientas');
       console.log('API getClientas response:', result);
+      
+      if (!result) {
+        throw new Error('No se recibió respuesta del servidor');
+      }
+      
+      if (result.error) {
+        list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 13px;">❌ Error del servidor: ' + result.error + '</div>';
+        return;
+      }
       
       if (result.success && result.clientas && result.clientas.length > 0) {
         CLIENT_DIRECTORY_CACHE = result.clientas
@@ -3402,17 +3414,14 @@
           cedula: c.cedula ? String(c.cedula) : '',
           correo: c.correo ? String(c.correo) : ''
         }));
-      } else if (result.error) {
-        list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 13px;">❌ Error: ' + result.error + '</div>';
-        return;
       } else {
-        // Sin datos del API, usar locales como fallback
-        CLIENT_DIRECTORY_CACHE = CLIENT_DIRECTORY.map(c => ({...c}));
+        // Respuesta exitosa pero sin clientas
+        CLIENT_DIRECTORY_CACHE = [];
       }
     } catch (err) {
       console.error('Error cargando clientas:', err);
-      // Sin conexión: usar datos locales
-      CLIENT_DIRECTORY_CACHE = CLIENT_DIRECTORY.map(c => ({...c}));
+      list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--danger); font-size: 13px;">❌ Error: ' + err.message + '<br><small style="color: var(--ink-soft); margin-top: 8px; display: block;">Verifica que el Apps Script esté activo</small></div>';
+      return;
     }
 
     const filtered = search 
