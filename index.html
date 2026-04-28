@@ -3464,6 +3464,8 @@
   ];
 
   async function renderClientDirectory() {
+    // Cargar perfiles de clientas desde el servidor
+    await loadClientProfiles();
     const search = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const list = document.getElementById('clientDirectoryList');
     
@@ -3955,98 +3957,36 @@
   }
 
   // === PERFILES DE CLIENTAS ===
-  const CLIENT_PROFILES = {
-    sofia: {
-      name: 'Sofía López', code: 'C-0004', initials: 'SL', isTop: true, visits: 5, spent: 310, last: '12/04',
-      obs: 'Clienta frecuente. Siempre puntual. Prefiere que la atiendan Yadira o Diana.',
-      cejas: { 
-        obsArea: 'Cejas pobladas naturales. Solo depilación de forma, no quitar mucho.',
-        history: [
-          { date: '12/04', service: 'Depilación cejas', price: 8, by: 'María' },
-          { date: '28/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { obsArea: '', history: [] },
-      pestanas: {
-        fichas: [
-          { modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13', obs: 'Ojos sensibles, usar pegamento hipoalergénico. Le gusta el rizo C.', fecha: '12/04/2026', activa: true },
-          { modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14', obs: 'Probó muñeca pero prefirió volver a gato.', fecha: '15/03/2026', activa: false },
-          { modelo: 'Volumen ruso', diseno: 'Gato', tallas: '9-12-14', obs: 'Primera vez con volumen ruso, le gustó pero volvió a híbridas.', fecha: '01/02/2026', activa: false },
-        ],
-        history: [
-          { date: '12/04', service: 'Efecto híbridas', price: 60, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
-          { date: '28/03', service: 'Retoque híbridas', price: 35, by: 'Yadira', modelo: 'Efecto híbridas', diseno: 'Gato', tallas: '9-11-13' },
-          { date: '15/03', service: 'Efecto híbridas', price: 60, by: 'Diana', modelo: 'Efecto híbridas', diseno: 'Muñeca', tallas: '10-12-14' },
-        ]
-      },
-      facial: { history: [] },
-    },
-    isabella: {
-      name: 'Isabella Vera', code: 'C-0007', initials: 'IV', isTop: false, visits: 2, spent: 55, last: '05/04',
-      obs: 'Piel sensible en zona de bikini, usar cera de baja temperatura.',
-      cejas: { 
-        obsArea: 'Pide cejas definidas pero naturales.',
-        history: [
-          { date: '05/04', service: 'Dep. cejas + maquillaje', price: 12, by: 'Lesly' },
-      ]},
-      depilacion: { 
-        obsArea: 'Piel MUY sensible en bikini. Solo cera baja temperatura. Se irrita fácil, aplicar gel calmante post.',
-        history: [
-          { date: '05/04', service: 'Dep. piernas completas', price: 30, by: 'Lesly' },
-          { date: '20/03', service: 'Dep. media pierna', price: 15, by: 'María' },
-      ]},
-      pestanas: { fichas: [], obsArea: '', history: [] },
-      facial: { obsArea: '', history: [] },
-    },
-    lucia: {
-      name: 'Lucía Paredes', code: 'C-0009', initials: 'LP', isTop: false, visits: 1, spent: 17, last: '20/04',
-      obs: 'Primera visita al salón.',
-      cejas: { obsArea: '', history: [
-        { date: '20/04', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { obsArea: '', history: [] },
-      pestanas: { fichas: [], obsArea: '', history: [] },
-      facial: { obsArea: '', history: [] },
-    },
-    carmen: {
-      name: 'Carmen Molina', code: 'C-0002', initials: 'CM', isTop: true, visits: 8, spent: 520, last: '19/04',
-      obs: 'Clienta VIP. Viene cada 2 semanas. Siempre combina facial con cejas.',
-      cejas: { history: [
-        { date: '05/04', service: 'Dep. cejas + pigmento', price: 17, by: 'María' },
-        { date: '22/03', service: 'Dep. cejas + pigmento', price: 17, by: 'Keyla' },
-      ]},
-      depilacion: { history: [
-        { date: '22/03', service: 'Dep. bigote', price: 4, by: 'María' },
-      ]},
-      pestanas: { fichas: [], history: [] },
-      facial: {
-        ficha: {
-          fecha: '19/04/2026',
-          biotipo: 'Mixto',
-          fototipo: 'III (Fitzpatrick)',
-          edad: 34,
-          sexo: 'Femenino',
-          tipoPiel: 'Mixta',
-          signosLesiones: 'Comedones en zona T, poro abierto en mejillas',
-          signosHiper: 'Mejillas (leve)',
-          estadoPiel: 'Seborreica en zona T, deshidratada en contorno',
-          antecedentes: {
-            enfermedades: 'Ninguna reportada',
-            familiares: 'Madre con rosácea',
-            alergias: 'Ácido glicólico concentrado (>10%)',
-            medicamentos: 'Ninguno',
-            quirurgicos: 'Ninguno',
-            esteticos: 'Microdermoabrasión (2024), Peeling químico suave (ene 2026)'
-          },
-          obsExtra: 'Responde bien a limpieza con vapor. Evitar productos con fragancia. Prefiere sesiones de 60 min máximo. Zona del mentón tiende a brotes hormonales.'
-        },
-        history: [
-          { date: '19/04', service: 'Limpieza profunda', price: 60, by: 'Laura' },
-          { date: '05/04', service: 'Limpieza prof. + dermaplaning', price: 75, by: 'Laura' },
-          { date: '22/03', service: 'Limpieza prof. + hidratación', price: 67, by: 'Laura' },
-          { date: '08/03', service: 'Limpieza profunda', price: 60, by: 'Laura' },
-        ]},
-    },
-  };
+  let CLIENT_PROFILES = {}; // Se llenarán desde el servidor
+
+  // Función para cargar perfiles de clientas desde el servidor
+  async function loadClientProfiles() {
+    try {
+      const result = await apiGet('getAllClients');
+      if (result.success && result.clients) {
+        CLIENT_PROFILES = {};
+        result.clients.forEach(client => {
+          const key = client.code.toLowerCase().replace('c-', 'c');
+          CLIENT_PROFILES[key] = {
+            name: client.nombre || '',
+            code: client.code || '',
+            initials: client.nombre ? client.nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??',
+            isTop: false,
+            visits: parseInt(client.visitas) || 0,
+            spent: 0,
+            last: client.ultimaVisita || '',
+            obs: client.observaciones || '',
+            cejas: { obsArea: '', history: [] },
+            depilacion: { obsArea: '', history: [] },
+            pestanas: { fichas: [], obsArea: '', history: [] },
+            facial: { obsArea: '', history: [] }
+          };
+        });
+      }
+    } catch (err) {
+      console.error('Error cargando perfiles de clientas:', err);
+    }
+  }
 
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
