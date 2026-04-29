@@ -1254,9 +1254,9 @@ function handleAddFichaCejasPigmento(data) {
     const allData = ws.getDataRange().getValues();
     const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
     
-    // Buscar último ID (empezar desde fila 5, asumiendo headers en filas 1-4)
+    // Buscar último ID (empezar desde fila 6, índice 5 - filas 1-4=headers, fila 5=encabezados columnas)
     let maxNum = 0;
-    for (let i = 4; i < allData.length; i++) {
+    for (let i = 5; i < allData.length; i++) {
       const id = String(allData[i][0] || '').trim();
       if (id) {
         const num = parseInt(id);
