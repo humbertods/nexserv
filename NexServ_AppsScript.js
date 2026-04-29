@@ -1,6 +1,6 @@
 // ============================================
 // NexServ · Google Apps Script — Backend API
-// Versión: 2.0
+// Versión: 2.2 - Fix nombre sheet con emoji 🖊️ (29/04/2026)
 // Conecta la app HTML con Google Sheets
 // ============================================
 
@@ -1210,7 +1210,7 @@ function handleUpdateFichaFacial(data) {
 // Columnas: A=# | B=Código | C=Fecha | D=Color | E=Aguja | F=TipoSesion | G=Observaciones | H=Responsable | I=ProxRetoque
 // ============================================
 function handleGetFichaCejasPigmento(params) {
-  const ws = getSheet('FichaCejasPigmento');
+  const ws = getSheet('🖊️ FichaCejasPigmento');
   if (!ws) return { success: true, fichas: [] };
   
   const data = ws.getDataRange().getValues();
@@ -1239,7 +1239,7 @@ function handleGetFichaCejasPigmento(params) {
 
 function handleAddFichaCejasPigmento(data) {
   try {
-    const ws = getSheet('FichaCejasPigmento');
+    const ws = getSheet('🖊️ FichaCejasPigmento');
     if (!ws) {
       // Intentar con posibles variaciones del nombre
       const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -1247,7 +1247,7 @@ function handleAddFichaCejasPigmento(data) {
       const sheetNames = allSheets.map(s => s.getName());
       return { 
         success: false,
-        error: 'Sheet FichaCejasPigmento no encontrado. Sheets disponibles: ' + sheetNames.join(', ') 
+        error: 'Sheet 🖊️ FichaCejasPigmento no encontrado. Sheets disponibles: ' + sheetNames.join(', ') 
       };
     }
     
