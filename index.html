@@ -869,6 +869,33 @@
           <textarea id="ncFacObsExtra" placeholder="Detalles adicionales del tratamiento..." style="min-height: 50px;"></textarea>
         </div>
 
+        <!-- FICHA CEJAS EFECTO POLVO (opcional) -->
+        <div style="font-size: 13px; font-weight: 700; margin: 18px 0 6px;">💉 Cejas efecto polvo <span style="font-size: 11px; color: var(--ink-faint); font-weight: 500;">(opcional)</span></div>
+        <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-bottom: 10px;">Si la clienta ya tiene historial de pigmentación, registrá su última sesión.</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="input-group">
+            <label>Color utilizado</label>
+            <input type="text" id="ncPigColor" placeholder="Ej: Castaño medio">
+          </div>
+          <div class="input-group">
+            <label>Aguja utilizada</label>
+            <input type="text" id="ncPigAguja" placeholder="Ej: 7 puntas, U18">
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Tipo de sesión</label>
+          <select id="ncPigTipo">
+            <option value="">— Sin ficha —</option>
+            <option value="Nueva sesión">Nueva sesión</option>
+            <option value="Neutralización">Neutralización</option>
+            <option value="Retoque">Retoque</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Observaciones de pigmentación</label>
+          <textarea id="ncPigObs" placeholder="Ej: Primera sesión, cliente muy satisfecha..." style="min-height: 50px;"></textarea>
+        </div>
+
         <button class="btn-primary" onclick="saveNewClient()" style="margin-top: 12px;">Registrar clienta completa</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
@@ -3793,10 +3820,29 @@
       btn.disabled = false;
 
       if (result.success) {
+        const codigoCliente = result.codigo;
+        
+        // Guardar ficha de Cejas Efecto Polvo si tiene datos
+        const pigTipo = document.getElementById('ncPigTipo').value;
+        if (pigTipo) {
+          try {
+            await apiPost('addFichaCejasPigmento', {
+              codigo: codigoCliente,
+              color: document.getElementById('ncPigColor').value.trim(),
+              aguja: document.getElementById('ncPigAguja').value.trim(),
+              tipoSesion: pigTipo,
+              observaciones: document.getElementById('ncPigObs').value.trim(),
+              responsable: window.currentUser?.name || 'Admin'
+            });
+          } catch (err) {
+            console.error('Error guardando ficha pigmento:', err);
+          }
+        }
+        
         // Agregar al cache local
         CLIENT_DIRECTORY_CACHE.push({
-          key: result.codigo.toLowerCase().replace(/-/g, ''),
-          code: result.codigo,
+          key: codigoCliente.toLowerCase().replace(/-/g, ''),
+          code: codigoCliente,
           name: fullName,
           phone: phone,
           isTop: false,
@@ -3807,7 +3853,7 @@
         });
         closeModal();
         renderClientDirectory();
-        alert('✓ ' + fullName + ' registrada como ' + result.codigo);
+        alert('✓ ' + fullName + ' registrada como ' + codigoCliente);
       } else {
         alert('Error al guardar: ' + (result.message || result.error || 'Intenta de nuevo'));
       }
