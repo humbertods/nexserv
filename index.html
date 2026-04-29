@@ -586,6 +586,7 @@
     <div style="display: flex; gap: 0; margin-bottom: 16px; background: var(--bg-card); border-radius: var(--radius-pill); padding: 4px; box-shadow: var(--shadow-card); overflow-x: auto;">
       <button onclick="switchProfileTab('cejas', this)" class="profile-tab active-period" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .2s;">💅 Cejas</button>
       <button onclick="switchProfileTab('depilacion', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">🪒 Depil.</button>
+      <button onclick="switchProfileTab('pigmento', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">💉 Pigm.</button>
       <button onclick="switchProfileTab('pestanas', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">👁 Pest.</button>
       <button onclick="switchProfileTab('facial', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">✨ Facial</button>
     </div>
@@ -1368,6 +1369,40 @@
           <textarea id="npfObs" placeholder="Detalles del nuevo look..."></textarea>
         </div>
         <button class="btn-primary" onclick="saveNewPestFicha()" style="background: var(--top-purple);">Guardar nueva ficha</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- MODAL: NUEVA FICHA CEJAS EFECTO POLVO -->
+    <div class="modal-bg" id="newCejasPigmentoModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">💉 Nueva sesión - Cejas efecto polvo</div>
+        <div class="input-group">
+          <label>Color utilizado</label>
+          <input type="text" id="cpColor" placeholder="Ej: Castaño medio, Ash brown...">
+        </div>
+        <div class="input-group">
+          <label>Aguja utilizada</label>
+          <input type="text" id="cpAguja" placeholder="Ej: 7 puntas, U18...">
+        </div>
+        <div class="input-group">
+          <label>Tipo de sesión</label>
+          <select id="cpTipoSesion">
+            <option value="">Seleccionar...</option>
+            <option value="Nueva sesión">Nueva sesión</option>
+            <option value="Neutralización">Neutralización</option>
+            <option value="Retoque">Retoque</option>
+          </select>
+        </div>
+        <div id="cpRetoqueAlert" style="display: none; background: var(--warning-bg); border: 1.5px solid #e8b86d; color: var(--warning); padding: 12px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; margin-bottom: 14px; line-height: 1.5;">
+          📅 Se registrará que la clienta debe regresar en 30-45 días para su retoque
+        </div>
+        <div class="input-group">
+          <label>Observaciones</label>
+          <textarea id="cpObs" placeholder="Detalles de la sesión, reacciones, etc..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="saveCejasPigmentoFicha()">💉 Guardar sesión</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -3185,6 +3220,78 @@
     alert('✅ Nueva ficha creada: ' + modelo + ' · ' + diseno);
   }
 
+  // === CEJAS EFECTO POLVO ===
+  function openCejasPigmentoModal(codigo, clientName) {
+    window._cpCodigo = codigo;
+    window._cpNombre = clientName;
+    
+    // Limpiar campos
+    document.getElementById('cpColor').value = '';
+    document.getElementById('cpAguja').value = '';
+    document.getElementById('cpTipoSesion').value = '';
+    document.getElementById('cpObs').value = '';
+    document.getElementById('cpRetoqueAlert').style.display = 'none';
+    
+    document.getElementById('newCejasPigmentoModal').classList.add('active');
+  }
+  
+  // Mostrar alerta cuando selecciona "Nueva sesión"
+  document.addEventListener('DOMContentLoaded', function() {
+    const cpTipoSesion = document.getElementById('cpTipoSesion');
+    if (cpTipoSesion) {
+      cpTipoSesion.addEventListener('change', function() {
+        const alert = document.getElementById('cpRetoqueAlert');
+        alert.style.display = this.value === 'Nueva sesión' ? 'block' : 'none';
+      });
+    }
+  });
+  
+  async function saveCejasPigmentoFicha() {
+    const color = document.getElementById('cpColor').value.trim();
+    const aguja = document.getElementById('cpAguja').value.trim();
+    const tipoSesion = document.getElementById('cpTipoSesion').value;
+    const obs = document.getElementById('cpObs').value.trim();
+    
+    if (!color) { alert('⚠️ Ingresá el color utilizado'); return; }
+    if (!aguja) { alert('⚠️ Ingresá la aguja utilizada'); return; }
+    if (!tipoSesion) { alert('⚠️ Seleccioná el tipo de sesión'); return; }
+    
+    const codigo = window._cpCodigo;
+    const nombre = window._cpNombre;
+    const user = window.currentUser;
+    
+    try {
+      const result = await apiPost('addFichaCejasPigmento', {
+        codigo: codigo,
+        color: color,
+        aguja: aguja,
+        tipoSesion: tipoSesion,
+        observaciones: obs,
+        responsable: user?.name || ''
+      });
+      
+      if (result.success) {
+        closeModal();
+        
+        // Refrescar el tab si estamos en el perfil
+        if (currentProfileClient && currentProfileTab === 'pigmento') {
+          renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
+        }
+        
+        let msg = '✅ Sesión registrada: ' + tipoSesion;
+        if (result.proxRetoque) {
+          msg += '\n📅 Próximo retoque: ' + result.proxRetoque;
+        }
+        alert(msg);
+      } else {
+        alert('❌ Error al guardar: ' + (result.error || 'Desconocido'));
+      }
+    } catch (err) {
+      console.error('Error guardando ficha pigmento:', err);
+      alert('❌ Error de conexión al guardar la ficha');
+    }
+  }
+
   // === PROMO EN LLEGADA (Mikaela) ===
   async function toggleArrivalPromo(show) {
     document.getElementById('arrPromoOff').style.display = show ? 'none' : 'block';
@@ -4088,7 +4195,7 @@
     // Activar el tab correcto visualmente
     document.querySelectorAll('.profile-tab').forEach(b => { b.classList.remove('active-period'); b.style.background = 'transparent'; b.style.color = 'var(--ink-soft)'; });
     const tabs = document.querySelectorAll('.profile-tab');
-    const tabIdx = { cejas: 0, depilacion: 1, pestanas: 2, facial: 3 };
+    const tabIdx = { cejas: 0, depilacion: 1, pigmento: 2, pestanas: 3, facial: 4 };
     if (tabs[tabIdx[defaultTab]]) tabs[tabIdx[defaultTab]].classList.add('active-period');
     
     renderProfileTab();
@@ -4113,6 +4220,8 @@
       renderPestanasTab(el, data, c.name);
     } else if (tab === 'facial') {
       renderFacialTab(el, data, c.name);
+    } else if (tab === 'pigmento') {
+      renderPigmentoTab(el, c.code, c.name);
     } else {
       renderGenericTab(el, data, tab);
     }
@@ -4314,6 +4423,104 @@
         </div>
       ` : '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No tiene historial facial</div>'}
     `;
+  }
+
+  async function renderPigmentoTab(el, codigo, clientName) {
+    // Mostrar loading
+    el.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando fichas...</div>';
+    
+    try {
+      const result = await apiGet('getFichaCejasPigmento', { codigo: codigo });
+      const fichas = result.success ? (result.fichas || []) : [];
+      const numSesiones = fichas.length;
+      
+      // Determinar acceso (staff de cejas + owner)
+      const user = window.currentUser;
+      const canEdit = user?.area === 'cejas' || user?.role === 'owner';
+      
+      // Calcular próximo retoque si hay sesiones
+      let proxRetoque = null;
+      if (numSesiones > 0) {
+        // Buscar la última "Nueva sesión"
+        const nuevaSesion = fichas.find(f => f.tipoSesion === 'Nueva sesión');
+        if (nuevaSesion && nuevaSesion.proxRetoque) {
+          const fechaRetoque = parseFecha(nuevaSesion.proxRetoque);
+          const hoy = new Date();
+          const diff = Math.ceil((fechaRetoque - hoy) / (1000 * 60 * 60 * 24));
+          proxRetoque = {
+            fecha: nuevaSesion.proxRetoque,
+            fechaSesion: nuevaSesion.fecha,
+            diasRestantes: diff
+          };
+        }
+      }
+      
+      el.innerHTML = `
+        ${proxRetoque ? `
+          <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; border-radius: 20px; padding: 16px; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 600; opacity: 0.9; margin-bottom: 8px;">💉 Próximo retoque recomendado</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 18px; font-weight: 800; margin-bottom: 2px;">📅 ${proxRetoque.fecha}</div>
+                <div style="font-size: 11px; opacity: 0.8;">Desde última sesión: ${proxRetoque.fechaSesion}</div>
+              </div>
+              <div style="background: rgba(255,255,255,0.2); padding: 8px 14px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 700;">
+                ${proxRetoque.diasRestantes > 0 ? 'en ' + proxRetoque.diasRestantes + ' días' : (proxRetoque.diasRestantes === 0 ? 'HOY' : 'Vencido')}
+              </div>
+            </div>
+          </div>
+        ` : ''}
+        
+        <div class="section-title">💉 Cejas efecto polvo ${numSesiones > 0 ? '(' + numSesiones + ' sesiones)' : ''}</div>
+        
+        ${numSesiones > 0 ? `
+          <div class="card" style="padding: 10px 14px;">
+            ${fichas.map((f, i) => `
+              <div style="padding: 12px 0; ${i < fichas.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                  <div>
+                    <div style="font-size: 14px; font-weight: 700; color: var(--ink);">
+                      ${f.tipoSesion === 'Nueva sesión' ? '⭐ ' : ''}${f.tipoSesion}
+                    </div>
+                    <div style="font-size: 11px; color: var(--ink-faint); margin-top: 2px; font-weight: 500;">${f.fecha} · por ${f.responsable}</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 11px; color: var(--ink-soft); font-weight: 600;">Color: ${f.color}</div>
+                    <div style="font-size: 11px; color: var(--ink-soft); font-weight: 600;">Aguja: ${f.aguja}</div>
+                  </div>
+                </div>
+                ${f.observaciones ? `
+                  <div style="font-size: 12px; color: var(--ink-soft); background: var(--bg); padding: 8px 10px; border-radius: var(--radius-sm); margin-top: 6px; line-height: 1.4;">
+                    📝 ${f.observaciones}
+                  </div>
+                ` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div style="background: var(--bg-card); border: 2px dashed var(--line); border-radius: 22px; padding: 24px; text-align: center;">
+            <div style="font-size: 28px; margin-bottom: 8px;">💉</div>
+            <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Sin historial de pigmentación</div>
+            <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 14px;">La primera sesión se registrará automáticamente</div>
+            ${canEdit ? '<button onclick="openCejasPigmentoModal(\'' + codigo + '\', \'' + clientName + '\')" class="btn-primary">+ Registrar primera sesión</button>' : ''}
+          </div>
+        `}
+        
+        ${canEdit && numSesiones > 0 ? `
+          <button onclick="openCejasPigmentoModal('${codigo}', '${clientName}')" class="btn-primary" style="width: 100%; margin-top: 16px;">+ Registrar nueva sesión</button>
+        ` : ''}
+      `;
+    } catch (err) {
+      console.error('Error cargando fichas pigmento:', err);
+      el.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger); font-size: 13px;">❌ Error cargando fichas</div>';
+    }
+  }
+  
+  function parseFecha(fechaStr) {
+    // Espera formato DD/MM/YYYY
+    const parts = fechaStr.split('/');
+    if (parts.length !== 3) return new Date();
+    return new Date(parts[2], parts[1] - 1, parts[0]);
   }
 
   function renderGenericTab(el, data, tab) {
