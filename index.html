@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v2.1 - Edición de clientas para CEO (29/04/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3733,11 +3732,9 @@
       return;
     }
     
-    list.innerHTML = filtered.map(c => {
-      const isCEO = window.currentUser?.role === 'admin' || window.currentUser?.role === 'ceo';
-      return `
-      <div class="card" style="margin-bottom: 8px; padding: 14px; position: relative;">
-        <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="openClientProfile('${c.key}')">
+    list.innerHTML = filtered.map(c => `
+      <div class="card" style="margin-bottom: 8px; padding: 14px; cursor: pointer;" onclick="openClientProfile('${c.key}')">
+        <div style="display: flex; align-items: center; gap: 12px;">
           <div class="client-avatar ${c.isTop ? 'is-top' : ''}" style="flex-shrink: 0;">${c.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px;">
@@ -3747,10 +3744,8 @@
           </div>
           <span style="font-size: 16px; color: var(--ink-faint);">›</span>
         </div>
-        ${isCEO ? `<button onclick="event.stopPropagation(); editClientFromList('${c.key}')" style="position: absolute; top: 12px; right: 12px; padding: 6px 12px; background: var(--purple); color: white; border: none; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; cursor: pointer;">✏️ Editar</button>` : ''}
       </div>
-    `;
-    }).join('');
+    `).join('');
   }
 
   function filterClients() { renderClientDirectory(); }
@@ -3794,36 +3789,6 @@
     document.getElementById('newClientModal').classList.add('active');
   }
   
-  function editClientFromList(key) {
-    // Buscar los datos completos de la clienta desde el cache
-    const clientData = CLIENT_DIRECTORY_CACHE.find(c => c.key === key);
-    if (!clientData) {
-      alert('No se encontraron los datos de la clienta');
-      return;
-    }
-    
-    isEditMode = true;
-    editingClientCode = clientData.code;
-    
-    // Cambiar título y botón
-    document.getElementById('newClientModalTitle').textContent = 'Editar clienta';
-    document.getElementById('saveClientBtn').textContent = 'Guardar cambios';
-    
-    // Cargar datos existentes
-    const nameParts = clientData.name.split(' ');
-    document.getElementById('ncNombre').value = nameParts[0] || '';
-    document.getElementById('ncApellido').value = nameParts.slice(1).join(' ') || '';
-    document.getElementById('ncPhone').value = clientData.phone || '';
-    document.getElementById('ncCedula').value = clientData.cedula || '';
-    document.getElementById('ncEmail').value = clientData.correo || '';
-    
-    // Observaciones por área (necesitamos cargar desde el servidor)
-    loadClientDataForEdit(clientData.code);
-    
-    document.getElementById('ncCode').textContent = clientData.code;
-    document.getElementById('newClientModal').classList.add('active');
-  }
-  
   async function loadClientDataForEdit(codigo) {
     try {
       const result = await apiGet('getCliente', { codigo: codigo });
@@ -3849,18 +3814,15 @@
     document.getElementById('newClientModalTitle').textContent = 'Nueva clienta';
     document.getElementById('saveClientBtn').textContent = 'Registrar clienta completa';
     
-    // Reset todos los campos de texto
-    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra','ncPigColor','ncPigAguja','ncPigObs'].forEach(id => {
+    // Reset todos los campos
+    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    
-    // Reset todos los selects
-    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper','ncPigTipo'].forEach(id => {
+    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.selectedIndex = 0;
     });
-    
     document.getElementById('ncFacSexo').value = 'Femenino';
     document.getElementById('ncCode').textContent = 'C-' + String(CLIENT_DIRECTORY_CACHE.length + CLIENT_DIRECTORY.length + 1).padStart(4, '0');
     document.getElementById('newClientModal').classList.add('active');
@@ -5330,12 +5292,6 @@
   }
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
-    
-    // Si se está cerrando el modal de nueva clienta, resetear el formulario
-    if (document.getElementById('newClientModal').classList.contains('active')) {
-      isEditMode = false;
-      editingClientCode = null;
-    }
   }
 
   function pickPriority(el) {
