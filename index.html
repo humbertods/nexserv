@@ -3849,15 +3849,18 @@
     document.getElementById('newClientModalTitle').textContent = 'Nueva clienta';
     document.getElementById('saveClientBtn').textContent = 'Registrar clienta completa';
     
-    // Reset todos los campos
-    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra'].forEach(id => {
+    // Reset todos los campos de texto
+    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra','ncPigColor','ncPigAguja','ncPigObs'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper'].forEach(id => {
+    
+    // Reset todos los selects
+    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper','ncPigTipo'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.selectedIndex = 0;
     });
+    
     document.getElementById('ncFacSexo').value = 'Femenino';
     document.getElementById('ncCode').textContent = 'C-' + String(CLIENT_DIRECTORY_CACHE.length + CLIENT_DIRECTORY.length + 1).padStart(4, '0');
     document.getElementById('newClientModal').classList.add('active');
@@ -5327,6 +5330,12 @@
   }
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
+    
+    // Si se está cerrando el modal de nueva clienta, resetear el formulario
+    if (document.getElementById('newClientModal').classList.contains('active')) {
+      isEditMode = false;
+      editingClientCode = null;
+    }
   }
 
   function pickPriority(el) {
