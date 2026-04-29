@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- NexServ v2.1 - Fix FichaCejasPigmento Debug (29/04/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3824,24 +3825,38 @@
         
         // Guardar ficha de Cejas Efecto Polvo si tiene datos
         const pigTipo = document.getElementById('ncPigTipo').value;
+        console.log('🔍 Debug - pigTipo:', pigTipo);
+        
         if (pigTipo) {
+          console.log('✅ Hay datos de ficha de pigmento, procediendo a guardar...');
           try {
-            const pigResult = await apiPost('addFichaCejasPigmento', {
+            const pigData = {
               codigo: codigoCliente,
               color: document.getElementById('ncPigColor').value.trim(),
               aguja: document.getElementById('ncPigAguja').value.trim(),
               tipoSesion: pigTipo,
               observaciones: document.getElementById('ncPigObs').value.trim(),
               responsable: window.currentUser?.name || 'Admin'
-            });
+            };
             
-            if (!pigResult.success) {
+            console.log('📤 Enviando datos de ficha pigmento:', pigData);
+            
+            const pigResult = await apiPost('addFichaCejasPigmento', pigData);
+            
+            console.log('📥 Respuesta de ficha pigmento:', pigResult);
+            
+            if (pigResult.success) {
+              console.log('✅ Ficha de pigmento guardada exitosamente');
+            } else {
+              console.error('❌ Error en la respuesta:', pigResult.error);
               alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + (pigResult.error || 'Error desconocido'));
             }
           } catch (err) {
-            console.error('Error guardando ficha pigmento:', err);
+            console.error('❌ Error guardando ficha pigmento:', err);
             alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + err.message);
           }
+        } else {
+          console.log('ℹ️ No hay datos de ficha de pigmento para guardar');
         }
         
         // Agregar al cache local
