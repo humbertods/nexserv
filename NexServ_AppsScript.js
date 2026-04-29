@@ -54,6 +54,7 @@ function doPost(e) {
     switch (action) {
       case 'addClienta': result = handleAddClienta(data); break;
       case 'updateClienta': result = handleUpdateClienta(data); break;
+      case 'updateClientaFull': result = handleUpdateClientaFull(data); break;
       case 'addListaEspera': result = handleAddListaEspera(data); break;
       case 'tomarClienta': result = handleTomarClienta(data); break;
       case 'finalizarAtencion': result = handleFinalizarAtencion(data); break;
@@ -257,6 +258,29 @@ function handleUpdateClienta(data) {
   }
   return { success: false, message: 'Clienta no encontrada' };
 }
+
+function handleUpdateClientaFull(data) {
+  const ws = getSheet('Clientas');
+  const allData = ws.getDataRange().getValues();
+
+  for (let i = 3; i < allData.length; i++) {
+    if (allData[i][0] === data.codigo) {
+      const row = i + 1;
+      // Actualizar todos los campos editables
+      if (data.nombre !== undefined) ws.getRange(row, 2).setValue(data.nombre);
+      if (data.telefono !== undefined) ws.getRange(row, 3).setValue(data.telefono);
+      if (data.cedula !== undefined) ws.getRange(row, 11).setValue(data.cedula);
+      if (data.correo !== undefined) ws.getRange(row, 12).setValue(data.correo);
+      if (data.obsCejas !== undefined) ws.getRange(row, 13).setValue(data.obsCejas);
+      if (data.obsDepilacion !== undefined) ws.getRange(row, 14).setValue(data.obsDepilacion);
+      if (data.obsPestanas !== undefined) ws.getRange(row, 15).setValue(data.obsPestanas);
+      if (data.obsFacial !== undefined) ws.getRange(row, 16).setValue(data.obsFacial);
+      return { success: true };
+    }
+  }
+  return { success: false, message: 'Clienta no encontrada' };
+}
+
 
 // ============================================
 // CATÁLOGO

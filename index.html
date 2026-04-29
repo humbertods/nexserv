@@ -2,7 +2,6 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v2.1 - Fix FichaCejasPigmento Debug (29/04/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -568,6 +567,9 @@
       <div id="profileName" style="font-size: 24px; font-weight: 800; letter-spacing: -0.03em;"></div>
       <div id="profileCode" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;"></div>
       <div id="profileTopBadge" style="display: none; margin-top: 8px;"><span class="top-star large">⭐ TOP</span></div>
+      
+      <!-- Botón editar - solo visible para CEO -->
+      <button id="editClientBtn" onclick="openEditClient()" style="display: none; margin-top: 12px; padding: 10px 24px; background: var(--purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✏️ Editar clienta</button>
     </div>
 
     <!-- Stats rápidos -->
@@ -722,7 +724,7 @@
     <div class="modal-bg" id="newClientModal">
       <div class="modal" style="max-height: 92%;">
         <div class="modal-handle"></div>
-        <div class="modal-title">Nueva clienta</div>
+        <div class="modal-title" id="newClientModalTitle">Nueva clienta</div>
 
         <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px; text-align: center;">
           <div style="font-size: 11px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px;">Código automático</div>
@@ -897,7 +899,7 @@
           <textarea id="ncPigObs" placeholder="Ej: Primera sesión, cliente muy satisfecha..." style="min-height: 50px;"></textarea>
         </div>
 
-        <button class="btn-primary" onclick="saveNewClient()" style="margin-top: 12px;">Registrar clienta completa</button>
+        <button class="btn-primary" id="saveClientBtn" onclick="saveNewClient()" style="margin-top: 12px;">Registrar clienta completa</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -3748,7 +3750,70 @@
 
   function filterClients() { renderClientDirectory(); }
 
+  let isEditMode = false;
+  let editingClientCode = null;
+
+  function openEditClient() {
+    const key = currentProfileClient;
+    if (!key) return;
+    
+    const profile = CLIENT_PROFILES[key];
+    if (!profile) return;
+    
+    // Buscar los datos completos de la clienta desde el cache
+    const clientData = CLIENT_DIRECTORY_CACHE.find(c => c.key === key);
+    if (!clientData) {
+      alert('No se encontraron los datos de la clienta');
+      return;
+    }
+    
+    isEditMode = true;
+    editingClientCode = clientData.code;
+    
+    // Cambiar título y botón
+    document.getElementById('newClientModalTitle').textContent = 'Editar clienta';
+    document.getElementById('saveClientBtn').textContent = 'Guardar cambios';
+    
+    // Cargar datos existentes
+    const nameParts = profile.name.split(' ');
+    document.getElementById('ncNombre').value = nameParts[0] || '';
+    document.getElementById('ncApellido').value = nameParts.slice(1).join(' ') || '';
+    document.getElementById('ncPhone').value = clientData.phone || '';
+    document.getElementById('ncCedula').value = clientData.cedula || '';
+    document.getElementById('ncEmail').value = clientData.correo || '';
+    
+    // Observaciones por área (necesitamos cargar desde el servidor)
+    loadClientDataForEdit(clientData.code);
+    
+    document.getElementById('ncCode').textContent = clientData.code;
+    document.getElementById('newClientModal').classList.add('active');
+  }
+  
+  async function loadClientDataForEdit(codigo) {
+    try {
+      const result = await apiGet('getCliente', { codigo: codigo });
+      if (result.success && result.cliente) {
+        const c = result.cliente;
+        document.getElementById('ncObsCejas').value = c.obsCejas || '';
+        document.getElementById('ncObsDepil').value = c.obsDepilacion || '';
+        document.getElementById('ncObsPest').value = c.obsPestanas || '';
+        document.getElementById('ncObsFacial').value = c.obsFacial || '';
+        
+        // TODO: Cargar fichas de pestañas, facial y pigmento si existen
+      }
+    } catch (err) {
+      console.error('Error cargando datos para editar:', err);
+    }
+  }
+
   function openNewClient() {
+    isEditMode = false;
+    editingClientCode = null;
+    
+    // Cambiar título y botón a modo nuevo
+    document.getElementById('newClientModalTitle').textContent = 'Nueva clienta';
+    document.getElementById('saveClientBtn').textContent = 'Registrar clienta completa';
+    
     // Reset todos los campos
     ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra'].forEach(id => {
       const el = document.getElementById(id);
@@ -3775,10 +3840,48 @@
     const pestModelo = document.getElementById('ncPestModelo').value;
     const facBiotipo = document.getElementById('ncFacBiotipo').value;
 
-    // Guardar en Google Sheets via API
     const btn = document.querySelector('#newClientModal .btn-primary');
-    btn.textContent = 'Guardando...';
+    btn.textContent = isEditMode ? 'Guardando cambios...' : 'Guardando...';
     btn.disabled = true;
+
+    if (isEditMode) {
+      // MODO EDICIÓN
+      const postData = {
+        codigo: editingClientCode,
+        nombre: fullName,
+        telefono: phone,
+        cedula: cedula,
+        correo: email,
+        obsCejas: document.getElementById('ncObsCejas').value.trim(),
+        obsDepilacion: document.getElementById('ncObsDepil').value.trim(),
+        obsPestanas: document.getElementById('ncObsPest').value.trim(),
+        obsFacial: document.getElementById('ncObsFacial').value.trim()
+      };
+
+      try {
+        const result = await apiPost('updateClientaFull', postData);
+        btn.textContent = 'Guardar cambios';
+        btn.disabled = false;
+
+        if (result.success) {
+          closeModal();
+          await renderClientDirectory();
+          // Recargar el perfil actualizado
+          await loadClientProfiles();
+          if (currentProfileClient) {
+            openClientProfile(currentProfileClient);
+          }
+          alert('✓ Clienta actualizada correctamente');
+        } else {
+          alert('Error al actualizar: ' + (result.message || result.error || 'Intenta de nuevo'));
+        }
+      } catch (err) {
+        btn.textContent = 'Guardar cambios';
+        btn.disabled = false;
+        alert('Error de conexión. Verificá tu internet e intentá de nuevo.');
+      }
+    } else {
+      // MODO NUEVO (código original)
 
     const postData = {
       nombre: fullName,
@@ -3825,38 +3928,19 @@
         
         // Guardar ficha de Cejas Efecto Polvo si tiene datos
         const pigTipo = document.getElementById('ncPigTipo').value;
-        console.log('🔍 Debug - pigTipo:', pigTipo);
-        
         if (pigTipo) {
-          console.log('✅ Hay datos de ficha de pigmento, procediendo a guardar...');
           try {
-            const pigData = {
+            await apiPost('addFichaCejasPigmento', {
               codigo: codigoCliente,
               color: document.getElementById('ncPigColor').value.trim(),
               aguja: document.getElementById('ncPigAguja').value.trim(),
               tipoSesion: pigTipo,
               observaciones: document.getElementById('ncPigObs').value.trim(),
               responsable: window.currentUser?.name || 'Admin'
-            };
-            
-            console.log('📤 Enviando datos de ficha pigmento:', pigData);
-            
-            const pigResult = await apiPost('addFichaCejasPigmento', pigData);
-            
-            console.log('📥 Respuesta de ficha pigmento:', pigResult);
-            
-            if (pigResult.success) {
-              console.log('✅ Ficha de pigmento guardada exitosamente');
-            } else {
-              console.error('❌ Error en la respuesta:', pigResult.error);
-              alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + (pigResult.error || 'Error desconocido'));
-            }
+            });
           } catch (err) {
-            console.error('❌ Error guardando ficha pigmento:', err);
-            alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + err.message);
+            console.error('Error guardando ficha pigmento:', err);
           }
-        } else {
-          console.log('ℹ️ No hay datos de ficha de pigmento para guardar');
         }
         
         // Agregar al cache local
@@ -3882,6 +3966,7 @@
       btn.disabled = false;
       alert('Error de conexión. Verificá tu internet e intentá de nuevo.');
     }
+    } // FIN MODO NUEVO
   }
 
   // === RETIRO DE PESTAÑAS: GRATIS SI ES DE ROSA AGUILERA ===
@@ -4251,6 +4336,10 @@
     const isOwner = user?.role === 'owner';
     document.getElementById('profileSpentStat').style.display = isOwner ? 'block' : 'none';
     document.getElementById('profileStats').style.gridTemplateColumns = isOwner ? '1fr 1fr 1fr' : '1fr 1fr';
+    
+    // Botón editar: solo visible para CEO/admin
+    const isCEO = user?.role === 'admin' || user?.role === 'ceo';
+    document.getElementById('editClientBtn').style.display = isCEO ? 'inline-block' : 'none';
     
     // Default tab: si es pestañas staff, mostrar pestañas primero
     let defaultTab = 'cejas';
