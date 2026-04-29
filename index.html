@@ -4339,6 +4339,7 @@
     
     // Botón editar: solo visible para CEO/admin
     const isCEO = user?.role === 'admin' || user?.role === 'ceo';
+    console.log('🔍 Debug botón editar:', { user: user, role: user?.role, isCEO: isCEO });
     document.getElementById('editClientBtn').style.display = isCEO ? 'inline-block' : 'none';
     
     // Default tab: si es pestañas staff, mostrar pestañas primero
