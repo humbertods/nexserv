@@ -2199,9 +2199,35 @@
     `).join('');
   }
 
-  function renderStaffPromos() {
+  async function renderStaffPromos() {
     const list = document.getElementById('staffPromosList');
     if (!list) return;
+    
+    // Mostrar loading mientras carga
+    list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando promos...</div></div>';
+    
+    // Cargar promos desde el servidor
+    try {
+      const result = await apiGet('getPromos');
+      if (result.success && result.promos && result.promos.length > 0) {
+        // REEMPLAZAR completamente el array PROMOS con los datos del servidor
+        PROMOS = result.promos.map(p => ({
+          id: p.id || '',
+          name: p.nombre || '',
+          services: p.servicios || '',
+          price: Number(p.precioCombo) || 0,
+          regular: Number(p.sumaIndividual) || 0,
+          from: p.desde || '',
+          to: p.hasta || '',
+          active: p.activa === 'Sí' || p.activa === true,
+          division: p.division ? JSON.parse(p.division) : []
+        }));
+      }
+    } catch (err) { 
+      console.error('Error cargando promos:', err);
+    }
+    
+    // Renderizar las promos
     const active = PROMOS.filter(p => p.active);
     if (active.length === 0) {
       list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="font-size: 32px; margin-bottom: 8px;">🏷</div>No hay promos activas esta semana</div>';
@@ -2433,14 +2459,14 @@
   let activeClients = {};
   // ej: { 'Keyla': [{ name: 'Isabella Vera', service: '...', since: '10:52' }] }
 
-  function show(id) {
+  async function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     window.scrollTo(0, 0);
     if (id === 'waitList') renderWaitList();
     if (id === 'staffHome') loadStaffHome();
     if (id === 'ownerPromos') renderPromos();
-    if (id === 'staffPromos') renderStaffPromos();
+    if (id === 'staffPromos') await renderStaffPromos();
     if (id === 'ownerReports') renderReport();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
@@ -4563,7 +4589,7 @@
       if (id === 'clientDirectory') await renderClientDirectory();
       if (id === 'mikaelaHome') await loadMikaelaHome();
       if (id === 'ownerPromos') renderPromos();
-      if (id === 'staffPromos') renderStaffPromos();
+      if (id === 'staffPromos') await renderStaffPromos();
     }
     
     btn.classList.remove('spinning');
