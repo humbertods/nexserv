@@ -1051,42 +1051,14 @@
       <div class="name" style="font-size: 24px;">¿Quién la atiende?</div>
     </div>
 
-    <div class="card" style="background: var(--top-purple-bg); border-color: #d4b5ff; padding: 14px;">
+    <div class="card" style="background: var(--top-purple-bg); border-color: #d4b5ff; padding: 14px;" id="assignDirectClient">
       <div style="font-size: 13px; color: var(--top-purple); font-weight: 600;">
-        ⭐ Carmen Molina (TOP) · Limpieza profunda
+        Cargando...
       </div>
     </div>
 
-    <div class="section-title">Disponibles para Facial</div>
-    <div class="card" style="padding: 8px 20px;">
-      <div class="client-row" onclick="goAssign('Laura')">
-        <div class="client-avatar">L</div>
-        <div class="client-info">
-          <div class="client-name">Laura</div>
-          <div class="client-meta">Cosmetóloga · Disponible</div>
-        </div>
-        <div style="background: var(--success-bg); color: var(--success); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Libre</div>
-      </div>
-    </div>
-
-    <div class="section-title">Cualquier chica del salón</div>
-    <div class="card" style="padding: 8px 20px;">
-      <div class="client-row" onclick="goAssign('María')">
-        <div class="client-avatar">M</div>
-        <div class="client-info">
-          <div class="client-name">María</div>
-          <div class="client-meta">Cejas · En servicio (Andrea)</div>
-        </div>
-        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
-      </div>
-      <div class="client-row" onclick="goAssign('Yadira')">
-        <div class="client-avatar">Y</div>
-        <div class="client-info">
-          <div class="client-name">Yadira</div>
-          <div class="client-meta">Pestañas · En servicio (Valentina)</div>
-        </div>
-        <div style="background: var(--warning-bg); color: var(--warning); font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">Ocupada</div>
-      </div>
+    <div id="assignDirectStaffList">
+      <!-- Lista de staff se carga dinámicamente -->
     </div>
   </div>
 
@@ -2563,6 +2535,7 @@
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
+    if (id === 'assignDirect') { renderAssignDirect(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
@@ -5464,6 +5437,116 @@
       console.error('❌ Error enviando a lista:', err);
       alert('Error de conexión al enviar a lista de espera. Verificá tu internet.');
     }
+  }
+
+  async function renderAssignDirect() {
+    // Obtener datos de la clienta seleccionada
+    const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
+    const area = document.getElementById('arrArea')?.value || 'Cejas';
+    const servicio = document.getElementById('arrService')?.value || '';
+    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+    
+    // Mostrar info de la clienta
+    const topPart = isTop ? '⭐ ' : '';
+    document.getElementById('assignDirectClient').innerHTML = `
+      <div style="font-size: 13px; color: ${isTop ? 'var(--top-purple)' : 'var(--ink)'}; font-weight: 600;">
+        ${topPart}${nombre} · ${servicio}
+      </div>
+    `;
+    
+    // Cargar lista de espera para obtener estado de cada staff
+    const staffAvailability = {};
+    try {
+      const result = await apiGet('getListaCompleta');
+      if (result.success) {
+        // Marcar staff ocupado si está en servicio
+        [...(result.enServicio || []), ...(result.porCobrar || [])].forEach(item => {
+          const chicaNombre = item.tomadaPor;
+          if (!staffAvailability[chicaNombre]) {
+            staffAvailability[chicaNombre] = [];
+          }
+          staffAvailability[chicaNombre].push(item.nombre);
+        });
+      }
+    } catch (err) {
+      console.error('Error cargando disponibilidad:', err);
+    }
+    
+    // Definir todo el staff del salón
+    const allStaff = [
+      { name: 'María', area: 'Cejas', areas: ['cejas', 'depilacion'] },
+      { name: 'Keyla', area: 'Cejas', areas: ['cejas', 'depilacion'] },
+      { name: 'Lesly', area: 'Cejas', areas: ['cejas', 'depilacion'] },
+      { name: 'Yadira', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
+      { name: 'Diana', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
+      { name: 'Laura', area: 'Facial', areas: ['facial'] }
+    ];
+    
+    // Mapear área seleccionada
+    const areaMap = { 
+      'Cejas': 'cejas', 
+      'Depilación': 'depilacion', 
+      'Pestañas': 'pestanas', 
+      'Lifting / Retiro': 'retiro_lifting', 
+      'Facial': 'facial' 
+    };
+    const areaKey = areaMap[area] || 'cejas';
+    
+    // Separar en disponibles para el área vs todas las demás
+    const forArea = [];
+    const others = [];
+    
+    allStaff.forEach(staff => {
+      const clients = staffAvailability[staff.name] || [];
+      const isOccupied = clients.length > 0;
+      const status = isOccupied ? 'Ocupada' : 'Libre';
+      const statusBg = isOccupied ? 'var(--warning-bg)' : 'var(--success-bg)';
+      const statusColor = isOccupied ? 'var(--warning)' : 'var(--success)';
+      const meta = isOccupied ? 
+        `${staff.area} · En servicio (${clients[0]})` : 
+        `${staff.area} · Disponible`;
+      const initials = staff.name.split(' ').map(n => n[0]).join('');
+      
+      const staffHtml = `
+        <div class="client-row" onclick="goAssign('${staff.name}')">
+          <div class="client-avatar">${initials}</div>
+          <div class="client-info">
+            <div class="client-name">${staff.name}</div>
+            <div class="client-meta">${meta}</div>
+          </div>
+          <div style="background: ${statusBg}; color: ${statusColor}; font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">${status}</div>
+        </div>
+      `;
+      
+      if (staff.areas.includes(areaKey)) {
+        forArea.push(staffHtml);
+      } else {
+        others.push(staffHtml);
+      }
+    });
+    
+    // Renderizar listas
+    let html = '';
+    
+    if (forArea.length > 0) {
+      html += `
+        <div class="section-title">Disponibles para ${area}</div>
+        <div class="card" style="padding: 8px 20px;">
+          ${forArea.join('')}
+        </div>
+      `;
+    }
+    
+    if (others.length > 0) {
+      html += `
+        <div class="section-title">Cualquier chica del salón</div>
+        <div class="card" style="padding: 8px 20px;">
+          ${others.join('')}
+        </div>
+      `;
+    }
+    
+    document.getElementById('assignDirectStaffList').innerHTML = html;
   }
 
   function goAssign(chica) {
