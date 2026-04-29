@@ -3826,7 +3826,7 @@
         const pigTipo = document.getElementById('ncPigTipo').value;
         if (pigTipo) {
           try {
-            await apiPost('addFichaCejasPigmento', {
+            const pigResult = await apiPost('addFichaCejasPigmento', {
               codigo: codigoCliente,
               color: document.getElementById('ncPigColor').value.trim(),
               aguja: document.getElementById('ncPigAguja').value.trim(),
@@ -3834,8 +3834,13 @@
               observaciones: document.getElementById('ncPigObs').value.trim(),
               responsable: window.currentUser?.name || 'Admin'
             });
+            
+            if (!pigResult.success) {
+              alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + (pigResult.error || 'Error desconocido'));
+            }
           } catch (err) {
             console.error('Error guardando ficha pigmento:', err);
+            alert('⚠️ Clienta registrada pero hubo un error al guardar la ficha de pigmento:\n' + err.message);
           }
         }
         
