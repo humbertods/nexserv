@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<!-- NexServ v2.1 - Edición de clientas para CEO (29/04/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2835,20 +2836,81 @@
       }
     } catch (err) {
       console.error('Error al tomar clienta:', err);
+      alert('Error al tomar la clienta. Intentá de nuevo.');
+      return;
     }
     
-    if (user && user.maxClients === 2) {
-      if (!activeClients[name]) activeClients[name] = [];
-      const slot = activeClients[name].length;
-      if (slot >= 2) {
-        alert('Ya tenés 2 clientas en atención. Finalizá una para tomar otra.');
-        return;
+    // Cargar datos actualizados de las atenciones
+    try {
+      const atenResult = await apiGet('getAtenciones', { chica: name });
+      if (atenResult.success && atenResult.atenciones && atenResult.atenciones.length > 0) {
+        const aten = atenResult.atenciones;
+        const slot = user && user.maxClients === 2 ? aten.length - 1 : 0;
+        
+        // Cargar datos de la atención recién tomada
+        const a = aten[slot];
+        if (slot === 0) {
+          window._as1Client = a.codigo;
+          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          document.getElementById('as1Avatar').textContent = initials;
+          document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
+          document.getElementById('as1Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
+          document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
+          document.getElementById('obs1Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
+          
+          // Limpiar servicios previos
+          slotServices[1] = [];
+          document.getElementById('as1ServicesList').innerHTML = '';
+          document.getElementById('as1SvcCount').textContent = '0';
+          document.getElementById('as1Total').textContent = '$0';
+          
+          if (user.area === 'pestanas') {
+            loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
+          }
+        } else {
+          window._as2Client = a.codigo;
+          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          document.getElementById('as2Avatar').textContent = initials;
+          document.getElementById('as2Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
+          document.getElementById('as2Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
+          document.getElementById('as2Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
+          document.getElementById('obs2Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
+          
+          // Limpiar servicios previos
+          slotServices[2] = [];
+          document.getElementById('as2ServicesList').innerHTML = '';
+          document.getElementById('as2SvcCount').textContent = '0';
+          document.getElementById('as2Total').textContent = '$0';
+          
+          if (user.area === 'pestanas') {
+            loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
+          }
+        }
+        
+        if (user && user.maxClients === 2) {
+          if (!activeClients[name]) activeClients[name] = [];
+          activeClients[name] = aten.map(at => ({ name: at.nombre, service: at.servicio }));
+          updateCapacityUI(name);
+        }
+        
+        setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
       }
-      activeClients[name].push({ name: window._takingClient || 'Clienta', service: window._takingService || 'Servicio' });
-      updateCapacityUI(name);
-      setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
-    } else {
-      setTimeout(() => { show('activeService'); }, 300);
+    } catch (err) {
+      console.error('Error cargando datos de la clienta:', err);
+      // Fallback al comportamiento anterior
+      if (user && user.maxClients === 2) {
+        if (!activeClients[name]) activeClients[name] = [];
+        const slot = activeClients[name].length;
+        if (slot >= 2) {
+          alert('Ya tenés 2 clientas en atención. Finalizá una para tomar otra.');
+          return;
+        }
+        activeClients[name].push({ name: window._takingClient || 'Clienta', service: window._takingService || 'Servicio' });
+        updateCapacityUI(name);
+        setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
+      } else {
+        setTimeout(() => { show('activeService'); }, 300);
+      }
     }
   }
 
@@ -3732,9 +3794,11 @@
       return;
     }
     
-    list.innerHTML = filtered.map(c => `
-      <div class="card" style="margin-bottom: 8px; padding: 14px; cursor: pointer;" onclick="openClientProfile('${c.key}')">
-        <div style="display: flex; align-items: center; gap: 12px;">
+    list.innerHTML = filtered.map(c => {
+      const isCEO = window.currentUser?.role === 'admin' || window.currentUser?.role === 'ceo';
+      return `
+      <div class="card" style="margin-bottom: 8px; padding: 14px; position: relative;">
+        <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="openClientProfile('${c.key}')">
           <div class="client-avatar ${c.isTop ? 'is-top' : ''}" style="flex-shrink: 0;">${c.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
           <div style="flex: 1; min-width: 0;">
             <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px;">
@@ -3744,8 +3808,10 @@
           </div>
           <span style="font-size: 16px; color: var(--ink-faint);">›</span>
         </div>
+        ${isCEO ? `<button onclick="event.stopPropagation(); editClientFromList('${c.key}')" style="position: absolute; top: 12px; right: 12px; padding: 6px 12px; background: var(--purple); color: white; border: none; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; cursor: pointer;">✏️ Editar</button>` : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function filterClients() { renderClientDirectory(); }
@@ -3789,6 +3855,36 @@
     document.getElementById('newClientModal').classList.add('active');
   }
   
+  function editClientFromList(key) {
+    // Buscar los datos completos de la clienta desde el cache
+    const clientData = CLIENT_DIRECTORY_CACHE.find(c => c.key === key);
+    if (!clientData) {
+      alert('No se encontraron los datos de la clienta');
+      return;
+    }
+    
+    isEditMode = true;
+    editingClientCode = clientData.code;
+    
+    // Cambiar título y botón
+    document.getElementById('newClientModalTitle').textContent = 'Editar clienta';
+    document.getElementById('saveClientBtn').textContent = 'Guardar cambios';
+    
+    // Cargar datos existentes
+    const nameParts = clientData.name.split(' ');
+    document.getElementById('ncNombre').value = nameParts[0] || '';
+    document.getElementById('ncApellido').value = nameParts.slice(1).join(' ') || '';
+    document.getElementById('ncPhone').value = clientData.phone || '';
+    document.getElementById('ncCedula').value = clientData.cedula || '';
+    document.getElementById('ncEmail').value = clientData.correo || '';
+    
+    // Observaciones por área (necesitamos cargar desde el servidor)
+    loadClientDataForEdit(clientData.code);
+    
+    document.getElementById('ncCode').textContent = clientData.code;
+    document.getElementById('newClientModal').classList.add('active');
+  }
+  
   async function loadClientDataForEdit(codigo) {
     try {
       const result = await apiGet('getCliente', { codigo: codigo });
@@ -3814,15 +3910,18 @@
     document.getElementById('newClientModalTitle').textContent = 'Nueva clienta';
     document.getElementById('saveClientBtn').textContent = 'Registrar clienta completa';
     
-    // Reset todos los campos
-    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra'].forEach(id => {
+    // Reset todos los campos de texto
+    ['ncNombre','ncApellido','ncCedula','ncPhone','ncEmail','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial','ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra','ncPigColor','ncPigAguja','ncPigObs'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper'].forEach(id => {
+    
+    // Reset todos los selects
+    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper','ncPigTipo'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.selectedIndex = 0;
     });
+    
     document.getElementById('ncFacSexo').value = 'Femenino';
     document.getElementById('ncCode').textContent = 'C-' + String(CLIENT_DIRECTORY_CACHE.length + CLIENT_DIRECTORY.length + 1).padStart(4, '0');
     document.getElementById('newClientModal').classList.add('active');
@@ -5292,6 +5391,12 @@
   }
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
+    
+    // Si se está cerrando el modal de nueva clienta, resetear el formulario
+    if (document.getElementById('newClientModal').classList.contains('active')) {
+      isEditMode = false;
+      editingClientCode = null;
+    }
   }
 
   function pickPriority(el) {
@@ -5340,15 +5445,25 @@
       postData.precioRegular = promo.regular;
     }
 
-    try {
-      await apiPost('addListaEspera', postData);
-    } catch (err) {
-      console.error('Error enviando a lista:', err);
-    }
+    console.log('📤 Enviando a lista de espera:', postData);
 
-    window._arrPromo = null;
-    simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + servicio, isTop);
-    setTimeout(() => { show('mikaelaHome'); }, 600);
+    try {
+      const result = await apiPost('addListaEspera', postData);
+      console.log('📥 Respuesta de addListaEspera:', result);
+      
+      if (result && result.success) {
+        console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
+        window._arrPromo = null;
+        simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + servicio, isTop);
+        setTimeout(() => { show('mikaelaHome'); }, 600);
+      } else {
+        console.error('❌ Error en la respuesta:', result);
+        alert('Error al agregar a lista de espera: ' + (result?.error || result?.message || 'Error desconocido'));
+      }
+    } catch (err) {
+      console.error('❌ Error enviando a lista:', err);
+      alert('Error de conexión al enviar a lista de espera. Verificá tu internet.');
+    }
   }
 
   function goAssign(chica) {
