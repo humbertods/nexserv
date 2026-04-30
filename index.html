@@ -2766,8 +2766,9 @@
           document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
           document.getElementById('as1Name').textContent = a1.nombre + (a1.esTop ? ' ⭐' : '');
           document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
-          document.getElementById('as1ServiceName').textContent = a1.servicio;
-          document.getElementById('as1ServiceArea').textContent = a1.area + ' · precio regular';
+          // NOTA: as1ServiceName y as1ServiceArea ya no existen, ahora usamos slotServices
+          // document.getElementById('as1ServiceName').textContent = a1.servicio;
+          // document.getElementById('as1ServiceArea').textContent = a1.area + ' · precio regular';
           document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
           
           // Doble atención: registrar en activeClients
@@ -2780,7 +2781,8 @@
               document.getElementById('as2Avatar').textContent = initials2;
               document.getElementById('as2Name').textContent = a2.nombre + (a2.esTop ? ' ⭐' : '');
               document.getElementById('as2Code').textContent = a2.codigo + ' · Llegó ' + a2.horaLlegada;
-              document.getElementById('as2ServiceName').textContent = a2.servicio;
+              // NOTA: as2ServiceName ya no existe, ahora usamos slotServices
+              // document.getElementById('as2ServiceName').textContent = a2.servicio;
             }
             updateCapacityUI(user.name);
           }
@@ -3512,18 +3514,22 @@
   async function finishSlot2() {
     const user = window.currentUser;
     const clientName = document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '';
-    const serviceName = document.getElementById('as2ServiceName')?.textContent || '';
-    const price = document.getElementById('as2Total')?.textContent?.replace('$', '') || '0';
+    const svcs = slotServices[2] || [];
+    const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
+    const total = svcs.reduce((sum, s) => {
+      if (s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
     const promoData = activePromos[clientName];
     
     try {
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
-        servicio: serviceName,
-        total: price,
+        servicio: svcNames,
+        total: String(total),
         promoNombre: promoData ? promoData.promo.name : '',
-        precioRegular: promoData ? String(promoData.promo.regular) : price
+        precioRegular: promoData ? String(promoData.promo.regular) : String(total)
       });
     } catch (err) { console.error(err); }
 
