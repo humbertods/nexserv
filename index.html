@@ -2226,16 +2226,15 @@
   };
 
   let PROMOS = []; // Se llenarán desde el servidor
+  let PROMOS_LOADED = false; // Flag para saber si ya se cargaron
 
-  async function renderPromos() {
-    const list = document.getElementById('promosList');
-    if (!list) return;
+  // Función para asegurar que PROMOS esté cargado
+  async function ensurePromosLoaded() {
+    if (PROMOS_LOADED && PROMOS.length > 0) return; // Ya cargado
     
-    // Cargar promos desde el servidor
     try {
       const result = await apiGet('getPromos');
       if (result.success && result.promos && result.promos.length > 0) {
-        // REEMPLAZAR completamente el array PROMOS con los datos del servidor
         PROMOS = result.promos.map(p => ({
           id: p.id || '',
           name: p.nombre || '',
@@ -2247,14 +2246,20 @@
           active: p.activa === 'Sí' || p.activa === true,
           division: p.division ? JSON.parse(p.division) : []
         }));
-      } else {
-        // Si no hay promos en el servidor, dejar el array vacío
-        PROMOS = [];
+        PROMOS_LOADED = true;
+        console.log('✅ PROMOS loaded:', PROMOS.length, 'promos');
       }
-    } catch (err) { 
-      console.error('Error cargando promos:', err);
-      PROMOS = []; // En caso de error, array vacío
+    } catch (err) {
+      console.error('Error loading PROMOS:', err);
     }
+  }
+
+  async function renderPromos() {
+    const list = document.getElementById('promosList');
+    if (!list) return;
+    
+    // Asegurar que PROMOS esté cargado
+    await ensurePromosLoaded();
 
     document.getElementById('promoCount').textContent = PROMOS.filter(p => p.active).length;
     list.innerHTML = PROMOS.map((p, i) => `
@@ -3626,6 +3631,9 @@
   async function loadStaffHome() {
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
+    
+    // 🔧 Asegurar que PROMOS esté cargado ANTES de procesar atenciones
+    await ensurePromosLoaded();
     
     try {
       const result = await apiGet('getAtenciones', { chica: user.name });
