@@ -4389,7 +4389,7 @@
   
   async function approveAuthorization(reqId) {
     try {
-      const result = await apiPost('aprobarAutorizacion', { id: reqId });
+      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
         alert('✓ Servicio aprobado. El staff puede continuar.');
@@ -4405,7 +4405,7 @@
   
   async function rejectAuthorization(reqId) {
     try {
-      const result = await apiPost('rechazarAutorizacion', { id: reqId });
+      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
       
       if (result.success) {
         alert('✕ Servicio rechazado. El staff será notificado.');
