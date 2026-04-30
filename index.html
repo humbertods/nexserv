@@ -1185,6 +1185,28 @@
         <button class="btn-primary outline" onclick="modifyService()">Modificar servicio</button>
       </div>
     </div>
+
+    <!-- Modal de opciones al finalizar -->
+    <div class="modal-bg" id="finishOptionsModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">¿Qué sigue para la clienta?</div>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div id="finishClientName" style="font-size: 16px; font-weight: 700; margin-bottom: 8px;"></div>
+          <div id="finishPromoInfo" style="display: none; background: var(--accent-bg); border-radius: 12px; padding: 10px; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">🏷 Promo multi-área</div>
+            <div id="finishPromoName" style="font-size: 13px; font-weight: 700; color: var(--accent);"></div>
+          </div>
+          <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 16px;">
+            Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
+        <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
+        <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
+        <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <!-- ACTIVE SERVICE (lo que ve la chica cuando tiene una clienta) -->
@@ -2797,8 +2819,11 @@
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
     
-    content.innerHTML = myList.map(w => {
-      const wData = JSON.stringify(w).replace(/"/g, '&quot;');
+    content.innerHTML = myList.map((w, idx) => {
+      // Guardar en objeto global
+      if (!window._waitListData) window._waitListData = {};
+      window._waitListData[idx] = w;
+      
       return `
       <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}">
         <div class="waitlist-top">
@@ -2812,15 +2837,20 @@
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${w.obs ? `<div class="waitlist-obs">📝 ${w.obs}</div>` : ''}
         <div class="waitlist-actions">
-          <button class="btn-take" onclick='openTake("${wData}")'>Tomar clienta</button>
+          <button class="btn-take" onclick='openTake(${idx})'>Tomar clienta</button>
         </div>
       </div>
     `;
     }).join('');
   }
 
-  function openTake(wDataStr) {
-    const w = JSON.parse(wDataStr.replace(/&quot;/g, '"'));
+  function openTake(idx) {
+    const w = window._waitListData[idx];
+    if (!w) {
+      alert('Error: no se encontró la clienta');
+      return;
+    }
+    
     window._takingData = w;
     window._takingId = w.id;
     window._takingClient = w.name;
@@ -2978,6 +3008,52 @@
     window._acceptedPromo = null;
     loadClientAfterTake();
   }
+  
+  // Opciones al finalizar servicio
+  async function finishAndSend() {
+    // Mandar directo a cobrar (finaliza completamente)
+    closeModal();
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot;
+    
+    try {
+      await apiPost('finalizarAtencion', {
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        servicio: data.svcNames,
+        total: data.total,
+        promoNombre: data.promoNombre,
+        precioRegular: data.precioRegular
+      });
+    } catch (err) { console.error(err); }
+
+    // Limpiar slot
+    if (activePromos[data.clientName]) delete activePromos[data.clientName];
+    slotServices[slot] = [];
+
+    if (user && activeClients[user.name]) {
+      activeClients[user.name].splice(slot - 1, 1);
+      updateCapacityUI(user.name);
+    }
+    
+    alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
+    show('staffHome');
+  }
+  
+  async function finishAndContinue() {
+    // Pasar a otra área (devolver a lista de espera para que otra staff la tome)
+    closeModal();
+    alert('🔄 Funcionalidad en desarrollo: Pasar a otra área. Por ahora, enviá a cobrar y Mikaela la reasignará.');
+    // TODO: Implementar lógica para devolver a lista con asignación a otra área
+  }
+  
+  async function finishAndReturn() {
+    // Devolver a lista de espera (la clienta NO continuará con otros servicios)
+    closeModal();
+    alert('↩️ Funcionalidad en desarrollo: Devolver a lista. Por ahora, enviá a cobrar con el total parcial.');
+    // TODO: Implementar lógica para devolver a lista marcando como "no continuará"
+  }
 
   function updateCapacityUI(chicaName) {
     const clients = activeClients[chicaName] || [];
@@ -3023,26 +3099,25 @@
     const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
     const promoData = activePromos[clientName];
     
-    try {
-      await apiPost('finalizarAtencion', {
-        chicaNombre: user?.name || '',
-        clienteNombre: clientName,
-        servicio: svcNames,
-        total: promoData ? String(promoData.promo.price) : String(total),
-        promoNombre: promoData ? promoData.promo.name : '',
-        precioRegular: promoData ? String(promoData.promo.regular) : String(total)
-      });
-    } catch (err) { console.error(err); }
-
-    if (promoData) delete activePromos[clientName];
-    slotServices[1] = [];
-
-    if (user && activeClients[user.name]) {
-      activeClients[user.name].splice(0, 1);
-      updateCapacityUI(user.name);
+    // Guardar datos en variable global para usar en las opciones
+    window._finishingSlot = 1;
+    window._finishingData = {
+      clientName,
+      svcNames,
+      total: promoData ? String(promoData.promo.price) : String(total),
+      promoNombre: promoData ? promoData.promo.name : '',
+      precioRegular: promoData ? String(promoData.promo.regular) : String(total)
+    };
+    
+    // Mostrar modal de opciones
+    document.getElementById('finishClientName').textContent = clientName;
+    if (promoData) {
+      document.getElementById('finishPromoInfo').style.display = 'block';
+      document.getElementById('finishPromoName').textContent = promoData.promo.name;
+    } else {
+      document.getElementById('finishPromoInfo').style.display = 'none';
     }
-    alert('✓ Servicio finalizado. Mikaela procederá al cobro.');
-    show('staffHome');
+    document.getElementById('finishOptionsModal').classList.add('active');
   }
 
   async function finishSlot2() {
