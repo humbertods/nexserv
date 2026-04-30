@@ -3530,10 +3530,53 @@
     }
   }
 
+  
+  // Sincronizar estados de autorización con el backend
+  async function syncAuthorizationStates(slot) {
+    const svcs = slotServices[slot] || [];
+    const pendingServices = svcs.filter(s => s.status === 'pendiente' && s.authId);
+    
+    if (pendingServices.length === 0) return; // No hay pendientes
+    
+    console.log('🔄 Sincronizando estados de autorización...', pendingServices);
+    
+    try {
+      const result = await apiGet('getAutorizaciones');
+      
+      if (result.success && result.autorizaciones) {
+        // Actualizar estados basados en el backend
+        for (const svc of pendingServices) {
+          const authInBackend = result.autorizaciones.find(a => a.id === svc.authId);
+          
+          if (authInBackend) {
+            console.log(`📋 Autorización ${svc.authId}:`, authInBackend.estado);
+            
+            if (authInBackend.estado === 'aprobado') {
+              svc.status = 'aprobado';
+              console.log('✅ Servicio aprobado:', svc.name);
+            } else if (authInBackend.estado === 'rechazado') {
+              svc.status = 'rechazado';
+              console.log('❌ Servicio rechazado:', svc.name);
+            }
+          }
+        }
+        
+        // Actualizar UI
+        renderServicesForSlot(slot);
+      }
+    } catch (err) {
+      console.error('Error sincronizando autorizaciones:', err);
+    }
+  }
+  
   async function finishSlot1() {
     const user = window.currentUser;
     const displayName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
     const clientKey = normalizeClientKey(displayName);
+    
+    // Sincronizar estados con el backend primero
+    await syncAuthorizationStates(1);
+    
     const svcs = slotServices[1] || [];
     
     console.log('🔍 finishSlot1:', {
@@ -3601,7 +3644,19 @@
   async function finishSlot2() {
     const user = window.currentUser;
     const clientName = document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '';
+    
+    // Sincronizar estados con el backend primero
+    await syncAuthorizationStates(2);
+    
     const svcs = slotServices[2] || [];
+    
+    // Verificar si hay servicios pendientes
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      alert('⏳ No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.');
+      return;
+    }
+    
     const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
     const total = svcs.reduce((sum, s) => {
       if (s.status === 'rechazado') return sum;
