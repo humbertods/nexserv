@@ -2730,7 +2730,8 @@
             priority: String(w.prioridad || 'normal').toLowerCase(),
             waiting: w.horaLlegada || '?',
             obs: w.observaciones || '',
-            isTop: String(w.esTop || '').toLowerCase().includes('sí')
+            isTop: String(w.esTop || '').toLowerCase().includes('sí'),
+            asignadaA: w.asignadaA || ''
           };
         });
       }
@@ -2741,7 +2742,16 @@
     // Lista siempre viene del API o está vacía
 
     const allowed = AREA_FILTER[user.area] || [];
-    const myList = lista.filter(w => allowed.includes(w.area));
+    
+    // Filtrar por área Y por asignación directa
+    const myList = lista.filter(w => {
+      // Si tiene asignación directa, solo la ve la chica asignada
+      if (w.asignadaA && w.asignadaA.trim() !== '') {
+        return w.asignadaA === user.name;
+      }
+      // Si no tiene asignación directa, filtrar por área
+      return allowed.includes(w.area);
+    });
     
     document.getElementById('waitCountMy').textContent = myList.length;
     document.getElementById('waitCountAll').textContent = lista.length;
@@ -2768,7 +2778,7 @@
         <div class="waitlist-top">
           <div class="waitlist-client">
             <div class="waitlist-code">${w.code} · llegó ${w.waiting}</div>
-            <div class="waitlist-name">${w.name}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
+            <div class="waitlist-name">${w.name}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${w.asignadaA ? ' <span style="background: var(--accent-bg); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 700; margin-left: 6px;">Asignada directamente</span>' : ''}</div>
           </div>
           ${priBadge[w.priority] || priBadge['normal']}
         </div>
@@ -5549,9 +5559,60 @@
     document.getElementById('assignDirectStaffList').innerHTML = html;
   }
 
-  function goAssign(chica) {
-    alert(`✓ Carmen asignada directamente a ${chica}. Notificación enviada solo a ${chica}.`);
-    show('mikaelaHome');
+  async function goAssign(chica) {
+    // Obtener datos del formulario de llegada
+    const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
+    const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
+    const area = document.getElementById('arrArea')?.value || 'Cejas';
+    const servicio = document.getElementById('arrService')?.value || '';
+    const obs = document.getElementById('arrObs')?.value || '';
+    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+    const promo = window._arrPromo || null;
+
+    // Mapear área a clave interna
+    const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
+    const areaKey = areaMap[area] || 'cejas';
+
+    const postData = {
+      codigo: codigo,
+      nombre: nombre,
+      servicio: servicio,
+      area: areaKey,
+      prioridad: 'Normal',
+      observaciones: obs,
+      esTop: isTop ? 'Sí' : 'No',
+      asignadaA: chica  // Asignación directa a esta chica
+    };
+
+    if (promo) {
+      postData.promoNombre = promo.name;
+      postData.precioPromo = promo.price;
+      postData.precioRegular = promo.regular;
+    }
+
+    console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
+
+    try {
+      const result = await apiPost('addListaEspera', postData);
+      console.log('📥 Respuesta de addListaEspera:', result);
+      
+      if (result && result.success) {
+        console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
+        window._arrPromo = null;
+        
+        // Notificar solo a la chica asignada
+        simulateNotif('staff', `${nombre} asignada directamente`, (isTop ? '⭐ ' : '') + servicio, isTop);
+        
+        alert(`✓ ${nombre} asignada directamente a ${chica}. Notificación enviada.`);
+        setTimeout(() => { show('mikaelaHome'); }, 600);
+      } else {
+        console.error('❌ Error en la respuesta:', result);
+        alert('Error al asignar clienta: ' + (result?.error || result?.message || 'Error desconocido'));
+      }
+    } catch (err) {
+      console.error('❌ Error enviando a lista con asignación directa:', err);
+      alert('Error de conexión al asignar clienta. Verificá tu internet.');
+    }
   }
 
   function simulateNotif(forRole, title, body, isTop) {
