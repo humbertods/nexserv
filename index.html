@@ -2993,6 +2993,19 @@
           document.getElementById('as1SvcCount').textContent = '0';
           document.getElementById('as1Total').textContent = '$0';
           
+          // Si viene con servicio normal asignado (NO promo), cargarlo
+          if (a.servicio && a.servicio !== '—' && !a.promoNombre) {
+            const price = a.total || 0;
+            slotServices[1].push({
+              name: a.servicio,
+              price: price,
+              area: a.area
+            });
+            renderServicesForSlot(1);
+            document.getElementById('as1Total').textContent = '$' + price;
+            document.getElementById('as1SvcCount').textContent = '1';
+          }
+          
           // Si viene con promo asignada, guardarla pero permitir cambiarla
           if (window._availablePromo) {
             const promoBasic = window._availablePromo;
@@ -3086,6 +3099,19 @@
           document.getElementById('as2ServicesList').innerHTML = '';
           document.getElementById('as2SvcCount').textContent = '0';
           document.getElementById('as2Total').textContent = '$0';
+          
+          // Si viene con servicio normal asignado (NO promo), cargarlo
+          if (a.servicio && a.servicio !== '—' && !a.promoNombre) {
+            const price = a.total || 0;
+            slotServices[2].push({
+              name: a.servicio,
+              price: price,
+              area: a.area
+            });
+            renderServicesForSlot(2);
+            document.getElementById('as2Total').textContent = '$' + price;
+            document.getElementById('as2SvcCount').textContent = '1';
+          }
           
           // Si viene con promo asignada, guardarla pero permitir cambiarla
           if (window._availablePromo) {
