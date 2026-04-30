@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v50 - COMISIONES STAFF (30/04/2026 17:02) -->
+<!-- NexServ v51 - FIX AUTORIZACIONES SYNC (30/04/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3222,6 +3222,52 @@
           updateCapacityUI(name);
         }
         
+        // FIX: Recargar servicios adicionales (autorizaciones) al volver a la pantalla
+        // Evita que se pierdan al refrescar o navegar entre pantallas
+        try {
+          const authResult = await apiGet('getAutorizaciones');
+          if (authResult.success && authResult.autorizaciones && authResult.autorizaciones.length > 0) {
+            const slotNum = slot === 0 ? 1 : 2;
+            const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
+            const staffName = user?.name || '';
+
+            // Solo autorizaciones de esta clienta + este staff, que no estén rechazadas
+            const myAuths = authResult.autorizaciones.filter(a =>
+              a.clienteCodigo === clientCode &&
+              a.staffNombre === staffName &&
+              a.estado !== 'rechazado'
+            );
+
+            if (myAuths.length > 0) {
+              const existingNames = slotServices[slotNum].map(s => s.name);
+              for (const auth of myAuths) {
+                if (!existingNames.includes(auth.servicioNombre)) {
+                  slotServices[slotNum].push({
+                    name: auth.servicioNombre,
+                    price: Number(auth.servicioPrecio || 0),
+                    area: auth.servicioArea || '',
+                    status: auth.estado === 'aprobado' ? 'aprobado' : 'pendiente',
+                    authId: auth.id,
+                    note: auth.nota || '',
+                    requestedBy: auth.staffNombre || staffName
+                  });
+                }
+              }
+              // Recalcular total y re-renderizar
+              const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
+                if (s.status === 'rechazado') return sum;
+                return sum + Number(s.price || 0);
+              }, 0);
+              renderServicesForSlot(slotNum);
+              document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
+              document.getElementById('as' + slotNum + 'SvcCount').textContent =
+                slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
+            }
+          }
+        } catch (authErr) {
+          console.error('Error recargando autorizaciones:', authErr);
+        }
+
         setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
       }
     } catch (err) {
@@ -6707,7 +6753,7 @@
     document.getElementById('addSvcPriceDisplay').style.display = 'block';
   }
 
-  function confirmAddService() {
+  async function confirmAddService() {
     const val = document.getElementById('addSvcService').value;
     if (!val) { alert('Seleccioná un servicio'); return; }
     
@@ -6735,10 +6781,11 @@
       // Limpiar nota
       document.getElementById('addSvcNote').value = '';
       
-      // Enviar solicitud de autorización a Mikaela
-      sendAuthorizationRequest(clientName, svc, slot);
-      
       closeModal();
+      
+      // FIX: await para que authId quede guardado en svc antes de que el staff pueda finalizar
+      await sendAuthorizationRequest(clientName, svc, slot);
+      
       alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
     }
   }
