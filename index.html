@@ -3011,11 +3011,35 @@
               if (!window._assignedPromo) window._assignedPromo = {};
               window._assignedPromo[1] = promoFull;
               
+              // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
+              const myArea = user?.area || 'cejas';
+              const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+              const myDiv = promoFull.division ? promoFull.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
+              const myPrice = myDiv ? myDiv.monto : promoFull.price;
+              
+              slotServices[1].push({
+                name: promoFull.name,
+                area: myArea,
+                price: myPrice
+              });
+              
+              // Actualizar UI
+              renderServicesForSlot(1);
+              document.getElementById('as1Total').textContent = '$' + myPrice;
+              document.getElementById('as1SvcCount').textContent = '1';
+              
+              // Registrar promo activa
+              activePromos[a.nombre] = {
+                promo: promoFull,
+                startedBy: myArea,
+                completedAreas: []
+              };
+              
               // Modificar el botón de promo para mostrar que hay una asignada
               const promoBtn = document.getElementById('promoBtn1');
               if (promoBtn) {
-                promoBtn.innerHTML = '🏷 Aplicar promo<br><span style="font-size: 10px; opacity: 0.9;">Asignada: ' + promoFull.name + '</span>';
-                promoBtn.style.background = 'linear-gradient(135deg, #ff6b9d 0%, #c44569 100%)';
+                promoBtn.innerHTML = '✓ Promo aplicada';
+                promoBtn.style.background = 'var(--success)';
               }
               
               // Mostrar info de la promo asignada con servicios incluidos
