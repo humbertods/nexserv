@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v46 - AUTH SYNC DEBUG (30/04/2026 15:58) -->
+<!-- NexServ v45 - SERVICE PRICE TO LIST (30/04/2026 15:40) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3595,29 +3595,16 @@
     const svcs = slotServices[slot] || [];
     const pendingServices = svcs.filter(s => s.status === 'pendiente' && s.authId);
     
-    console.log('🔄 syncAuthorizationStates called for slot', slot);
-    console.log('   Total services:', svcs.length);
-    console.log('   Pending services with authId:', pendingServices.length);
-    console.log('   All services:', svcs);
-    
-    if (pendingServices.length === 0) {
-      console.log('   No pending services to sync');
-      return; // No hay pendientes
-    }
+    if (pendingServices.length === 0) return; // No hay pendientes
     
     console.log('🔄 Sincronizando estados de autorización...', pendingServices);
     
     try {
       const result = await apiGet('getAutorizaciones');
       
-      console.log('   Backend returned:', result);
-      
       if (result.success && result.autorizaciones) {
-        console.log('   Total autorizaciones from backend:', result.autorizaciones.length);
-        
         // Actualizar estados basados en el backend
         for (const svc of pendingServices) {
-          console.log(`   Looking for authId: ${svc.authId}`);
           const authInBackend = result.autorizaciones.find(a => a.id === svc.authId);
           
           if (authInBackend) {
@@ -3630,14 +3617,11 @@
               svc.status = 'rechazado';
               console.log('❌ Servicio rechazado:', svc.name);
             }
-          } else {
-            console.log(`⚠️ No se encontró autorización ${svc.authId} en backend`);
           }
         }
         
         // Actualizar UI
         renderServicesForSlot(slot);
-        console.log('✅ UI actualizada');
       }
     } catch (err) {
       console.error('Error sincronizando autorizaciones:', err);
