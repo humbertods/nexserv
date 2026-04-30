@@ -1164,6 +1164,27 @@
         <button class="btn-primary outline" onclick="closeModal()">Cancelar</button>
       </div>
     </div>
+
+    <!-- Modal de confirmación de promo -->
+    <div class="modal-bg" id="promoConfirmModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">🏷 Clienta con promo</div>
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div id="promoConfirmName" style="font-size: 16px; font-weight: 700; margin-bottom: 8px;"></div>
+          <div id="promoConfirmDetail" style="font-size: 13px; color: var(--ink-soft); margin-bottom: 16px;"></div>
+          <div style="background: var(--accent-bg); border-radius: 12px; padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">Promo aplicada</div>
+            <div id="promoConfirmPromo" style="font-size: 15px; font-weight: 800; color: var(--accent);"></div>
+          </div>
+          <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.5;">
+            ¿La clienta continúa con esta promo o necesita modificar el servicio?
+          </div>
+        </div>
+        <button class="btn-primary" onclick="acceptPromo()">Continuar con la promo</button>
+        <button class="btn-primary outline" onclick="modifyService()">Modificar servicio</button>
+      </div>
+    </div>
   </div>
 
   <!-- ACTIVE SERVICE (lo que ve la chica cuando tiene una clienta) -->
@@ -2731,7 +2752,10 @@
             waiting: w.horaLlegada || '?',
             obs: w.observaciones || '',
             isTop: String(w.esTop || '').toLowerCase().includes('sí'),
-            asignadaA: w.asignadaA || ''
+            asignadaA: w.asignadaA || '',
+            promoNombre: w.promoNombre || '',
+            precioPromo: w.precioPromo || '',
+            precioRegular: w.precioRegular || ''
           };
         });
       }
@@ -2773,7 +2797,9 @@
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
     
-    content.innerHTML = myList.map(w => `
+    content.innerHTML = myList.map(w => {
+      const wData = JSON.stringify(w).replace(/"/g, '&quot;');
+      return `
       <div class="waitlist-card priority-${w.priority} ${w.isTop ? 'is-top' : ''}">
         <div class="waitlist-top">
           <div class="waitlist-client">
@@ -2786,18 +2812,22 @@
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${w.obs ? `<div class="waitlist-obs">📝 ${w.obs}</div>` : ''}
         <div class="waitlist-actions">
-          <button class="btn-take" onclick="openTake('${w.id}', '${w.name}', '${w.service}', ${w.isTop})">Tomar clienta</button>
+          <button class="btn-take" onclick='openTake("${wData}")'>Tomar clienta</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
-  function openTake(id, name, service, isTop) {
-    window._takingId = id;
-    window._takingClient = name;
-    window._takingService = service;
-    const topPart = isTop ? ' <span class="top-star">⭐ TOP</span>' : '';
-    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${name}</strong>${topPart}<br>para <strong>${service}</strong>.<br>Se registrará la hora automáticamente.`;
+  function openTake(wDataStr) {
+    const w = JSON.parse(wDataStr.replace(/&quot;/g, '"'));
+    window._takingData = w;
+    window._takingId = w.id;
+    window._takingClient = w.name;
+    window._takingService = w.service;
+    
+    const topPart = w.isTop ? ' <span class="top-star">⭐ TOP</span>' : '';
+    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${w.service}</strong>.<br>Se registrará la hora automáticamente.`;
     document.getElementById('takeModal').classList.add('active');
   }
   async function confirmTake() {
@@ -2823,6 +2853,25 @@
       return;
     }
     
+    // Verificar si viene con promo
+    const takingData = window._takingData;
+    if (takingData && takingData.promoNombre && takingData.promoNombre.trim() !== '') {
+      // Mostrar modal de confirmación de promo
+      document.getElementById('promoConfirmName').textContent = takingData.name;
+      document.getElementById('promoConfirmDetail').textContent = takingData.service;
+      document.getElementById('promoConfirmPromo').textContent = takingData.promoNombre + ' · $' + takingData.precioPromo;
+      document.getElementById('promoConfirmModal').classList.add('active');
+      return; // No continuar hasta que el staff confirme
+    }
+    
+    // Si no tiene promo, continuar normalmente
+    await loadClientAfterTake();
+  }
+  
+  async function loadClientAfterTake() {
+    const user = window.currentUser;
+    const name = user ? user.name : 'Staff';
+    
     // Cargar datos actualizados de las atenciones
     try {
       const atenResult = await apiGet('getAtenciones', { chica: name });
@@ -2847,6 +2896,13 @@
           document.getElementById('as1SvcCount').textContent = '0';
           document.getElementById('as1Total').textContent = '$0';
           
+          // Si tiene promo asignada desde la toma, aplicarla
+          if (window._acceptedPromo) {
+            const promo = window._acceptedPromo;
+            showPromoBanner(1, promo, user.area, false);
+            window._acceptedPromo = null;
+          }
+          
           if (user.area === 'pestanas') {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
@@ -2864,6 +2920,13 @@
           document.getElementById('as2ServicesList').innerHTML = '';
           document.getElementById('as2SvcCount').textContent = '0';
           document.getElementById('as2Total').textContent = '$0';
+          
+          // Si tiene promo asignada desde la toma, aplicarla
+          if (window._acceptedPromo) {
+            const promo = window._acceptedPromo;
+            showPromoBanner(2, promo, user.area, false);
+            window._acceptedPromo = null;
+          }
           
           if (user.area === 'pestanas') {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
@@ -2895,6 +2958,25 @@
         setTimeout(() => { show('activeService'); }, 300);
       }
     }
+  }
+  
+  function acceptPromo() {
+    closeModal();
+    const takingData = window._takingData;
+    // Guardar la promo para aplicarla después
+    window._acceptedPromo = {
+      name: takingData.promoNombre,
+      price: takingData.precioPromo,
+      regular: takingData.precioRegular
+    };
+    loadClientAfterTake();
+  }
+  
+  function modifyService() {
+    closeModal();
+    // No aplicar la promo, dejar que el staff modifique
+    window._acceptedPromo = null;
+    loadClientAfterTake();
   }
 
   function updateCapacityUI(chicaName) {
