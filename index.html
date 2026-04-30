@@ -525,7 +525,7 @@
       <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
       <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button><span class="icon">◉</span></button>
+      <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
       <button><span class="icon">◐</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
@@ -1089,7 +1089,7 @@
       </div>
 
       <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
-      <div class="double-action">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
         <div class="action-btn primary" onclick="goToList()">
           <span class="icon">📋</span>
           <span class="label">Mandar a lista</span>
@@ -1100,6 +1100,13 @@
           <span class="label">Asignar directo</span>
           <span class="sub">elegí la chica ahora</span>
         </div>
+      </div>
+      
+      <!-- Botón para asignar servicio normal -->
+      <div class="action-btn" style="width: 100%; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50;" onclick="openAssignServiceFromArrival()">
+        <span class="icon">💼</span>
+        <span class="label" style="color: #2e7d32; font-weight: 800;">Asignar servicio</span>
+        <span class="sub" style="color: #388e3c;">sin promo, va a lista de espera</span>
       </div>
     </div>
   </div>
@@ -1121,6 +1128,59 @@
     <div id="assignDirectStaffList">
       <!-- Lista de staff se carga dinámicamente -->
     </div>
+  </div>
+
+  <!-- HISTORIAL DE SERVICIOS COBRADOS -->
+  <div class="screen" id="serviciosHistory">
+    <div class="header">
+      <div class="greeting">
+        <div class="hello">Historial de servicios</div>
+        <div class="name">Cobros del día</div>
+      </div>
+      <div class="avatar" onclick="openUserMenu(this)" style="cursor: pointer;">M</div>
+    </div>
+
+    <!-- Filtros -->
+    <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+      <select id="historyFilterDate" onchange="loadServiciosHistory()" style="flex: 1; padding: 10px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 13px; font-weight: 600;">
+        <option value="hoy">Hoy</option>
+        <option value="ayer">Ayer</option>
+        <option value="semana">Esta semana</option>
+        <option value="mes">Este mes</option>
+      </select>
+      <button class="refresh-btn" onclick="loadServiciosHistory()" style="padding: 10px 16px; border-radius: 12px; background: var(--accent); color: white; border: none; font-weight: 700; cursor: pointer;">↻</button>
+    </div>
+
+    <!-- Resumen del día -->
+    <div class="stat-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 16px;">
+      <div class="stat success">
+        <div class="label">Servicios</div>
+        <div class="value" id="historyTotalCount">0</div>
+      </div>
+      <div class="stat purple">
+        <div class="label">Total cobrado</div>
+        <div class="value" id="historyTotalAmount">$0</div>
+      </div>
+      <div class="stat info">
+        <div class="label">Promedio</div>
+        <div class="value" id="historyAvgAmount">$0</div>
+      </div>
+    </div>
+
+    <!-- Lista de servicios cobrados -->
+    <div class="section-title">Servicios cobrados <span class="count" id="historyCount">0</span></div>
+    <div id="historyList">
+      <div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando historial...</div>
+    </div>
+
+    <nav class="nav">
+      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
+      <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
+      <button class="active"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
+      <button><span class="icon">◐</span></button>
+      <div class="refresh-toast">✓ Actualizado</div>
+    </nav>
   </div>
 
   <!-- STAFF HOME -->
@@ -2642,6 +2702,7 @@
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
+    if (id === 'serviciosHistory') { loadServiciosHistory(); }
     if (id === 'assignDirect') { renderAssignDirect(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
@@ -4170,6 +4231,16 @@
     document.getElementById('assignServiceModal').classList.add('active');
   }
   
+  function openAssignServiceFromArrival() {
+    // Usar datos de newArrivalData
+    if (!window.newArrivalData || !window.newArrivalData.code || !window.newArrivalData.fullName) {
+      alert('Error: No se encontró información de la clienta');
+      return;
+    }
+    
+    openAssignServiceModal(window.newArrivalData.code, window.newArrivalData.fullName);
+  }
+  
   function loadAssignServiceCatalog() {
     const area = document.getElementById('assignSvcArea').value;
     const sel = document.getElementById('assignSvcService');
@@ -4399,6 +4470,87 @@
       }
     } catch (err) {
       console.error('Error cargando dashboard Mikaela:', err);
+    }
+  }
+  
+  
+  async function loadServiciosHistory() {
+    const filter = document.getElementById('historyFilterDate')?.value || 'hoy';
+    
+    try {
+      // Llamar al backend para obtener historial de servicios cobrados
+      const result = await apiGet('getServiciosCobrados', { filtro: filter });
+      
+      if (!result.success) {
+        console.error('Error cargando historial:', result.message);
+        document.getElementById('historyList').innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint);">Error al cargar historial</div>';
+        return;
+      }
+      
+      const servicios = result.servicios || [];
+      
+      // Actualizar estadísticas
+      const totalCount = servicios.length;
+      const totalAmount = servicios.reduce((sum, s) => sum + Number(s.total || 0), 0);
+      const avgAmount = totalCount > 0 ? totalAmount / totalCount : 0;
+      
+      document.getElementById('historyCount').textContent = totalCount;
+      document.getElementById('historyTotalCount').textContent = totalCount;
+      document.getElementById('historyTotalAmount').textContent = '$' + totalAmount.toFixed(2);
+      document.getElementById('historyAvgAmount').textContent = '$' + avgAmount.toFixed(2);
+      
+      // Renderizar lista
+      const list = document.getElementById('historyList');
+      
+      if (servicios.length === 0) {
+        list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">✨ No hay servicios cobrados en este período</div>';
+        return;
+      }
+      
+      list.innerHTML = servicios.map(s => {
+        const initials = s.clienteNombre.split(' ').map(n => n[0]).join('').slice(0, 2);
+        const isMultiStaff = s.serviciosDetalle && s.serviciosDetalle.length > 1;
+        
+        return `
+          <div class="card" style="margin-bottom: 12px; padding: 14px; border-left: 4px solid var(--success);">
+            <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px;">
+              <div class="client-avatar" style="flex-shrink: 0;">${initials}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 15px; color: var(--ink);">${s.clienteNombre}</div>
+                <div style="font-size: 12px; color: var(--ink-soft); margin-top: 2px;">
+                  ${s.fecha} · ${s.hora} · ${s.metodoPago || 'Efectivo'}
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 20px; font-weight: 800; color: var(--success);">$${s.total}</div>
+              </div>
+            </div>
+            
+            ${isMultiStaff ? `
+              <div style="background: var(--bg); border-radius: 10px; padding: 10px; margin-top: 10px;">
+                <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 6px;">SERVICIOS POR STAFF:</div>
+                ${s.serviciosDetalle.map(d => `
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line-soft);">
+                    <div>
+                      <div style="font-size: 12px; font-weight: 600; color: var(--ink);">${d.staff}</div>
+                      <div style="font-size: 11px; color: var(--ink-soft);">${d.servicio}</div>
+                    </div>
+                    <div style="font-size: 13px; font-weight: 700; color: var(--accent);">$${d.monto}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div style="font-size: 12px; color: var(--ink-soft); margin-top: 8px;">
+                <strong>${s.staffNombre}</strong> · ${s.servicio}
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+      
+    } catch (err) {
+      console.error('Error loading history:', err);
+      document.getElementById('historyList').innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint);">Error al cargar historial</div>';
     }
   }
   
