@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v47 - AUTO REFRESH AUTH (30/04/2026 16:15) -->
+<!-- NexServ v46 - AUTH SYNC DEBUG (30/04/2026 15:58) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2688,11 +2688,6 @@
   }
 
   async function show(id) {
-    // Detener auto-refresh de autorizaciones si salimos de staffHome
-    if (id !== 'staffHome' && typeof stopAuthorizationAutoRefresh === 'function') {
-      stopAuthorizationAutoRefresh();
-    }
-    
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     window.scrollTo(0, 0);
@@ -3905,41 +3900,6 @@
       }
     } catch (err) {
       console.error('Error cargando staff home:', err);
-    }
-    
-    // Iniciar auto-refresh de autorizaciones pendientes
-    startAuthorizationAutoRefresh();
-  }
-  
-  // Auto-refresh de autorizaciones cada 10 segundos
-  function startAuthorizationAutoRefresh() {
-    // Limpiar intervalo anterior si existe
-    if (window._authCheckInterval) {
-      clearInterval(window._authCheckInterval);
-    }
-    
-    window._authCheckInterval = setInterval(async () => {
-      // Solo sincronizar si hay servicios pendientes
-      const hasPendingSlot1 = (slotServices[1] || []).some(s => s.status === 'pendiente');
-      const hasPendingSlot2 = (slotServices[2] || []).some(s => s.status === 'pendiente');
-      
-      if (hasPendingSlot1) {
-        console.log('⏰ Auto-sincronizando slot 1...');
-        await syncAuthorizationStates(1);
-      }
-      
-      if (hasPendingSlot2) {
-        console.log('⏰ Auto-sincronizando slot 2...');
-        await syncAuthorizationStates(2);
-      }
-    }, 10000); // Cada 10 segundos
-  }
-  
-  // Detener auto-refresh cuando se salga de staffHome
-  function stopAuthorizationAutoRefresh() {
-    if (window._authCheckInterval) {
-      clearInterval(window._authCheckInterval);
-      window._authCheckInterval = null;
     }
   }
 
