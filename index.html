@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v41 - HISTORY FIX + SERVICE BTN (30/04/2026 14:50) -->
+<!-- NexServ v43 - SERVICE DROPDOWN IN MAIN FORM (30/04/2026 15:00) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -1032,7 +1032,7 @@
 
       <div class="input-group">
         <label>Área</label>
-        <select id="arrArea">
+        <select id="arrArea" onchange="updateServiceButtonLabel(); loadServicesForArea();">
           <option>Cejas</option>
           <option>Depilación</option>
           <option>Pestañas</option>
@@ -1042,7 +1042,10 @@
       </div>
       <div class="input-group">
         <label>Servicio tentativo</label>
-        <input type="text" id="arrService" placeholder="Ej: Limpieza profunda">
+        <select id="arrService" onchange="onArrServiceChange()">
+          <option value="">Primero seleccioná el área</option>
+        </select>
+        <div id="arrServicePriceDisplay" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--accent);"></div>
       </div>
 
       <div class="section-title" style="margin-top: 16px;">Prioridad</div>
@@ -1103,10 +1106,22 @@
       </div>
       
       <!-- Botón para asignar servicio normal -->
-      <div class="action-btn" style="width: 100%; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; padding: 20px 16px; margin-top: 12px;" onclick="openAssignServiceFromArrival()">
-        <span class="icon" style="font-size: 24px;">💼</span>
-        <span class="label" style="color: #2e7d32; font-weight: 800; font-size: 16px;">Asignar servicio</span>
-        <span class="sub" style="color: #388e3c; font-size: 12px;">sin promo, va a lista de espera</span>
+      <div id="assignServiceSection" style="margin-top: 12px;">
+        <div id="assignServiceBtn" class="action-btn" style="width: 100%; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: 2px solid #4caf50; padding: 20px 16px; cursor: pointer;" onclick="toggleServiceSelector()">
+          <span class="icon" style="font-size: 24px;">➕</span>
+          <span class="label" id="assignServiceLabel" style="color: #2e7d32; font-weight: 800; font-size: 16px;">Agregar servicio...</span>
+          <span class="sub" style="color: #388e3c; font-size: 12px;">sin promo, va a lista de espera</span>
+        </div>
+        
+        <!-- Selector de servicios (se expande al hacer clic) -->
+        <div id="serviceSelectorBox" style="display: none; margin-top: 12px; background: white; border: 2px solid #4caf50; border-radius: 16px; padding: 16px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px;">Servicios disponibles:</div>
+          <select id="arrServiceSelect" onchange="onServiceSelectChange()" style="width: 100%; padding: 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; margin-bottom: 12px;">
+            <option value="">Seleccionar servicio...</option>
+          </select>
+          <div id="arrServicePrice" style="display: none; background: var(--bg); padding: 10px; border-radius: 10px; margin-bottom: 12px; font-size: 14px; font-weight: 700; color: var(--accent);"></div>
+          <button onclick="confirmServiceAssignment()" style="width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">✓ Confirmar y asignar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -4843,6 +4858,144 @@
     document.getElementById('arrivalClientList').style.display = 'none';
     document.getElementById('arrivalSearch').style.display = 'none';
     document.getElementById('arrivalForm').style.display = 'block';
+    
+    // Inicializar selector de servicios
+    updateServiceButtonLabel();
+    loadServicesForArea();
+  }
+  
+  // Actualizar el label del botón según el área seleccionada
+  function updateServiceButtonLabel() {
+    const area = document.getElementById('arrArea')?.value || '';
+    const label = document.getElementById('assignServiceLabel');
+    if (label) {
+      label.textContent = area ? `Agregar servicio de ${area}` : 'Agregar servicio...';
+    }
+  }
+  
+  // Cargar servicios del área seleccionada
+  async function loadServicesForArea() {
+    const area = document.getElementById('arrArea')?.value;
+    const selectMain = document.getElementById('arrService'); // Servicio tentativo
+    const selectExpanded = document.getElementById('arrServiceSelect'); // Expandible
+    
+    if (!area) return;
+    
+    // Asegurar que CATALOGO esté cargado
+    if (!window.CATALOGO || window.CATALOGO.length === 0) {
+      await loadCatalogo();
+    }
+    
+    // Filtrar servicios del área
+    const servicios = window.CATALOGO.filter(s => s.area === area);
+    
+    // Actualizar dropdown principal (Servicio tentativo)
+    if (selectMain) {
+      selectMain.innerHTML = '<option value="">Seleccionar servicio...</option>';
+      
+      if (servicios.length === 0) {
+        selectMain.innerHTML = '<option value="">No hay servicios disponibles</option>';
+      } else {
+        servicios.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({nombre: s.servicio, precio: s.precio});
+          opt.textContent = `${s.servicio} - $${s.precio}`;
+          selectMain.appendChild(opt);
+        });
+      }
+      
+      // Ocultar precio hasta que seleccionen
+      document.getElementById('arrServicePriceDisplay').style.display = 'none';
+    }
+    
+    // Actualizar dropdown expandible (para asignar servicio adicional)
+    if (selectExpanded) {
+      selectExpanded.innerHTML = '<option value="">Seleccionar servicio...</option>';
+      document.getElementById('arrServicePrice').style.display = 'none';
+      
+      if (servicios.length > 0) {
+        servicios.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({nombre: s.servicio, precio: s.precio});
+          opt.textContent = `${s.servicio} - $${s.precio}`;
+          selectExpanded.appendChild(opt);
+        });
+      }
+    }
+  }
+  
+  // Cuando seleccionen servicio tentativo, mostrar el precio
+  function onArrServiceChange() {
+    const select = document.getElementById('arrService');
+    const priceDiv = document.getElementById('arrServicePriceDisplay');
+    
+    if (select.value) {
+      const data = JSON.parse(select.value);
+      priceDiv.textContent = `💵 Precio: $${data.precio}`;
+      priceDiv.style.display = 'block';
+    } else {
+      priceDiv.style.display = 'none';
+    }
+  }
+  
+  // Toggle del selector de servicios
+  function toggleServiceSelector() {
+    const box = document.getElementById('serviceSelectorBox');
+    const area = document.getElementById('arrArea')?.value;
+    
+    if (!area) {
+      alert('Primero seleccioná el área');
+      document.getElementById('arrArea').focus();
+      return;
+    }
+    
+    if (box.style.display === 'none') {
+      box.style.display = 'block';
+      loadServicesForArea();
+    } else {
+      box.style.display = 'none';
+    }
+  }
+  
+  // Cuando seleccionen un servicio, mostrar el precio
+  function onServiceSelectChange() {
+    const select = document.getElementById('arrServiceSelect');
+    const priceDiv = document.getElementById('arrServicePrice');
+    
+    if (select.value) {
+      const data = JSON.parse(select.value);
+      priceDiv.textContent = `💵 Total: $${data.precio}`;
+      priceDiv.style.display = 'block';
+    } else {
+      priceDiv.style.display = 'none';
+    }
+  }
+  
+  // Confirmar asignación de servicio
+  async function confirmServiceAssignment() {
+    const select = document.getElementById('arrServiceSelect');
+    
+    if (!select.value) {
+      alert('Seleccioná un servicio primero');
+      return;
+    }
+    
+    const data = JSON.parse(select.value);
+    const clientData = window.newArrivalData;
+    
+    if (!clientData) {
+      alert('Error: No se encontró información de la clienta');
+      return;
+    }
+    
+    // Asignar servicio usando la función existente
+    await handleAsignarServicioNormal(clientData.code, clientData.fullName, data.nombre, data.precio);
+    
+    // Cerrar selector
+    document.getElementById('serviceSelectorBox').style.display = 'none';
+    
+    // Volver al home
+    show('mikaelaHome');
   }
 
   // === DIRECTORIO DE CLIENTAS ===
@@ -6654,10 +6807,21 @@
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
     const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicio = document.getElementById('arrService')?.value || '';
+    const servicioRaw = document.getElementById('arrService')?.value || '';
     const obs = document.getElementById('arrObs')?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     const promo = window._arrPromo || null;
+    
+    // Extraer nombre del servicio del JSON
+    let servicio = '';
+    if (servicioRaw) {
+      try {
+        const data = JSON.parse(servicioRaw);
+        servicio = data.nombre;
+      } catch (e) {
+        servicio = servicioRaw; // Fallback por si no es JSON
+      }
+    }
 
     // Mapear área a clave interna
     const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
