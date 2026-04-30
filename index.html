@@ -3357,12 +3357,25 @@
         document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
         document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
         
-        // Inicializar lista de servicios con el servicio tentativo
+        // Inicializar lista de servicios con el servicio y precio de la atención
         slotServices[1] = [];
         if (a1.servicio && a1.servicio !== '—') {
-          slotServices[1].push({ name: a1.servicio, price: 0, area: a1.area });
+          // Si tiene promo, usar precio de promo; sino, extraer precio del string o usar precio regular
+          const price = a1.precioPromo || a1.total || 0;
+          slotServices[1].push({ 
+            name: a1.servicio, 
+            price: price, 
+            area: a1.area,
+            status: a1.promoNombre ? 'aprobado' : undefined,
+            note: a1.promoNombre ? 'Promo asignada: ' + a1.promoNombre : undefined
+          });
         }
-        renderServicesList(1);
+        renderServicesForSlot(1);
+        
+        // Actualizar total
+        const total1 = slotServices[1].reduce((sum, s) => sum + Number(s.price || 0), 0);
+        document.getElementById('as1Total').textContent = '$' + total1;
+        document.getElementById('as1SvcCount').textContent = slotServices[1].length;
         
         if (user.area === 'pestanas') {
           loadPestFichaQuick(a1.codigo.toLowerCase().replace(/-/g, ''), 1);
