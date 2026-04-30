@@ -308,9 +308,9 @@
 
   /* MODAL */
   .modal-bg {
-    position: absolute; inset: 0; background: rgba(0,0,0,0.5);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: none; align-items: flex-end; justify-content: center;
-    z-index: 50; border-radius: 32px; overflow: hidden;
+    z-index: 9999; border-radius: 0; overflow: hidden;
   }
   .modal-bg.active { display: flex; animation: fadeIn .2s ease; }
   .modal {
@@ -3520,19 +3520,26 @@
     // Cerrar cualquier modal abierto primero
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
-    // Mostrar modal de opciones
-    document.getElementById('finishClientName').textContent = clientName;
-    if (promoData) {
-      document.getElementById('finishPromoInfo').style.display = 'block';
-      document.getElementById('finishPromoName').textContent = promoData.promo.name;
-    } else {
-      document.getElementById('finishPromoInfo').style.display = 'none';
-    }
-    
-    const modal = document.getElementById('finishOptionsModal');
-    console.log('Abriendo modal:', modal);
-    modal.classList.add('active');
-    console.log('Modal classList:', modal.classList);
+    // Mostrar modal de opciones con un pequeño delay para asegurar que se renderice
+    setTimeout(() => {
+      document.getElementById('finishClientName').textContent = clientName;
+      if (promoData) {
+        document.getElementById('finishPromoInfo').style.display = 'block';
+        document.getElementById('finishPromoName').textContent = promoData.promo.name;
+      } else {
+        document.getElementById('finishPromoInfo').style.display = 'none';
+      }
+      
+      const modal = document.getElementById('finishOptionsModal');
+      console.log('Abriendo modal:', modal);
+      if (modal) {
+        modal.classList.add('active');
+        console.log('Modal classList después de add:', modal.classList);
+        console.log('Modal display:', window.getComputedStyle(modal).display);
+      } else {
+        console.error('❌ Modal finishOptionsModal no encontrado en el DOM');
+      }
+    }, 100);
   }
 
   async function finishSlot2() {
@@ -4232,6 +4239,21 @@
         
         // Autorizaciones pendientes
         renderAuthorizations();
+        
+        // Auto-refresh cada 15 segundos para mantener la lista actualizada
+        if (window._mikaelaAutoRefresh) {
+          clearInterval(window._mikaelaAutoRefresh);
+        }
+        window._mikaelaAutoRefresh = setInterval(() => {
+          // Solo refrescar si estamos en la pantalla de Mikaela
+          const currentScreen = document.querySelector('.screen.active');
+          if (currentScreen && currentScreen.id === 'ceoHome') {
+            loadMikaelaHome();
+          } else {
+            // Si ya no estamos en el home de Mikaela, detener el refresh
+            clearInterval(window._mikaelaAutoRefresh);
+          }
+        }, 15000); // 15 segundos
       }
     } catch (err) {
       console.error('Error cargando dashboard Mikaela:', err);
