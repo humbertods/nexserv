@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v48 - ADD ROSA (30/04/2026 16:35) -->
+<!-- NexServ v50 - COMISIONES STAFF (30/04/2026 17:02) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3865,9 +3865,25 @@
       const servResult = await apiGet('getServiciosHoy', { chica: user.name });
       const servList = document.getElementById('staffServiciosHoy');
       if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
-        document.querySelector('#staffHome .stat .value').textContent = servResult.servicios.length; // stat "Hoy"
-        servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servResult.servicios.map(s => {
+        const servicios = servResult.servicios;
+        
+        // Calcular totales del día
+        const totalDia = servicios.reduce((sum, s) => sum + Number(s.comision || 0), 0);
+        
+        // Actualizar contador de servicios
+        document.querySelector('#staffHome .stat .value').textContent = servicios.length; // stat "Hoy"
+        
+        // Actualizar COMM_DATA con datos del día
+        COMM_DATA = {
+          value: '$' + totalDia.toFixed(2),
+          detail: servicios.length + ' servicios completados',
+          day: '$' + totalDia.toFixed(0),
+          items: servicios.map(s => '$' + Number(s.comision || 0).toFixed(2))
+        };
+        
+        servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servicios.map(s => {
           const initials = s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const comision = Number(s.comision || 0).toFixed(2);
           return `
             <div class="client-row">
               <div class="client-avatar">${initials}</div>
@@ -3875,12 +3891,20 @@
                 <div class="client-name">${s.nombre}</div>
                 <div class="client-meta">${s.servicio} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
               </div>
-              <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--ink-faint);">✓</div>
+              <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--success);">$${comision}</div>
             </div>`;
         }).join('') + '</div>';
       } else {
         document.querySelector('#staffHome .stat .value').textContent = '0';
         servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
+        
+        // Reset COMM_DATA
+        COMM_DATA = {
+          value: '$0.00',
+          detail: '0 servicios completados',
+          day: '$0',
+          items: []
+        };
       }
     } catch (err) {
       console.error('Error cargando staff home:', err);
