@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v44 - SERVICE DROPDOWN FIX + CLEANUP (30/04/2026 15:10) -->
+<!-- NexServ v45 - SERVICE PRICE TO LIST (30/04/2026 15:40) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -6799,14 +6799,17 @@
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     const promo = window._arrPromo || null;
     
-    // Extraer nombre del servicio del JSON
+    // Extraer nombre y precio del servicio del JSON
     let servicio = '';
+    let precio = 0;
     if (servicioRaw) {
       try {
         const data = JSON.parse(servicioRaw);
         servicio = data.nombre;
+        precio = data.precio || 0;
       } catch (e) {
         servicio = servicioRaw; // Fallback por si no es JSON
+        precio = 0;
       }
     }
 
@@ -6819,9 +6822,14 @@
     const prioridad = priEl ? priEl.querySelector('.name').textContent : 'Normal';
 
     const postData = {
-      codigo: codigo, nombre: nombre, servicio: servicio,
-      area: areaKey, prioridad: prioridad, observaciones: obs,
-      esTop: isTop ? 'Sí' : 'No'
+      codigo: codigo, 
+      nombre: nombre, 
+      servicio: servicio,
+      area: areaKey, 
+      prioridad: prioridad, 
+      observaciones: obs,
+      esTop: isTop ? 'Sí' : 'No',
+      total: precio  // Agregar el precio aquí
     };
 
     if (promo) {
