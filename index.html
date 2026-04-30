@@ -3678,6 +3678,34 @@
             status: a1.promoNombre ? 'aprobado' : undefined,
             note: a1.promoNombre ? 'Promo asignada: ' + a1.promoNombre : undefined
           });
+          
+          // 🔧 CRITICAL FIX: Registrar promo en activePromos si existe
+          if (a1.promoNombre) {
+            const clientKey = normalizeClientKey(a1.nombre);
+            // Buscar la promo completa en PROMOS
+            const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
+            
+            if (promoFull) {
+              activePromos[clientKey] = {
+                promo: promoFull,
+                startedBy: user.area,
+                completedAreas: [],
+                _metadata: {
+                  displayName: a1.nombre,
+                  clientCode: a1.codigo,
+                  registeredAt: Date.now(),
+                  loadedFrom: 'loadStaffHome'
+                }
+              };
+              
+              console.log('✅ Promo registered from loadStaffHome:', {
+                key: clientKey,
+                display: a1.nombre,
+                promo: promoFull.name,
+                activePromos: Object.keys(activePromos)
+              });
+            }
+          }
         }
         renderServicesForSlot(1);
         
