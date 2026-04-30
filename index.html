@@ -2635,6 +2635,17 @@
     }
   }
 
+  // ============================================
+  // UTILITY: Client Key Normalization
+  // ============================================
+  function normalizeClientKey(name) {
+    return String(name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[⭐]/g, '');
+  }
+
   async function show(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -3028,15 +3039,25 @@
               document.getElementById('as1Total').textContent = '$' + myPrice;
               document.getElementById('as1SvcCount').textContent = '1';
               
-              // Registrar promo activa (normalizar nombre para evitar problemas)
-              const normalizedName = a.nombre.trim();
-              activePromos[normalizedName] = {
+              // Registrar promo activa con key normalizada
+              const clientKey = normalizeClientKey(a.nombre);
+              activePromos[clientKey] = {
                 promo: promoFull,
                 startedBy: myArea,
-                completedAreas: []
+                completedAreas: [],
+                _metadata: {
+                  displayName: a.nombre,
+                  clientCode: a.codigo,
+                  registeredAt: Date.now()
+                }
               };
               
-              console.log('✅ Promo registrada en activePromos:', normalizedName, activePromos[normalizedName]);
+              console.log('✅ Promo registered:', {
+                key: clientKey,
+                display: a.nombre,
+                promo: promoFull.name,
+                activePromos: Object.keys(activePromos)
+              });
               
               // Modificar el botón de promo para mostrar que hay una asignada
               const promoBtn = document.getElementById('promoBtn1');
@@ -3294,21 +3315,30 @@
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot;
-    const clientName = data.clientName;
+    const clientKey = data.clientKey;
+    const displayName = data.clientName;
     
-    console.log('🔍 finishAndContinue - clientName:', clientName);
-    console.log('🔍 activePromos completo:', activePromos);
-    console.log('🔍 Keys en activePromos:', Object.keys(activePromos));
+    console.log('🔍 finishAndContinue:', {
+      clientKey,
+      displayName,
+      activePromos: Object.keys(activePromos)
+    });
     
     // Obtener la promo activa para esta clienta
-    const promoData = activePromos[clientName];
+    const promoData = activePromos[clientKey];
     
     console.log('🔍 promoData encontrado:', promoData);
     
     if (!promoData || !promoData.promo) {
-      console.error('❌ No se encontró promo para:', clientName);
-      console.error('❌ activePromos actual:', activePromos);
-      alert('Error: No se encontró información de la promo. Usá "Mandar a cobrar" en su lugar.');
+      console.error('❌ Promo lookup failed:', {
+        searchKey: clientKey,
+        availableKeys: Object.keys(activePromos),
+        activePromos: activePromos
+      });
+      alert('Error: No se encontró información de la promo.\n\nDetalles técnicos:\n' +
+            'Key buscada: ' + clientKey + '\n' +
+            'Keys disponibles: ' + Object.keys(activePromos).join(', ') + '\n\n' +
+            'Usá "Mandar a cobrar" en su lugar.');
       return;
     }
     
@@ -3382,7 +3412,7 @@
       // Llamar al backend para devolver a lista de espera
       const result = await apiPost('continuarPromoALista', {
         chicaNombre: user?.name || '',
-        clienteNombre: clientName,
+        clienteNombre: displayName,
         servicio: data.svcNames,
         total: data.total,
         promoNombre: data.promoNombre,
@@ -3396,8 +3426,8 @@
       });
       
       if (result.success) {
-        // Limpiar slot
-        if (activePromos[clientName]) delete activePromos[clientName];
+        // Limpiar slot usando clientKey normalizada
+        if (activePromos[clientKey]) delete activePromos[clientKey];
         slotServices[slot] = [];
 
         if (user && activeClients[user.name]) {
@@ -3492,14 +3522,17 @@
   }
 
   async function finishSlot1() {
-    alert('🔍 DEBUG: finishSlot1 ejecutándose...');
-    
     const user = window.currentUser;
-    const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
+    const displayName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
+    const clientKey = normalizeClientKey(displayName);
     const svcs = slotServices[1] || [];
     
-    console.log('finishSlot1 llamado para:', clientName);
-    console.log('Servicios:', svcs);
+    console.log('🔍 finishSlot1:', {
+      displayName,
+      clientKey,
+      services: svcs.length,
+      activePromos: Object.keys(activePromos)
+    });
     
     // Verificar si hay servicios pendientes de autorización
     const hasPending = svcs.some(s => s.status === 'pendiente');
@@ -3515,7 +3548,7 @@
     }, 0);
     
     const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
-    const promoData = activePromos[clientName];
+    const promoData = activePromos[clientKey];
     
     console.log('Promo data:', promoData);
     console.log('Total:', total);
@@ -3523,7 +3556,8 @@
     // Guardar datos en variable global para usar en las opciones
     window._finishingSlot = 1;
     window._finishingData = {
-      clientName,
+      clientKey: clientKey,              // For lookup in activePromos
+      clientName: displayName,           // For display
       svcNames,
       total: promoData ? String(promoData.promo.price) : String(total),
       promoNombre: promoData ? promoData.promo.name : '',
@@ -3535,7 +3569,7 @@
     
     // Mostrar modal de opciones con un pequeño delay para asegurar que se renderice
     setTimeout(() => {
-      document.getElementById('finishClientName').textContent = clientName;
+      document.getElementById('finishClientName').textContent = displayName;
       if (promoData) {
         document.getElementById('finishPromoInfo').style.display = 'block';
         document.getElementById('finishPromoName').textContent = promoData.promo.name;
