@@ -565,6 +565,59 @@
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
+
+    <!-- Modal: Asignar servicio normal -->
+    <div class="modal-bg" id="assignServiceModal">
+      <div class="modal" style="max-height: 85%;">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Asignar servicio</div>
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div id="assignSvcClientName" style="font-size: 16px; font-weight: 700;"></div>
+        </div>
+        
+        <div class="input-group">
+          <label>Área</label>
+          <select id="assignSvcArea" onchange="loadAssignServiceCatalog()">
+            <option value="">Seleccionar área...</option>
+            <option value="cejas">Cejas</option>
+            <option value="depilacion">Depilación</option>
+            <option value="pestanas">Pestañas</option>
+            <option value="retiro_lifting">Lifting / Retiro</option>
+            <option value="facial">Facial</option>
+          </select>
+        </div>
+        
+        <div class="input-group">
+          <label>Servicio</label>
+          <select id="assignSvcService" onchange="updateAssignServicePrice()">
+            <option value="">Primero seleccioná el área</option>
+          </select>
+        </div>
+        
+        <div id="assignSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
+          <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
+          <span id="assignSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
+        </div>
+        
+        <button class="btn-primary" onclick="confirmAssignService()">Asignar servicio</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal: Asignar promo -->
+    <div class="modal-bg" id="assignPromoModal">
+      <div class="modal" style="max-height: 85%;">
+        <div class="modal-handle"></div>
+        <div class="modal-title">Asignar promo</div>
+        <div style="text-align: center; margin-bottom: 16px;">
+          <div id="assignPromoClientName" style="font-size: 16px; font-weight: 700;"></div>
+        </div>
+        
+        <div id="assignPromoList"></div>
+        
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <!-- CLIENT PROFILE -->
@@ -3768,6 +3821,134 @@
 
   // === LLEGADA: CLIENTA EXISTENTE ===
 
+  // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
+  
+  function openAssignServiceModal(clientCode, clientName) {
+    window._assigningClient = { code: clientCode, name: clientName };
+    document.getElementById('assignSvcClientName').textContent = clientName;
+    document.getElementById('assignSvcArea').value = '';
+    document.getElementById('assignSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
+    document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    document.getElementById('assignServiceModal').classList.add('active');
+  }
+  
+  function loadAssignServiceCatalog() {
+    const area = document.getElementById('assignSvcArea').value;
+    const sel = document.getElementById('assignSvcService');
+    sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
+    document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    
+    if (!area) return;
+    
+    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'pestanas', facial: 'facial' };
+    const catKey = catMap[area] || area;
+    const services = CATALOGO[catKey] || [];
+    
+    services.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ name: s.name, price: s.price, area: area });
+      opt.textContent = s.name + ' — $' + s.price;
+      sel.appendChild(opt);
+    });
+  }
+  
+  function updateAssignServicePrice() {
+    const val = document.getElementById('assignSvcService').value;
+    if (!val) { 
+      document.getElementById('assignSvcPriceDisplay').style.display = 'none'; 
+      return; 
+    }
+    const svc = JSON.parse(val);
+    document.getElementById('assignSvcPrice').textContent = '$' + svc.price;
+    document.getElementById('assignSvcPriceDisplay').style.display = 'block';
+  }
+  
+  async function confirmAssignService() {
+    const val = document.getElementById('assignSvcService').value;
+    if (!val) { 
+      alert('Seleccioná un servicio'); 
+      return; 
+    }
+    
+    const svc = JSON.parse(val);
+    const client = window._assigningClient;
+    
+    // TODO: Llamar al backend para actualizar la lista de espera con el servicio asignado
+    try {
+      const result = await apiPost('asignarServicioNormal', {
+        codigo: client.code,
+        servicio: svc.name,
+        area: svc.area,
+        precio: svc.price
+      });
+      
+      if (result.success) {
+        alert('✓ Servicio asignado a ' + client.name);
+        closeModal();
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo asignar'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al asignar servicio');
+    }
+  }
+  
+  function openAssignPromoModal(clientCode, clientName) {
+    window._assigningClient = { code: clientCode, name: clientName };
+    document.getElementById('assignPromoClientName').textContent = clientName;
+    
+    // Renderizar lista de promos activas
+    const active = PROMOS.filter(p => p.active);
+    const list = document.getElementById('assignPromoList');
+    list.innerHTML = active.map((p, i) => `
+      <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="confirmAssignPromo(${i})">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">${p.name}</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 6px;">${p.services}</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              ${p.division.map(d => '<span style="background: var(--bg); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-pill); color: var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>').join('')}
+            </div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0; margin-left: 10px;">
+            <div style="font-size: 22px; font-weight: 800; color: var(--accent-deep);">$${p.price}</div>
+            <div style="font-size: 11px; color: var(--ink-faint); text-decoration: line-through;">$${p.regular}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    
+    document.getElementById('assignPromoModal').classList.add('active');
+  }
+  
+  async function confirmAssignPromo(promoIdx) {
+    const promo = PROMOS[promoIdx];
+    const client = window._assigningClient;
+    
+    // TODO: Llamar al backend para actualizar la lista de espera con la promo asignada
+    try {
+      const result = await apiPost('asignarPromo', {
+        codigo: client.code,
+        promoNombre: promo.name,
+        precioPromo: promo.price,
+        precioRegular: promo.regular
+      });
+      
+      if (result.success) {
+        alert('✓ Promo "' + promo.name + '" asignada a ' + client.name);
+        closeModal();
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo asignar'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al asignar promo');
+    }
+  }
+
   // === POR COBRAR (Mikaela) ===
 
   async function loadMikaelaHome() {
@@ -3812,6 +3993,10 @@
                 ${priBadge[pri] || priBadge['normal']}
               </div>
               <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
+              <div style="display: flex; gap: 6px; margin-top: 10px;">
+                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+              </div>
             </div>`;
           }).join('');
         }
@@ -5850,25 +6035,38 @@
       document.getElementById('addSvcNote').value = '';
       
       // Enviar solicitud de autorización a Mikaela
-      sendAuthorizationRequest(clientName, svc);
+      sendAuthorizationRequest(clientName, svc, slot);
       
       closeModal();
       alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
     }
   }
   
-  async function sendAuthorizationRequest(clientName, service) {
-    // Guardar en lista global de solicitudes pendientes
-    if (!window._authorizationRequests) window._authorizationRequests = [];
-    window._authorizationRequests.push({
-      id: 'AUTH-' + Date.now(),
-      client: clientName,
-      service: service,
-      timestamp: new Date().toISOString()
-    });
+  async function sendAuthorizationRequest(clientName, service, slot) {
+    const user = window.currentUser;
+    const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     
-    // TODO: Enviar al backend para que Mikaela lo vea en su panel
-    // Por ahora solo se guarda localmente
+    try {
+      const result = await apiPost('solicitarAutorizacion', {
+        clienteCodigo: clientCode,
+        clienteNombre: clientName,
+        staffNombre: user?.name || 'Staff',
+        servicioNombre: service.name,
+        servicioArea: service.area,
+        servicioPrecio: service.price,
+        nota: service.note
+      });
+      
+      if (result.success) {
+        // Guardar ID de autorización en el servicio
+        service.authId = result.authId;
+        console.log('✓ Solicitud de autorización enviada:', result.authId);
+      } else {
+        console.error('Error al enviar autorización:', result.message);
+      }
+    } catch (err) {
+      console.error('Error al enviar autorización:', err);
+    }
   }
 
   function removeService(slot) {
