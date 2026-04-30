@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v40 - HISTORY + SERVICE BTN (30/04/2026 14:41) -->
+<!-- NexServ v41 - HISTORY FIX + SERVICE BTN (30/04/2026 14:50) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -4508,7 +4508,14 @@
       }
       
       list.innerHTML = servicios.map(s => {
-        const initials = s.clienteNombre.split(' ').map(n => n[0]).join('').slice(0, 2);
+        // Validar datos
+        if (!s || !s.clienteNombre) {
+          console.warn('Servicio sin nombre de cliente:', s);
+          return '';
+        }
+        
+        const clienteNombre = String(s.clienteNombre || 'Sin nombre');
+        const initials = clienteNombre.split(' ').map(n => n[0] || '').join('').slice(0, 2) || 'XX';
         const isMultiStaff = s.serviciosDetalle && s.serviciosDetalle.length > 1;
         
         return `
@@ -4516,13 +4523,13 @@
             <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px;">
               <div class="client-avatar" style="flex-shrink: 0;">${initials}</div>
               <div style="flex: 1;">
-                <div style="font-weight: 700; font-size: 15px; color: var(--ink);">${s.clienteNombre}</div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--ink);">${clienteNombre}</div>
                 <div style="font-size: 12px; color: var(--ink-soft); margin-top: 2px;">
-                  ${s.fecha} · ${s.hora} · ${s.metodoPago || 'Efectivo'}
+                  ${s.fecha || 'Sin fecha'} · ${s.hora || '--:--'} · ${s.metodoPago || 'Efectivo'}
                 </div>
               </div>
               <div style="text-align: right;">
-                <div style="font-size: 20px; font-weight: 800; color: var(--success);">$${s.total}</div>
+                <div style="font-size: 20px; font-weight: 800; color: var(--success);">$${s.total || 0}</div>
               </div>
             </div>
             
@@ -4546,7 +4553,7 @@
             `}
           </div>
         `;
-      }).join('');
+      }).filter(Boolean).join('');
       
     } catch (err) {
       console.error('Error loading history:', err);
