@@ -4322,18 +4322,27 @@
   }
   
   async function renderAuthorizations() {
+    console.log('🔍 renderAuthorizations called');
     try {
       // Cargar autorizaciones desde el backend
+      console.log('📡 Calling apiGet(getAutorizaciones)...');
       const result = await apiGet('getAutorizaciones');
       
+      console.log('📥 Backend response:', result);
+      
       if (!result.success) {
-        console.error('Error cargando autorizaciones:', result.message);
+        console.error('❌ Error cargando autorizaciones:', result.message);
         document.getElementById('authorizationsSection').style.display = 'none';
         return;
       }
       
       const requests = result.autorizaciones || [];
+      console.log('📋 Total autorizaciones recibidas:', requests.length);
+      console.log('📋 Autorizaciones:', requests);
+      
       const pendingRequests = requests.filter(r => r.estado === 'pendiente');
+      console.log('⏳ Autorizaciones PENDIENTES:', pendingRequests.length);
+      console.log('⏳ Pendientes:', pendingRequests);
       
       const authSection = document.getElementById('authorizationsSection');
       const authList = document.getElementById('authorizationsList');
@@ -6334,8 +6343,16 @@
     const user = window.currentUser;
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     
+    console.log('📤 sendAuthorizationRequest called:', {
+      clientName,
+      clientCode,
+      service,
+      slot,
+      user: user?.name
+    });
+    
     try {
-      const result = await apiPost('solicitarAutorizacion', {
+      const payload = {
         clienteCodigo: clientCode,
         clienteNombre: clientName,
         staffNombre: user?.name || 'Staff',
@@ -6343,17 +6360,23 @@
         servicioArea: service.area,
         servicioPrecio: service.price,
         nota: service.note
-      });
+      };
+      
+      console.log('📤 Sending to backend:', payload);
+      
+      const result = await apiPost('solicitarAutorizacion', payload);
+      
+      console.log('📥 Backend response:', result);
       
       if (result.success) {
         // Guardar ID de autorización en el servicio
         service.authId = result.authId;
-        console.log('✓ Solicitud de autorización enviada:', result.authId);
+        console.log('✅ Solicitud de autorización enviada:', result.authId);
       } else {
-        console.error('Error al enviar autorización:', result.message);
+        console.error('❌ Error al enviar autorización:', result.message);
       }
     } catch (err) {
-      console.error('Error al enviar autorización:', err);
+      console.error('❌ Exception al enviar autorización:', err);
     }
   }
 
