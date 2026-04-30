@@ -3259,8 +3259,21 @@
     const user = window.currentUser;
     const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
     const svcs = slotServices[1] || [];
-    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
-    const svcNames = svcs.map(s => s.name).join(' + ') || 'Servicio';
+    
+    // Verificar si hay servicios pendientes de autorización
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      alert('⏳ No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.\n\nEsperá a que Mikaela apruebe o rechace los servicios adicionales.');
+      return;
+    }
+    
+    // Calcular total solo de servicios aprobados
+    const total = svcs.reduce((sum, s) => {
+      if (s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
+    
+    const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
     const promoData = activePromos[clientName];
     
     // Guardar datos en variable global para usar en las opciones
