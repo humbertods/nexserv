@@ -1246,28 +1246,6 @@
         <button class="btn-primary outline" onclick="modifyService()">Modificar servicio</button>
       </div>
     </div>
-
-    <!-- Modal de opciones al finalizar -->
-    <div class="modal-bg" id="finishOptionsModal">
-      <div class="modal">
-        <div class="modal-handle"></div>
-        <div class="modal-title">¿Qué sigue para la clienta?</div>
-        <div style="text-align: center; margin-bottom: 20px;">
-          <div id="finishClientName" style="font-size: 16px; font-weight: 700; margin-bottom: 8px;"></div>
-          <div id="finishPromoInfo" style="display: none; background: var(--accent-bg); border-radius: 12px; padding: 10px; margin-bottom: 16px;">
-            <div style="font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">🏷 Promo multi-área</div>
-            <div id="finishPromoName" style="font-size: 13px; font-weight: 700; color: var(--accent);"></div>
-          </div>
-          <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 16px;">
-            Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
-          </div>
-        </div>
-        <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
-        <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
-        <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
-        <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
-      </div>
-    </div>
   </div>
 
   <!-- ACTIVE SERVICE (lo que ve la chica cuando tiene una clienta) -->
@@ -6685,6 +6663,30 @@
     });
   }
 </script>
+
+<!-- ============================================ -->
+<!-- GLOBAL MODALS (Outside all screens for proper z-index) -->
+<!-- ============================================ -->
+<div class="modal-bg" id="finishOptionsModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">¿Qué sigue para la clienta?</div>
+    <div style="text-align: center; margin-bottom: 20px;">
+      <div id="finishClientName" style="font-size: 16px; font-weight: 700; margin-bottom: 8px;"></div>
+      <div id="finishPromoInfo" style="display: none; background: var(--accent-bg); border-radius: 12px; padding: 10px; margin-bottom: 16px;">
+        <div style="font-size: 11px; font-weight: 600; color: var(--accent); margin-bottom: 4px;">🏷 Promo multi-área</div>
+        <div id="finishPromoName" style="font-size: 13px; font-weight: 700; color: var(--accent);"></div>
+      </div>
+      <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 16px;">
+        Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
+    <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
+    <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
+    <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
+  </div>
+</div>
 
 </body>
 </html>
