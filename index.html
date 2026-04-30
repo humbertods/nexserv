@@ -4308,7 +4308,7 @@
         window._mikaelaAutoRefresh = setInterval(() => {
           // Solo refrescar si estamos en la pantalla de Mikaela
           const currentScreen = document.querySelector('.screen.active');
-          if (currentScreen && currentScreen.id === 'ceoHome') {
+          if (currentScreen && currentScreen.id === 'mikaelaHome') {
             loadMikaelaHome();
           } else {
             // Si ya no estamos en el home de Mikaela, detener el refresh
@@ -4321,77 +4321,93 @@
     }
   }
   
-  function renderAuthorizations() {
-    const requests = window._authorizationRequests || [];
-    const pendingRequests = requests.filter(r => !r.approved && !r.rejected);
-    
-    const authSection = document.getElementById('authorizationsSection');
-    const authList = document.getElementById('authorizationsList');
-    const authCount = document.getElementById('authCount');
-    
-    if (pendingRequests.length === 0) {
-      authSection.style.display = 'none';
-      return;
+  async function renderAuthorizations() {
+    try {
+      // Cargar autorizaciones desde el backend
+      const result = await apiGet('getAutorizaciones');
+      
+      if (!result.success) {
+        console.error('Error cargando autorizaciones:', result.message);
+        document.getElementById('authorizationsSection').style.display = 'none';
+        return;
+      }
+      
+      const requests = result.autorizaciones || [];
+      const pendingRequests = requests.filter(r => r.estado === 'pendiente');
+      
+      const authSection = document.getElementById('authorizationsSection');
+      const authList = document.getElementById('authorizationsList');
+      const authCount = document.getElementById('authCount');
+      
+      if (pendingRequests.length === 0) {
+        authSection.style.display = 'none';
+        return;
+      }
+      
+      authSection.style.display = 'block';
+      authCount.textContent = pendingRequests.length;
+      
+      authList.innerHTML = pendingRequests.map((req, idx) => `
+        <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.clienteNombre}</div>
+              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.chicaNombre}</strong> · ${req.fecha}</div>
+            </div>
+            <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
+          </div>
+          
+          <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.servicioNombre}</div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.area} · <strong style="font-size: 14px; color: #28a745;">$${req.precio}</strong></div>
+            <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
+              <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
+              <div style="font-size: 11px; color: #333; font-style: italic;">"${req.nota || 'Sin nota'}"</div>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error('Error rendering authorizations:', err);
+      document.getElementById('authorizationsSection').style.display = 'none';
     }
-    
-    authSection.style.display = 'block';
-    authCount.textContent = pendingRequests.length;
-    
-    authList.innerHTML = pendingRequests.map((req, idx) => `
-      <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-          <div>
-            <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.client}</div>
-            <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.service.requestedBy}</strong> · ${req.service.requestedAt}</div>
-          </div>
-          <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
-        </div>
-        
-        <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
-          <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.service.name}</div>
-          <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.service.area} · <strong style="font-size: 14px; color: #28a745;">$${req.service.price}</strong></div>
-          <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
-            <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
-            <div style="font-size: 11px; color: #333; font-style: italic;">"${req.service.note}"</div>
-          </div>
-        </div>
-        
-        <div style="display: flex; gap: 8px;">
-          <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-          <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
-        </div>
-      </div>
-    `).join('');
   }
   
-  function approveAuthorization(reqId) {
-    if (!window._authorizationRequests) return;
-    
-    const req = window._authorizationRequests.find(r => r.id === reqId);
-    if (!req) return;
-    
-    req.approved = true;
-    req.service.status = 'aprobado';
-    
-    // TODO: Actualizar en el backend y notificar al staff
-    
-    alert('✓ Servicio aprobado. El staff podrá continuar con ' + req.client);
-    renderAuthorizations();
+  async function approveAuthorization(reqId) {
+    try {
+      const result = await apiPost('aprobarAutorizacion', { id: reqId });
+      
+      if (result.success) {
+        alert('✓ Servicio aprobado. El staff puede continuar.');
+        await renderAuthorizations(); // Reload list
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo aprobar'));
+      }
+    } catch (err) {
+      console.error('Error aprobando autorización:', err);
+      alert('Error al aprobar la autorización');
+    }
   }
   
-  function rejectAuthorization(reqId) {
-    if (!window._authorizationRequests) return;
-    
-    const req = window._authorizationRequests.find(r => r.id === reqId);
-    if (!req) return;
-    
-    req.rejected = true;
-    req.service.status = 'rechazado';
-    
-    // TODO: Actualizar en el backend y notificar al staff
-    
-    alert('✕ Servicio rechazado. El staff será notificado.');
-    renderAuthorizations();
+  async function rejectAuthorization(reqId) {
+    try {
+      const result = await apiPost('rechazarAutorizacion', { id: reqId });
+      
+      if (result.success) {
+        alert('✕ Servicio rechazado. El staff será notificado.');
+        await renderAuthorizations(); // Reload list
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo rechazar'));
+      }
+    } catch (err) {
+      console.error('Error rechazando autorización:', err);
+      alert('Error al rechazar la autorización');
+    }
   }
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
