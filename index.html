@@ -310,7 +310,7 @@
   .modal-bg {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     display: none; align-items: flex-end; justify-content: center;
-    z-index: 9999; border-radius: 0; overflow: hidden;
+    z-index: 999999; pointer-events: auto; border-radius: 0; overflow: hidden;
   }
   .modal-bg.active { display: flex; animation: fadeIn .2s ease; }
   .modal {
@@ -1342,7 +1342,7 @@
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot1()">Finalizar servicio</button>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="window.finishSlot1(); return false;">Finalizar servicio</button>
     <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera con motivo.')">Devolver a lista</button>
 
     <nav class="nav">
