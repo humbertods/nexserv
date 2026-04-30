@@ -3261,15 +3261,161 @@
   async function finishAndContinue() {
     // Pasar a otra área (devolver a lista de espera para que otra staff la tome)
     closeModal();
-    alert('🔄 Funcionalidad en desarrollo: Pasar a otra área. Por ahora, enviá a cobrar y Mikaela la reasignará.');
-    // TODO: Implementar lógica para devolver a lista con asignación a otra área
+    
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot;
+    const clientName = data.clientName;
+    
+    // Obtener la promo activa para esta clienta
+    const promoData = activePromos[clientName];
+    
+    if (!promoData || !promoData.promo) {
+      alert('Error: No se encontró información de la promo. Usá "Mandar a cobrar" en su lugar.');
+      return;
+    }
+    
+    const promo = promoData.promo;
+    const areaActual = user?.area || '';
+    
+    // Mapeo de áreas
+    const areaMap = {
+      'cejas': '💅 Cejas',
+      'depilacion': '💅 Depilación',
+      'pestanas': '👁 Pestañas',
+      'retiro_lifting': '👁 Lifting/Retiro',
+      'facial': '✨ Facial'
+    };
+    
+    // Encontrar la división correspondiente al área actual
+    const areaLabel = areaMap[areaActual] || areaActual;
+    const miDivision = promo.division.find(d => d.area === areaLabel || d.area.includes(areaLabel));
+    
+    if (!miDivision) {
+      alert('Error: No se encontró la división de precio para ' + areaActual + ' en esta promo.');
+      return;
+    }
+    
+    // Calcular áreas completadas y áreas faltantes
+    const areasCompletadas = promoData.completedAreas || [areaActual];
+    if (!areasCompletadas.includes(areaActual)) {
+      areasCompletadas.push(areaActual);
+    }
+    
+    // Obtener todas las áreas de la promo
+    const todasLasAreas = promo.division.map(d => {
+      // Convertir label a código de área
+      if (d.area.includes('Cejas') || d.area.includes('Depilación')) return 'cejas';
+      if (d.area.includes('Pestañas') || d.area.includes('Lifting') || d.area.includes('Retiro')) return 'pestanas';
+      if (d.area.includes('Facial')) return 'facial';
+      return '';
+    }).filter(a => a);
+    
+    // Áreas que faltan
+    const areasFaltantes = todasLasAreas.filter(a => !areasCompletadas.includes(a));
+    
+    if (areasFaltantes.length === 0) {
+      alert('⚠️ Todas las áreas de la promo ya están completadas. Usá "Mandar a cobrar" en su lugar.');
+      return;
+    }
+    
+    // Siguiente área y su precio
+    const siguienteArea = areasFaltantes[0];
+    const siguienteLabel = areaMap[siguienteArea];
+    const siguienteDivision = promo.division.find(d => d.area === siguienteLabel);
+    
+    // Nombres de servicios faltantes
+    const serviciosFaltantes = areasFaltantes.map(a => {
+      const label = areaMap[a];
+      const div = promo.division.find(d => d.area === label);
+      return div ? div.area.replace('💅 ', '').replace('👁 ', '').replace('✨ ', '') : a;
+    }).join(' + ');
+    
+    console.log('División calculada:', {
+      areaActual,
+      miDivision,
+      areasCompletadas,
+      areasFaltantes,
+      siguienteArea,
+      siguienteDivision,
+      serviciosFaltantes
+    });
+    
+    try {
+      // Llamar al backend para devolver a lista de espera
+      const result = await apiPost('continuarPromoALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: clientName,
+        servicio: data.svcNames,
+        total: data.total,
+        promoNombre: data.promoNombre,
+        precioRegular: data.precioRegular,
+        areaCompletada: areaActual,
+        montoChica: String(miDivision.monto),
+        areasFaltantes: serviciosFaltantes,
+        nuevaArea: siguienteArea,
+        montoSiguienteArea: siguienteDivision ? String(siguienteDivision.monto) : '0',
+        servicioActualizado: data.svcNames + ' (✅ completado)'
+      });
+      
+      if (result.success) {
+        // Limpiar slot
+        if (activePromos[clientName]) delete activePromos[clientName];
+        slotServices[slot] = [];
+
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        
+        alert('✓ Servicio completado.\n\n' +
+              '✅ ' + areaActual.toUpperCase() + ': $' + miDivision.monto + ' (tu parte)\n' +
+              '⏳ FALTA: ' + serviciosFaltantes + '\n\n' +
+              'La clienta volvió a lista de espera para continuar.');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo devolver a lista'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al devolver a lista de espera');
+    }
   }
   
   async function finishAndReturn() {
     // Devolver a lista de espera (la clienta NO continuará con otros servicios)
     closeModal();
-    alert('↩️ Funcionalidad en desarrollo: Devolver a lista. Por ahora, enviá a cobrar con el total parcial.');
-    // TODO: Implementar lógica para devolver a lista marcando como "no continuará"
+    
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot;
+    
+    try {
+      const result = await apiPost('devolverALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        motivo: 'no_continuara'
+      });
+      
+      if (result.success) {
+        // Limpiar slot
+        if (activePromos[data.clientName]) delete activePromos[data.clientName];
+        slotServices[slot] = [];
+
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        
+        alert('↩️ Clienta devuelta a lista de espera.');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo devolver'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al devolver a lista');
+    }
   }
 
   function updateCapacityUI(chicaName) {
@@ -3313,6 +3459,9 @@
     const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
     const svcs = slotServices[1] || [];
     
+    console.log('finishSlot1 llamado para:', clientName);
+    console.log('Servicios:', svcs);
+    
     // Verificar si hay servicios pendientes de autorización
     const hasPending = svcs.some(s => s.status === 'pendiente');
     if (hasPending) {
@@ -3329,6 +3478,9 @@
     const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
     const promoData = activePromos[clientName];
     
+    console.log('Promo data:', promoData);
+    console.log('Total:', total);
+    
     // Guardar datos en variable global para usar en las opciones
     window._finishingSlot = 1;
     window._finishingData = {
@@ -3339,6 +3491,9 @@
       precioRegular: promoData ? String(promoData.promo.regular) : String(total)
     };
     
+    // Cerrar cualquier modal abierto primero
+    document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
+    
     // Mostrar modal de opciones
     document.getElementById('finishClientName').textContent = clientName;
     if (promoData) {
@@ -3347,7 +3502,11 @@
     } else {
       document.getElementById('finishPromoInfo').style.display = 'none';
     }
-    document.getElementById('finishOptionsModal').classList.add('active');
+    
+    const modal = document.getElementById('finishOptionsModal');
+    console.log('Abriendo modal:', modal);
+    modal.classList.add('active');
+    console.log('Modal classList:', modal.classList);
   }
 
   async function finishSlot2() {
