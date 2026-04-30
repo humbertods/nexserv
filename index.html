@@ -499,6 +499,14 @@
       <div class="stat purple"><div class="label">Por cobrar</div><div class="value" id="mkStatCobrar">—</div></div>
     </div>
 
+    <!-- AUTORIZACIONES PENDIENTES -->
+    <div id="authorizationsSection" style="display: none;">
+      <div class="section-title" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 10px 16px; border-radius: 12px; margin-bottom: 12px;">
+        ⚠️ Autorizaciones pendientes <span class="count" style="background: white; color: #ff9800;" id="authCount">0</span>
+      </div>
+      <div id="authorizationsList"></div>
+    </div>
+
     <div class="section-title">Lista de espera <span class="count" id="mkEsperaCount">0</span></div>
     <div id="mkEsperaList"><div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando...</div></div>
 
@@ -1337,7 +1345,16 @@
           <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
           <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
         </div>
-        <button class="btn-primary" onclick="confirmAddService()">Agregar al ticket</button>
+        
+        <!-- Campo de nota para autorización (obligatorio) -->
+        <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">⚠️ Requiere autorización de Mikaela</div>
+          <div style="font-size: 11px; color: #856404; margin-bottom: 10px;">Todo servicio adicional debe ser aprobado para evitar atrasos en la agenda</div>
+          <label style="font-size: 12px; font-weight: 600; color: #856404; display: block; margin-bottom: 6px;">📝 Nota para Mikaela (obligatoria):</label>
+          <textarea id="addSvcNote" placeholder="Ej: La clienta tiene cejas despobladas, le recomendé diseño completo. Está interesada y quiere aprovechar hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 70px; resize: vertical; box-sizing: border-box;"></textarea>
+        </div>
+        
+        <button class="btn-primary" onclick="confirmAddService()">Solicitar autorización</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -2883,18 +2900,19 @@
       return;
     }
     
-    // Verificar si viene con promo
+    // Guardar la promo disponible (si existe) pero NO aplicarla automáticamente
     const takingData = window._takingData;
     if (takingData && takingData.promoNombre && takingData.promoNombre.trim() !== '') {
-      // Mostrar modal de confirmación de promo
-      document.getElementById('promoConfirmName').textContent = takingData.name;
-      document.getElementById('promoConfirmDetail').textContent = takingData.service;
-      document.getElementById('promoConfirmPromo').textContent = takingData.promoNombre + ' · $' + takingData.precioPromo;
-      document.getElementById('promoConfirmModal').classList.add('active');
-      return; // No continuar hasta que el staff confirme
+      window._availablePromo = {
+        name: takingData.promoNombre,
+        price: takingData.precioPromo,
+        regular: takingData.precioRegular
+      };
+    } else {
+      window._availablePromo = null;
     }
     
-    // Si no tiene promo, continuar normalmente
+    // Cargar clienta normalmente
     await loadClientAfterTake();
   }
   
@@ -2926,11 +2944,33 @@
           document.getElementById('as1SvcCount').textContent = '0';
           document.getElementById('as1Total').textContent = '$0';
           
-          // Si tiene promo asignada desde la toma, aplicarla
-          if (window._acceptedPromo) {
-            const promo = window._acceptedPromo;
-            showPromoBanner(1, promo, user.area, false);
-            window._acceptedPromo = null;
+          // Si viene con promo asignada, guardarla pero permitir cambiarla
+          if (window._availablePromo) {
+            const promo = window._availablePromo;
+            // Guardar promo asignada originalmente
+            if (!window._assignedPromo) window._assignedPromo = {};
+            window._assignedPromo[1] = promo;
+            
+            // Modificar el botón de promo para mostrar que hay una asignada
+            const promoBtn = document.getElementById('promoBtn1');
+            if (promoBtn) {
+              promoBtn.innerHTML = '🏷 Aplicar promo<br><span style="font-size: 10px; opacity: 0.9;">Asignada: ' + promo.name + '</span>';
+              promoBtn.style.background = 'linear-gradient(135deg, #ff6b9d 0%, #c44569 100%)';
+            }
+            
+            // Mostrar info de la promo asignada
+            const infoDiv = document.createElement('div');
+            infoDiv.id = 'promoAssignedInfo1';
+            infoDiv.style.cssText = 'background: linear-gradient(135deg, #fff5f7 0%, #ffe8ef 100%); border: 2px solid #ff6b9d; padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; font-size: 13px;';
+            infoDiv.innerHTML = `
+              <div style="font-weight: 700; color: #c44569; margin-bottom: 4px;">💝 Promo asignada por Mikaela</div>
+              <div style="color: #1a1a1a; font-weight: 600;">${promo.name} · $${promo.price}</div>
+              <div style="color: #666; font-size: 11px; margin-top: 4px;">Precio regular: $${promo.regular} | Podés aplicar esta o elegir otra si la clienta lo prefiere</div>
+            `;
+            const actionBtns = document.getElementById('as1ActionBtns');
+            if (actionBtns) {
+              actionBtns.parentNode.insertBefore(infoDiv, actionBtns);
+            }
           }
           
           if (user.area === 'pestanas') {
@@ -2951,11 +2991,33 @@
           document.getElementById('as2SvcCount').textContent = '0';
           document.getElementById('as2Total').textContent = '$0';
           
-          // Si tiene promo asignada desde la toma, aplicarla
-          if (window._acceptedPromo) {
-            const promo = window._acceptedPromo;
-            showPromoBanner(2, promo, user.area, false);
-            window._acceptedPromo = null;
+          // Si viene con promo asignada, guardarla pero permitir cambiarla
+          if (window._availablePromo) {
+            const promo = window._availablePromo;
+            // Guardar promo asignada originalmente
+            if (!window._assignedPromo) window._assignedPromo = {};
+            window._assignedPromo[2] = promo;
+            
+            // Modificar el botón de promo para mostrar que hay una asignada
+            const promoBtn = document.getElementById('promoBtn2');
+            if (promoBtn) {
+              promoBtn.innerHTML = '🏷 Aplicar promo<br><span style="font-size: 10px; opacity: 0.9;">Asignada: ' + promo.name + '</span>';
+              promoBtn.style.background = 'linear-gradient(135deg, #ff6b9d 0%, #c44569 100%)';
+            }
+            
+            // Mostrar info de la promo asignada
+            const infoDiv = document.createElement('div');
+            infoDiv.id = 'promoAssignedInfo2';
+            infoDiv.style.cssText = 'background: linear-gradient(135deg, #fff5f7 0%, #ffe8ef 100%); border: 2px solid #ff6b9d; padding: 12px 16px; border-radius: 12px; margin-bottom: 14px; font-size: 13px;';
+            infoDiv.innerHTML = `
+              <div style="font-weight: 700; color: #c44569; margin-bottom: 4px;">💝 Promo asignada por Mikaela</div>
+              <div style="color: #1a1a1a; font-weight: 600;">${promo.name} · $${promo.price}</div>
+              <div style="color: #666; font-size: 11px; margin-top: 4px;">Precio regular: $${promo.regular} | Podés aplicar esta o elegir otra si la clienta lo prefiere</div>
+            `;
+            const actionBtns = document.getElementById('as2ActionBtns');
+            if (actionBtns) {
+              actionBtns.parentNode.insertBefore(infoDiv, actionBtns);
+            }
           }
           
           if (user.area === 'pestanas') {
@@ -2990,23 +3052,105 @@
     }
   }
   
-  function acceptPromo() {
-    closeModal();
-    const takingData = window._takingData;
-    // Guardar la promo para aplicarla después
-    window._acceptedPromo = {
-      name: takingData.promoNombre,
-      price: takingData.precioPromo,
-      regular: takingData.precioRegular
+  function applyAvailablePromo(slot) {
+    const promo = window._availablePromosPerSlot ? window._availablePromosPerSlot[slot] : null;
+    if (!promo) {
+      alert('No hay promo disponible');
+      return;
+    }
+    
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+    
+    // Agregar servicio de la promo
+    const servicioPromo = {
+      name: 'Servicio promo: ' + promo.name,
+      area: user.area,
+      price: promo.price
     };
-    loadClientAfterTake();
+    
+    if (!slotServices[slot]) slotServices[slot] = [];
+    slotServices[slot].push(servicioPromo);
+    
+    // Actualizar UI de servicios
+    renderServicesForSlot(slot);
+    
+    // Actualizar total
+    const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+    
+    // Guardar en activePromos
+    if (!window.activePromos) window.activePromos = {};
+    window.activePromos[clientName] = { promo: promo };
+    
+    // Cambiar botón
+    const promoBtn = document.getElementById('promoBtn' + slot);
+    if (promoBtn) {
+      promoBtn.textContent = '✓ Promo aplicada';
+      promoBtn.style.background = 'var(--success)';
+      promoBtn.onclick = null;
+    }
+    
+    // Ocultar info de promo disponible
+    const infoDiv = document.getElementById('promoAvailableInfo' + slot);
+    if (infoDiv) infoDiv.remove();
   }
   
-  function modifyService() {
-    closeModal();
-    // No aplicar la promo, dejar que el staff modifique
-    window._acceptedPromo = null;
-    loadClientAfterTake();
+  function renderServicesForSlot(slot) {
+    const services = slotServices[slot] || [];
+    const listEl = document.getElementById('as' + slot + 'ServicesList');
+    if (!listEl) return;
+    
+    listEl.innerHTML = services.map((s, idx) => {
+      const isPending = s.status === 'pendiente';
+      const isApproved = s.status === 'aprobado';
+      const isRejected = s.status === 'rechazado';
+      
+      const bgColor = isPending ? '#fff3cd' : isRejected ? '#f8d7da' : 'var(--bg-card)';
+      const borderStyle = isPending ? 'border: 2px solid #ffc107;' : isRejected ? 'border: 2px solid #dc3545;' : '';
+      
+      const statusBadge = isPending ? 
+        '<div style="background: #ffc107; color: #856404; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">⏳ PENDIENTE AUTORIZACIÓN</div>' :
+        isApproved ?
+        '<div style="background: #28a745; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">✓ APROBADO</div>' :
+        isRejected ?
+        '<div style="background: #dc3545; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">✕ RECHAZADO</div>' :
+        '';
+      
+      const noteInfo = (isPending || isApproved) && s.note ? 
+        `<div style="font-size: 10px; color: var(--ink-soft); margin-top: 4px; font-style: italic;">Por: ${s.requestedBy || 'Staff'} - "${s.note}"</div>` : '';
+      
+      return `
+      <div class="service-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${bgColor}; ${borderStyle} border-radius: 12px; margin-bottom: 8px;">
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 14px;">${s.name}</div>
+          <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${s.area.charAt(0).toUpperCase() + s.area.slice(1)}</div>
+          ${statusBadge}
+          ${noteInfo}
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 16px; font-weight: 800; ${isPending ? 'opacity: 0.5;' : ''}">${isPending ? '⏳' : ''}$${s.price}</div>
+          ${!isPending ? `<button onclick="removeServiceItem(${slot}, ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px;">✕</button>` : ''}
+        </div>
+      </div>
+    `;
+    }).join('');
+  }
+  
+  function removeServiceItem(slot, idx) {
+    if (!slotServices[slot]) return;
+    slotServices[slot].splice(idx, 1);
+    renderServicesForSlot(slot);
+    
+    // Actualizar total
+    const total = slotServices[slot].reduce((sum, s) => {
+      // Solo sumar servicios aprobados o sin estado (originales)
+      if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+      return sum + Number(s.price);
+    }, 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
   }
   
   // Opciones al finalizar servicio
@@ -3665,10 +3809,86 @@
             </div>
           `).join('');
         }
+        
+        // Autorizaciones pendientes
+        renderAuthorizations();
       }
     } catch (err) {
       console.error('Error cargando dashboard Mikaela:', err);
     }
+  }
+  
+  function renderAuthorizations() {
+    const requests = window._authorizationRequests || [];
+    const pendingRequests = requests.filter(r => !r.approved && !r.rejected);
+    
+    const authSection = document.getElementById('authorizationsSection');
+    const authList = document.getElementById('authorizationsList');
+    const authCount = document.getElementById('authCount');
+    
+    if (pendingRequests.length === 0) {
+      authSection.style.display = 'none';
+      return;
+    }
+    
+    authSection.style.display = 'block';
+    authCount.textContent = pendingRequests.length;
+    
+    authList.innerHTML = pendingRequests.map((req, idx) => `
+      <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.client}</div>
+            <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.service.requestedBy}</strong> · ${req.service.requestedAt}</div>
+          </div>
+          <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
+        </div>
+        
+        <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+          <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.service.name}</div>
+          <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.service.area} · <strong style="font-size: 14px; color: #28a745;">$${req.service.price}</strong></div>
+          <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
+            <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
+            <div style="font-size: 11px; color: #333; font-style: italic;">"${req.service.note}"</div>
+          </div>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+          <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+          <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  function approveAuthorization(reqId) {
+    if (!window._authorizationRequests) return;
+    
+    const req = window._authorizationRequests.find(r => r.id === reqId);
+    if (!req) return;
+    
+    req.approved = true;
+    req.service.status = 'aprobado';
+    
+    // TODO: Actualizar en el backend y notificar al staff
+    
+    alert('✓ Servicio aprobado. El staff podrá continuar con ' + req.client);
+    renderAuthorizations();
+  }
+  
+  function rejectAuthorization(reqId) {
+    if (!window._authorizationRequests) return;
+    
+    const req = window._authorizationRequests.find(r => r.id === reqId);
+    if (!req) return;
+    
+    req.rejected = true;
+    req.service.status = 'rechazado';
+    
+    // TODO: Actualizar en el backend y notificar al staff
+    
+    alert('✕ Servicio rechazado. El staff será notificado.');
+    renderAuthorizations();
   }
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
@@ -5236,6 +5456,9 @@
     window._promoSlot = slot;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
     
+    // Verificar si hay promo asignada por Mikaela
+    const assignedPromo = window._assignedPromo ? window._assignedPromo[slot] : null;
+    
     // ¿Hay promo en curso para esta clienta?
     const inProgress = activePromos[clientName];
     const inProgressEl = document.getElementById('promoInProgress');
@@ -5254,15 +5477,23 @@
       
       inProgressEl.style.display = 'block';
     } else {
-      document.getElementById('promoSelectTitle').textContent = '🏷 Aplicar promo';
+      document.getElementById('promoSelectTitle').textContent = assignedPromo ? '🏷 Elegir promo (asignada: ' + assignedPromo.name + ')' : '🏷 Aplicar promo';
       inProgressEl.style.display = 'none';
     }
     
     // Renderizar lista de promos activas
     const list = document.getElementById('promoSelectList');
     const active = PROMOS.filter(p => p.active);
-    list.innerHTML = active.map((p, i) => `
-      <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(${i})">
+    list.innerHTML = active.map((p, i) => {
+      // Verificar si esta es la promo asignada por Mikaela
+      const isAssigned = assignedPromo && p.name === assignedPromo.name;
+      const borderStyle = isAssigned ? 'border: 3px solid #ff6b9d;' : '';
+      const bgStyle = isAssigned ? 'background: linear-gradient(135deg, #fff5f7 0%, #ffe8ef 100%);' : 'background: var(--bg-card);';
+      const assignedBadge = isAssigned ? '<div style="background: #ff6b9d; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px; display: inline-block; margin-bottom: 6px;">💝 ASIGNADA POR MIKAELA</div>' : '';
+      
+      return `
+      <div style="${bgStyle} ${borderStyle} border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(${i})">
+        ${assignedBadge}
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div style="flex: 1;">
             <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">${p.name}</div>
@@ -5272,12 +5503,13 @@
             </div>
           </div>
           <div style="text-align: right; flex-shrink: 0; margin-left: 10px;">
-            <div style="font-size: 22px; font-weight: 800; color: var(--accent-deep);">$${p.price}</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${isAssigned ? '#c44569' : 'var(--accent-deep)'};">$${p.price}</div>
             <div style="font-size: 11px; color: var(--ink-faint); text-decoration: line-through;">$${p.regular}</div>
           </div>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
     
     document.getElementById('promoSelectModal').classList.add('active');
   }
@@ -5289,6 +5521,29 @@
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
     
+    // Obtener el precio que le corresponde a esta área
+    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    const myDiv = promo.division ? promo.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
+    const myPrice = myDiv ? myDiv.monto : promo.price;
+    
+    // Agregar servicio de promo a slotServices
+    const servicioPromo = {
+      name: promo.name,
+      area: myArea,
+      price: myPrice
+    };
+    
+    if (!slotServices[slot]) slotServices[slot] = [];
+    slotServices[slot].push(servicioPromo);
+    
+    // Actualizar UI
+    renderServicesForSlot(slot);
+    
+    // Actualizar total
+    const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+    
     // Registrar promo activa
     activePromos[clientName] = {
       promo: promo,
@@ -5296,20 +5551,18 @@
       completedAreas: [myArea]
     };
     
-    // Actualizar precio del servicio y total con el precio de la promo
-    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-    const myDiv = promo.division ? promo.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
-    const myPrice = myDiv ? myDiv.monto : promo.price;
+    // Ocultar banner de promo asignada si existe
+    const assignedInfo = document.getElementById('promoAssignedInfo' + slot);
+    if (assignedInfo) assignedInfo.remove();
     
-    document.getElementById('as' + slot + 'ServiceName').textContent = promo.name;
-    document.getElementById('as' + slot + 'ServiceArea').textContent = promo.services + ' · PROMO';
-    document.getElementById('as' + slot + 'ServicePrice').textContent = '$' + myPrice;
-    document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
+    // Cambiar botón
+    const promoBtn = document.getElementById('promoBtn' + slot);
+    if (promoBtn) {
+      promoBtn.textContent = '✓ Promo aplicada';
+      promoBtn.style.background = 'var(--success)';
+    }
     
-    // Mostrar banner
-    showPromoBanner(slot, promo, myArea);
     closeModal();
-    
     alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
   }
 
@@ -5471,9 +5724,18 @@
     const areaSel = document.getElementById('addSvcArea');
     areaSel.innerHTML = '<option value="">Seleccionar área...</option>';
     
-    const areas = AREA_FILTER[user?.area] || ['cejas'];
-    const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting / Retiro', facial: 'Facial' };
-    areas.forEach(a => {
+    // IMPORTANTE: Mostrar TODAS las áreas, no solo las del staff
+    // Esto permite recomendaciones cruzadas y servicio personalizado
+    const allAreas = ['cejas', 'depilacion', 'pestanas', 'retiro_lifting', 'facial'];
+    const areaNames = { 
+      cejas: 'Cejas', 
+      depilacion: 'Depilación', 
+      pestanas: 'Pestañas', 
+      retiro_lifting: 'Lifting / Retiro', 
+      facial: 'Facial' 
+    };
+    
+    allAreas.forEach(a => {
       const opt = document.createElement('option');
       opt.value = a;
       opt.textContent = areaNames[a] || a;
@@ -5516,14 +5778,51 @@
   function confirmAddService() {
     const val = document.getElementById('addSvcService').value;
     if (!val) { alert('Seleccioná un servicio'); return; }
+    
+    // Validar nota obligatoria
+    const note = document.getElementById('addSvcNote').value.trim();
+    if (!note || note.length < 10) {
+      alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+      return;
+    }
+    
     const svc = JSON.parse(val);
     const slot = window._addServiceSlot || 1;
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
     const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
     svc.area = areaNames[svc.area] || svc.area;
     
+    // Marcar como pendiente de autorización
+    svc.status = 'pendiente';
+    svc.note = note;
+    svc.requestedBy = user?.name || 'Staff';
+    svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    
     if (addServiceToSlot(slot, svc)) {
+      // Limpiar nota
+      document.getElementById('addSvcNote').value = '';
+      
+      // Enviar solicitud de autorización a Mikaela
+      sendAuthorizationRequest(clientName, svc);
+      
       closeModal();
+      alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
     }
+  }
+  
+  async function sendAuthorizationRequest(clientName, service) {
+    // Guardar en lista global de solicitudes pendientes
+    if (!window._authorizationRequests) window._authorizationRequests = [];
+    window._authorizationRequests.push({
+      id: 'AUTH-' + Date.now(),
+      client: clientName,
+      service: service,
+      timestamp: new Date().toISOString()
+    });
+    
+    // TODO: Enviar al backend para que Mikaela lo vea en su panel
+    // Por ahora solo se guarda localmente
   }
 
   function removeService(slot) {
