@@ -3060,8 +3060,9 @@
           document.getElementById('as1SvcCount').textContent = '0';
           document.getElementById('as1Total').textContent = '$0';
           
-          // Si viene con servicio normal asignado (NO promo), cargarlo
-          if (a.servicio && a.servicio !== '—' && !a.promoNombre) {
+          // Si viene con servicio normal (NO promo), cargarlo
+          // Si tiene promo, se cargara en el bloque siguiente con el precio correcto del area
+          if (a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo) {
             const price = a.total || 0;
             slotServices[1].push({
               name: a.servicio,
@@ -4132,37 +4133,46 @@
         }
         
         if (a1.servicio && a1.servicio !== '—') {
-          const price = a1.precioPromo || a1.total || 0;
-          // Solo agregar el servicio base si no existe ya en la lista
-          if (!slotServices[1].find(s => s.name === a1.servicio)) {
-            slotServices[1].unshift({ 
-              name: a1.servicio, 
-              price: price, 
-              area: a1.area,
-              status: a1.promoNombre ? 'aprobado' : undefined,
-              note: a1.promoNombre ? 'Promo asignada: ' + a1.promoNombre : undefined
-            });
-          }
-          
-          // Registrar promo en activePromos solo si realmente hay una promo activa
           const clientKey1 = normalizeClientKey(a1.nombre);
+
           if (a1.promoNombre && String(a1.promoNombre).trim() !== '') {
+            // Con promo: calcular el precio correspondiente al area del staff
             const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
             if (promoFull) {
+              const myArea = user.area || 'cejas';
+              const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : myArea === 'facial' ? '✨ Facial' : myArea;
+              const myDiv = promoFull.division ? promoFull.division.find(d =>
+                d.area === areaLabel || d.area.toLowerCase().includes(myArea) ||
+                (myArea === 'cejas' && d.area.toLowerCase().includes('depil'))
+              ) : null;
+              const myPrice = myDiv ? myDiv.monto : (a1.precioPromo || a1.total || 0);
+
+              // Solo agregar si no existe ya
+              if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
+                slotServices[1].unshift({
+                  name: a1.promoNombre,
+                  price: myPrice,
+                  area: myArea
+                });
+              }
               activePromos[clientKey1] = {
                 promo: promoFull,
-                startedBy: user.area,
+                startedBy: myArea,
                 completedAreas: [],
-                _metadata: {
-                  displayName: a1.nombre,
-                  clientCode: a1.codigo,
-                  registeredAt: Date.now(),
-                  loadedFrom: 'loadStaffHome'
-                }
+                _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
             }
           } else {
-            // Sin promo — limpiar cualquier promo residual de sesiones anteriores
+            // Sin promo: precio normal del servicio
+            const price = a1.total || 0;
+            if (!slotServices[1].find(s => s.name === a1.servicio)) {
+              slotServices[1].unshift({
+                name: a1.servicio,
+                price: price,
+                area: a1.area
+              });
+            }
+            // Limpiar promo residual
             if (activePromos[clientKey1]) delete activePromos[clientKey1];
           }
         }
