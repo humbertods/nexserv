@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v66 - MULTI-PROMO + SECUENCIA SERVICIOS (01/05/2026) -->
+<!-- NexServ v67 - SECUENCIA AREAS GUARDADA Y VISIBLE (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -1069,16 +1069,18 @@
         <textarea id="arrObs" placeholder="Notas especiales de esta visita..."></textarea>
       </div>
 
-      <!-- SERVICIOS EN SECUENCIA (multi-area con orden) -->
+      <!-- ORDEN DE ATENCIÓN -->
       <div style="margin-top: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 13px; font-weight: 700; color: var(--ink);">Servicios en secuencia</div>
-          <button onclick="addServicioSecuencia()" style="padding: 6px 14px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">+ Agregar</button>
+        <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
+        <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas. Toca + para agregar un área a la secuencia.</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+          <button onclick="addAreaSecuencia('cejas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Cejas</button>
+          <button onclick="addAreaSecuencia('depilacion')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Depilación</button>
+          <button onclick="addAreaSecuencia('pestanas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Pestañas</button>
+          <button onclick="addAreaSecuencia('facial')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Facial</button>
         </div>
-        <div id="secuenciaList" style="margin-bottom: 8px;">
-          <!-- Items de secuencia se renderizan aqui -->
-        </div>
-        <div id="secuenciaEmpty" style="font-size: 12px; color: var(--ink-faint); text-align: center; padding: 8px 0;">El servicio de arriba se tomara como principal</div>
+        <div id="secuenciaList" style="margin-bottom: 8px;"></div>
+        <div id="secuenciaEmpty" style="font-size: 12px; color: var(--ink-faint); text-align: center; padding: 6px 0; display:block;">Sin orden definido — el staff tomará según disponibilidad</div>
       </div>
 
       <!-- PROMOS (hasta 3) -->
@@ -1323,6 +1325,12 @@
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
       <span style="animation: pulse 2s infinite;">●</span> En atención · 14 min
+    </div>
+
+    <!-- Secuencia de areas definida por Mikaela -->
+    <div id="as1SecuenciaBanner" style="display:none; background: #f0f4ff; border: 1.5px solid #c7d2fe; border-radius: 16px; padding: 12px 16px; margin-bottom: 14px;">
+      <div style="font-size: 11px; font-weight: 700; color: #3730a3; margin-bottom: 8px;">Orden de atención definido por Mikaela</div>
+      <div id="as1SecuenciaItems" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
     </div>
 
     <!-- Observaciones de la clienta -->
@@ -3037,6 +3045,7 @@
           document.getElementById('as1Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
           document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
           document.getElementById('obs1Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
+          renderSecuenciaBanner(1, a.secuencia || []);
           
           // Limpiar servicios previos
           slotServices[1] = [];
@@ -3623,6 +3632,29 @@
 
   
   // Sincronizar estados de autorización con el backend
+  function renderSecuenciaBanner(slotNum, secuencia) {
+    const banner = document.getElementById('as' + slotNum + 'SecuenciaBanner');
+    const items = document.getElementById('as' + slotNum + 'SecuenciaItems');
+    if (!banner || !items) return;
+    if (!secuencia || secuencia.length === 0) { banner.style.display = 'none'; return; }
+
+    const ICONS = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
+    const LABELS = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting', facial: 'Facial' };
+
+    items.innerHTML = secuencia.map((area, i) => `
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="background: #e0e7ff; border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: #3730a3; display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 10px; font-weight: 800;">${i + 1}</span>
+          <span>${ICONS[area] || ''}</span>
+          <span>${LABELS[area] || area}</span>
+        </div>
+        ${i < secuencia.length - 1 ? '<span style="color:#93c5fd;font-size:14px;">→</span>' : ''}
+      </div>
+    `).join('');
+
+    banner.style.display = 'block';
+  }
+
   // Recarga servicios adicionales (pendientes + aprobados) desde el backend
   async function recargarAutorizacionesStaff(slotNum) {
     const user = window.currentUser;
@@ -3964,7 +3996,8 @@
         document.getElementById('as1Name').textContent = a1.nombre + (a1.esTop ? ' ⭐' : '');
         document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
         document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
-        
+        renderSecuenciaBanner(1, a1.secuencia || []);
+
         // Solo resetear slotServices si cambio la clienta o si esta completamente vacia
         if (!mismaClienta || !tieneServicios) {
           slotServices[1] = [];
@@ -4413,18 +4446,14 @@
   });
 
   // ========== SECUENCIA DE SERVICIOS ==========
-  let _secuencia = [];
+  let _secuencia = []; // [{area, label}]
 
-  function addServicioSecuencia() {
-    const area = document.getElementById('arrArea')?.value || '';
-    const servicioRaw = document.getElementById('arrService')?.value || '';
-    if (!area || !servicioRaw) { alert('Selecciona area y servicio primero'); return; }
-    let nombre = servicioRaw, precio = 0;
-    try { const d = JSON.parse(servicioRaw); nombre = d.nombre; precio = d.precio || 0; } catch(e) {}
-    _secuencia.push({ area, nombre, precio });
+  const AREA_LABELS_SEC = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+  const AREA_ICONS_SEC = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
+
+  function addAreaSecuencia(area) {
+    _secuencia.push({ area, label: AREA_LABELS_SEC[area] || area });
     renderSecuencia();
-    document.getElementById('arrArea').selectedIndex = 0;
-    document.getElementById('arrService').innerHTML = '<option value="">Primero selecciona el area</option>';
   }
 
   function removeSecuenciaItem(idx) {
@@ -4443,20 +4472,21 @@
     const list = document.getElementById('secuenciaList');
     const empty = document.getElementById('secuenciaEmpty');
     if (!list) return;
-    if (_secuencia.length === 0) { list.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+    if (_secuencia.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
     if (empty) empty.style.display = 'none';
-    const areaLabels = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
     list.innerHTML = _secuencia.map((s, i) => `
-      <div style="background: var(--bg-card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
-        <div style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">${i + 1}</div>
-        <div style="flex: 1; min-width: 0;">
-          <div style="font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${s.nombre}</div>
-          <div style="font-size: 11px; color: var(--ink-soft);">${areaLabels[s.area] || s.area} - $${s.precio}</div>
-        </div>
+      <div style="background: var(--bg-card); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px;">
+        <div style="background: var(--accent); color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">${i + 1}</div>
+        <div style="font-size: 16px;">${AREA_ICONS_SEC[s.area] || ''}</div>
+        <div style="flex: 1; font-size: 14px; font-weight: 700;">${s.label}</div>
         <div style="display: flex; gap: 4px; flex-shrink: 0;">
-          ${i > 0 ? '<button onclick="moveSecuencia(' + i + ',-1)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:12px;cursor:pointer;">up</button>' : ''}
-          ${i < _secuencia.length - 1 ? '<button onclick="moveSecuencia(' + i + ',1)" style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:12px;cursor:pointer;">dn</button>' : ''}
-          <button onclick="removeSecuenciaItem(${i})" style="width:28px;height:28px;border-radius:50%;border:none;background:var(--danger-bg);color:var(--danger);font-size:12px;cursor:pointer;font-weight:700;">x</button>
+          ${i > 0 ? `<button onclick="moveSecuencia(${i},-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↑</button>` : '<div style="width:30px"></div>'}
+          ${i < _secuencia.length - 1 ? `<button onclick="moveSecuencia(${i},1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↓</button>` : '<div style="width:30px"></div>'}
+          <button onclick="removeSecuenciaItem(${i})" style="width:30px;height:30px;border-radius:50%;border:none;background:var(--danger-bg);color:var(--danger);font-size:14px;cursor:pointer;font-weight:700;">✕</button>
         </div>
       </div>
     `).join('');
