@@ -3552,10 +3552,12 @@
           updateCapacityUI(user.name);
         }
         
-        alert('✓ Servicio completado.\n\n' +
-              '✅ ' + areaActual.toUpperCase() + ': $' + miDivision.monto + ' (tu parte)\n' +
-              '⏳ FALTA: ' + serviciosFaltantes + '\n\n' +
-              'La clienta volvió a lista de espera para continuar.');
+        const promasExtMsg = (data.promasExtraPendientes || []).map(p => p.nombre).join(' + ');
+        const faltaTotal = serviciosFaltantes + (promasExtMsg ? ' + ' + promasExtMsg : '');
+        alert('Servicio completado.\n\n' +
+              '- ' + areaActual.toUpperCase() + ': $' + miDivision.monto + ' (completado)\n' +
+              '- Falta: ' + faltaTotal + '\n\n' +
+              'La clienta volvio a lista de espera para continuar.');
         show('staffHome');
       } else {
         alert('Error: ' + (result.message || 'No se pudo devolver a lista'));
@@ -3579,6 +3581,9 @@
 
     try {
       // Finalizar la atencion actual (cobra la parte ya realizada)
+      // Las promasExtra restantes son las que vienen despues de la que se activa ahora
+      const promasExtraRestantes = data.promasExtraPendientes.slice(1);
+
       const result = await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
@@ -3589,7 +3594,8 @@
         siguientePromo: siguientePromo.nombre,
         siguientePromoPrecio: siguientePromo.precio,
         siguientePromoRegular: siguientePromo.regular,
-        siguientePromoArea: siguientePromo._area || 'cejas'
+        siguientePromoArea: siguientePromo._area || 'cejas',
+        promasExtraRestantes: promasExtraRestantes  // Las que quedan despues de esta
       });
 
       if (result.success) {
@@ -3602,7 +3608,13 @@
         }
         // Quitar la promo que acabamos de activar de las pendientes
         window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
-        alert('Tu parte esta lista. La clienta queda en lista de espera con la siguiente promo: ' + siguientePromo.nombre + ' ($' + siguientePromo.precio + ')');
+        const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
+        const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
+        const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
+        var msgAlert = parteActual + ' completado. Siguiente: ' + siguientePromo.nombre + ' ($' + siguientePromo.precio + ')';
+        if (restantes) msgAlert += '. Pendiente despues: ' + restantes;
+        msgAlert += '. La clienta volvio a lista de espera.';
+        alert(msgAlert);
         show('staffHome');
       } else {
         alert('Error: ' + (result.message || 'No se pudo procesar'));
