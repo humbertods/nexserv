@@ -2904,7 +2904,8 @@
             precioPromo: w.precioPromo || '',
             precioRegular: w.precioRegular || '',
             total: w.total || 0,
-            secuencia: w.secuencia || []
+            secuencia: w.secuencia || [],
+            promasExtra: w.promasExtra || []
           };
         });
       }
@@ -3021,8 +3022,9 @@
     } else {
       window._availablePromo = null;
     }
-    // Pasar secuencia para mostrar banner de orden
+    // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
+    window._takingPromasExtra = takingData ? (takingData.promasExtra || []) : [];
     
     // Cargar clienta normalmente
     await loadClientAfterTake();
@@ -3563,6 +3565,53 @@
     }
   }
   
+  async function finishAndNextPromo() {
+    // Finalizar la parte actual y activar la siguiente promo del ticket
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot || 1;
+    const siguientePromo = data.promasExtraPendientes && data.promasExtraPendientes[0];
+
+    if (!siguientePromo) { alert('No hay siguiente promo'); return; }
+
+    closeModal();
+
+    try {
+      // Finalizar la atencion actual (cobra la parte ya realizada)
+      const result = await apiPost('finalizarAtencion', {
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        servicio: data.svcNames,
+        total: data.total,
+        promoNombre: data.promoNombre,
+        precioRegular: data.precioRegular,
+        siguientePromo: siguientePromo.nombre,
+        siguientePromoPrecio: siguientePromo.precio,
+        siguientePromoRegular: siguientePromo.regular,
+        siguientePromoArea: siguientePromo._area || 'cejas'
+      });
+
+      if (result.success) {
+        // Limpiar slot actual
+        delete activePromos[normalizeClientKey(data.clientName)];
+        slotServices[slot] = [];
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        // Quitar la promo que acabamos de activar de las pendientes
+        window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
+        alert('Tu parte esta lista. La clienta queda en lista de espera con la siguiente promo: ' + siguientePromo.nombre + ' ($' + siguientePromo.precio + ')');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo procesar'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al procesar');
+    }
+  }
+
   async function finishAndRetire() {
     // Retirar clienta: cobrar solo lo realizado, cancelar todo lo pendiente del ticket
     const user = window.currentUser;
@@ -3908,6 +3957,9 @@
     
     const hayAreasExtras = areasExtras.length > 0;
 
+    // Promos extra pendientes (2a, 3a promo del ticket)
+    const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
+
     // Guardar datos en variable global para usar en las opciones
     window._finishingSlot = 1;
     window._finishingData = {
@@ -3917,7 +3969,8 @@
       total: promoData ? String(promoData.promo.price) : String(total),
       promoNombre: promoData ? promoData.promo.name : '',
       precioRegular: promoData ? String(promoData.promo.regular) : String(total),
-      areasExtras: areasExtras  // Para flujo multi-area sin promo
+      areasExtras: areasExtras,
+      promasExtraPendientes: promasExtraPendientes
     };
     
     // Cerrar cualquier modal abierto primero
@@ -3932,17 +3985,41 @@
         document.getElementById('finishPromoInfo').style.display = 'none';
       }
       
-      // Mostrar/ocultar boton "Continuar en otra area" segun si aplica
+      // Mostrar/ocultar boton "Continuar en otra area"
       const btnContinue = document.querySelector('#finishOptionsModal button[onclick="finishAndContinue()"]');
       if (btnContinue) {
         if (promoData || hayAreasExtras) {
           btnContinue.style.display = 'block';
           const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
-          btnContinue.textContent = promoData 
+          btnContinue.textContent = promoData
             ? '➡️ Continuar en otra área (promo)'
             : '➡️ Continuar en otra área: ' + areasLabel;
         } else {
           btnContinue.style.display = 'none';
+        }
+      }
+
+      // Mostrar/ocultar boton "Continuar con siguiente promo"
+      const btnNextPromo = document.querySelector('#finishOptionsModal button[onclick="finishAndNextPromo()"]');
+      if (btnNextPromo) {
+        if (promasExtraPendientes.length > 0) {
+          const siguientePromo = promasExtraPendientes[0];
+          // Determinar area de la siguiente promo desde su division
+          const promoFull = PROMOS.find(p => p.name === siguientePromo.nombre);
+          let sigArea = 'cejas'; // default
+          if (promoFull && promoFull.division && promoFull.division.length > 0) {
+            const div0 = String(promoFull.division[0].area || '').toLowerCase();
+            if (div0.includes('facial')) sigArea = 'facial';
+            else if (div0.includes('pesta')) sigArea = 'pestanas';
+            else if (div0.includes('depil') || div0.includes('corporal') || div0.includes('bikini')) sigArea = 'depilacion';
+            else sigArea = 'cejas';
+          }
+          siguientePromo._area = sigArea; // guardar para enviar al backend
+          btnNextPromo.style.display = 'block';
+          const areaLabel = { cejas: 'Cejas/Depilacion', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial' }[sigArea] || sigArea;
+          btnNextPromo.textContent = '🏷 Continuar con: ' + siguientePromo.nombre + ' (' + areaLabel + ' · $' + siguientePromo.precio + ')';
+        } else {
+          btnNextPromo.style.display = 'none';
         }
       }
       
@@ -7607,6 +7684,7 @@
     </div>
     <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
+    <button class="btn-primary" style="margin-bottom: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndNextPromo()">🏷 Continuar con siguiente promo</button>
     <button class="btn-primary outline" style="margin-bottom: 10px; color: var(--danger); border-color: var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
     <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
