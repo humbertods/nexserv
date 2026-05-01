@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v56b - FIX FILTRO FECHA AUTH (01/05/2026) -->
+<!-- NexServ v56c - FIX RACE CONDITION AUTH (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3615,13 +3615,25 @@
 
       let changed = false;
       for (const auth of myAuths) {
-        const existing = slotServices[slotNum].find(s => s.authId === auth.id);
+        // Buscar por authId primero, luego por nombre (por si authId aun no estaba asignado)
+        let existing = slotServices[slotNum].find(s => s.authId === auth.id);
+        if (!existing) {
+          existing = slotServices[slotNum].find(s => s.name === auth.servicioNombre && !s.authId);
+        }
+
         if (existing) {
+          // Siempre asignar authId si faltaba
+          if (!existing.authId) {
+            existing.authId = auth.id;
+            changed = true;
+          }
+          // Actualizar status si cambio
           if (existing.status !== auth.estado) {
             existing.status = auth.estado;
             changed = true;
           }
         } else if (!slotServices[slotNum].find(s => s.name === auth.servicioNombre)) {
+          // Agregar si no existe de ninguna forma
           slotServices[slotNum].push({
             name: auth.servicioNombre,
             price: Number(auth.servicioPrecio || 0),
