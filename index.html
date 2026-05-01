@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v62 - FICHAS CARGAN Y ACTUALIZAN DESDE BACKEND (01/05/2026) -->
+<!-- NexServ v63 - FIX FICHAS RESET + INDICES (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -5314,6 +5314,15 @@
     document.getElementById('ncCedula').value = clientData.cedula || '';
     document.getElementById('ncEmail').value = clientData.correo || '';
     
+    // Limpiar fichas antes de cargar los datos de esta clienta
+    ['ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('ncFacSexo').value = 'Femenino';
+    
     // Observaciones por área (necesitamos cargar desde el servidor)
     loadClientDataForEdit(clientData.code);
     
@@ -5343,6 +5352,15 @@
     document.getElementById('ncPhone').value = clientData.phone || '';
     document.getElementById('ncCedula').value = clientData.cedula || '';
     document.getElementById('ncEmail').value = clientData.correo || '';
+    
+    // Limpiar fichas antes de cargar los datos de esta clienta
+    ['ncPestTallas','ncPestObs','ncFacEdad','ncFacSignos','ncFacEstado','ncFacAlergias','ncFacAntecedentes','ncFacObsExtra','ncObsCejas','ncObsDepil','ncObsPest','ncObsFacial'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['ncPestModelo','ncPestDiseno','ncFacBiotipo','ncFacFototipo','ncFacTipoPiel','ncFacHiper'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('ncFacSexo').value = 'Femenino';
     
     // Observaciones por área (necesitamos cargar desde el servidor)
     loadClientDataForEdit(clientData.code);
@@ -5463,10 +5481,11 @@
             try {
               await apiPost('addFichaPestanas', {
                 codigo: editingClientCode,
+                nombre: fullName,
                 modelo: pestModelo,
                 diseno: document.getElementById('ncPestDiseno').value || '—',
                 tallas: document.getElementById('ncPestTallas').value.trim() || '—',
-                observaciones: document.getElementById('ncPestObs').value.trim()
+                obs: document.getElementById('ncPestObs').value.trim()
               });
             } catch(e) { console.error('Error guardando ficha pestanas:', e); }
           }
