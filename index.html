@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v63 - FIX FICHAS RESET + INDICES (01/05/2026) -->
+<!-- NexServ v64 - FIX PROMO RESIDUAL (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3053,6 +3053,12 @@
             document.getElementById('as1SvcCount').textContent = '1';
           }
           
+          // Limpiar promo residual si este servicio no tiene promo
+          if (!window._availablePromo) {
+            const clientKeyClean = normalizeClientKey(a.nombre);
+            if (activePromos[clientKeyClean]) delete activePromos[clientKeyClean];
+          }
+          
           // Si viene con promo asignada, guardarla pero permitir cambiarla
           if (window._availablePromo) {
             const promoBasic = window._availablePromo;
@@ -3973,14 +3979,12 @@
             });
           }
           
-          // 🔧 CRITICAL FIX: Registrar promo en activePromos si existe
-          if (a1.promoNombre) {
-            const clientKey = normalizeClientKey(a1.nombre);
-            // Buscar la promo completa en PROMOS
+          // Registrar promo en activePromos solo si realmente hay una promo activa
+          const clientKey1 = normalizeClientKey(a1.nombre);
+          if (a1.promoNombre && String(a1.promoNombre).trim() !== '') {
             const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
-            
             if (promoFull) {
-              activePromos[clientKey] = {
+              activePromos[clientKey1] = {
                 promo: promoFull,
                 startedBy: user.area,
                 completedAreas: [],
@@ -3991,14 +3995,10 @@
                   loadedFrom: 'loadStaffHome'
                 }
               };
-              
-              console.log('✅ Promo registered from loadStaffHome:', {
-                key: clientKey,
-                display: a1.nombre,
-                promo: promoFull.name,
-                activePromos: Object.keys(activePromos)
-              });
             }
+          } else {
+            // Sin promo — limpiar cualquier promo residual de sesiones anteriores
+            if (activePromos[clientKey1]) delete activePromos[clientKey1];
           }
         }
         renderServicesForSlot(1);
