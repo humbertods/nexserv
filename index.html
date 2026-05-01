@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v51 - FIX AUTORIZACIONES SYNC (30/04/2026) -->
+<!-- NexServ v51b - FIX AUTH SYNC + FILTRO HISTORIAL (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -4555,9 +4555,16 @@
         return;
       }
       
-      const servicios = result.servicios || [];
-      
-      // Actualizar estadísticas
+      const serviciosRaw = result.servicios || [];
+
+      // Filtrar registros inválidos: sin clienteNombre o con fecha epoch (registros corruptos)
+      const servicios = serviciosRaw.filter(s => {
+        if (!s || !s.clienteNombre || s.clienteNombre.toString().trim() === '') return false;
+        if (s.fecha && s.fecha.toString().includes('1969')) return false;
+        return true;
+      });
+
+      // Actualizar estadísticas (solo registros válidos)
       const totalCount = servicios.length;
       const totalAmount = servicios.reduce((sum, s) => sum + Number(s.total || 0), 0);
       const avgAmount = totalCount > 0 ? totalAmount / totalCount : 0;
@@ -4576,12 +4583,6 @@
       }
       
       list.innerHTML = servicios.map(s => {
-        // Validar datos
-        if (!s || !s.clienteNombre) {
-          console.warn('Servicio sin nombre de cliente:', s);
-          return '';
-        }
-        
         const clienteNombre = String(s.clienteNombre || 'Sin nombre');
         const initials = clienteNombre.split(' ').map(n => n[0] || '').join('').slice(0, 2) || 'XX';
         const isMultiStaff = s.serviciosDetalle && s.serviciosDetalle.length > 1;
