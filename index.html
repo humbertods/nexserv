@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v51b - FIX AUTH SYNC + FILTRO HISTORIAL (01/05/2026) -->
+<!-- NexServ v52b - FIX RENDER PENDIENTES (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2700,6 +2700,8 @@
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
+    if (id === 'activeService') { recargarAutorizacionesStaff(1); }
+    if (id === 'activeService2') { recargarAutorizacionesStaff(2); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
     if (id === 'assignDirect') { renderAssignDirect(); }
     if (id === 'arrivalExisting') {
@@ -3222,52 +3224,7 @@
           updateCapacityUI(name);
         }
         
-        // FIX: Recargar servicios adicionales (autorizaciones) al volver a la pantalla
-        // Evita que se pierdan al refrescar o navegar entre pantallas
-        try {
-          const authResult = await apiGet('getAutorizaciones');
-          if (authResult.success && authResult.autorizaciones && authResult.autorizaciones.length > 0) {
-            const slotNum = slot === 0 ? 1 : 2;
-            const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
-            const staffName = user?.name || '';
-
-            // Solo autorizaciones de esta clienta + este staff, que no estén rechazadas
-            const myAuths = authResult.autorizaciones.filter(a =>
-              a.clienteCodigo === clientCode &&
-              a.staffNombre === staffName &&
-              a.estado !== 'rechazado'
-            );
-
-            if (myAuths.length > 0) {
-              const existingNames = slotServices[slotNum].map(s => s.name);
-              for (const auth of myAuths) {
-                if (!existingNames.includes(auth.servicioNombre)) {
-                  slotServices[slotNum].push({
-                    name: auth.servicioNombre,
-                    price: Number(auth.servicioPrecio || 0),
-                    area: auth.servicioArea || '',
-                    status: auth.estado === 'aprobado' ? 'aprobado' : 'pendiente',
-                    authId: auth.id,
-                    note: auth.nota || '',
-                    requestedBy: auth.staffNombre || staffName
-                  });
-                }
-              }
-              // Recalcular total y re-renderizar
-              const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
-                if (s.status === 'rechazado') return sum;
-                return sum + Number(s.price || 0);
-              }, 0);
-              renderServicesForSlot(slotNum);
-              document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
-              document.getElementById('as' + slotNum + 'SvcCount').textContent =
-                slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
-            }
-          }
-        } catch (authErr) {
-          console.error('Error recargando autorizaciones:', authErr);
-        }
-
+        // recargarAutorizacionesStaff se llama automaticamente desde show('activeService')
         setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
       }
     } catch (err) {
@@ -3637,6 +3594,67 @@
 
   
   // Sincronizar estados de autorización con el backend
+  // Recarga servicios adicionales (pendientes + aprobados) desde el backend al volver a la pantalla
+  async function recargarAutorizacionesStaff(slotNum) {
+    const user = window.currentUser;
+    if (!user) return;
+    const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
+    if (!clientCode) return; // No hay clienta activa en este slot
+
+    try {
+      const authResult = await apiGet('getAutorizaciones');
+      if (!authResult.success || !authResult.autorizaciones) return;
+
+      const staffName = user.name || '';
+      // Incluir pendientes y aprobados de esta clienta+staff
+      const myAuths = authResult.autorizaciones.filter(a =>
+        a.clienteCodigo === clientCode &&
+        a.staffNombre === staffName &&
+        a.estado !== 'rechazado'
+      );
+
+      if (myAuths.length === 0) return;
+
+      if (!slotServices[slotNum]) slotServices[slotNum] = [];
+      const existingNames = slotServices[slotNum].map(s => s.name);
+
+      let changed = false;
+      for (const auth of myAuths) {
+        // Actualizar status si ya existe en memoria
+        const existing = slotServices[slotNum].find(s => s.authId === auth.id);
+        if (existing) {
+          existing.status = auth.estado; // puede haber pasado a 'aprobado'
+          changed = true;
+        } else if (!existingNames.includes(auth.servicioNombre)) {
+          // Agregar si no existe
+          slotServices[slotNum].push({
+            name: auth.servicioNombre,
+            price: Number(auth.servicioPrecio || 0),
+            area: auth.servicioArea || '',
+            status: auth.estado,
+            authId: auth.id,
+            note: auth.nota || '',
+            requestedBy: auth.staffNombre || staffName
+          });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
+          if (s.status === 'rechazado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
+        renderServicesForSlot(slotNum);
+        document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
+        document.getElementById('as' + slotNum + 'SvcCount').textContent =
+          slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
+      }
+    } catch (err) {
+      console.error('Error recargando autorizaciones del staff:', err);
+    }
+  }
+
   async function syncAuthorizationStates(slot) {
     const svcs = slotServices[slot] || [];
     const pendingServices = svcs.filter(s => s.status === 'pendiente' && s.authId);
@@ -4649,6 +4667,7 @@
       console.log('📋 Total autorizaciones recibidas:', requests.length);
       console.log('📋 Autorizaciones:', requests);
       
+      // Mikaela solo ve los PENDIENTES para aprobar/rechazar
       const pendingRequests = requests.filter(r => r.estado === 'pendiente');
       console.log('⏳ Autorizaciones PENDIENTES:', pendingRequests.length);
       console.log('⏳ Pendientes:', pendingRequests);
@@ -4670,14 +4689,14 @@
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
             <div>
               <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.clienteNombre}</div>
-              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.chicaNombre}</strong> · ${req.fecha}</div>
+              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.staffNombre}</strong> · ${req.fecha}</div>
             </div>
             <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
           </div>
           
           <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
             <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.servicioNombre}</div>
-            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.area} · <strong style="font-size: 14px; color: #28a745;">$${req.precio}</strong></div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.servicioArea} · <strong style="font-size: 14px; color: #28a745;">$${req.servicioPrecio}</strong></div>
             <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
               <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
               <div style="font-size: 11px; color: #333; font-style: italic;">"${req.nota || 'Sin nota'}"</div>
@@ -6634,45 +6653,20 @@
   let slotServices = { 1: [], 2: [] }; // { name, price, area, code }
 
   function renderServicesList(slot) {
-    const list = document.getElementById('as' + slot + 'ServicesList');
+    // Delega a renderServicesForSlot para que todos los renders
+    // respeten el estado (pendiente/aprobado/rechazado) de cada servicio
+    renderServicesForSlot(slot);
     const svcs = slotServices[slot] || [];
-    document.getElementById('as' + slot + 'SvcCount').textContent = svcs.length;
-    
-    if (svcs.length === 0) {
-      list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Agregá el servicio que vas a realizar</div>';
-    } else {
-      list.innerHTML = svcs.map((s, i) => `
-        <div class="card" style="margin-bottom: 8px; padding: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div style="flex: 1;">
-              <div style="font-weight: 700; font-size: 14px;">${s.name}</div>
-              <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${s.area || ''}</div>
-            </div>
-            <div style="font-size: 17px; font-weight: 800; color: var(--accent-deep); margin-right: 10px;">$${s.price}</div>
-            <button onclick="removeServiceItem(${slot}, ${i})" style="width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--danger-bg); color: var(--danger); font-size: 14px; cursor: pointer; font-weight: 700;">✕</button>
-          </div>
-        </div>
-      `).join('');
-    }
-    
-    // Actualizar total
-    const total = svcs.reduce((sum, s) => sum + Number(s.price), 0);
+    const total = svcs.reduce((sum, s) => {
+      if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
     document.getElementById('as' + slot + 'Total').textContent = '$' + total;
-    
-    // Ocultar botón agregar si ya tiene 5
-    const addBtn = document.querySelector('#as' + slot + 'ActionBtns button:first-child');
-    if (addBtn) {
-      if (svcs.length >= 5) {
-        addBtn.style.display = 'none';
-      } else {
-        addBtn.style.display = 'block';
-      }
-    }
-    
+    document.getElementById('as' + slot + 'SvcCount').textContent =
+      svcs.filter(s => s.status !== 'rechazado').length;
     // Guardar nombre del primer servicio para compatibilidad
     if (svcs.length > 0) {
-      const svcNames = svcs.map(s => s.name).join(' + ');
-      window['_as' + slot + 'ServiceSummary'] = svcNames;
+      window['_as' + slot + 'ServiceSummary'] = svcs.map(s => s.name).join(' + ');
     }
   }
 
@@ -6683,14 +6677,31 @@
       return false;
     }
     slotServices[slot].push(service);
-    renderServicesList(slot);
+    // Usar renderServicesForSlot para que muestre el badge de estado (pendiente/aprobado)
+    // y no sume al total servicios que aun no estan aprobados
+    renderServicesForSlot(slot);
+    // Actualizar total: solo servicios sin status pendiente/rechazado
+    const total = slotServices[slot].reduce((sum, s) => {
+      if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent =
+      slotServices[slot].filter(s => s.status !== 'rechazado').length;
     return true;
   }
 
   function removeServiceItem(slot, index) {
     if (!confirm('¿Quitar este servicio?')) return;
     slotServices[slot].splice(index, 1);
-    renderServicesList(slot);
+    renderServicesForSlot(slot);
+    const total = slotServices[slot].reduce((sum, s) => {
+      if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent =
+      slotServices[slot].filter(s => s.status !== 'rechazado').length;
   }
 
   function openEditService() {
