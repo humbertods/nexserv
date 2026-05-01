@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v64 - FIX PROMO RESIDUAL (01/05/2026) -->
+<!-- NexServ v65 - FIX PROMO KEY NORMALIZACION (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3268,7 +3268,7 @@
     
     // Guardar en activePromos
     if (!window.activePromos) window.activePromos = {};
-    window.activePromos[clientName] = { promo: promo };
+    window.activePromos[normalizeClientKey(clientName)] = { promo: promo };
     
     // Cambiar botón
     const promoBtn = document.getElementById('promoBtn' + slot);
@@ -3885,7 +3885,7 @@
       if (s.status === 'rechazado') return sum;
       return sum + Number(s.price || 0);
     }, 0);
-    const promoData = activePromos[clientName];
+    const promoData = activePromos[normalizeClientKey(clientName)];
     
     try {
       await apiPost('finalizarAtencion', {
@@ -3898,7 +3898,7 @@
       });
     } catch (err) { console.error(err); }
 
-    if (promoData) delete activePromos[clientName];
+    if (promoData) delete activePromos[normalizeClientKey(clientName)];
 
     if (user && activeClients[user.name]) {
       activeClients[user.name].splice(1, 1);
@@ -6776,8 +6776,9 @@
     document.getElementById('as' + slot + 'Total').textContent = '$' + total;
     document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
     
-    // Registrar promo activa
-    activePromos[clientName] = {
+    // Registrar promo activa usando clave normalizada (igual que finishSlot1)
+    const promoClientKey = normalizeClientKey(clientName);
+    activePromos[promoClientKey] = {
       promo: promo,
       startedBy: myArea,
       completedAreas: [myArea]
@@ -6801,7 +6802,7 @@
   function continuePromo() {
     const slot = window._promoSlot;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
-    const inProgress = activePromos[clientName];
+    const inProgress = activePromos[normalizeClientKey(clientName)];
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
     
