@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v67 - SECUENCIA AREAS GUARDADA Y VISIBLE (01/05/2026) -->
+<!-- NexServ v68 - FIX COLUMNAS LISTASPERA + PROMO CORRECTA (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2902,7 +2902,9 @@
             asignadaA: w.asignadaA || '',
             promoNombre: w.promoNombre || '',
             precioPromo: w.precioPromo || '',
-            precioRegular: w.precioRegular || ''
+            precioRegular: w.precioRegular || '',
+            total: w.total || 0,
+            secuencia: w.secuencia || []
           };
         });
       }
@@ -3019,6 +3021,8 @@
     } else {
       window._availablePromo = null;
     }
+    // Pasar secuencia para mostrar banner de orden
+    window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
     
     // Cargar clienta normalmente
     await loadClientAfterTake();
@@ -3045,7 +3049,8 @@
           document.getElementById('as1Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
           document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
           document.getElementById('obs1Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
-          renderSecuenciaBanner(1, a.secuencia || []);
+          // Usar secuencia de la fila de ListaEspera (más confiable que _takingSecuencia)
+          renderSecuenciaBanner(1, a.secuencia && a.secuencia.length > 0 ? a.secuencia : (window._takingSecuencia || []));
           
           // Limpiar servicios previos
           slotServices[1] = [];
