@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v52b - FIX RENDER PENDIENTES (01/05/2026) -->
+<!-- NexServ v53 - AUTO POLL AUTORIZACIONES STAFF (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2702,6 +2702,8 @@
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
     if (id === 'activeService') { recargarAutorizacionesStaff(1); }
     if (id === 'activeService2') { recargarAutorizacionesStaff(2); }
+    // Detener polling si el staff navega a otra pantalla
+    if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
     if (id === 'assignDirect') { renderAssignDirect(); }
     if (id === 'arrivalExisting') {
@@ -3594,39 +3596,35 @@
 
   
   // Sincronizar estados de autorización con el backend
-  // Recarga servicios adicionales (pendientes + aprobados) desde el backend al volver a la pantalla
+  // Recarga servicios adicionales (pendientes + aprobados) desde el backend
   async function recargarAutorizacionesStaff(slotNum) {
     const user = window.currentUser;
     if (!user) return;
     const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
-    if (!clientCode) return; // No hay clienta activa en este slot
+    if (!clientCode) return;
 
     try {
       const authResult = await apiGet('getAutorizaciones');
       if (!authResult.success || !authResult.autorizaciones) return;
 
       const staffName = user.name || '';
-      // Incluir pendientes y aprobados de esta clienta+staff
       const myAuths = authResult.autorizaciones.filter(a =>
         a.clienteCodigo === clientCode &&
         a.staffNombre === staffName &&
         a.estado !== 'rechazado'
       );
 
-      if (myAuths.length === 0) return;
-
       if (!slotServices[slotNum]) slotServices[slotNum] = [];
-      const existingNames = slotServices[slotNum].map(s => s.name);
 
       let changed = false;
       for (const auth of myAuths) {
-        // Actualizar status si ya existe en memoria
         const existing = slotServices[slotNum].find(s => s.authId === auth.id);
         if (existing) {
-          existing.status = auth.estado; // puede haber pasado a 'aprobado'
-          changed = true;
-        } else if (!existingNames.includes(auth.servicioNombre)) {
-          // Agregar si no existe
+          if (existing.status !== auth.estado) {
+            existing.status = auth.estado;
+            changed = true;
+          }
+        } else if (!slotServices[slotNum].find(s => s.name === auth.servicioNombre)) {
           slotServices[slotNum].push({
             name: auth.servicioNombre,
             price: Number(auth.servicioPrecio || 0),
@@ -3642,7 +3640,7 @@
 
       if (changed) {
         const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
-          if (s.status === 'rechazado') return sum;
+          if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
           return sum + Number(s.price || 0);
         }, 0);
         renderServicesForSlot(slotNum);
@@ -3650,9 +3648,46 @@
         document.getElementById('as' + slotNum + 'SvcCount').textContent =
           slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
       }
+
+      // Polling: si hay pendientes, verificar cada 8 segundos automaticamente
+      const hayPendientes = slotServices[slotNum].some(s => s.status === 'pendiente');
+      const pollKey = '_authPoll' + slotNum;
+
+      if (hayPendientes && !window[pollKey]) {
+        window[pollKey] = setInterval(async () => {
+          // Detener si el staff ya no esta en la pantalla activa
+          const screenId = slotNum === 1 ? 'activeService' : 'activeService2';
+          const screenVisible = document.getElementById(screenId)?.classList.contains('active');
+          if (!screenVisible) {
+            clearInterval(window[pollKey]);
+            window[pollKey] = null;
+            return;
+          }
+          await recargarAutorizacionesStaff(slotNum);
+          // Detener si ya no quedan pendientes
+          const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+          if (!aunPendientes) {
+            clearInterval(window[pollKey]);
+            window[pollKey] = null;
+          }
+        }, 8000);
+      }
+
+      // Si ya no hay pendientes, asegurar que el poll este detenido
+      if (!hayPendientes && window[pollKey]) {
+        clearInterval(window[pollKey]);
+        window[pollKey] = null;
+      }
+
     } catch (err) {
       console.error('Error recargando autorizaciones del staff:', err);
     }
+  }
+
+  // Detener polling al salir de pantallas de atención
+  function detenerPollAutorizaciones() {
+    if (window._authPoll1) { clearInterval(window._authPoll1); window._authPoll1 = null; }
+    if (window._authPoll2) { clearInterval(window._authPoll2); window._authPoll2 = null; }
   }
 
   async function syncAuthorizationStates(slot) {
