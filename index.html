@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v54 - CATALOGO DINAMICO DESDE SHEETS (01/05/2026) -->
+<!-- NexServ v55 - FIX POLL + AREA CRUZADA (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3364,16 +3364,49 @@
     
     console.log('🔍 promoData encontrado:', promoData);
     
+    // Flujo sin promo: servicio de area cruzada (ej: facial agrega servicio de cejas)
     if (!promoData || !promoData.promo) {
-      console.error('❌ Promo lookup failed:', {
-        searchKey: clientKey,
-        availableKeys: Object.keys(activePromos),
-        activePromos: activePromos
-      });
-      alert('Error: No se encontró información de la promo.\n\nDetalles técnicos:\n' +
-            'Key buscada: ' + clientKey + '\n' +
-            'Keys disponibles: ' + Object.keys(activePromos).join(', ') + '\n\n' +
-            'Usá "Mandar a cobrar" en su lugar.');
+      const areasExtras = data.areasExtras || [];
+      if (areasExtras.length === 0) {
+        alert('No hay áreas adicionales para continuar. Usá "Mandar a cobrar".');
+        return;
+      }
+      
+      const areaDisplayMap = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+      const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
+      
+      try {
+        // Mandar a cobrar la parte del staff actual y dejar pendiente en lista de espera para las otras areas
+        const result = await apiPost('finalizarAtencion', {
+          chicaNombre: user?.name || '',
+          clienteNombre: displayName,
+          servicio: data.svcNames,
+          total: data.total,
+          promoNombre: '',
+          precioRegular: data.total,
+          areaCompletada: user?.area || '',
+          montoChica: data.total,
+          areasFaltantes: areasLabel,
+          nuevaArea: areasExtras[0],
+          montoSiguienteArea: '0',
+          servicioActualizado: data.svcNames
+        });
+        
+        if (result.success) {
+          slotServices[slot] = [];
+          if (user && activeClients[user.name]) {
+            activeClients[user.name].splice(slot - 1, 1);
+            updateCapacityUI(user.name);
+          }
+          alert('Servicio completado. Pendiente: ' + areasLabel + '. La clienta volvio a lista de espera para continuar con ' + areasLabel + '.');
+          show('staffHome');
+        } else {
+          alert('Error: ' + (result.message || 'No se pudo procesar'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error al procesar');
+      }
       return;
     }
     
@@ -3725,21 +3758,42 @@
     console.log('Promo data:', promoData);
     console.log('Total:', total);
     
+    // Detectar si hay servicios de areas cruzadas (ej: Laura facial agrega servicio de Cejas)
+    const areaMapInv = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', facial: 'facial' };
+    const areaDisplayMap = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+    const staffArea = user?.area || '';
+    const svcsAprobados = svcs.filter(s => s.status !== 'rechazado');
+    
+    // Áreas de servicios aprobados que NO son del área del staff
+    const areasExtras = [...new Set(
+      svcsAprobados
+        .map(s => {
+          const a = String(s.area || '').toLowerCase();
+          if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+          if (a.includes('pesta') || a.includes('lifting') || a.includes('retiro')) return 'pestanas';
+          if (a.includes('facial')) return 'facial';
+          return null;
+        })
+        .filter(a => a && a !== staffArea)
+    )];
+    
+    const hayAreasExtras = areasExtras.length > 0;
+
     // Guardar datos en variable global para usar en las opciones
     window._finishingSlot = 1;
     window._finishingData = {
-      clientKey: clientKey,              // For lookup in activePromos
-      clientName: displayName,           // For display
+      clientKey: clientKey,
+      clientName: displayName,
       svcNames,
       total: promoData ? String(promoData.promo.price) : String(total),
       promoNombre: promoData ? promoData.promo.name : '',
-      precioRegular: promoData ? String(promoData.promo.regular) : String(total)
+      precioRegular: promoData ? String(promoData.promo.regular) : String(total),
+      areasExtras: areasExtras  // Para flujo multi-area sin promo
     };
     
     // Cerrar cualquier modal abierto primero
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
-    // Mostrar modal de opciones con un pequeño delay para asegurar que se renderice
     setTimeout(() => {
       document.getElementById('finishClientName').textContent = displayName;
       if (promoData) {
@@ -3749,15 +3803,22 @@
         document.getElementById('finishPromoInfo').style.display = 'none';
       }
       
-      const modal = document.getElementById('finishOptionsModal');
-      console.log('Abriendo modal:', modal);
-      if (modal) {
-        modal.classList.add('active');
-        console.log('Modal classList después de add:', modal.classList);
-        console.log('Modal display:', window.getComputedStyle(modal).display);
-      } else {
-        console.error('❌ Modal finishOptionsModal no encontrado en el DOM');
+      // Mostrar/ocultar boton "Continuar en otra area" segun si aplica
+      const btnContinue = document.querySelector('#finishOptionsModal button[onclick="finishAndContinue()"]');
+      if (btnContinue) {
+        if (promoData || hayAreasExtras) {
+          btnContinue.style.display = 'block';
+          const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
+          btnContinue.textContent = promoData 
+            ? '➡️ Continuar en otra área (promo)'
+            : '➡️ Continuar en otra área: ' + areasLabel;
+        } else {
+          btnContinue.style.display = 'none';
+        }
       }
+      
+      const modal = document.getElementById('finishOptionsModal');
+      if (modal) modal.classList.add('active');
     }, 100);
   }
 
@@ -6796,6 +6857,9 @@
       
       // FIX: await para que authId quede guardado en svc antes de que el staff pueda finalizar
       await sendAuthorizationRequest(clientName, svc, slot);
+      
+      // Iniciar poll inmediatamente ya que hay un servicio pendiente
+      recargarAutorizacionesStaff(slot);
       
       alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
     }
