@@ -3563,6 +3563,52 @@
     }
   }
   
+  async function finishAndRetire() {
+    // Retirar clienta: cobrar solo lo realizado, cancelar todo lo pendiente del ticket
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot || 1;
+
+    // Solo los servicios aprobados del slot actual
+    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const totalRealizado = svcs.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const nombresRealizados = svcs.map(s => s.name).join(' + ') || data.svcNames;
+
+    if (!confirm('La clienta se retira. Se cobrara solo lo realizado: ' + nombresRealizados + ' = $' + totalRealizado + '.\n\nLos servicios y promos pendientes se cancelan.')) return;
+
+    closeModal();
+
+    try {
+      // Finalizar la atención con el total parcial y marcar como "Por cobrar"
+      const result = await apiPost('finalizarAtencion', {
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        servicio: nombresRealizados,
+        total: String(totalRealizado),
+        promoNombre: '',         // Sin promo — se cobra precio normal de lo realizado
+        precioRegular: String(totalRealizado),
+        esRetiro: true           // Flag para que el backend cancele servicios pendientes
+      });
+
+      if (result.success) {
+        // Limpiar slot
+        delete activePromos[normalizeClientKey(data.clientName)];
+        slotServices[slot] = [];
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        alert('La clienta fue retirada. Mikaela puede proceder al cobro de $' + totalRealizado + '.');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo procesar el retiro'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al procesar el retiro');
+    }
+  }
+
   async function finishAndReturn() {
     // Devolver a lista de espera (la clienta NO continuará con otros servicios)
     closeModal();
@@ -7561,6 +7607,7 @@
     </div>
     <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
+    <button class="btn-primary outline" style="margin-bottom: 10px; color: var(--danger); border-color: var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
     <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
   </div>
