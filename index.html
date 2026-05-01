@@ -3059,6 +3059,7 @@
           document.getElementById('as1ServicesList').innerHTML = '';
           document.getElementById('as1SvcCount').textContent = '0';
           document.getElementById('as1Total').textContent = '$0';
+          const prevInfo1 = document.getElementById('promoAssignedInfo1'); if (prevInfo1) prevInfo1.remove();
           
           // Si viene con servicio normal (NO promo), cargarlo
           // Si tiene promo, se cargara en el bloque siguiente con el precio correcto del area
@@ -3152,6 +3153,17 @@
               const actionBtns = document.getElementById('as1ActionBtns');
               if (actionBtns) {
                 actionBtns.parentNode.insertBefore(infoDiv, actionBtns);
+              }
+
+              // Mostrar banner de promasExtra si hay mas promos pendientes
+              const promasExtraActuales = window._takingPromasExtra || [];
+              if (promasExtraActuales.length > 0) {
+                const extraDiv = document.createElement('div');
+                extraDiv.id = 'promoExtraInfo1';
+                extraDiv.style.cssText = 'background: #fff8e1; border: 1.5px solid #f0c040; padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 12px;';
+                extraDiv.innerHTML = '<div style="font-weight:700;color:#8a6d00;margin-bottom:4px;">Despues de esta promo, la clienta tiene:</div>' +
+                  promasExtraActuales.map(function(p,i){ return '<div style="color:#5a4a00;font-weight:600;">' + (i+1) + '. ' + p.nombre + ' ($' + p.precio + ')</div>'; }).join('');
+                if (actionBtns) actionBtns.parentNode.insertBefore(extraDiv, actionBtns);
               }
             }
           }
