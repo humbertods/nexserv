@@ -3787,13 +3787,25 @@
     const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
     if (!clientCode) return;
 
+    // Arrancar poll de inmediato si ya hay pendientes en memoria (sin esperar al backend)
+    const pollKeyImmediate = '_authPoll' + slotNum;
+    const hayPendientesYa = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+    if (hayPendientesYa && !window[pollKeyImmediate]) {
+      window[pollKeyImmediate] = setInterval(async () => {
+        const screenId = slotNum === 1 ? 'activeService' : 'activeService2';
+        const screenVisible = document.getElementById(screenId)?.classList.contains('active');
+        if (!screenVisible) { clearInterval(window[pollKeyImmediate]); window[pollKeyImmediate] = null; return; }
+        await recargarAutorizacionesStaff(slotNum);
+        const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+        if (!aunPendientes) { clearInterval(window[pollKeyImmediate]); window[pollKeyImmediate] = null; }
+      }, 8000);
+    }
+
     try {
       const authResult = await apiGet('getAutorizaciones');
       if (!authResult.success || !authResult.autorizaciones) return;
 
       const staffName = user.name || '';
-      // Filtrar: misma clienta + mismo staff + estado activo (pendiente o aprobado)
-      // El backend ya cierra (completada) las autorizaciones al finalizar servicio
       const myAuths = authResult.autorizaciones.filter(a =>
         a.clienteCodigo === clientCode &&
         a.staffNombre === staffName &&
@@ -3847,8 +3859,8 @@
           slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
       }
 
-      // Polling: si hay pendientes, verificar cada 8 segundos automaticamente
-      const hayPendientes = slotServices[slotNum].some(s => s.status === 'pendiente');
+      // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
+      const hayPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
       const pollKey = '_authPoll' + slotNum;
 
       if (hayPendientes && !window[pollKey]) {
