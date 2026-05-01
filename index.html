@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v58 - FIX HISTORIAL OWNER CAMPOS (01/05/2026) -->
+<!-- NexServ v59 - HISTORIAL POR STAFF EXPANDIBLE (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2607,33 +2607,56 @@
         document.getElementById('ownerListas').textContent = listas;
       }
 
-      // Cargar historial reciente
-      const histResult = await apiGet('getHistorial', { limit: 4 });
+      // Cargar historial reciente agrupado por staff
+      const histResult = await apiGet('getHistorial', { periodo: 'hoy' });
       const histContainer = document.getElementById('ownerHistorial');
-      if (histResult.success && histResult.historial && histResult.historial.length > 0) {
-        histContainer.innerHTML = '<div class="card" style="padding: 4px 16px;">' + 
-          histResult.historial.map(h => `
-            <div class="history-row">
-              <div class="history-info">
-                <div class="history-top">
-                  <span class="history-time">${h.hora || '—'}</span>
-                  <span class="history-client">${h.nombre}</span>
-                </div>
-                <div class="history-service">${h.servicio}</div>
-                <div class="history-meta">por ${h.chica || '—'} · ${h.codigo}</div>
+      if (histResult.success && histResult.porStaff && histResult.porStaff.length > 0) {
+        histContainer.innerHTML = histResult.porStaff.map((s, idx) => `
+          <div style="background: var(--bg-card); border-radius: 16px; margin-bottom: 10px; overflow: hidden; box-shadow: var(--shadow-card);">
+            <div onclick="toggleStaffHistorial(${idx})" style="display: flex; align-items: center; padding: 14px 16px; cursor: pointer; gap: 12px;">
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--chip); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">${s.chica[0]}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 15px;">${s.chica}</div>
+                <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${s.servicios.length} servicio${s.servicios.length !== 1 ? 's' : ''} hoy</div>
               </div>
-              <div class="history-amount">
-                <div class="history-value">$${h.precio || 0}</div>
-                <div class="history-comm">+$${h.comision || 0}</div>
+              <div style="text-align: right; margin-right: 8px;">
+                <div style="font-size: 18px; font-weight: 800; color: var(--ink);">$${s.totalFacturado}</div>
+                <div style="font-size: 11px; color: var(--success);">+$${s.totalComision.toFixed(1)} com.</div>
+              </div>
+              <div id="arrow-${idx}" style="color: var(--ink-faint); font-size: 12px; transition: transform 0.2s;">▼</div>
+            </div>
+            <div id="staff-detail-${idx}" style="display: none; border-top: 1px solid var(--line); padding: 0 16px;">
+              ${s.servicios.map((sv, si) => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; ${si < s.servicios.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
+                  <div>
+                    <div style="font-size: 13px; font-weight: 600;">${sv.cliente}</div>
+                    <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${sv.servicio} · ${sv.hora}</div>
+                  </div>
+                  <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${sv.precio}</div>
+                </div>
+              `).join('')}
+              <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid var(--line); margin-top: 2px;">
+                <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">TOTAL</div>
+                <div style="font-size: 16px; font-weight: 800;">$${s.totalFacturado}</div>
               </div>
             </div>
-          `).join('') + '</div>';
+          </div>
+        `).join('');
       } else {
         histContainer.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios registrados hoy</div>';
       }
     } catch (err) {
       console.error('Error cargando owner home:', err);
     }
+  }
+
+  function toggleStaffHistorial(idx) {
+    const detail = document.getElementById('staff-detail-' + idx);
+    const arrow = document.getElementById('arrow-' + idx);
+    if (!detail) return;
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
   }
 
   // ============================================
