@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v60 - REPORTES DINAMICOS BACKEND (01/05/2026) -->
+<!-- NexServ v62 - FICHAS CARGAN Y ACTUALIZAN DESDE BACKEND (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -5353,6 +5353,7 @@
   
   async function loadClientDataForEdit(codigo) {
     try {
+      // Cargar observaciones por area
       const result = await apiGet('getCliente', { codigo: codigo });
       if (result.success && result.cliente) {
         const c = result.cliente;
@@ -5360,9 +5361,37 @@
         document.getElementById('ncObsDepil').value = c.obsDepilacion || '';
         document.getElementById('ncObsPest').value = c.obsPestanas || '';
         document.getElementById('ncObsFacial').value = c.obsFacial || '';
-        
-        // TODO: Cargar fichas de pestañas, facial y pigmento si existen
       }
+
+      // Cargar ficha de pestañas activa
+      const pestResult = await apiGet('getFichaPestanas', { codigo: codigo });
+      if (pestResult.success && pestResult.fichas && pestResult.fichas.length > 0) {
+        const fichaActiva = pestResult.fichas.find(f => String(f.activa).toLowerCase() === 'si' || String(f.activa).toLowerCase() === 'sí') || pestResult.fichas[0];
+        if (fichaActiva) {
+          document.getElementById('ncPestModelo').value = fichaActiva.modelo || '';
+          document.getElementById('ncPestDiseno').value = fichaActiva.diseno || '';
+          document.getElementById('ncPestTallas').value = fichaActiva.tallas || '';
+          document.getElementById('ncPestObs').value = fichaActiva.observaciones || '';
+        }
+      }
+
+      // Cargar ficha facial
+      const facResult = await apiGet('getFichaFacial', { codigo: codigo });
+      if (facResult.success && facResult.ficha) {
+        const f = facResult.ficha;
+        document.getElementById('ncFacBiotipo').value = f.biotipo || '';
+        document.getElementById('ncFacEdad').value = f.edad || '';
+        document.getElementById('ncFacSexo').value = f.sexo || '';
+        document.getElementById('ncFacFototipo').value = f.fototipo || '';
+        document.getElementById('ncFacTipoPiel').value = f.tipoPiel || '';
+        document.getElementById('ncFacSignos').value = f.signosLesiones || '';
+        document.getElementById('ncFacHiper').value = f.signosHiper || '';
+        document.getElementById('ncFacEstado').value = f.estadoPiel || '';
+        document.getElementById('ncFacAlergias').value = f.alergias || '';
+        document.getElementById('ncFacAntecedentes').value = f.enfermedades || '';
+        document.getElementById('ncFacObsExtra').value = f.obsExtra || '';
+      }
+
     } catch (err) {
       console.error('Error cargando datos para editar:', err);
     }
@@ -5429,14 +5458,47 @@
         btn.disabled = false;
 
         if (result.success) {
+          // Guardar ficha de pestañas si se completó
+          if (pestModelo) {
+            try {
+              await apiPost('addFichaPestanas', {
+                codigo: editingClientCode,
+                modelo: pestModelo,
+                diseno: document.getElementById('ncPestDiseno').value || '—',
+                tallas: document.getElementById('ncPestTallas').value.trim() || '—',
+                observaciones: document.getElementById('ncPestObs').value.trim()
+              });
+            } catch(e) { console.error('Error guardando ficha pestanas:', e); }
+          }
+
+          // Guardar ficha facial si se completó
+          if (facBiotipo) {
+            try {
+              await apiPost('updateFichaFacial', {
+                codigo: editingClientCode,
+                nombre: fullName,
+                fecha: new Date().toLocaleDateString('es-EC', {day:'2-digit',month:'2-digit',year:'numeric'}),
+                biotipo: facBiotipo,
+                edad: document.getElementById('ncFacEdad').value || '',
+                sexo: document.getElementById('ncFacSexo').value || '',
+                fototipo: document.getElementById('ncFacFototipo').value || '',
+                tipoPiel: document.getElementById('ncFacTipoPiel').value || '',
+                signosLesiones: document.getElementById('ncFacSignos').value.trim() || '',
+                signosHiper: document.getElementById('ncFacHiper').value || 'Ninguna',
+                estadoPiel: document.getElementById('ncFacEstado').value.trim() || '',
+                alergias: document.getElementById('ncFacAlergias').value.trim() || 'Ninguna',
+                obsExtra: document.getElementById('ncFacAntecedentes').value.trim() || ''
+              });
+            } catch(e) { console.error('Error guardando ficha facial:', e); }
+          }
+
           closeModal();
           await renderClientDirectory();
-          // Recargar el perfil actualizado
           await loadClientProfiles();
           if (currentProfileClient) {
             openClientProfile(currentProfileClient);
           }
-          alert('✓ Clienta actualizada correctamente');
+          alert('Clienta actualizada correctamente');
         } else {
           alert('Error al actualizar: ' + (result.message || result.error || 'Intenta de nuevo'));
         }
@@ -5729,8 +5791,8 @@
     }
   }
 
-  function openFacialForm(isEdit) {
-    document.getElementById('facialFormTitle').textContent = isEdit ? '✏️ Editar ficha facial' : '✨ Nueva ficha facial';
+  async function openFacialForm(isEdit) {
+    document.getElementById('facialFormTitle').textContent = isEdit ? 'Editar ficha facial' : 'Nueva ficha facial';
     
     // Reset todos los campos
     document.getElementById('ffEdad').value = '';
@@ -5746,8 +5808,6 @@
     document.getElementById('ffQuirurgicos').value = '';
     document.getElementById('ffEsteticos').value = '';
     document.getElementById('ffObsExtra').value = '';
-    
-    // Reset chips
     document.querySelectorAll('#facialFormModal .chip-toggle').forEach(c => {
       c.classList.remove('chip-active');
       c.style.background = 'var(--bg-card)';
@@ -5755,43 +5815,52 @@
       c.style.borderColor = 'var(--line)';
     });
     
-    // Si es edición, precargar datos
-    if (isEdit && currentProfileClient) {
+    // Abrir modal primero
+    document.getElementById('facialFormModal').classList.add('active');
+
+    // Cargar datos existentes desde backend (siempre, no solo en edicion)
+    if (currentProfileClient) {
       const c = CLIENT_PROFILES[currentProfileClient];
-      const f = c?.facial?.ficha;
-      if (f) {
-        document.getElementById('ffEdad').value = f.edad || '';
-        document.getElementById('ffSexo').value = f.sexo || 'Femenino';
-        document.getElementById('ffBiotipo').value = f.biotipo || '';
-        document.getElementById('ffFototipo').value = f.fototipo ? f.fototipo.split(' ')[0] + ' ' + f.fototipo.split(' ').slice(1).join(' ') : '';
-        document.getElementById('ffTipoPiel').value = f.tipoPiel || '';
-        document.getElementById('ffHiper').value = f.signosHiper || '';
-        document.getElementById('ffEnfermedades').value = f.antecedentes?.enfermedades || '';
-        document.getElementById('ffFamiliares').value = f.antecedentes?.familiares || '';
-        document.getElementById('ffAlergias').value = f.antecedentes?.alergias || '';
-        document.getElementById('ffMedicamentos').value = f.antecedentes?.medicamentos || '';
-        document.getElementById('ffQuirurgicos').value = f.antecedentes?.quirurgicos || '';
-        document.getElementById('ffEsteticos').value = f.antecedentes?.esteticos || '';
-        document.getElementById('ffObsExtra').value = f.obsExtra || '';
-        
-        // Activar chips de lesiones
-        if (f.signosLesiones) {
-          document.querySelectorAll('#facialFormModal .chip-toggle').forEach(c => {
-            if (f.signosLesiones.toLowerCase().includes(c.textContent.toLowerCase()) || f.estadoPiel?.toLowerCase().includes(c.textContent.toLowerCase())) {
-              c.classList.add('chip-active');
-              c.style.background = 'var(--success)';
-              c.style.color = 'white';
-              c.style.borderColor = 'var(--success)';
-            }
-          });
+      if (c) {
+        try {
+          const result = await apiGet('getFichaFacial', { codigo: c.code });
+          const f = result.success && result.ficha ? result.ficha : null;
+          if (f) {
+            document.getElementById('ffEdad').value = f.edad || '';
+            document.getElementById('ffSexo').value = f.sexo || 'Femenino';
+            document.getElementById('ffBiotipo').value = f.biotipo || '';
+            document.getElementById('ffFototipo').value = f.fototipo || '';
+            document.getElementById('ffTipoPiel').value = f.tipoPiel || '';
+            document.getElementById('ffHiper').value = f.signosHiper || '';
+            document.getElementById('ffEnfermedades').value = f.enfermedades || '';
+            document.getElementById('ffFamiliares').value = f.antFamiliares || '';
+            document.getElementById('ffAlergias').value = f.alergias || '';
+            document.getElementById('ffMedicamentos').value = f.medicamentos || '';
+            document.getElementById('ffQuirurgicos').value = f.quirurgicos || '';
+            document.getElementById('ffEsteticos').value = f.esteticos || '';
+            document.getElementById('ffObsExtra').value = f.obsExtra || '';
+
+            // Activar chips
+            const lesiones = (f.signosLesiones || '').toLowerCase();
+            const estado = (f.estadoPiel || '').toLowerCase();
+            document.querySelectorAll('#facialFormModal .chip-toggle').forEach(chip => {
+              const label = chip.textContent.trim().toLowerCase();
+              if (lesiones.includes(label) || estado.includes(label)) {
+                chip.classList.add('chip-active');
+                chip.style.background = 'var(--success)';
+                chip.style.color = 'white';
+                chip.style.borderColor = 'var(--success)';
+              }
+            });
+          }
+        } catch(e) {
+          console.error('Error cargando ficha facial:', e);
         }
       }
     }
-    
-    document.getElementById('facialFormModal').classList.add('active');
   }
 
-  function saveFacialForm() {
+  async function saveFacialForm() {
     const c = CLIENT_PROFILES[currentProfileClient];
     if (!c) return;
     
@@ -5832,9 +5901,36 @@
     if (!c.facial) c.facial = { history: [] };
     c.facial.ficha = ficha;
     
-    closeModal();
-    renderProfileTab();
-    alert('✓ Ficha facial guardada para ' + c.name);
+    // Persistir en backend
+    try {
+      const payload = {
+        codigo: c.code,
+        nombre: c.name,
+        fecha: ficha.fecha,
+        edad: ficha.edad,
+        sexo: ficha.sexo,
+        biotipo: ficha.biotipo,
+        fototipo: ficha.fototipo,
+        tipoPiel: ficha.tipoPiel,
+        signosLesiones: ficha.signosLesiones,
+        signosHiper: ficha.signosHiper,
+        estadoPiel: ficha.estadoPiel,
+        enfermedades: ficha.antecedentes.enfermedades,
+        familiares: ficha.antecedentes.familiares,
+        alergias: ficha.antecedentes.alergias,
+        medicamentos: ficha.antecedentes.medicamentos,
+        quirurgicos: ficha.antecedentes.quirurgicos,
+        esteticos: ficha.antecedentes.esteticos,
+        obsExtra: ficha.obsExtra
+      };
+      const result = await apiPost('updateFichaFacial', payload);
+      if (!result.success) throw new Error(result.message || 'Error');
+      closeModal();
+      renderProfileTab();
+      alert('Ficha facial guardada para ' + c.name);
+    } catch(e) {
+      alert('Error guardando ficha: ' + e.message);
+    }
   }
 
   // === PERFILES DE CLIENTAS ===
