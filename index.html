@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v59b - FIX HISTORIAL CAMPOS STAFF (01/05/2026) -->
+<!-- NexServ v60 - REPORTES DINAMICOS BACKEND (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -6278,100 +6278,111 @@
 
   // === REPORTES ===
   let currentPeriod = 'dia';
+  let REPORT_DATA = {}; // Se carga dinamicamente desde el backend
 
-  const REPORT_DATA = {
-    maria: { name: 'María', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] } },
-    lesly: { name: 'Lesly', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] } },
-    rosa: { name: 'Rosa', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] } },
-    keyla: { name: 'Keyla', area: 'Cejas · Depilación · Lifting',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [] } },
-    yadira: { name: 'Yadira', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] } },
-    diana: { name: 'Diana', area: 'Pestañas · Lifting/Retiros',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        modelos: [] } },
-    laura: { name: 'Laura', area: 'Facial',
-      dia: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        topFacial: [] },
-      semana: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        topFacial: [] },
-      mes: { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0,
-        desglose: [],
-        top: [],
-        topFacial: [] } },
+  const STAFF_META = {
+    'Maria':  { key: 'maria',  area: 'Cejas · Depilacion · Lifting' },
+    'María':  { key: 'maria',  area: 'Cejas · Depilacion · Lifting' },
+    'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
+    'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
+    'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
+    'Yadira': { key: 'yadira', area: 'Pestanas · Lifting/Retiros' },
+    'Diana':  { key: 'diana',  area: 'Pestanas · Lifting/Retiros' },
+    'Laura':  { key: 'laura',  area: 'Facial' },
   };
 
-  function switchPeriod(period, btn) {
+  function emptyPeriodData() {
+    return { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] };
+  }
+
+  function buildEmptyReportData() {
+    const data = {};
+    Object.entries(STAFF_META).forEach(([nombre, meta]) => {
+      if (!data[meta.key]) {
+        data[meta.key] = {
+          name: nombre,
+          area: meta.area,
+          dia: emptyPeriodData(),
+          semana: emptyPeriodData(),
+          mes: emptyPeriodData()
+        };
+      }
+    });
+    return data;
+  }
+
+  async function loadReportData() {
+    const now = new Date();
+    const hoy = now.toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
+    
+    // Obtener inicio de semana (lunes) y mes
+    const dayOfWeek = (now.getDay() + 6) % 7; // 0=lun
+    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - dayOfWeek); startOfWeek.setHours(0,0,0,0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    REPORT_DATA = buildEmptyReportData();
+
+    try {
+      // Cargar historial completo
+      const result = await apiGet('getHistorial', { periodo: 'todo' });
+      if (!result.success || !result.historial) return;
+
+      const clientasVistas = { dia: new Set(), semana: new Set(), mes: new Set() };
+
+      result.historial.forEach(h => {
+        const chica = String(h.chica || '').trim();
+        const meta = STAFF_META[chica];
+        if (!meta) return;
+        const key = meta.key;
+        if (!REPORT_DATA[key]) return;
+
+        // Parsear fecha dd/MM/yyyy
+        const parts = String(h.fecha || '').split('/');
+        if (parts.length !== 3) return;
+        const fechaDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        const precio = Number(h.precio || 0);
+        const comision = Number(h.comision || 0);
+        const clientaKey = key + '_' + (h.codigo || h.nombre);
+        const esHoy = h.fecha === hoy;
+        const esSemana = fechaDate >= startOfWeek;
+        const esMes = fechaDate >= startOfMonth;
+
+        if (esHoy) {
+          REPORT_DATA[key].dia.servicios++;
+          REPORT_DATA[key].dia.facturado += precio;
+          REPORT_DATA[key].dia.comision += comision;
+          if (!clientasVistas.dia.has(clientaKey)) { clientasVistas.dia.add(clientaKey); REPORT_DATA[key].dia.clientas++; }
+        }
+        if (esSemana) {
+          REPORT_DATA[key].semana.servicios++;
+          REPORT_DATA[key].semana.facturado += precio;
+          REPORT_DATA[key].semana.comision += comision;
+          if (!clientasVistas.semana.has(clientaKey)) { clientasVistas.semana.add(clientaKey); REPORT_DATA[key].semana.clientas++; }
+        }
+        if (esMes) {
+          REPORT_DATA[key].mes.servicios++;
+          REPORT_DATA[key].mes.facturado += precio;
+          REPORT_DATA[key].mes.comision += comision;
+          if (!clientasVistas.mes.has(clientaKey)) { clientasVistas.mes.add(clientaKey); REPORT_DATA[key].mes.clientas++; }
+        }
+      });
+    } catch(e) {
+      console.error('Error cargando reporte:', e);
+    }
+  }
+
+    function switchPeriod(period, btn) {
     currentPeriod = period;
     document.querySelectorAll('.period-btn').forEach(b => { b.classList.remove('active-period'); b.style.background = 'transparent'; b.style.color = 'var(--ink-soft)'; });
     btn.classList.add('active-period');
     renderReport();
   }
 
-  function renderReport() {
-    const staffKey = document.getElementById('reportStaff').value;
+  async function renderReport() {
     const container = document.getElementById('reportContent');
-    
+    if (container) container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Cargando...</div>';
+    await loadReportData();
+    const staffKey = document.getElementById('reportStaff').value;
     if (staffKey === 'all') {
       renderTeamReport(container);
     } else {
