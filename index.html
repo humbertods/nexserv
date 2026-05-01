@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v53 - AUTO POLL AUTORIZACIONES STAFF (01/05/2026) -->
+<!-- NexServ v54 - CATALOGO DINAMICO DESDE SHEETS (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2043,92 +2043,53 @@
   let CLIENT_DIRECTORY_CACHE = [];
 
   // CATÁLOGO DE SERVICIOS (del Excel NexServ_Base)
-  const CATALOGO = {
-    cejas: [
-      { code: 'SC001', name: 'Depilación de cejas', price: 8 },
-      { code: 'SC002', name: 'Depilación + maquillaje', price: 12 },
-      { code: 'SC003', name: 'Depilación + pigmento', price: 17 },
-      { code: 'SC004', name: 'Depilación + Brow lamination', price: 25 },
-      { code: 'SC005', name: 'Dep. + Brow lamination + pigmento', price: 35 },
-      { code: 'SC006', name: 'Depilación cejas hombres', price: 9 },
-      { code: 'SC007', name: 'Depilación + pigmento hombres', price: 18 },
-      { code: 'SC008', name: 'Maquillaje de cejas', price: 5 },
-      { code: 'SC009', name: 'Solo pigmento', price: 10 },
-      { code: 'SC010', name: 'Cejas efecto polvo permanentes', price: 120 },
-      { code: 'SC011', name: 'Retoque cejas efecto polvo', price: 80 },
-    ],
-    depilacion: [
-      { code: 'SD001', name: 'Bigote', price: 4 },
-      { code: 'SD002', name: 'Patillas', price: 7 },
-      { code: 'SD003', name: 'Pómulos', price: 5 },
-      { code: 'SD004', name: 'Barbilla', price: 5 },
-      { code: 'SD005', name: 'Frente', price: 5 },
-      { code: 'SD006', name: 'Cuello', price: 7 },
-      { code: 'SD007', name: 'Rostro completo', price: 22 },
-      { code: 'SD008', name: 'Línea de bikini', price: 15 },
-      { code: 'SD009', name: 'Bikini completo', price: 30 },
-      { code: 'SD010', name: 'Media pierna', price: 15 },
-      { code: 'SD011', name: 'Piernas completas', price: 30 },
-      { code: 'SD012', name: 'Axilas', price: 9 },
-      { code: 'SD013', name: 'Brazos', price: 15 },
-      { code: 'SD014', name: 'Glúteos', price: 20 },
-      { code: 'SD015', name: 'Nuca', price: 7 },
-      { code: 'SD016', name: 'Manos', price: 5 },
-      { code: 'SD017', name: 'Pies', price: 5 },
-    ],
-    pestanas: [
-      { code: 'SP001', name: 'Pelo a pelo clásicas', price: 50 },
-      { code: 'SP002', name: 'Retoque clásicas', price: 30 },
-      { code: 'SP003', name: 'Tupidas', price: 60 },
-      { code: 'SP004', name: 'Retoque tupidas', price: 35 },
-      { code: 'SP005', name: 'Volumen brasilero', price: 60 },
-      { code: 'SP006', name: 'Retoque vol. brasilero', price: 35 },
-      { code: 'SP007', name: 'Efecto híbridas', price: 60 },
-      { code: 'SP008', name: 'Retoque híbridas', price: 35 },
-      { code: 'SP009', name: 'Efecto seda', price: 60 },
-      { code: 'SP010', name: 'Retoque seda', price: 35 },
-      { code: 'SP011', name: 'Efecto Aura', price: 60 },
-      { code: 'SP012', name: 'Retoque Aura', price: 35 },
-      { code: 'SP013', name: 'Volumen ligero', price: 70 },
-      { code: 'SP014', name: 'Retoque vol. ligero', price: 40 },
-      { code: 'SP015', name: 'Volumen ligero wispy', price: 70 },
-      { code: 'SP016', name: 'Retoque vol. ligero wispy', price: 40 },
-      { code: 'SP017', name: 'Volumen ruso', price: 70 },
-      { code: 'SP018', name: 'Retoque vol. ruso', price: 45 },
-      { code: 'SP019', name: 'Mega volumen ruso Kylie', price: 85 },
-      { code: 'SP020', name: 'Retoque mega vol. ruso Kylie', price: 55 },
-      { code: 'SP021', name: 'Volumen egipcio', price: 70 },
-      { code: 'SP022', name: 'Retoque vol. egipcio', price: 40 },
-      { code: 'SP023', name: 'Volumen tecnológico', price: 60 },
-      { code: 'SP024', name: 'Retoque vol. tecnológico', price: 35 },
-      { code: 'SP025', name: 'Retiro de pestañas', price: 10 },
-      { code: 'SP026', name: 'Lifting de pestañas', price: 30 },
-      { code: 'SP027', name: 'Volumen hawaiano', price: 60 },
-      { code: 'SP028', name: 'Retoque vol. hawaiano', price: 35 },
-      { code: 'SP029', name: 'Mega volumen ruso', price: 85 },
-      { code: 'SP030', name: 'Retoque mega vol. ruso', price: 55 },
-      { code: 'SP031', name: 'Retiro de lifting', price: 10 },
-    ],
-    facial: [
-      { code: 'SF001', name: 'Limpieza profunda', price: 60 },
-      { code: 'SF002', name: 'Limpieza express', price: 30 },
-      { code: 'SF003', name: 'Limpieza express + dermaplaning', price: 45 },
-      { code: 'SF004', name: 'Limpieza profunda + dermaplaning', price: 75 },
-      { code: 'SF005', name: 'Limpieza profunda espalda', price: 45 },
-      { code: 'SF006', name: 'Limpieza para adolescentes', price: 55 },
-      { code: 'SF007', name: 'Limpieza prof. + dermaplaning completo', price: 80 },
-      { code: 'SF008', name: 'Limpieza prof. + hidratación', price: 67 },
-      { code: 'SF009', name: 'Masaje yoga facial', price: 30 },
-      { code: 'SF010', name: 'Limpieza profunda + vino', price: 70 },
-      { code: 'SF011', name: 'Limpieza prof. + oxigenación', price: 80 },
-      { code: 'SF012', name: 'Limpieza prof. + hidratación profunda', price: 70 },
-      { code: 'SF013', name: 'Limpieza profunda + jet peel', price: 65 },
-      { code: 'SF014', name: 'Limpieza profunda + antiedad', price: 65 },
-      { code: 'SF015', name: 'Glow skin', price: 40 },
-    ],
+  // CATALOGO se carga dinamicamente desde Google Sheets
+  // Mapa de area: nombre en Sheets -> clave JS
+  const AREA_MAP_CATALOGO = {
+    'Cejas': 'cejas',
+    'Depilacion': 'depilacion',
+    'Depilación': 'depilacion',
+    'Pestanas': 'pestanas',
+    'Pestañas': 'pestanas',
+    'Retiro lifting': 'retiro_lifting',
+    'Retiro Lifting': 'retiro_lifting',
+    'Facial': 'facial',
   };
 
-  function initPromoSelects() {
+  let CATALOGO = { cejas: [], depilacion: [], pestanas: [], retiro_lifting: [], facial: [] };
+  let CATALOGO_LOADED = false;
+
+  async function ensureCatalogoLoaded() {
+    if (CATALOGO_LOADED) return;
+    try {
+      const result = await apiGet('getCatalogo');
+      if (result.success && result.servicios) {
+        // Resetear
+        CATALOGO = { cejas: [], depilacion: [], pestanas: [], retiro_lifting: [], facial: [] };
+        for (const s of result.servicios) {
+          // Solo servicios activos (columna E = "Si" o "Sí" o true)
+          const activo = String(s.activo || '').toLowerCase();
+          if (activo === 'no') continue;
+          const areaKey = AREA_MAP_CATALOGO[String(s.area || '').trim()] || null;
+          if (!areaKey) continue;
+          const precio = Number(String(s.precio || '0').replace(/[$,]/g, '')) || 0;
+          CATALOGO[areaKey].push({
+            code: String(s.codigo || ''),
+            name: String(s.servicio || ''),
+            price: precio
+          });
+        }
+        CATALOGO_LOADED = true;
+        console.log('Catalogo cargado:', Object.keys(CATALOGO).map(k => k + ':' + CATALOGO[k].length));
+      }
+    } catch (err) {
+      console.error('Error cargando catalogo:', err);
+    }
+  }
+
+
+  async function initPromoSelects() {
+    await ensureCatalogoLoaded();
     const areas = ['cejas', 'depilacion', 'pestanas', 'facial'];
     const ids = ['promoCejas', 'promoPestanas', 'promoFacial'];
     const depIds = ['promoDepilacion1', 'promoDepilacion2', 'promoDepilacion3'];
@@ -2854,6 +2815,7 @@
       }
     }
     
+    ensureCatalogoLoaded(); // Pre-cargar catalogo en background
     show(user.screen);
   }
 
@@ -4982,6 +4944,7 @@
   
   // Cargar servicios del área seleccionada
   async function loadServicesForArea() {
+    await ensureCatalogoLoaded();
     const area = document.getElementById('arrArea')?.value;
     const selectMain = document.getElementById('arrService'); // Servicio tentativo
     const selectExpanded = document.getElementById('arrServiceSelect'); // Expandible
@@ -6772,7 +6735,8 @@
     document.getElementById('addServiceModal').classList.add('active');
   }
 
-  function loadAddServiceCatalog() {
+  async function loadAddServiceCatalog() {
+    await ensureCatalogoLoaded();
     const area = document.getElementById('addSvcArea').value;
     const sel = document.getElementById('addSvcService');
     sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
@@ -6978,6 +6942,7 @@
   }
 
   async function renderAssignDirect() {
+    await ensureCatalogoLoaded();
     // Obtener datos de la clienta seleccionada
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const area = document.getElementById('arrArea')?.value || 'Cejas';
