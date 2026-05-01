@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v59 - HISTORIAL POR STAFF EXPANDIBLE (01/05/2026) -->
+<!-- NexServ v59b - FIX HISTORIAL CAMPOS STAFF (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2620,8 +2620,8 @@
                 <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${s.servicios.length} servicio${s.servicios.length !== 1 ? 's' : ''} hoy</div>
               </div>
               <div style="text-align: right; margin-right: 8px;">
-                <div style="font-size: 18px; font-weight: 800; color: var(--ink);">$${s.totalFacturado}</div>
-                <div style="font-size: 11px; color: var(--success);">+$${s.totalComision.toFixed(1)} com.</div>
+                <div style="font-size: 18px; font-weight: 800; color: var(--ink);">$${Number(s.totalFacturado || 0)}</div>
+                <div style="font-size: 11px; color: var(--success);">+$${Number(s.totalComision || 0).toFixed(1)} com.</div>
               </div>
               <div id="arrow-${idx}" style="color: var(--ink-faint); font-size: 12px; transition: transform 0.2s;">▼</div>
             </div>
@@ -2632,12 +2632,12 @@
                     <div style="font-size: 13px; font-weight: 600;">${sv.cliente}</div>
                     <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${sv.servicio} · ${sv.hora}</div>
                   </div>
-                  <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${sv.precio}</div>
+                  <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Number(sv.precio || 0)}</div>
                 </div>
               `).join('')}
               <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid var(--line); margin-top: 2px;">
                 <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">TOTAL</div>
-                <div style="font-size: 16px; font-weight: 800;">$${s.totalFacturado}</div>
+                <div style="font-size: 16px; font-weight: 800;">$${Number(s.totalFacturado || 0)}</div>
               </div>
             </div>
           </div>
