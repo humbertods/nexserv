@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v55 - FIX POLL + AREA CRUZADA (01/05/2026) -->
+<!-- NexServ v56 - FIX AUTH STALE (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3603,10 +3603,14 @@
       if (!authResult.success || !authResult.autorizaciones) return;
 
       const staffName = user.name || '';
+      // Filtrar: misma clienta + mismo staff + no rechazadas + de hoy
+      const hoy = new Date().toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
       const myAuths = authResult.autorizaciones.filter(a =>
         a.clienteCodigo === clientCode &&
         a.staffNombre === staffName &&
-        a.estado !== 'rechazado'
+        a.estado !== 'rechazado' &&
+        a.estado !== 'completada' &&
+        (!a.fecha || a.fecha === hoy)
       );
 
       if (!slotServices[slotNum]) slotServices[slotNum] = [];
