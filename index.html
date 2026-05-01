@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v57b - FIX CODIGO ANTERIOR COMPARACION (01/05/2026) -->
+<!-- NexServ v58 - FIX HISTORIAL OWNER CAMPOS (01/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2616,15 +2616,14 @@
             <div class="history-row">
               <div class="history-info">
                 <div class="history-top">
-                  <span class="history-time">${h.horaToma || '—'}</span>
+                  <span class="history-time">${h.hora || '—'}</span>
                   <span class="history-client">${h.nombre}</span>
-                  ${h.esTop ? '<span class="top-star">⭐</span>' : ''}
                 </div>
                 <div class="history-service">${h.servicio}</div>
-                <div class="history-meta">por ${h.responsable} · ${h.codigo}</div>
+                <div class="history-meta">por ${h.chica || '—'} · ${h.codigo}</div>
               </div>
               <div class="history-amount">
-                <div class="history-value">$${h.total || 0}</div>
+                <div class="history-value">$${h.precio || 0}</div>
                 <div class="history-comm">+$${h.comision || 0}</div>
               </div>
             </div>
