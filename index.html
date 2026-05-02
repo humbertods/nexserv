@@ -3892,35 +3892,52 @@
 
   async function syncAuthorizationStates(slot) {
     const svcs = slotServices[slot] || [];
-    const pendingServices = svcs.filter(s => s.status === 'pendiente' && s.authId);
+    const pendingServices = svcs.filter(s => s.status === 'pendiente');
     
-    if (pendingServices.length === 0) return; // No hay pendientes
-    
-    console.log('🔄 Sincronizando estados de autorización...', pendingServices);
-    
+    if (pendingServices.length === 0) return;
+
     try {
       const result = await apiGet('getAutorizaciones');
-      
+
       if (result.success && result.autorizaciones) {
-        // Actualizar estados basados en el backend
+        const user = window.currentUser;
+        const staffName = user ? user.name : '';
+        const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+
         for (const svc of pendingServices) {
-          const authInBackend = result.autorizaciones.find(a => a.id === svc.authId);
-          
+          // Buscar por authId primero, luego por nombre+staff+cliente
+          let authInBackend = svc.authId
+            ? result.autorizaciones.find(a => a.id === svc.authId)
+            : null;
+
+          if (!authInBackend) {
+            authInBackend = result.autorizaciones.find(a =>
+              a.servicioNombre === svc.name &&
+              a.staffNombre === staffName &&
+              a.clienteCodigo === clientCode &&
+              (a.estado === 'aprobado' || a.estado === 'rechazado')
+            );
+          }
+
           if (authInBackend) {
-            console.log(`📋 Autorización ${svc.authId}:`, authInBackend.estado);
-            
+            if (!svc.authId) svc.authId = authInBackend.id;
             if (authInBackend.estado === 'aprobado') {
               svc.status = 'aprobado';
-              console.log('✅ Servicio aprobado:', svc.name);
             } else if (authInBackend.estado === 'rechazado') {
               svc.status = 'rechazado';
-              console.log('❌ Servicio rechazado:', svc.name);
             }
           }
         }
-        
-        // Actualizar UI
+
+        // Recalcular total y re-renderizar
+        const totalRecalc = svcs.reduce((sum, s) => {
+          if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
         renderServicesForSlot(slot);
+        document.getElementById('as' + slot + 'Total').textContent = '$' + totalRecalc;
+        document.getElementById('as' + slot + 'SvcCount').textContent =
+          svcs.filter(s => s.status !== 'rechazado').length;
       }
     } catch (err) {
       console.error('Error sincronizando autorizaciones:', err);
