@@ -3436,22 +3436,36 @@
       const areaDisplayMap = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
       const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
       
+      
       try {
-        // Obtener servicios aprobados de las areas extras para pasar al siguiente staff
-        const svcsExtras = (slotServices[slot] || []).filter(function(s) {
-          return s.status === 'aprobado' && s.area && s.area !== (user && user.area ? user.area : '');
+        const myArea = user && user.area ? user.area : '';
+        const allSvcs = slotServices[slot] || [];
+        // Servicios completados (no rechazados ni pendientes)
+        const svcsRealizados = allSvcs.filter(function(s) {
+          return s.status !== 'rechazado' && s.status !== 'pendiente';
+        });
+        // Servicios de la siguiente area (aprobados, area diferente)
+        const svcsExtras = allSvcs.filter(function(s) {
+          return s.status === 'aprobado' && s.area && s.area.toLowerCase() !== myArea.toLowerCase();
         });
         const servicioSiguiente = svcsExtras.map(function(s){ return s.name; }).join(' + ') || areasLabel;
         const totalSiguiente = svcsExtras.reduce(function(sum,s){ return sum + Number(s.price||0); }, 0);
+        const totalRealizadoLaura = svcsRealizados.filter(function(s){ return !svcsExtras.includes(s); }).reduce(function(s,v){ return s+Number(v.price||0); }, 0);
+
+        // Historial acumulado: muestra realizados + pendientes para la siguiente staff
+        const histRealizados = svcsRealizados.filter(function(s){ return !svcsExtras.includes(s); }).map(function(s){ return s.name + ' $' + s.price; }).join(' + ');
+        const servicioHistorial = (histRealizados ? '[✅' + (user && user.name ? user.name : '') + ': ' + histRealizados + '] | ' : '') + servicioSiguiente;
 
         const result = await apiPost('finalizarAtencion', {
-          chicaNombre: user?.name || '',
+          chicaNombre: user && user.name ? user.name : '',
           clienteNombre: displayName,
-          servicio: servicioSiguiente || areasLabel,
+          clienteCodigo: window._as1Client || '',
+          servicio: servicioHistorial || servicioSiguiente,
+          servicioSiguiente: servicioSiguiente,
           total: String(totalSiguiente || 0),
           promoNombre: '',
           precioRegular: String(totalSiguiente || 0),
-          areaCompletada: user?.area || '',
+          areaCompletada: myArea,
           areasFaltantes: areasLabel,
           nuevaArea: areasExtras[0]
         });
