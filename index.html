@@ -6802,17 +6802,18 @@
 
   async function loadReportData() {
     const now = new Date();
-    const hoy = now.toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
-    
-    // Obtener inicio de semana (lunes) y mes
-    const dayOfWeek = (now.getDay() + 6) % 7; // 0=lun
+    // Formato dd/MM/yyyy consistente con el backend
+    const pad = n => String(n).padStart(2,'0');
+    const hoy = pad(now.getDate()) + '/' + pad(now.getMonth()+1) + '/' + now.getFullYear();
+
+    // Inicio de semana (lunes) y mes
+    const dayOfWeek = (now.getDay() + 6) % 7;
     const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - dayOfWeek); startOfWeek.setHours(0,0,0,0);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     REPORT_DATA = buildEmptyReportData();
 
     try {
-      // Cargar historial completo
       const result = await apiGet('getHistorial', { periodo: 'todo' });
       if (!result.success || !result.historial) return;
 
@@ -6829,6 +6830,7 @@
         const parts = String(h.fecha || '').split('/');
         if (parts.length !== 3) return;
         const fechaDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        if (isNaN(fechaDate.getTime())) return;
         const precio = Number(h.precio || 0);
         const comision = Number(h.comision || 0);
         const clientaKey = key + '_' + (h.codigo || h.nombre);
