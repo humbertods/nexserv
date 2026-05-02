@@ -6814,49 +6814,46 @@
     REPORT_DATA = buildEmptyReportData();
 
     try {
-      const result = await apiGet('getHistorial', { periodo: 'todo' });
-      if (!result.success || !result.historial) return;
+      // Cargar datos de la semana desde hoja Comisiones (acumulados semanales)
+      const comResult = await apiGet('getComisiones');
+      if (comResult.success && comResult.comisiones) {
+        comResult.comisiones.forEach(function(c) {
+          const chica = String(c.chica || '').trim();
+          const meta = STAFF_META[chica];
+          if (!meta) return;
+          const key = meta.key;
+          if (!REPORT_DATA[key]) return;
+          REPORT_DATA[key].semana.servicios = Number(c.servicios || 0);
+          REPORT_DATA[key].semana.facturado = Number(c.facturado || 0);
+          REPORT_DATA[key].semana.comision = Number(c.comision || 0);
+          REPORT_DATA[key].semana.clientas = Number(c.servicios || 0); // aprox
+          // Mes = semana por ahora (hasta tener historial completo)
+          REPORT_DATA[key].mes.servicios = Number(c.servicios || 0);
+          REPORT_DATA[key].mes.facturado = Number(c.facturado || 0);
+          REPORT_DATA[key].mes.comision = Number(c.comision || 0);
+          REPORT_DATA[key].mes.clientas = Number(c.servicios || 0);
+        });
+      }
 
-      const clientasVistas = { dia: new Set(), semana: new Set(), mes: new Set() };
-
-      result.historial.forEach(h => {
-        const chica = String(h.chica || '').trim();
-        const meta = STAFF_META[chica];
-        if (!meta) return;
-        const key = meta.key;
-        if (!REPORT_DATA[key]) return;
-
-        // Parsear fecha dd/MM/yyyy
-        const parts = String(h.fecha || '').split('/');
-        if (parts.length !== 3) return;
-        const fechaDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-        if (isNaN(fechaDate.getTime())) return;
-        const precio = Number(h.precio || 0);
-        const comision = Number(h.comision || 0);
-        const clientaKey = key + '_' + (h.codigo || h.nombre);
-        const esHoy = h.fecha === hoy;
-        const esSemana = fechaDate >= startOfWeek;
-        const esMes = fechaDate >= startOfMonth;
-
-        if (esHoy) {
+      // Cargar datos de HOY desde serviciosHoy de cada staff
+      const histResult = await apiGet('getHistorial', { periodo: 'hoy' });
+      if (histResult.success && histResult.historial) {
+        const clientasHoy = new Set();
+        histResult.historial.forEach(function(h) {
+          const chica = String(h.chica || '').trim();
+          const meta = STAFF_META[chica];
+          if (!meta) return;
+          const key = meta.key;
+          if (!REPORT_DATA[key]) return;
+          const precio = Number(h.precio || 0);
+          const comision = Number(h.comision || 0);
+          const clientaKey = key + '_' + (h.codigo || h.nombre);
           REPORT_DATA[key].dia.servicios++;
           REPORT_DATA[key].dia.facturado += precio;
           REPORT_DATA[key].dia.comision += comision;
-          if (!clientasVistas.dia.has(clientaKey)) { clientasVistas.dia.add(clientaKey); REPORT_DATA[key].dia.clientas++; }
-        }
-        if (esSemana) {
-          REPORT_DATA[key].semana.servicios++;
-          REPORT_DATA[key].semana.facturado += precio;
-          REPORT_DATA[key].semana.comision += comision;
-          if (!clientasVistas.semana.has(clientaKey)) { clientasVistas.semana.add(clientaKey); REPORT_DATA[key].semana.clientas++; }
-        }
-        if (esMes) {
-          REPORT_DATA[key].mes.servicios++;
-          REPORT_DATA[key].mes.facturado += precio;
-          REPORT_DATA[key].mes.comision += comision;
-          if (!clientasVistas.mes.has(clientaKey)) { clientasVistas.mes.add(clientaKey); REPORT_DATA[key].mes.clientas++; }
-        }
-      });
+          if (!clientasHoy.has(clientaKey)) { clientasHoy.add(clientaKey); REPORT_DATA[key].dia.clientas++; }
+        });
+      }
     } catch(e) {
       console.error('Error cargando reporte:', e);
     }
