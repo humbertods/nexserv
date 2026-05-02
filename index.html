@@ -2699,10 +2699,8 @@
       document.getElementById('arrivalClientList').innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Escribí al menos 2 letras para buscar</div>';
       document.getElementById('arrivalClientList').style.display = 'block';
       document.getElementById('arrivalForm').style.display = 'none';
-      // Reset promo
-      window._arrPromo = null;
-      document.getElementById('arrPromoOff').style.display = 'block';
-      document.getElementById('arrPromoOn').style.display = 'none';
+      // Reset promo y secuencia
+      resetArrivalExtras();
       document.getElementById('arrService').value = '';
     }
   }
