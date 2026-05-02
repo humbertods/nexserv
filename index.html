@@ -3383,6 +3383,7 @@
       await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
+        clienteCodigo: window._as1Client || '',
         servicio: data.svcNames,
         total: data.total,
         promoNombre: data.promoNombre,
@@ -3601,6 +3602,7 @@
       const result = await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
+        clienteCodigo: window._as1Client || '',
         servicio: data.svcNames,
         total: data.total,
         promoNombre: data.promoNombre,
@@ -3659,6 +3661,7 @@
       const result = await apiPost('finalizarAtencion', {
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
+        clienteCodigo: window._as1Client || '',
         servicio: nombresRealizados,
         total: String(totalRealizado),
         promoNombre: '',         // Sin promo — se cobra precio normal de lo realizado
@@ -3965,6 +3968,7 @@
     await syncAuthorizationStates(1);
     
     const svcs = slotServices[1] || [];
+    const _clientCode1 = window._as1Client || '';
     
     console.log('🔍 finishSlot1:', {
       displayName,
