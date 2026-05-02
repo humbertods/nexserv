@@ -5941,19 +5941,20 @@
       }
     } catch (err) { console.error('Error comisiones:', err); }
 
-    // Cargar historial de cierres
+    // Cargar historial de cierres semanales desde CierresSemana
     let histData = PAY_HISTORY;
     try {
-      const result2 = await apiGet('getCierresPagos');
+      const result2 = await apiGet('getCierresSemana');
       if (result2.success && result2.cierres && result2.cierres.length > 0) {
         // Agrupar por semana
         const weeks = {};
         result2.cierres.forEach(c => {
-          if (!weeks[c.semana]) {
-            weeks[c.semana] = { week: c.semana, dates: c.periodo, closed: c.fechaCierre, total: 0, facturado: 0 };
+          const key = String(c.semana || '');
+          if (!weeks[key]) {
+            weeks[key] = { week: key, dates: (c.desde || '') + ' - ' + (c.hasta || ''), closed: c.fechaPago, total: 0, facturado: 0 };
           }
-          weeks[c.semana].total += Number(c.comision) || 0;
-          weeks[c.semana].facturado += Number(c.facturado) || 0;
+          weeks[key].total += Number(c.comision) || 0;
+          weeks[key].facturado += Number(c.facturado) || 0;
         });
         histData = Object.values(weeks).reverse();
       }
