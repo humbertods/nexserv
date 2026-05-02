@@ -3040,8 +3040,17 @@
           document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
           document.getElementById('as1Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
           document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
-          document.getElementById('obs1Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
-          // Usar secuencia de la fila de ListaEspera (más confiable que _takingSecuencia)
+          // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
+          const obsText = a.obsGeneral || a.observaciones || '';
+          document.getElementById('obs1Display').textContent = obsText || 'Sin observaciones';
+          // Destacar si hay servicios previos en las observaciones
+          if (obsText && obsText.includes('✅')) {
+            document.getElementById('obs1Display').style.color = 'var(--success-dark, #2a7a4b)';
+            document.getElementById('obs1Display').style.fontWeight = '600';
+          } else {
+            document.getElementById('obs1Display').style.color = '';
+            document.getElementById('obs1Display').style.fontWeight = '';
+          }
           renderSecuenciaBanner(1, a.secuencia && a.secuencia.length > 0 ? a.secuencia : (window._takingSecuencia || []));
           
           // Limpiar servicios previos
@@ -3967,8 +3976,13 @@
     // Verificar si hay servicios pendientes de autorización
     const hasPending = svcs.some(s => s.status === 'pendiente');
     if (hasPending) {
-      alert('⏳ No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.\n\nEsperá a que Mikaela apruebe o rechace los servicios adicionales.');
-      return;
+      // Intentar sync una vez más antes de bloquear
+      await syncAuthorizationStates(1);
+      const stillPending = (slotServices[1] || []).some(s => s.status === 'pendiente');
+      if (stillPending) {
+        alert('No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.\n\nEsperá a que Mikaela apruebe o rechace los servicios adicionales.');
+        return;
+      }
     }
     
     // Calcular total solo de servicios aprobados
