@@ -1426,20 +1426,6 @@
       </div>
     </div>
 
-    <!-- Modal Resumen Semana Staff -->
-    <div class="modal-bg" id="resumenSemanaModal">
-      <div class="modal" style="max-height: 90%; overflow-y: auto;">
-        <div class="modal-handle"></div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <div class="modal-title" style="margin-bottom: 0;">Comisiones acumuladas</div>
-          <button onclick="closeModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ink-faint);">✕</button>
-        </div>
-        <div id="resumenSemanaContent">
-          <div style="text-align: center; padding: 30px; color: var(--ink-faint);">Cargando...</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Modal agregar servicio -->
     <div class="modal-bg" id="addServiceModal">
       <div class="modal" style="max-height: 85%;">
@@ -7807,6 +7793,20 @@
     <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
   </div>
 </div>
+
+  <!-- Modal Resumen Semana Staff - global para acceder desde cualquier pantalla -->
+  <div class="modal-bg" id="resumenSemanaModal">
+    <div class="modal" style="max-height: 90%; overflow-y: auto;">
+      <div class="modal-handle"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div class="modal-title" style="margin-bottom: 0;">Comisiones acumuladas</div>
+        <button onclick="closeModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ink-faint);">✕</button>
+      </div>
+      <div id="resumenSemanaContent">
+        <div style="text-align: center; padding: 30px; color: var(--ink-faint);">Cargando...</div>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
