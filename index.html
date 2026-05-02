@@ -3427,20 +3427,23 @@
       const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
       
       try {
-        // Mandar a cobrar la parte del staff actual y dejar pendiente en lista de espera para las otras areas
+        // Obtener servicios aprobados de las areas extras para pasar al siguiente staff
+        const svcsExtras = (slotServices[slot] || []).filter(function(s) {
+          return s.status === 'aprobado' && s.area && s.area !== (user && user.area ? user.area : '');
+        });
+        const servicioSiguiente = svcsExtras.map(function(s){ return s.name; }).join(' + ') || areasLabel;
+        const totalSiguiente = svcsExtras.reduce(function(sum,s){ return sum + Number(s.price||0); }, 0);
+
         const result = await apiPost('finalizarAtencion', {
           chicaNombre: user?.name || '',
           clienteNombre: displayName,
-          servicio: data.svcNames,
-          total: data.total,
+          servicio: servicioSiguiente || areasLabel,
+          total: String(totalSiguiente || 0),
           promoNombre: '',
-          precioRegular: data.total,
+          precioRegular: String(totalSiguiente || 0),
           areaCompletada: user?.area || '',
-          montoChica: data.total,
           areasFaltantes: areasLabel,
-          nuevaArea: areasExtras[0],
-          montoSiguienteArea: '0',
-          servicioActualizado: data.svcNames
+          nuevaArea: areasExtras[0]
         });
         
         if (result.success) {
