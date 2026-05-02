@@ -1202,6 +1202,7 @@
       <div style="display: flex; align-items: center; gap: 14px;">
         <div id="commValue" style="font-size: 44px; font-weight: 800; letter-spacing: -0.04em; line-height: 1;">****</div>
         <button onclick="toggleComm()" id="commToggle" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; width: 42px; height: 42px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .2s;">👁‍🗨</button>
+        <button onclick="openResumenSemana()" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: white; padding: 8px 14px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0;">📊 Semana</button>
       </div>
       <div id="commDetail" style="font-size: 12px; opacity: 0.6; margin-top: 6px; font-weight: 500;">Toca el ojo para ver tu comisión</div>
     </div>
@@ -1422,6 +1423,20 @@
         </div>
         <button class="btn-primary" onclick="closeModal(); alert('✓ Servicio actualizado')">Guardar cambio</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal Resumen Semana Staff -->
+    <div class="modal-bg" id="resumenSemanaModal">
+      <div class="modal" style="max-height: 90%; overflow-y: auto;">
+        <div class="modal-handle"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div class="modal-title" style="margin-bottom: 0;">Comisiones acumuladas</div>
+          <button onclick="closeModal()" style="background: none; border: none; font-size: 22px; cursor: pointer; color: var(--ink-faint);">✕</button>
+        </div>
+        <div id="resumenSemanaContent">
+          <div style="text-align: center; padding: 30px; color: var(--ink-faint);">Cargando...</div>
+        </div>
       </div>
     </div>
 
@@ -4676,6 +4691,61 @@
     if (btn) btn.style.display = 'inline-block';
     const empty = document.getElementById('secuenciaEmpty');
     if (empty) empty.style.display = 'block';
+  }
+
+  async function openResumenSemana() {
+    document.getElementById('resumenSemanaModal').classList.add('active');
+    const container = document.getElementById('resumenSemanaContent');
+    container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Cargando...</div>';
+    const user = window.currentUser;
+    if (!user) return;
+    try {
+      const result = await apiGet('getServiciosSemana', { chica: user.name });
+      if (!result.success || !result.dias || result.dias.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Sin servicios esta semana</div>';
+        return;
+      }
+      const totalSemana = result.dias.reduce(function(s, d) { return s + d.total; }, 0);
+      container.innerHTML =
+        '<div style="background:var(--chip);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Total semana</div>' +
+          '<div style="font-size:22px;font-weight:800;color:var(--success);">$' + totalSemana.toFixed(2) + '</div>' +
+        '</div>' +
+        result.dias.map(function(dia, idx) {
+          return '<div style="margin-bottom:8px;">' +
+            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+              '<div style="font-size:15px;font-weight:700;">' + dia.dia + '</div>' +
+              '<div style="display:flex;align-items:center;gap:10px;">' +
+                '<div style="font-size:17px;font-weight:800;color:var(--success);">$' + dia.total.toFixed(1) + '</div>' +
+                '<div id="arrow-sem-' + idx + '" style="color:var(--ink-faint);font-size:12px;transition:transform 0.2s;">▼</div>' +
+              '</div>' +
+            '</div>' +
+            '<div id="dia-detail-' + idx + '" style="display:none;background:var(--bg-card);border-radius:0 0 14px 14px;margin-top:-8px;padding:8px 16px 14px;border-top:1px solid var(--line);">' +
+              dia.servicios.map(function(s, si) {
+                return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;' + (si < dia.servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                  '<div style="flex:1;">' +
+                    '<div style="font-size:13px;font-weight:700;">' + s.cliente + '</div>' +
+                    '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + s.hora + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
+                    '<div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">' + s.servicio + '</div>' +
+                  '</div>' +
+                  '<div style="font-size:15px;font-weight:800;color:var(--success);margin-left:12px;">$' + Number(s.comision || 0).toFixed(2) + '</div>' +
+                '</div>';
+              }).join('') +
+            '</div>' +
+          '</div>';
+        }).join('');
+    } catch (err) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
+    }
+  }
+
+  function toggleDiaSemana(idx) {
+    const detail = document.getElementById('dia-detail-' + idx);
+    const arrow = document.getElementById('arrow-sem-' + idx);
+    if (!detail) return;
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
   }
 
   async function toggleArrivalPromo(show) {
