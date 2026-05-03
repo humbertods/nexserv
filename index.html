@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v91c - FIX COBRAR: data-attributes seguros, sin JSON en onclick (03/05/2026) -->
+<!-- NexServ v91d - FIX servicio JSON en panel staff + cobrar data-attrs (03/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3099,14 +3099,23 @@
           // Si viene con servicio normal (NO promo), cargarlo
           // Si tiene promo, se cargara en el bloque siguiente con el precio correcto del area
           if (a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo) {
-            const price = a.total || 0;
+            // El servicio puede venir como JSON string {"nombre":"...","precio":17} o como texto plano
+            let servicioNombre = a.servicio;
+            let servicioPrecio = Number(a.total) || 0;
+            try {
+              if (String(a.servicio).trim().startsWith('{')) {
+                const svcObj = JSON.parse(a.servicio);
+                servicioNombre = svcObj.nombre || svcObj.name || a.servicio;
+                servicioPrecio = Number(svcObj.precio || svcObj.price || a.total) || 0;
+              }
+            } catch(e) {}
             slotServices[1].push({
-              name: a.servicio,
-              price: price,
+              name: servicioNombre,
+              price: servicioPrecio,
               area: a.area
             });
             renderServicesForSlot(1);
-            document.getElementById('as1Total').textContent = '$' + price;
+            document.getElementById('as1Total').textContent = '$' + servicioPrecio;
             document.getElementById('as1SvcCount').textContent = '1';
           }
           
