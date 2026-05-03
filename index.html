@@ -3363,12 +3363,35 @@
     
     // Actualizar total
     const total = slotServices[slot].reduce((sum, s) => {
-      // Solo sumar servicios aprobados o sin estado (originales)
       if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
       return sum + Number(s.price);
     }, 0);
     document.getElementById('as' + slot + 'Total').textContent = '$' + total;
     document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
+
+    // Sincronizar cambio de servicios con el backend (actualiza col F en ListaEspera)
+    syncServiciosBackend(slot, total);
+  }
+
+  async function syncServiciosBackend(slot, total) {
+    const user = window.currentUser;
+    if (!user) return;
+    const svcs = slotServices[slot] || [];
+    const activeNames = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente').map(s => s.name).join(' + ');
+    if (!activeNames) return;
+    const clientName = slot === 1
+      ? (document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '')
+      : (document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '');
+    const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+    try {
+      await apiPost('updateServiciosAtencion', {
+        chicaNombre: user.name,
+        clienteNombre: clientName,
+        clienteCodigo: clientCode || '',
+        servicios: activeNames,
+        total: String(total || 0)
+      });
+    } catch(e) { console.error('Error sync servicios:', e); }
   }
   
   // Opciones al finalizar servicio
@@ -3967,6 +3990,8 @@
         document.getElementById('as' + slot + 'Total').textContent = '$' + totalRecalc;
         document.getElementById('as' + slot + 'SvcCount').textContent =
           svcs.filter(s => s.status !== 'rechazado').length;
+        // Sincronizar cambio de estado con backend (actualiza col F en ListaEspera)
+        syncServiciosBackend(slot, totalRecalc);
       }
     } catch (err) {
       console.error('Error sincronizando autorizaciones:', err);
