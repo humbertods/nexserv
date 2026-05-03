@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v91b - FIX SW CACHÉ: service worker deshabilitado (03/05/2026) -->
+<!-- NexServ v91c - FIX COBRAR: data-attributes seguros, sin JSON en onclick (03/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -5217,7 +5217,16 @@
                   <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}</div>
                   <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${p.servicio} · atendida por ${p.tomadaPor}</div>
                 </div>
-                <button onclick="openCobrar('${p.idEspera}', '${p.nombre}', '${p.servicio}', '${p.tomadaPor}', '${p.total || '0'}', '${p.precioRegular || p.total || '0'}', '${p.promoNombre || ''}', ${p.serviciosDetalle ? JSON.stringify(JSON.stringify(p.serviciosDetalle)) : "''"} )" style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
+                <button onclick="cobrarDesdeBtn(this)" 
+                  data-id="${p.idEspera}"
+                  data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
+                  data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                  data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
+                  data-total="${p.total||'0'}"
+                  data-regular="${p.precioRegular||p.total||'0'}"
+                  data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
+                  data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
+                  style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
               </div>
             </div>
           `).join('');
@@ -5499,7 +5508,16 @@
                 <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}</div>
                 <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${p.servicio} · atendida por ${p.tomadaPor}</div>
               </div>
-              <button onclick="openCobrar('${p.idEspera}', '${p.nombre}', '${p.servicio}', '${p.tomadaPor}', '${p.total || '0'}', '${p.precioRegular || p.total || '0'}', '${p.promoNombre || ''}', ${p.serviciosDetalle ? JSON.stringify(JSON.stringify(p.serviciosDetalle)) : "''"} )" style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
+              <button onclick="cobrarDesdeBtn(this)"
+                  data-id="${p.idEspera}"
+                  data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
+                  data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                  data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
+                  data-total="${p.total||'0'}"
+                  data-regular="${p.precioRegular||p.total||'0'}"
+                  data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
+                  data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
+                  style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
             </div>
           </div>
         `).join('');
@@ -5510,6 +5528,21 @@
     } catch (err) {
       console.error('Error cargando por cobrar:', err);
     }
+  }
+
+  function cobrarDesdeBtn(btn) {
+    const idEspera = btn.dataset.id || '';
+    const nombre = btn.dataset.nombre || '';
+    const servicio = btn.dataset.servicio || '';
+    const chica = btn.dataset.chica || '';
+    const total = btn.dataset.total || '0';
+    const regular = btn.dataset.regular || total;
+    const promo = btn.dataset.promo || '';
+    let desglose = null;
+    try {
+      if (btn.dataset.desglose) desglose = JSON.parse(decodeURIComponent(btn.dataset.desglose));
+    } catch(e) {}
+    openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
   }
 
   function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON) {
