@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v91 - FIX CRÍTICO: idEspera en todos los finalizarAtencion (03/05/2026) -->
+<!-- NexServ v91b - FIX SW CACHÉ: service worker deshabilitado (03/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -8132,13 +8132,14 @@
   });
 
   // Registrar Service Worker para PWA
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('SW registrado:', reg.scope))
-        .catch(err => console.log('SW error:', err));
-    });
-  }
+  // Service Worker deshabilitado temporalmente para evitar conflictos de caché
+  // if ('serviceWorker' in navigator) {
+  //   window.addEventListener('load', () => {
+  //     navigator.serviceWorker.register('./sw.js')
+  //       .then(reg => console.log('SW registrado:', reg.scope))
+  //       .catch(err => console.log('SW error:', err));
+  //   });
+  // }
 </script>
 
 <!-- ============================================ -->
