@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v91d - FIX servicio JSON en panel staff + cobrar data-attrs (03/05/2026) -->
+<!-- NexServ v92 - MODAL AGREGAR SERVICIO: tabs Servicio/Promo + promo directa sin auth (03/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -1437,35 +1437,51 @@
 
     <!-- Modal agregar servicio -->
     <div class="modal-bg" id="addServiceModal">
-      <div class="modal" style="max-height: 85%;">
+      <div class="modal" style="max-height: 88%; overflow-y: auto;">
         <div class="modal-handle"></div>
-        <div class="modal-title">Agregar servicio</div>
-        <div class="input-group">
-          <label>Área</label>
-          <select id="addSvcArea" onchange="loadAddServiceCatalog()">
-            <option value="">Seleccionar área...</option>
-          </select>
+        <div class="modal-title" id="addSvcModalTitle">➕ Agregar servicio</div>
+
+        <!-- TABS -->
+        <div style="display: flex; gap: 6px; margin-bottom: 16px; background: var(--bg); border-radius: var(--radius-pill); padding: 4px;">
+          <button id="tabSvcBtn" onclick="switchAddSvcTab('servicio')" style="flex:1; padding: 10px; border-radius: var(--radius-pill); border: none; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: var(--ink); color: white; transition: all .15s;">🛍 Servicio</button>
+          <button id="tabPromoBtn" onclick="switchAddSvcTab('promo')" style="flex:1; padding: 10px; border-radius: var(--radius-pill); border: none; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); transition: all .15s;">🏷 Promo</button>
         </div>
-        <div class="input-group">
-          <label>Servicio</label>
-          <select id="addSvcService" onchange="updateAddServicePrice()">
-            <option value="">Primero seleccioná el área</option>
-          </select>
+
+        <!-- TAB: SERVICIO -->
+        <div id="tabSvcContent">
+          <div class="input-group">
+            <label>Área</label>
+            <select id="addSvcArea" onchange="loadAddServiceCatalog()">
+              <option value="">Seleccionar área...</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label>Servicio</label>
+            <select id="addSvcService" onchange="updateAddServicePrice()">
+              <option value="">Primero seleccioná el área</option>
+            </select>
+          </div>
+          <div id="addSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
+            <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
+            <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
+          </div>
+          <div id="addSvcNoteWrapper" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">⚠️ Requiere autorización de Mikaela</div>
+            <div style="font-size: 11px; color: #856404; margin-bottom: 10px;">Todo servicio adicional debe ser aprobado</div>
+            <label style="font-size: 12px; font-weight: 600; color: #856404; display: block; margin-bottom: 6px;">📝 Nota para Mikaela (obligatoria):</label>
+            <textarea id="addSvcNote" placeholder="Ej: La clienta quiere agregar diseño completo, está interesada hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 70px; resize: vertical; box-sizing: border-box;"></textarea>
+          </div>
+          <button class="btn-primary" onclick="confirmAddService()" id="addSvcConfirmBtn">Solicitar autorización</button>
         </div>
-        <div id="addSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
-          <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
-          <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
+
+        <!-- TAB: PROMO -->
+        <div id="tabPromoContent" style="display: none;">
+          <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 14px; text-align: center; line-height: 1.5;">
+            Si la clienta prefiere una promo en lugar del servicio asignado,<br>seleccionala acá. <strong>No requiere autorización.</strong>
+          </div>
+          <div id="addSvcPromoList"></div>
         </div>
-        
-        <!-- Campo de nota para autorización (obligatorio) -->
-        <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
-          <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">⚠️ Requiere autorización de Mikaela</div>
-          <div style="font-size: 11px; color: #856404; margin-bottom: 10px;">Todo servicio adicional debe ser aprobado para evitar atrasos en la agenda</div>
-          <label style="font-size: 12px; font-weight: 600; color: #856404; display: block; margin-bottom: 6px;">📝 Nota para Mikaela (obligatoria):</label>
-          <textarea id="addSvcNote" placeholder="Ej: La clienta tiene cejas despobladas, le recomendé diseño completo. Está interesada y quiere aprovechar hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 70px; resize: vertical; box-sizing: border-box;"></textarea>
-        </div>
-        
-        <button class="btn-primary" onclick="confirmAddService()">Solicitar autorización</button>
+
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -7670,8 +7686,104 @@
     document.getElementById('editServiceModal').classList.add('active');
   }
   
+  function switchAddSvcTab(tab) {
+    const isSvc = tab === 'servicio';
+    document.getElementById('tabSvcContent').style.display = isSvc ? 'block' : 'none';
+    document.getElementById('tabPromoContent').style.display = isSvc ? 'none' : 'block';
+    const btnSvc = document.getElementById('tabSvcBtn');
+    const btnPro = document.getElementById('tabPromoBtn');
+    btnSvc.style.background = isSvc ? 'var(--ink)' : 'transparent';
+    btnSvc.style.color = isSvc ? 'white' : 'var(--ink-soft)';
+    btnPro.style.background = !isSvc ? 'var(--accent)' : 'transparent';
+    btnPro.style.color = !isSvc ? 'white' : 'var(--ink-soft)';
+    if (!isSvc) renderAddSvcPromos();
+  }
+
+  function renderAddSvcPromos() {
+    const list = document.getElementById('addSvcPromoList');
+    if (!list) return;
+    const slot = window._addServiceSlot || 1;
+    const user = window.currentUser;
+    const activePromosList = PROMOS.filter(p => p.active);
+    if (activePromosList.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;padding:20px;">No hay promos activas</div>';
+      return;
+    }
+    list.innerHTML = activePromosList.map(promo => `
+      <div onclick="applyPromoFromAddSvc(${JSON.stringify(promo).replace(/'/g,'&#39;').replace(/"/g,'&quot;')})" 
+           style="background:var(--bg-card);border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;border:2px solid var(--line);transition:all .15s;"
+           onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:800;">${promo.name}</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${(promo.services||[]).join(' + ')}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:12px;">
+            <div style="font-size:18px;font-weight:800;color:var(--accent-deep);">$${promo.price}</div>
+            <div style="font-size:10px;color:var(--ink-faint);text-decoration:line-through;">$${promo.regular}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function applyPromoFromAddSvc(promoData) {
+    // El staff cambia el servicio por una promo — no requiere autorización de Mikaela
+    // pero sí notifica el cambio
+    const slot = window._addServiceSlot || 1;
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    
+    // Limpiar servicios anteriores del slot y aplicar la promo
+    slotServices[slot] = [];
+    const myArea = user?.area || 'cejas';
+    const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+    const myDiv = promoData.division ? promoData.division.find(d => {
+      const areaLower = (d.area||'').toLowerCase();
+      return areaLower.includes(myArea) || areaLower.includes(areaLabels[myArea]?.toLowerCase());
+    }) : null;
+    const myPrice = myDiv ? myDiv.monto : promoData.price;
+
+    slotServices[slot].push({
+      name: promoData.name,
+      area: myArea,
+      price: myPrice,
+      status: undefined
+    });
+
+    // Registrar promo activa
+    const clientKey = normalizeClientKey(clientName);
+    activePromos[clientKey] = {
+      promo: promoData,
+      startedBy: myArea,
+      completedAreas: [],
+      _metadata: { displayName: clientName }
+    };
+
+    renderServicesForSlot(slot);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
+    document.getElementById('as' + slot + 'SvcCount').textContent = '1';
+
+    // Sincronizar con backend
+    syncServiciosBackend(slot, myPrice);
+
+    closeModal();
+    showNotif('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
+  }
+
   function openAddService(slot) {
     window._addServiceSlot = slot || 1;
+    window._modoEnganche = false;
+    // Resetear al tab Servicio y título
+    switchAddSvcTab('servicio');
+    const titleEl = document.getElementById('addSvcModalTitle');
+    if (titleEl) titleEl.textContent = '➕ Agregar servicio';
+    // Restaurar nota si fue ocultada
+    const noteWrapper = document.getElementById('addSvcNoteWrapper');
+    if (noteWrapper) noteWrapper.style.display = 'block';
+    const confirmBtn = document.getElementById('addSvcConfirmBtn');
+    if (confirmBtn) confirmBtn.textContent = 'Solicitar autorización';
+
     const user = window.currentUser;
     const areaSel = document.getElementById('addSvcArea');
     areaSel.innerHTML = '<option value="">Seleccionar área...</option>';
