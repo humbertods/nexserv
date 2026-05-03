@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v90 - PANEL MIKAELA EN VIVO: TIMELINE POR ÁREA + REFRESH INTELIGENTE (03/05/2026) -->
+<!-- NexServ v91 - FIX CRÍTICO: idEspera en todos los finalizarAtencion (03/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2822,6 +2822,7 @@
           // Primera atención activa
           const a1 = aten[0];
           window._as1Client = a1.codigo;
+          window._as1IdEspera = a1.idEspera || ''; // ID del ticket LE-XXXX
           const initials1 = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as1Avatar').textContent = initials1;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
@@ -3054,6 +3055,7 @@
         const a = aten[slot];
         if (slot === 0) {
           window._as1Client = a.codigo;
+          window._as1IdEspera = a.idEspera || window._takingId || ''; // ID ticket LE-XXXX
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as1Avatar').textContent = initials;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
@@ -3491,6 +3493,7 @@
     
     try {
       await apiPost('finalizarAtencion', {
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
         clienteCodigo: window._as1Client || '',
@@ -3568,6 +3571,7 @@
         const servicioHistorial = (histRealizados ? '[✅' + (user && user.name ? user.name : '') + ': ' + histRealizados + '] | ' : '') + servicioSiguiente;
 
         const result = await apiPost('finalizarAtencion', {
+          idEspera: window._as1IdEspera || '',
           chicaNombre: user && user.name ? user.name : '',
           clienteNombre: displayName,
           clienteCodigo: window._as1Client || '',
@@ -3668,6 +3672,7 @@
     try {
       // Llamar al backend para devolver a lista de espera
       const result = await apiPost('continuarPromoALista', {
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: displayName,
         servicio: data.svcNames,
@@ -3725,6 +3730,7 @@
       const promasExtraRestantes = data.promasExtraPendientes.slice(1);
 
       const result = await apiPost('finalizarAtencion', {
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
         clienteCodigo: window._as1Client || '',
@@ -3736,7 +3742,7 @@
         siguientePromoPrecio: siguientePromo.precio,
         siguientePromoRegular: siguientePromo.regular,
         siguientePromoArea: siguientePromo._area || 'cejas',
-        promasExtraRestantes: promasExtraRestantes  // Las que quedan despues de esta
+        promasExtraRestantes: promasExtraRestantes
       });
 
       if (result.success) {
@@ -3784,14 +3790,15 @@
     try {
       // Finalizar la atención con el total parcial y marcar como "Por cobrar"
       const result = await apiPost('finalizarAtencion', {
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
         clienteCodigo: window._as1Client || '',
         servicio: nombresRealizados,
         total: String(totalRealizado),
-        promoNombre: '',         // Sin promo — se cobra precio normal de lo realizado
+        promoNombre: '',
         precioRegular: String(totalRealizado),
-        esRetiro: true           // Flag para que el backend cancele servicios pendientes
+        esRetiro: true
       });
 
       if (result.success) {
@@ -4270,6 +4277,7 @@
     
     try {
       await apiPost('finalizarAtencion', {
+        idEspera: window._as2IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: clientName,
         servicio: svcNames,
