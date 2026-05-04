@@ -1,8 +1,20 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script>
+// Matar cualquier Service Worker y cache registrado
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+}
+if ('caches' in window) {
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
+</script>
 <meta charset="UTF-8">
-<!-- NexServ v94u - FIX: idEspera→ticketId en openCobrar para evitar duplicado (04/05/2026) -->
+<!-- NexServ v94w - FIX lifting: cejas/pestañas pueden hacer retiro/lifting en promos (04/05/2026) -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2240,7 +2252,7 @@
 
   const AREA_LABELS = { cejas: '💅 Cejas', depilacion: '🪒 Depilación', pestanas: '👁 Pestañas', facial: '✨ Facial' };
   const AREA_COMM = { cejas: '30%', depilacion: '30%', pestanas: '30%', facial: '40%' };
-  const AREA_STAFF = { cejas: 'María / Keyla / Lesly', depilacion: 'María / Keyla / Lesly', pestanas: 'Yadira / Diana', facial: 'Laura' };
+  const AREA_STAFF = { cejas: 'María / Keyla / Lesly / Rosa', depilacion: 'María / Keyla / Lesly / Rosa', pestanas: 'Yadira / Diana', retiro_lifting: 'María / Keyla / Lesly / Rosa / Yadira / Diana', facial: 'Laura' };
 
   function updatePromoTotal() {
     const selected = getSelectedServices();
@@ -3410,7 +3422,11 @@
               // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
               const myArea = user?.area || 'cejas';
               const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-              const myDiv = promoFull.division ? promoFull.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
+              const myDiv = promoFull.division ? promoFull.division.find(d =>
+                d.area === areaLabel || d.area.includes('Depilación') ||
+                (myArea === 'cejas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro'))) ||
+                (myArea === 'pestanas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro') || d.area.toLowerCase().includes('pestañ')))
+              ) : null;
               const myPrice = myDiv ? myDiv.monto : promoFull.price;
               
               slotServices[1].push({
@@ -4679,7 +4695,9 @@
               const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : myArea === 'facial' ? '✨ Facial' : myArea;
               const myDiv = promoFull.division ? promoFull.division.find(d =>
                 d.area === areaLabel || d.area.toLowerCase().includes(myArea) ||
-                (myArea === 'cejas' && d.area.toLowerCase().includes('depil'))
+                (myArea === 'cejas' && d.area.toLowerCase().includes('depil')) ||
+                (myArea === 'cejas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro'))) ||
+                (myArea === 'pestanas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro') || d.area.toLowerCase().includes('pestañ') || d.area.toLowerCase().includes('pestaña')))
               ) : null;
               const myPrice = myDiv ? myDiv.monto : (a1.precioPromo || a1.total || 0);
 
