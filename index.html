@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94k - STOCK: sin nav propio, sin CSS fixed, solo topbar volver (04/05/2026) -->
+<!-- NexServ v94l - STOCK: overlay fullscreen z-index:500, no interfiere con nav (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2864,7 +2864,7 @@
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
-    if (id === 'mkStockScreen') { renderMkStock(); }
+    if (id === 'mkStockScreen') { openMkStock(); return; } // stock es overlay, no screen normal
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
@@ -5913,6 +5913,15 @@
     saveStockData(stock);
   }
 
+  function openMkStock() {
+    document.getElementById('mkStockScreen').style.display = 'block';
+    renderMkStock();
+  }
+
+  function closeMkStock() {
+    document.getElementById('mkStockScreen').style.display = 'none';
+  }
+
   async function renderMkStock() {
     const el = document.getElementById('mkStockList');
     if (!el) return;
@@ -8902,15 +8911,17 @@
     </div>
   </div>
 
-<!-- PANTALLA STOCK MIKAELA -->
-<div class="screen" id="mkStockScreen" style="padding-bottom: 40px;">
-  <div class="topbar">
-    <button class="back-btn" onclick="show('mikaelaHome')">← Volver al panel</button>
+<!-- PANTALLA STOCK MIKAELA — fullscreen overlay -->
+<div id="mkStockScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:500; overflow-y:auto; padding: 0 0 40px;">
+  <div class="topbar" style="position:sticky; top:0; z-index:10; background:var(--bg-card);">
+    <button class="back-btn" onclick="closeMkStock()">← Volver</button>
     <div class="topbar-title">🛍 Stock de productos</div>
   </div>
-  <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
-    style="display:block;width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;margin-bottom:14px;">
-  <div id="mkStockList"></div>
+  <div style="padding: 16px;">
+    <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
+      style="display:block;width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;margin-bottom:14px;">
+    <div id="mkStockList"></div>
+  </div>
 </div>
 
 </body>
