@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v93c - PROMOS: desglose individual por servicio de depilación (04/05/2026) -->
+<!-- NexServ v93d - FIX: cierre de función updateDepiSumaCheck (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2319,6 +2319,7 @@
         warnEl.textContent = '';
       }
     }
+  } // fin updateDepiSumaCheck
 
   // Actualizar ahorro cuando cambie el precio combo
   document.addEventListener('DOMContentLoaded', () => {
