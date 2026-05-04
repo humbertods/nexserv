@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94c - STOCK SIRA: conectado al Sheet de SIRA, descuenta stock en tiempo real (04/05/2026) -->
+<!-- NexServ v94d - FIX NAV: 5 botones correctos en menú Mikaela (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -531,11 +531,10 @@
 
     <nav class="nav">
       <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-      <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
+      <button onclick="show('clientDirectory')"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
       <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
       <button onclick="show('mkStockScreen')"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
-      <button><span class="icon">◐</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
 
@@ -8913,11 +8912,10 @@
   </div>
   <nav class="nav">
     <button onclick="show('mikaelaHome')"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-    <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
+    <button onclick="show('clientDirectory')"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
     <button onclick="doRefresh(this)"><span class="icon">↻</span></button>
     <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
     <button class="active"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
-    <button><span class="icon">◐</span></button>
   </nav>
 </div>
 
