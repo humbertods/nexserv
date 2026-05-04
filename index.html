@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94n - STOCK: closeMkStock recarga mikaelaHome (04/05/2026) -->
+<!-- NexServ v94o - STOCK: screen normal + oculta nav de mikaela al entrar (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -415,7 +415,11 @@
     transition: transform .4s ease;
     font-size: 0 !important;
   }
+  #mkStockScreen .nav-from-parent,
+  .screen#mkStockScreen ~ * .nav { display: none; }
   .nav .refresh-btn.spinning { animation: spin .6s ease; }
+  /* Ocultar nav de mikaelaHome cuando stock está activo */
+  #mkStockScreen.active ~ * { display: none; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .refresh-toast {
     position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
@@ -537,7 +541,7 @@
       <button onclick="show('clientDirectory')"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
       <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
-      <button onclick="show('mkStockScreen')"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
+      <button onclick="openMkStock()"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
 
@@ -2864,7 +2868,7 @@
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
-    if (id === 'mkStockScreen') { openMkStock(); return; } // stock es overlay, no screen normal
+    if (id === 'mkStockScreen') { renderMkStock(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
@@ -5914,13 +5918,17 @@
   }
 
   function openMkStock() {
-    document.getElementById('mkStockScreen').style.display = 'block';
-    renderMkStock();
+    show('mkStockScreen');
+    // Ocultar nav de mikaelaHome para que no se vea sobre el stock
+    const mkNav = document.querySelector('#mikaelaHome .nav');
+    if (mkNav) mkNav.style.display = 'none';
   }
 
   function closeMkStock() {
-    document.getElementById('mkStockScreen').style.display = 'none';
-    loadMikaelaHome();
+    // Restaurar nav de mikaelaHome
+    const mkNav = document.querySelector('#mikaelaHome .nav');
+    if (mkNav) mkNav.style.display = '';
+    show('mikaelaHome');
   }
 
   async function renderMkStock() {
@@ -8912,15 +8920,13 @@
     </div>
   </div>
 
-<!-- PANTALLA STOCK MIKAELA — fullscreen overlay -->
-<div id="mkStockScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:500; overflow-y:auto;">
-  <div style="padding: 24px 24px 60px;">
-    <button onclick="closeMkStock()" style="background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink-soft);cursor:pointer;padding:0;margin-bottom:16px;display:flex;align-items:center;gap:6px;">← Volver al panel</button>
-    <div style="font-size:22px;font-weight:800;margin-bottom:16px;">🛍 Stock de productos</div>
-    <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
-      style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);box-sizing:border-box;margin-bottom:14px;">
-    <div id="mkStockList"></div>
-  </div>
+<!-- PANTALLA STOCK MIKAELA -->
+<div class="screen" id="mkStockScreen">
+  <button onclick="closeMkStock()" style="background:none;border:none;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink-soft);cursor:pointer;padding:0 0 16px;display:flex;align-items:center;gap:6px;">← Volver al panel</button>
+  <div style="font-size:22px;font-weight:800;margin-bottom:16px;">🛍 Stock de productos</div>
+  <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
+    style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);box-sizing:border-box;margin-bottom:14px;">
+  <div id="mkStockList"></div>
 </div>
 
 </body>
