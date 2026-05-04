@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v92f - LOGIN: logo fondo crema integrado (04/05/2026) -->
+<!-- NexServ v93 - DEPILACIÓN COMPARTIDA: split por staff, confirmación de partes (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -1299,11 +1299,30 @@
     </nav>
 
     <div class="modal-bg" id="takeModal">
-      <div class="modal">
+      <div class="modal" style="max-height: 90%; overflow-y: auto;">
         <div class="modal-handle"></div>
         <div class="modal-title">¿Tomar esta clienta?</div>
-        <div style="text-align: center; color: var(--ink-soft); font-size: 14px; margin-bottom: 20px;" id="takeText"></div>
-        <button class="btn-primary" onclick="confirmTake()">Sí, tomarla</button>
+        <div style="text-align: center; color: var(--ink-soft); font-size: 14px; margin-bottom: 16px;" id="takeText"></div>
+
+        <!-- DEPILACIÓN: selector de partes que hará esta staff -->
+        <div id="takeDepiSplit" style="display: none;">
+          <div style="background: #fff8e6; border: 2px solid #e0a800; border-radius: 16px; padding: 14px; margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 800; color: #856404; margin-bottom: 10px;">🪒 ¿Qué parte del servicio hacés vos?</div>
+            <div style="font-size: 11px; color: #856404; margin-bottom: 12px;">Seleccioná los servicios que realizarás. Los que no marques quedarán en lista para otra staff.</div>
+            <div id="takeDepiItems"></div>
+          </div>
+          <div style="background: var(--bg); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; text-align: center;">
+            <div style="font-size: 11px; color: var(--ink-faint); font-weight: 600;">TU TOTAL</div>
+            <div id="takeDepiTotal" style="font-size: 24px; font-weight: 800; color: var(--accent-deep);">$0</div>
+          </div>
+          <button class="btn-primary" onclick="confirmTakeDepi()" style="margin-bottom: 8px;">✓ Confirmar mi parte</button>
+          <button class="btn-primary" onclick="confirmTakeDepiAll()" style="background: var(--ink); margin-bottom: 8px;">Hago todo el servicio</button>
+        </div>
+
+        <!-- Botón normal (no depilación) -->
+        <div id="takeNormal">
+          <button class="btn-primary" onclick="confirmTake()">Sí, tomarla</button>
+        </div>
         <button class="btn-primary outline" onclick="closeModal()">Cancelar</button>
       </div>
     </div>
@@ -3008,10 +3027,7 @@
 
   function openTake(idx) {
     const w = window._waitListData[idx];
-    if (!w) {
-      alert('Error: no se encontró la clienta');
-      return;
-    }
+    if (!w) { alert('Error: no se encontró la clienta'); return; }
     
     window._takingData = w;
     window._takingId = w.id;
@@ -3020,7 +3036,107 @@
     
     const topPart = w.isTop ? ' <span class="top-star">⭐ TOP</span>' : '';
     document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${w.service}</strong>.<br>Se registrará la hora automáticamente.`;
+
+    // Detectar si es servicio de depilación corporal con múltiples ítems
+    const esDepi = w.area === 'depilacion' || String(w.service || '').toLowerCase().includes('depi') || String(w.service || '').toLowerCase().includes('bikini') || String(w.service || '').toLowerCase().includes('pierna') || String(w.service || '').toLowerCase().includes('axila');
+    const splitEl = document.getElementById('takeDepiSplit');
+    const normalEl = document.getElementById('takeNormal');
+
+    if (esDepi) {
+      // Parsear servicios individuales del ticket
+      // El servicio puede venir como "Bikini completo + Medias piernas + Axilas" o similar
+      const servicioStr = String(w.service || '');
+      const partes = servicioStr.split(/\s*[\+\,]\s*/).map(s => s.trim()).filter(s => s && !s.includes('continuac') && !s.includes('completado'));
+      
+      // Intentar obtener precios del catálogo para cada parte
+      const items = partes.map(nombre => {
+        // Buscar precio en catálogo
+        const catalogoDepi = CATALOGO.depilacion || [];
+        const match = catalogoDepi.find(c => c.name.toLowerCase().includes(nombre.toLowerCase()) || nombre.toLowerCase().includes(c.name.toLowerCase()));
+        return {
+          nombre: nombre,
+          precio: match ? Number(match.price) : 0,
+          checked: true
+        };
+      });
+
+      window._depiItems = items;
+
+      if (items.length > 1) {
+        splitEl.style.display = 'block';
+        normalEl.style.display = 'none';
+        renderDepiItems();
+      } else {
+        splitEl.style.display = 'none';
+        normalEl.style.display = 'block';
+      }
+    } else {
+      splitEl.style.display = 'none';
+      normalEl.style.display = 'block';
+    }
+
     document.getElementById('takeModal').classList.add('active');
+  }
+
+  function renderDepiItems() {
+    const items = window._depiItems || [];
+    const el = document.getElementById('takeDepiItems');
+    if (!el) return;
+    el.innerHTML = items.map((item, i) => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0dfa0;cursor:pointer;">
+        <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleDepiItem(${i}, this.checked)"
+          style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${item.nombre}</div>
+          ${item.precio > 0 ? `<div style="font-size:11px;color:var(--ink-faint);">$${item.precio}</div>` : ''}
+        </div>
+        ${item.checked ? '<span style="font-size:16px;">✅</span>' : '<span style="font-size:16px;opacity:0.3;">⬜</span>'}
+      </label>
+    `).join('');
+    updateDepiTotal();
+  }
+
+  function toggleDepiItem(idx, checked) {
+    if (window._depiItems && window._depiItems[idx] !== undefined) {
+      window._depiItems[idx].checked = checked;
+      renderDepiItems();
+    }
+  }
+
+  function updateDepiTotal() {
+    const items = window._depiItems || [];
+    const total = items.filter(i => i.checked).reduce((sum, i) => sum + Number(i.precio || 0), 0);
+    const el = document.getElementById('takeDepiTotal');
+    if (el) el.textContent = '$' + total;
+  }
+
+  async function confirmTakeDepiAll() {
+    // La staff hace todo el servicio — flujo normal
+    window._depiItems = (window._depiItems || []).map(i => ({...i, checked: true}));
+    await confirmTake();
+  }
+
+  async function confirmTakeDepi() {
+    const items = window._depiItems || [];
+    const misItems = items.filter(i => i.checked);
+    const restItems = items.filter(i => !i.checked);
+
+    if (misItems.length === 0) {
+      alert('Seleccioná al menos un servicio para hacer vos.');
+      return;
+    }
+
+    if (restItems.length === 0) {
+      // Todas marcadas — flujo normal
+      await confirmTake();
+      return;
+    }
+
+    // Flujo compartido: guardar qué hace esta staff y qué queda pendiente
+    window._depiMisParts = misItems;
+    window._depiRestParts = restItems;
+    window._esSplitDepi = true;
+    await confirmTake();
   }
   async function confirmTake() {
     closeModal();
@@ -3120,9 +3236,25 @@
             }).filter(Boolean);
           }
           
-          // Si viene con servicio normal (NO promo), cargarlo
-          // Si tiene promo, se cargara en el bloque siguiente con el precio correcto del area
-          if (a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo) {
+          // Si es depilación compartida (split), cargar solo los servicios de esta staff
+          if (window._esSplitDepi && window._depiMisParts && window._depiMisParts.length > 0) {
+            slotServices[1] = window._depiMisParts.map(item => ({
+              name: item.nombre,
+              price: item.precio || 0,
+              area: 'depilacion',
+              status: undefined
+            }));
+            const totalMio = slotServices[1].reduce((s, v) => s + Number(v.price), 0);
+            renderServicesForSlot(1);
+            document.getElementById('as1Total').textContent = '$' + totalMio;
+            document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
+            // Guardar las partes restantes para pasarlas a lista al finalizar
+            window._depiRestPending = window._depiRestParts || [];
+            // Limpiar flags
+            window._esSplitDepi = false;
+          } else if (window._esSplitDepi) {
+            window._esSplitDepi = false;
+          }
             // El servicio puede venir como JSON string {"nombre":"...","precio":17} o como texto plano
             let servicioNombre = a.servicio;
             let servicioPrecio = Number(a.total) || 0;
@@ -3538,8 +3670,37 @@
       });
     } catch (err) { console.error(err); }
 
-    // Limpiar
-    window._desgloseAcumulado = [];
+    // Si había depilación compartida, crear ticket con las partes restantes
+    if (window._depiRestPending && window._depiRestPending.length > 0) {
+      const restNames = window._depiRestPending.map(i => i.nombre).join(' + ');
+      const restTotal = window._depiRestPending.reduce((s, i) => s + Number(i.precio || 0), 0);
+      const obsDepi = `✅ ${data.svcNames} completado por ${user?.name || 'Staff'} · Pendiente: ${restNames}`;
+      try {
+        await apiPost('continuarPromoALista', {
+          idEspera: window._as1IdEspera || '',
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          servicio: restNames,
+          total: String(restTotal),
+          promoNombre: data.promoNombre || '',
+          precioRegular: data.precioRegular || String(restTotal),
+          areaCompletada: 'depilacion',
+          areasFaltantes: restNames,
+          nuevaArea: 'depilacion',
+          montoSiguienteArea: String(restTotal),
+          servicioActualizado: obsDepi
+        });
+      } catch(e) { console.error(e); }
+      window._depiRestPending = [];
+      alert(`✓ Tu parte lista. ${restNames} quedó en lista de espera para otra staff.`);
+      show('staffHome');
+      slotServices[slot] = [];
+      if (user && activeClients[user.name]) {
+        activeClients[user.name].splice(slot - 1, 1);
+        updateCapacityUI(user.name);
+      }
+      return;
+    }
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
     slotServices[slot] = [];
     if (user && activeClients[user.name]) {
