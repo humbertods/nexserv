@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94r - FIX assignDirect: timeout 5s + fallback sin disponibilidad (04/05/2026) -->
+<!-- NexServ v94s - PRODUCTOS EN COBRO: aparecen en total + showToast + confirmarCobro incluye productos (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -6069,7 +6069,7 @@
       window._apProductosEnTicket[id].push({ nombre, precio: precioNum, cantidad: 1, subtotal: precioNum });
     }
     renderAPTicketItems();
-    showNotif('✓ ' + nombre + ' agregado al ticket');
+    showToast('✓ ' + nombre + ' agregado al ticket');
   }
 
   function quitarProductoDeTicket(nombre) {
@@ -6138,10 +6138,23 @@
     } catch(e) { console.error('Error registrando productos:', e); }
 
     closeModal();
-    showNotif('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
-    // Refrescar caché de productos con stock actualizado
+    showToast('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
     window._productosMarca = null;
     cargarProductosMarca();
+  }
+
+  function showToast(msg) {
+    let t = document.getElementById('globalToast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'globalToast';
+      t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:white;padding:10px 20px;border-radius:100px;font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(() => { t.style.opacity = '0'; }, 2500);
   }
 
   function cobrarDesdeBtn(btn) {
@@ -6221,7 +6234,44 @@
 
     // Total inicial (efectivo/transferencia = precio promo si aplica)
     const totalEl = document.getElementById('cobrarTotal');
-    totalEl.textContent = '$' + window._cobrarTotalPromo;
+
+    // Agregar productos del ticket si existen
+    const idEspera = window._cobrarId;
+    const productosTicket = (idEspera && window._apProductosEnTicket && window._apProductosEnTicket[idEspera]) ? window._apProductosEnTicket[idEspera] : [];
+    const totalProductos = productosTicket.reduce((s, p) => s + (Number(p.precio) * Number(p.cantidad || 1)), 0);
+    window._cobrarTotalProductos = totalProductos;
+
+    // Mostrar sección de productos si hay
+    let prodSecEl = document.getElementById('cobrarProductosSection');
+    if (!prodSecEl) {
+      prodSecEl = document.createElement('div');
+      prodSecEl.id = 'cobrarProductosSection';
+      totalEl.parentNode.insertBefore(prodSecEl, totalEl);
+    }
+    if (productosTicket.length > 0) {
+      prodSecEl.innerHTML = `
+        <div style="background:var(--accent-bg);border-radius:12px;padding:10px 14px;margin-bottom:10px;">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">🛍 PRODUCTOS VENDIDOS</div>
+          ${productosTicket.map(p => `
+            <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:3px;">
+              <span>${p.nombre}${p.cantidad > 1 ? ' x'+p.cantidad : ''}</span>
+              <span>$${(p.precio * (p.cantidad||1)).toFixed(2)}</span>
+            </div>
+          `).join('')}
+          <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--accent-deep);margin-top:6px;padding-top:6px;border-top:1px solid var(--line);">
+            <span>Total productos</span><span>$${totalProductos.toFixed(2)}</span>
+          </div>
+        </div>
+      `;
+      // Sumar productos al total
+      const totalConProductos = window._cobrarTotalPromo + totalProductos;
+      totalEl.textContent = '$' + totalConProductos.toFixed(2);
+      window._cobrarTotalConProductos = totalConProductos;
+    } else {
+      prodSecEl.innerHTML = '';
+      totalEl.textContent = '$' + window._cobrarTotalPromo;
+      window._cobrarTotalConProductos = window._cobrarTotalPromo;
+    }
     totalEl.style.color = 'var(--accent-deep)';
 
     // Reset botones de pago
@@ -6279,27 +6329,51 @@
     btn.disabled = true;
 
     // Si tiene promo y paga con tarjeta, cobrar precio regular
-    const totalFinal = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
+    const totalServicios = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
       ? window._cobrarTotalRegular
       : window._cobrarTotalPromo;
+
+    // Sumar productos si hay
+    const totalProductos = window._cobrarTotalProductos || 0;
+    const totalFinal = totalServicios + totalProductos;
 
     try {
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
         metodoPago: window._cobrarPago,
-        totalCobrado: totalFinal
+        totalCobrado: totalFinal,
+        totalServicios: totalServicios,
+        totalProductos: totalProductos
       });
     } catch (err) { console.error(err); }
+
+    // Si hay productos, registrarlos en el historial
+    const idEspera = window._cobrarId;
+    const productosTicket = (idEspera && window._apProductosEnTicket && window._apProductosEnTicket[idEspera]) ? window._apProductosEnTicket[idEspera] : [];
+    if (productosTicket.length > 0) {
+      try {
+        await apiPost('registrarVentaProductos', {
+          idEspera,
+          clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
+          productos: productosTicket,
+          total: totalProductos
+        });
+      } catch(e) { console.error(e); }
+      // Limpiar productos del ticket
+      delete window._apProductosEnTicket[idEspera];
+      // Limpiar la card de productos
+      const ticketDiv = document.getElementById('productos-ticket-' + idEspera);
+      if (ticketDiv) ticketDiv.innerHTML = '';
+    }
 
     btn.textContent = '✓ Confirmar cobro';
     btn.disabled = false;
     closeModal();
     await loadPorCobrar();
-    
-    let msg = '✓ Cobro de $' + totalFinal + ' registrado como ' + window._cobrarPago;
-    if (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta') {
-      msg += '\n(Precio regular — promo no aplica con tarjeta)';
-    }
+
+    let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
+    if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
+    if (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta') msg += '\n(Precio regular — promo no aplica con tarjeta)';
     alert(msg);
   }
   async function filterArrivalClients() {
