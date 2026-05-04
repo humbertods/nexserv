@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94s - PRODUCTOS EN COBRO: aparecen en total + showToast + confirmarCobro incluye productos (04/05/2026) -->
+<!-- NexServ v94t - FIX: idEspera duplicado en confirmarCobro (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -6348,21 +6348,18 @@
     } catch (err) { console.error(err); }
 
     // Si hay productos, registrarlos en el historial
-    const idEspera = window._cobrarId;
-    const productosTicket = (idEspera && window._apProductosEnTicket && window._apProductosEnTicket[idEspera]) ? window._apProductosEnTicket[idEspera] : [];
+    const productosTicket = (window._cobrarId && window._apProductosEnTicket && window._apProductosEnTicket[window._cobrarId]) ? window._apProductosEnTicket[window._cobrarId] : [];
     if (productosTicket.length > 0) {
       try {
         await apiPost('registrarVentaProductos', {
-          idEspera,
+          idEspera: window._cobrarId,
           clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
           productos: productosTicket,
           total: totalProductos
         });
       } catch(e) { console.error(e); }
-      // Limpiar productos del ticket
-      delete window._apProductosEnTicket[idEspera];
-      // Limpiar la card de productos
-      const ticketDiv = document.getElementById('productos-ticket-' + idEspera);
+      delete window._apProductosEnTicket[window._cobrarId];
+      const ticketDiv = document.getElementById('productos-ticket-' + window._cobrarId);
       if (ticketDiv) ticketDiv.innerHTML = '';
     }
 
