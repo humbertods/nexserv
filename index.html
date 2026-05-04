@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v93b - FIX SYNTAX: bloque depi split reorganizado (04/05/2026) -->
+<!-- NexServ v93c - PROMOS: desglose individual por servicio de depilación (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -2216,13 +2216,19 @@
 
     // Auto-generar filas de división por área
     const divContainer = document.getElementById('promoDivision');
-    // Agrupar por área (cejas+depilacion van juntas porque las atiende la misma chica)
+    // Para depilación: cada servicio tiene su propio campo de monto
+    // Para otras áreas: se agrupan por área
     const areaGroups = {};
     selected.forEach(s => {
-      // cejas y depilacion van al mismo grupo porque las hacen las mismas chicas
-      const groupKey = (s.area === 'depilacion') ? 'cejas' : s.area;
-      if (!areaGroups[groupKey]) areaGroups[groupKey] = [];
-      areaGroups[groupKey].push(s);
+      if (s.area === 'depilacion') {
+        // Cada servicio de depilación es un ítem individual con su propio monto
+        const key = 'depi__' + s.name;
+        areaGroups[key] = [s];
+      } else {
+        const groupKey = s.area;
+        if (!areaGroups[groupKey]) areaGroups[groupKey] = [];
+        areaGroups[groupKey].push(s);
+      }
     });
 
     // Preservar valores previos si existen
@@ -2233,25 +2239,30 @@
     });
 
     divContainer.innerHTML = '';
-    Object.keys(areaGroups).forEach(area => {
-      const services = areaGroups[area];
-      const serviceNames = services.map(s => s.name).join(' + ');
-      const suggestedPrice = prevValues[area] || '';
+    Object.keys(areaGroups).forEach(key => {
+      const services = areaGroups[key];
+      const isDepiItem = key.startsWith('depi__');
+      const area = isDepiItem ? 'depilacion' : key;
+      const itemName = isDepiItem ? services[0].name : services.map(s => s.name).join(' + ');
+      const suggestedPrice = prevValues[key] || '';
       
       const row = document.createElement('div');
-      row.dataset.area = area;
-      row.style.cssText = 'background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px;';
+      row.dataset.area = key; // key único por servicio en depi
+      row.dataset.realarea = area;
+      row.dataset.servicio = itemName;
+      row.style.cssText = 'background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; border-left: 3px solid ' + (isDepiItem ? '#c44569' : 'var(--accent)') + ';';
       row.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
           <div>
-            <div style="font-weight: 700; font-size: 13px;">${AREA_LABELS[area] || area}</div>
-            <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${serviceNames}</div>
-            <div style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">→ La atiende: ${AREA_STAFF[area]} · Comisión: ${AREA_COMM[area]}</div>
+            <div style="font-weight: 700; font-size: 13px;">${isDepiItem ? '🪒 ' : (AREA_LABELS[area] ? AREA_LABELS[area] + ' · ' : '')}${itemName}</div>
+            <div style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">→ La atiende: ${AREA_STAFF[area] || AREA_STAFF['cejas']} · Comisión: ${AREA_COMM[area]}</div>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap;">Monto asignado:</span>
-          <input type="number" placeholder="$" value="${suggestedPrice}" style="flex: 1; padding: 12px; border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; background: var(--bg-card);">
+          <span style="font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap;">Monto promo:</span>
+          <input type="number" placeholder="$" value="${suggestedPrice}" data-field="promo"
+            style="flex: 1; padding: 10px; border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; background: var(--bg-card);"
+            oninput="updateDepiSumaCheck()">
         </div>
       `;
       divContainer.appendChild(row);
@@ -2267,7 +2278,47 @@
     } else {
       savingsEl.style.display = 'none';
     }
+
+    // Mostrar advertencia de suma si hay items de depilación
+    updateDepiSumaCheck();
   }
+
+  function updateDepiSumaCheck() {
+    const divContainer = document.getElementById('promoDivision');
+    if (!divContainer) return;
+    const rows = divContainer.querySelectorAll('[data-area]');
+    let sumaDepi = 0;
+    let tieneDepi = false;
+    rows.forEach(row => {
+      if (String(row.dataset.area || '').startsWith('depi__')) {
+        tieneDepi = true;
+        const inp = row.querySelector('input');
+        sumaDepi += Number(inp?.value || 0);
+      }
+    });
+    let warnEl = document.getElementById('depiSumaWarn');
+    if (!warnEl && tieneDepi) {
+      warnEl = document.createElement('div');
+      warnEl.id = 'depiSumaWarn';
+      warnEl.style.cssText = 'font-size: 12px; font-weight: 600; text-align: center; padding: 8px; border-radius: 10px; margin-bottom: 8px;';
+      divContainer.parentNode.insertBefore(warnEl, divContainer.nextSibling);
+    }
+    if (warnEl && tieneDepi) {
+      const promoTotal = Number(document.getElementById('promoPrice')?.value || 0);
+      if (promoTotal > 0 && sumaDepi > 0) {
+        if (Math.abs(sumaDepi - promoTotal) < 0.01) {
+          warnEl.textContent = '✅ La suma de los ítems ($' + sumaDepi + ') coincide con el precio promo';
+          warnEl.style.background = 'var(--success-bg)';
+          warnEl.style.color = 'var(--success)';
+        } else {
+          warnEl.textContent = '⚠️ La suma de los ítems ($' + sumaDepi + ') no coincide con el precio promo ($' + promoTotal + ')';
+          warnEl.style.background = '#fff3cd';
+          warnEl.style.color = '#856404';
+        }
+      } else {
+        warnEl.textContent = '';
+      }
+    }
 
   // Actualizar ahorro cuando cambie el precio combo
   document.addEventListener('DOMContentLoaded', () => {
@@ -2478,14 +2529,22 @@
       setTimeout(() => {
         const rows = document.getElementById('promoDivision').querySelectorAll('[data-area]');
         rows.forEach(row => {
-          const area = row.dataset.area;
-          const areaLabel = AREA_LABELS[area];
-          const match = p.division.find(d => d.area === areaLabel);
+          const key = row.dataset.area;
+          const servicio = row.dataset.servicio;
+          let match;
+          if (key.startsWith('depi__')) {
+            // Buscar por nombre de servicio
+            match = p.division.find(d => d.servicio === servicio || d.area === servicio);
+          } else {
+            const areaLabel = AREA_LABELS[key];
+            match = p.division.find(d => d.area === areaLabel);
+          }
           if (match) {
             const inp = row.querySelector('input');
             if (inp) inp.value = match.monto;
           }
         });
+        updateDepiSumaCheck();
       }, 50);
     }
     
@@ -2505,16 +2564,35 @@
 
     const services = selected.map(s => s.name).join(' + ');
 
-    // Leer división por área
+    // Leer división por área — con desglose individual para depilación
     const divRows = document.getElementById('promoDivision').querySelectorAll('[data-area]');
     const division = [];
     let divTotal = 0;
     divRows.forEach(row => {
-      const area = row.dataset.area;
+      const key = row.dataset.area;
+      const realArea = row.dataset.realarea || key;
+      const servicio = row.dataset.servicio || '';
       const inp = row.querySelector('input');
-      const monto = parseInt(inp?.value) || 0;
+      const monto = parseFloat(inp?.value) || 0;
       if (monto > 0) {
-        division.push({ area: AREA_LABELS[area] || area, staff: AREA_STAFF[area], monto: monto, comm: AREA_COMM[area] });
+        if (key.startsWith('depi__')) {
+          // Ítem individual de depilación: guardar con nombre del servicio
+          division.push({
+            area: servicio,           // nombre del servicio (ej: "Bikini completo")
+            servicio: servicio,       // duplicado para compatibilidad
+            realArea: 'depilacion',
+            staff: AREA_STAFF['depilacion'] || AREA_STAFF['cejas'],
+            monto: monto,
+            comm: AREA_COMM['depilacion']
+          });
+        } else {
+          division.push({
+            area: AREA_LABELS[key] || key,
+            staff: AREA_STAFF[key],
+            monto: monto,
+            comm: AREA_COMM[key]
+          });
+        }
         divTotal += monto;
       }
     });
