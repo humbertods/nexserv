@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94h - STOCK SCREEN: mismo patrón que otras pantallas con topbar (04/05/2026) -->
+<!-- NexServ v94i - STOCK SCREEN: sin nav duplicado, solo topbar con volver (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -8910,15 +8910,8 @@
     <div class="topbar-title">🛍 Stock de productos</div>
   </div>
   <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
-    style="display:block;width:calc(100% - 48px);margin:0 24px 14px;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;">
-  <div id="mkStockList" style="padding: 0 24px;"></div>
-  <nav class="nav">
-    <button onclick="show('mikaelaHome')"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-    <button onclick="show('clientDirectory')"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
-    <button onclick="doRefresh(this)"><span class="icon">↻</span></button>
-    <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
-    <button class="active"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
-  </nav>
+    style="display:block;width:calc(100% - 48px);margin:0 0 14px;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;">
+  <div id="mkStockList"></div>
 </div>
 
 </body>
