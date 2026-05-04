@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94t - FIX: idEspera duplicado en confirmarCobro (04/05/2026) -->
+<!-- NexServ v94u - FIX: idEspera→ticketId en openCobrar para evitar duplicado (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -6236,8 +6236,8 @@
     const totalEl = document.getElementById('cobrarTotal');
 
     // Agregar productos del ticket si existen
-    const idEspera = window._cobrarId;
-    const productosTicket = (idEspera && window._apProductosEnTicket && window._apProductosEnTicket[idEspera]) ? window._apProductosEnTicket[idEspera] : [];
+    const ticketId = window._cobrarId;
+    const productosTicket = (ticketId && window._apProductosEnTicket && window._apProductosEnTicket[ticketId]) ? window._apProductosEnTicket[ticketId] : [];
     const totalProductos = productosTicket.reduce((s, p) => s + (Number(p.precio) * Number(p.cantidad || 1)), 0);
     window._cobrarTotalProductos = totalProductos;
 
