@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94q - STOCK: usa modal de productos existente, sin pantalla separada (04/05/2026) -->
+<!-- NexServ v94r - FIX assignDirect: timeout 5s + fallback sin disponibilidad (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -8658,19 +8658,20 @@
     // Cargar lista de espera para obtener estado de cada staff
     const staffAvailability = {};
     try {
-      const result = await apiGet('getListaCompleta');
+      const result = await Promise.race([
+        apiGet('getListaCompleta'),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]);
       if (result.success) {
-        // Marcar staff ocupado si está en servicio
         [...(result.enServicio || []), ...(result.porCobrar || [])].forEach(item => {
           const chicaNombre = item.tomadaPor;
-          if (!staffAvailability[chicaNombre]) {
-            staffAvailability[chicaNombre] = [];
-          }
+          if (!staffAvailability[chicaNombre]) staffAvailability[chicaNombre] = [];
           staffAvailability[chicaNombre].push(item.nombre);
         });
       }
     } catch (err) {
       console.error('Error cargando disponibilidad:', err);
+      // Continuar sin disponibilidad — mostrar todas como libres
     }
     
     // Definir todo el staff del salón
