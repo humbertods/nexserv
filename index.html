@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94f - FIX STOCK SCREEN: padding-bottom para no tapar con nav (04/05/2026) -->
+<!-- NexServ v94g - FIX STOCK SCREEN: layout correcto sin overflow (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -5917,7 +5917,7 @@
   async function renderMkStock() {
     const el = document.getElementById('mkStockList');
     if (!el) return;
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">⏳ Cargando stock desde SIRA...</div>';
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">⏳ Cargando productos...</div>';
 
     // Forzar recarga fresca del backend
     await cargarProductosMarca();
@@ -8904,12 +8904,12 @@
   </div>
 
 <!-- PANTALLA STOCK MIKAELA -->
-<div class="screen" id="mkStockScreen">
+<div class="screen" id="mkStockScreen" style="padding: 0;">
   <div class="topbar">
     <button class="back-btn" onclick="show('mikaelaHome')">← Volver</button>
     <div class="topbar-title">🛍 Stock de productos</div>
   </div>
-  <div class="content" style="padding: 16px; padding-bottom: 100px;">
+  <div style="padding: 16px 16px 120px; overflow-y: auto;">
     <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
       style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;margin-bottom:14px;">
     <div id="mkStockList"></div>
