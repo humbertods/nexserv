@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94 - VENTA PRODUCTOS AL COBRAR: botón + Producto en panel Mikaela (04/05/2026) -->
+<!-- NexServ v94c - STOCK SIRA: conectado al Sheet de SIRA, descuenta stock en tiempo real (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -534,6 +534,7 @@
       <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
       <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
+      <button onclick="show('mkStockScreen')"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
       <button><span class="icon">◐</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
@@ -2861,7 +2862,7 @@
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
-    if (id === 'assignDirect') { renderAssignDirect(); }
+    if (id === 'mkStockScreen') { renderMkStock(); }
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
       document.getElementById('arrivalSearch').style.display = 'block';
@@ -5840,6 +5841,128 @@
   }
 
   // ============================================
+  // PRODUCTOS DE MARCA — lista fija + stock en localStorage
+  // ============================================
+  const PRODUCTOS_MARCA_BASE = [
+    { nombre: 'Gel fijador de cejas tipo brow',  precio: 12, min: 5  },
+    { nombre: 'Gel fijador de cejas tipo rimel', precio: 12, min: 5  },
+    { nombre: 'Pomada dark Brown',               precio: 10, min: 1  },
+    { nombre: 'Brocha 2 en 1 Pequeña',           precio: 5,  min: 5  },
+    { nombre: 'Brocha 2 en 1 Grande',            precio: 8,  min: 3  },
+    { nombre: 'Brocha Rubor',                    precio: 9,  min: 5  },
+    { nombre: 'Brocha de Contorno',              precio: 9,  min: 5  },
+    { nombre: 'Brocha de Cejas',                 precio: 10, min: 5  },
+    { nombre: 'Brocha difuminar',                precio: 8,  min: 5  },
+    { nombre: 'Brocha de Contorno (cejas)',       precio: 8,  min: 5  },
+    { nombre: 'Tijera',                          precio: 9,  min: 1  },
+    { nombre: 'Ventilador',                      precio: 15, min: 1  },
+    { nombre: 'Lápiz Dark Brown',                precio: 15, min: 3  },
+    { nombre: 'Lápiz Chocolate',                 precio: 15, min: 3  },
+    { nombre: 'Lápiz Gray',                      precio: 15, min: 3  },
+    { nombre: 'Lápiz Blonde',                    precio: 15, min: 2  },
+  ];
+
+  // Stock inicial (si no hay guardado)
+  const STOCK_INICIAL = {
+    'Gel fijador de cejas tipo brow': 36,
+    'Gel fijador de cejas tipo rimel': 10,
+    'Pomada dark Brown': 12,
+    'Brocha 2 en 1 Pequeña': 56,
+    'Brocha 2 en 1 Grande': 14,
+    'Brocha Rubor': 45,
+    'Brocha de Contorno': 18,
+    'Brocha de Cejas': 103,
+    'Brocha difuminar': 81,
+    'Brocha de Contorno (cejas)': 29,
+    'Tijera': 2,
+    'Ventilador': 4,
+    'Lápiz Dark Brown': 14,
+    'Lápiz Chocolate': 11,
+    'Lápiz Gray': 9,
+    'Lápiz Blonde': 2,
+  };
+
+  function getStockData() {
+    try {
+      const raw = localStorage.getItem('nexserv_stock');
+      return raw ? JSON.parse(raw) : { ...STOCK_INICIAL };
+    } catch(e) { return { ...STOCK_INICIAL }; }
+  }
+
+  function saveStockData(stock) {
+    try { localStorage.setItem('nexserv_stock', JSON.stringify(stock)); } catch(e) {}
+  }
+
+  function getProductosMarca() {
+    const stock = getStockData();
+    return PRODUCTOS_MARCA_BASE.map(p => ({
+      ...p,
+      stock: stock[p.nombre] !== undefined ? stock[p.nombre] : (STOCK_INICIAL[p.nombre] || 0)
+    }));
+  }
+
+  function descontarStockVenta(productos) {
+    const stock = getStockData();
+    productos.forEach(p => {
+      if (stock[p.nombre] !== undefined) {
+        stock[p.nombre] = Math.max(0, stock[p.nombre] - Number(p.cantidad || 1));
+      }
+    });
+    saveStockData(stock);
+  }
+
+  async function renderMkStock() {
+    const el = document.getElementById('mkStockList');
+    if (!el) return;
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">⏳ Cargando stock desde SIRA...</div>';
+
+    // Forzar recarga fresca del backend
+    await cargarProductosMarca();
+    const q = (document.getElementById('mkStockSearch')?.value || '').toLowerCase();
+    const productos = window._productosMarca || [];
+    const filtrados = q ? productos.filter(p => p.nombre.toLowerCase().includes(q)) : productos;
+
+    if (filtrados.length === 0) {
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">No hay productos de marca en SIRA</div>';
+      return;
+    }
+
+    el.innerHTML = filtrados.map(p => {
+      const minimo = p.minimo || 0;
+      const bajo = p.stock <= minimo && p.stock > 0;
+      const agotado = p.stock === 0;
+      const color = agotado ? 'var(--danger)' : bajo ? '#e0a800' : 'var(--success)';
+      const badge = agotado ? '🔴 AGOTADO' : bajo ? '🟡 BAJO' : '🟢 OK';
+      return `
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-card);border-radius:16px;margin-bottom:8px;border-left:4px solid ${color};">
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;">${p.nombre}</div>
+            <div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">Precio venta: $${p.precio} · Mín: ${minimo}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:800;color:${color};">${p.stock}</div>
+            <div style="font-size:10px;font-weight:700;color:${color};">${badge}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function ajustarStock(nombre, delta) {
+    const stock = getStockData();
+    if (stock[nombre] === undefined) stock[nombre] = STOCK_INICIAL[nombre] || 0;
+    stock[nombre] = Math.max(0, stock[nombre] + delta);
+    saveStockData(stock);
+    renderMkStock();
+  }
+
+  // Override cargarProductosMarca para usar la lista local
+  window._productosMarca = null; // forzar uso de función local
+  async function cargarProductosMarca() {
+    window._productosMarca = getProductosMarca();
+  }
+
+  // ============================================
   // VENTA DE PRODUCTOS AL COBRAR
   // ============================================
   window._apTicketId = null;
@@ -5858,21 +5981,17 @@
 
   function filtrarProductosAP() {
     const q = (document.getElementById('apSearch')?.value || '').toLowerCase();
-    // Usar CATALOGO_MARCA si existe (productos de la marca), sino CATALOGO.cejas etc
-    // Los productos del salón vienen del backend como catálogo de marca
     const listEl = document.getElementById('apProductList');
     if (!listEl) return;
 
-    // Intentar obtener lista de productos — pueden estar en window._productosMarca
-    let productos = window._productosMarca || [];
-
-    // Si no hay productos cargados, cargarlos
-    if (productos.length === 0) {
+    // Si no hay productos cargados aún, cargar del backend
+    if (!window._productosMarca || window._productosMarca.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:20px;font-size:13px;">⏳ Cargando productos...</div>';
       cargarProductosMarca().then(() => filtrarProductosAP());
-      listEl.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:20px;font-size:13px;">Cargando productos...</div>';
       return;
     }
 
+    const productos = window._productosMarca;
     const filtrados = q ? productos.filter(p => p.nombre.toLowerCase().includes(q)) : productos;
 
     if (filtrados.length === 0) {
@@ -5880,35 +5999,33 @@
       return;
     }
 
-    listEl.innerHTML = filtrados.map((p, i) => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-card);border-radius:12px;margin-bottom:6px;">
+    listEl.innerHTML = filtrados.map((p, i) => {
+      const agotado = p.stock === 0;
+      return `
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card);border-radius:12px;margin-bottom:6px;${agotado ? 'opacity:0.5;' : ''}">
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:700;">${p.nombre}</div>
-          <div style="font-size:11px;color:var(--ink-faint);">Stock: ${p.stock || '—'}</div>
+          <div style="font-size:11px;color:var(--ink-faint);">Stock: <strong>${p.stock}</strong>${agotado ? ' · SIN STOCK' : ''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <input type="number" value="${p.precio||0}" min="0" step="0.5"
-            id="ap-precio-${i}"
-            style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);">
-          <button onclick="agregarProductoATicket('${p.nombre.replace(/'/g,"\\'")}', document.getElementById('ap-precio-${i}').value)"
-            style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">+ Agregar</button>
-        </div>
+        <input type="number" value="${p.precio}" min="0" step="0.5" id="ap-precio-${i}"
+          style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);"
+          ${agotado ? 'disabled' : ''}>
+        <button onclick="agregarProductoATicket('${p.nombre.replace(/'/g,"\\'")}', document.getElementById('ap-precio-${i}').value)"
+          style="padding:8px 14px;background:${agotado ? 'var(--line)' : 'var(--accent)'};color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:${agotado ? 'default' : 'pointer'};"
+          ${agotado ? 'disabled' : ''}>+ Agregar</button>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   async function cargarProductosMarca() {
     try {
       const result = await apiGet('getMarcaProductos');
       if (result.success && result.productos) {
-        window._productosMarca = result.productos.map(p => ({
-          nombre: p.nombre || p.name || '',
-          precio: Number(p.valor || p.precio || p.price || 0),
-          stock: p.stock || 0
-        })).filter(p => p.nombre);
+        window._productosMarca = result.productos;
+      } else {
+        window._productosMarca = [];
       }
     } catch(e) {
-      // Fallback: lista vacía
       window._productosMarca = [];
     }
   }
@@ -5984,7 +6101,8 @@
       `;
     }
 
-    // Registrar venta en el historial del backend
+    // Descontar stock
+    descontarStockVenta(items);
     try {
       await apiPost('registrarVentaProductos', {
         idEspera: id,
@@ -5996,6 +6114,9 @@
 
     closeModal();
     showNotif('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
+    // Refrescar caché de productos con stock actualizado
+    window._productosMarca = null;
+    cargarProductosMarca();
   }
 
   function cobrarDesdeBtn(btn) {
@@ -8778,6 +8899,27 @@
       </div>
     </div>
   </div>
+
+<!-- PANTALLA STOCK MIKAELA -->
+<div class="screen" id="mkStockScreen">
+  <div class="topbar">
+    <button class="back-btn" onclick="show('mikaelaHome')">← Volver</button>
+    <div class="topbar-title">🛍 Stock de productos</div>
+  </div>
+  <div class="content" style="padding: 16px;">
+    <input type="text" id="mkStockSearch" placeholder="Buscar producto..." oninput="renderMkStock()"
+      style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;margin-bottom:14px;">
+    <div id="mkStockList"></div>
+  </div>
+  <nav class="nav">
+    <button onclick="show('mikaelaHome')"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
+    <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
+    <button onclick="doRefresh(this)"><span class="icon">↻</span></button>
+    <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
+    <button class="active"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
+    <button><span class="icon">◐</span></button>
+  </nav>
+</div>
 
 </body>
 </html>
