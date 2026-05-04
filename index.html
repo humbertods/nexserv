@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v93d - FIX: cierre de función updateDepiSumaCheck (04/05/2026) -->
+<!-- NexServ v94 - VENTA PRODUCTOS AL COBRAR: botón + Producto en panel Mikaela (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -539,6 +539,35 @@
     </nav>
 
     <!-- Modal: Cobrar servicio -->
+    <!-- Modal agregar producto al ticket -->
+    <div class="modal-bg" id="agregarProductoModal">
+      <div class="modal" style="max-height: 90%; overflow-y: auto;">
+        <div class="modal-handle"></div>
+        <div class="modal-title">🛍 Agregar producto</div>
+        <div id="apClienteName" style="text-align: center; font-size: 14px; color: var(--ink-soft); font-weight: 600; margin-bottom: 16px;"></div>
+
+        <!-- Búsqueda -->
+        <input type="text" id="apSearch" placeholder="Buscar producto..." oninput="filtrarProductosAP()"
+          style="width: 100%; padding: 12px 16px; border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; background: var(--bg); box-sizing: border-box; margin-bottom: 12px;">
+
+        <!-- Lista productos -->
+        <div id="apProductList" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;"></div>
+
+        <!-- Productos agregados al ticket -->
+        <div id="apTicketItems" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px; margin-bottom: 16px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--ink-faint); margin-bottom: 8px;">PRODUCTOS EN EL TICKET</div>
+          <div id="apTicketList"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);">
+            <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">TOTAL PRODUCTOS</div>
+            <div id="apTicketTotal" style="font-size: 18px; font-weight: 800; color: var(--accent-deep);">$0</div>
+          </div>
+        </div>
+
+        <button class="btn-primary" onclick="confirmarProductosTicket()" style="background: var(--accent);">✓ Listo, ya agregué todo</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
     <div class="modal-bg" id="cobrarModal">
       <div class="modal" style="max-height: 92%; overflow-y: auto;">
         <div class="modal-handle"></div>
@@ -5491,17 +5520,23 @@
                   <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}</div>
                   <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${p.servicio} · atendida por ${p.tomadaPor}</div>
                 </div>
-                <button onclick="cobrarDesdeBtn(this)" 
-                  data-id="${p.idEspera}"
-                  data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
-                  data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
-                  data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
-                  data-total="${p.total||'0'}"
-                  data-regular="${p.precioRegular||p.total||'0'}"
-                  data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
-                  data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
-                  style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
+                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                  <button onclick="cobrarDesdeBtn(this)" 
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
+                    data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
+                    data-total="${p.total||'0'}"
+                    data-regular="${p.precioRegular||p.total||'0'}"
+                    data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
+                    data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
+                    style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
+                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}')"
+                    style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🛍 + Producto</button>
+                </div>
               </div>
+              <!-- Productos agregados a este ticket -->
+              <div id="productos-ticket-${p.idEspera}" style="margin-top: 8px;"></div>
             </div>
           `).join('');
         }
@@ -5802,6 +5837,165 @@
     } catch (err) {
       console.error('Error cargando por cobrar:', err);
     }
+  }
+
+  // ============================================
+  // VENTA DE PRODUCTOS AL COBRAR
+  // ============================================
+  window._apTicketId = null;
+  window._apClienteNombre = null;
+  window._apProductosEnTicket = {}; // { ticketId: [{nombre, precio, cantidad}] }
+
+  function openAgregarProducto(idEspera, nombre, totalServicio) {
+    window._apTicketId = idEspera;
+    window._apClienteNombre = nombre;
+    document.getElementById('apClienteName').textContent = 'Para: ' + nombre;
+    document.getElementById('apSearch').value = '';
+    filtrarProductosAP();
+    renderAPTicketItems();
+    document.getElementById('agregarProductoModal').classList.add('active');
+  }
+
+  function filtrarProductosAP() {
+    const q = (document.getElementById('apSearch')?.value || '').toLowerCase();
+    // Usar CATALOGO_MARCA si existe (productos de la marca), sino CATALOGO.cejas etc
+    // Los productos del salón vienen del backend como catálogo de marca
+    const listEl = document.getElementById('apProductList');
+    if (!listEl) return;
+
+    // Intentar obtener lista de productos — pueden estar en window._productosMarca
+    let productos = window._productosMarca || [];
+
+    // Si no hay productos cargados, cargarlos
+    if (productos.length === 0) {
+      cargarProductosMarca().then(() => filtrarProductosAP());
+      listEl.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:20px;font-size:13px;">Cargando productos...</div>';
+      return;
+    }
+
+    const filtrados = q ? productos.filter(p => p.nombre.toLowerCase().includes(q)) : productos;
+
+    if (filtrados.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:20px;font-size:13px;">No se encontraron productos</div>';
+      return;
+    }
+
+    listEl.innerHTML = filtrados.map((p, i) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-card);border-radius:12px;margin-bottom:6px;">
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${p.nombre}</div>
+          <div style="font-size:11px;color:var(--ink-faint);">Stock: ${p.stock || '—'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="number" value="${p.precio||0}" min="0" step="0.5"
+            id="ap-precio-${i}"
+            style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);">
+          <button onclick="agregarProductoATicket('${p.nombre.replace(/'/g,"\\'")}', document.getElementById('ap-precio-${i}').value)"
+            style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">+ Agregar</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function cargarProductosMarca() {
+    try {
+      const result = await apiGet('getMarcaProductos');
+      if (result.success && result.productos) {
+        window._productosMarca = result.productos.map(p => ({
+          nombre: p.nombre || p.name || '',
+          precio: Number(p.valor || p.precio || p.price || 0),
+          stock: p.stock || 0
+        })).filter(p => p.nombre);
+      }
+    } catch(e) {
+      // Fallback: lista vacía
+      window._productosMarca = [];
+    }
+  }
+
+  function agregarProductoATicket(nombre, precio) {
+    const id = window._apTicketId;
+    if (!id) return;
+    if (!window._apProductosEnTicket[id]) window._apProductosEnTicket[id] = [];
+    const precioNum = Number(precio) || 0;
+    // Si ya existe el mismo producto, sumar cantidad
+    const existing = window._apProductosEnTicket[id].find(p => p.nombre === nombre);
+    if (existing) {
+      existing.cantidad = (existing.cantidad || 1) + 1;
+      existing.subtotal = existing.cantidad * precioNum;
+    } else {
+      window._apProductosEnTicket[id].push({ nombre, precio: precioNum, cantidad: 1, subtotal: precioNum });
+    }
+    renderAPTicketItems();
+    showNotif('✓ ' + nombre + ' agregado al ticket');
+  }
+
+  function quitarProductoDeTicket(nombre) {
+    const id = window._apTicketId;
+    if (!id || !window._apProductosEnTicket[id]) return;
+    window._apProductosEnTicket[id] = window._apProductosEnTicket[id].filter(p => p.nombre !== nombre);
+    renderAPTicketItems();
+  }
+
+  function renderAPTicketItems() {
+    const id = window._apTicketId;
+    const items = (id && window._apProductosEnTicket[id]) ? window._apProductosEnTicket[id] : [];
+    const ticketEl = document.getElementById('apTicketItems');
+    const listEl = document.getElementById('apTicketList');
+    const totalEl = document.getElementById('apTicketTotal');
+    if (!ticketEl) return;
+    if (items.length === 0) {
+      ticketEl.style.display = 'none';
+      return;
+    }
+    ticketEl.style.display = 'block';
+    listEl.innerHTML = items.map(item => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);">
+        <div>
+          <div style="font-size:13px;font-weight:700;">${item.nombre}</div>
+          <div style="font-size:11px;color:var(--ink-faint);">x${item.cantidad} · $${item.precio} c/u</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:14px;font-weight:800;">$${(item.precio * item.cantidad).toFixed(2)}</div>
+          <button onclick="quitarProductoDeTicket('${item.nombre.replace(/'/g,"\\'")})"
+            style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:2px;">✕</button>
+        </div>
+      </div>
+    `).join('');
+    const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
+    totalEl.textContent = '$' + total.toFixed(2);
+  }
+
+  async function confirmarProductosTicket() {
+    const id = window._apTicketId;
+    const items = (id && window._apProductosEnTicket[id]) ? window._apProductosEnTicket[id] : [];
+    if (items.length === 0) { closeModal(); return; }
+
+    // Mostrar en la card del ticket los productos agregados
+    const ticketDiv = document.getElementById('productos-ticket-' + id);
+    if (ticketDiv) {
+      const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
+      ticketDiv.innerHTML = `
+        <div style="background:var(--accent-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">
+          <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">🛍 PRODUCTOS AGREGADOS</div>
+          ${items.map(i => `<div style="font-size:12px;font-weight:600;">• ${i.nombre} x${i.cantidad} = $${(i.precio*i.cantidad).toFixed(2)}</div>`).join('')}
+          <div style="font-size:12px;font-weight:800;color:var(--accent-deep);margin-top:4px;">Total productos: $${total.toFixed(2)}</div>
+        </div>
+      `;
+    }
+
+    // Registrar venta en el historial del backend
+    try {
+      await apiPost('registrarVentaProductos', {
+        idEspera: id,
+        clienteNombre: window._apClienteNombre || '',
+        productos: items,
+        total: items.reduce((s, i) => s + (i.precio * i.cantidad), 0)
+      });
+    } catch(e) { console.error('Error registrando productos:', e); }
+
+    closeModal();
+    showNotif('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
   }
 
   function cobrarDesdeBtn(btn) {
