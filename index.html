@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v94m - STOCK: overlay simple sin topbar class (04/05/2026) -->
+<!-- NexServ v94n - STOCK: closeMkStock recarga mikaelaHome (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -5920,6 +5920,7 @@
 
   function closeMkStock() {
     document.getElementById('mkStockScreen').style.display = 'none';
+    loadMikaelaHome();
   }
 
   async function renderMkStock() {
@@ -5947,11 +5948,11 @@
       return `
         <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-card);border-radius:16px;margin-bottom:8px;border-left:4px solid ${color};">
           <div style="flex:1;">
-            <div style="font-size:13px;font-weight:700;">${p.nombre}</div>
+            <div style="font-size:14px;font-weight:700;">${p.nombre}</div>
             <div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">Precio venta: $${p.precio} · Mín: ${minimo}</div>
           </div>
-          <div style="text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:${color};">${p.stock}</div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:26px;font-weight:800;color:${color};line-height:1;">${p.stock}</div>
             <div style="font-size:10px;font-weight:700;color:${color};">${badge}</div>
           </div>
         </div>
