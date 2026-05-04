@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<!-- NexServ v93 - DEPILACIÓN COMPARTIDA: split por staff, confirmación de partes (04/05/2026) -->
+<!-- NexServ v93b - FIX SYNTAX: bloque depi split reorganizado (04/05/2026) -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>NexServ</title>
 <!-- PWA -->
@@ -3248,13 +3248,14 @@
             renderServicesForSlot(1);
             document.getElementById('as1Total').textContent = '$' + totalMio;
             document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
-            // Guardar las partes restantes para pasarlas a lista al finalizar
             window._depiRestPending = window._depiRestParts || [];
-            // Limpiar flags
             window._esSplitDepi = false;
           } else if (window._esSplitDepi) {
             window._esSplitDepi = false;
           }
+
+          // Si viene con servicio normal (NO promo), cargarlo
+          if (a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo && !(window._depiMisParts && window._depiMisParts.length > 0)) {
             // El servicio puede venir como JSON string {"nombre":"...","precio":17} o como texto plano
             let servicioNombre = a.servicio;
             let servicioPrecio = Number(a.total) || 0;
