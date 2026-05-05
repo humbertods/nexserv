@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95g - FIX: finishDoAllBtn creado dinámicamente si no existe en HTML (05/05/2026) -->
+<!-- NexServ v95i - PROMO: 2 botones verdes "yo termino" + "continuar misma promo" (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1473,8 +1473,11 @@ if ('caches' in window) {
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="window.finishSlot1(); return false;">Finalizar servicio</button>
-    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera con motivo.')">Devolver a lista</button>
+    <!-- Botones de finalización — cambian según si hay promo multi-área -->
+    <div id="as1FinishBtns">
+      <button class="btn-primary" style="margin-bottom: 10px;" onclick="window.finishSlot1(); return false;">Finalizar servicio</button>
+    </div>
+    <button class="btn-primary outline" id="as1DevolverBtn" style="color: var(--danger); border-color: var(--danger-bg);" onclick="devolverALista(1)">Devolver a lista</button>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -2933,6 +2936,86 @@ if ('caches' in window) {
 
     // Si puede hacer ALGUNAS → suma de sus partes
     return misPartes.reduce((s, d) => s + Number(d.monto || 0), 0);
+  }
+
+  // Actualiza los botones de finalización según si hay promo multi-área activa
+  function updateFinishButtons(slot) {
+    const slot1 = slot === 1 || !slot;
+    const btnContainer = document.getElementById('as' + (slot1?1:2) + 'FinishBtns');
+    if (!btnContainer) return;
+
+    const clientName = document.getElementById('as' + (slot1?1:2) + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey = normalizeClientKey(clientName);
+    const promoData = activePromos[clientKey];
+    const user = window.currentUser;
+    const myArea = user?.area || 'cejas';
+
+    if (!promoData || !promoData.promo) {
+      // Sin promo — botón normal
+      btnContainer.innerHTML = `
+        <button class="btn-primary" style="margin-bottom:10px;" onclick="window.finishSlot${slot1?1:2}(); return false;">
+          Finalizar servicio
+        </button>`;
+      return;
+    }
+
+    // Con promo multi-área — verificar si puede hacer todo sola
+    const AREA_CAPS = {
+      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
+      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
+      'facial':   ['facial']
+    };
+    const myCaps = AREA_CAPS[myArea] || [myArea];
+    const promo = promoData.promo;
+    const puedeTodo = promo.division && promo.division.length > 0 &&
+      promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+
+    let html = '';
+    if (puedeTodo) {
+      // Puede hacer todo el combo sola
+      html += `
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="finishAndSendAll()">
+          ✅ Terminé todo el combo — mandar a cobrar
+        </button>
+        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">
+          ➡️ Siguiente servicio del combo
+        </button>`;
+    } else {
+      // Necesita otra staff para completar
+      html += `
+        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="window.finishSlot${slot1?1:2}(); return false;">
+          ➡️ Terminé mi parte — continuar en otra área
+        </button>
+        <button class="btn-primary" style="margin-bottom:10px;" onclick="finishAndSend()">
+          💰 Mandar a cobrar (mi parte)
+        </button>`;
+    }
+    btnContainer.innerHTML = html;
+  }
+
+  async function finishAndContinueSameStaff() {
+    // La misma staff continúa con el siguiente servicio del combo
+    // Solo registra que terminó esa parte y actualiza el total
+    const slot = 1;
+    const user = window.currentUser;
+    const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey = normalizeClientKey(clientName);
+    const promoData = activePromos[clientKey];
+
+    if (!promoData) { await finishAndSend(); return; }
+
+    // Notificar a Mikaela que sigue en proceso
+    showToast('✓ Parte completada — continuando con el combo...');
+
+    // El total final se registrará al mandar a cobrar con el precio completo
+    // Por ahora solo limpiar los servicios del slot para agregar el siguiente
+    slotServices[slot] = [];
+    renderServicesForSlot(slot);
+    document.getElementById('as1Total').textContent = '$0';
+    document.getElementById('as1SvcCount').textContent = '0';
+
+    // Actualizar botones de vuelta al estado normal para agregar siguiente servicio
+    updateFinishButtons(slot);
   }
 
   function normalizeClientKey(name) {
@@ -4621,38 +4704,47 @@ if ('caches' in window) {
         document.getElementById('finishPromoInfo').style.display = 'none';
       }
       
-      // Mostrar botón "Hice todo el combo yo sola" si la staff puede hacer toda la promo
+      // Mostrar/ocultar botones de "yo termino el combo" si la staff puede hacer toda la promo
       let btnDoAll = document.getElementById('finishDoAllBtn');
-      // Crear el botón dinámicamente si no existe (compatibilidad con HTML viejo)
+      let btnContSame = document.getElementById('finishContinueSameBtn');
+      // Crear botones dinámicamente si no existen (compatibilidad con HTML viejo)
       if (!btnDoAll) {
         btnDoAll = document.createElement('button');
         btnDoAll.id = 'finishDoAllBtn';
         btnDoAll.className = 'btn-primary';
-        btnDoAll.style.cssText = 'margin-bottom: 10px; background: var(--success); display: none;';
-        btnDoAll.textContent = '✅ Hice todo el combo yo sola — mandar a cobrar';
+        btnDoAll.style.cssText = 'margin-bottom:10px;background:#2d6a4f;display:none;';
+        btnDoAll.textContent = '✅ Yo termino el combo completo — cobrar total';
         btnDoAll.onclick = finishAndSendAll;
-        // Insertarlo antes del primer botón del modal
         const modal = document.getElementById('finishOptionsModal');
         const firstBtn = modal?.querySelector('.btn-primary');
         if (firstBtn) firstBtn.parentNode.insertBefore(btnDoAll, firstBtn);
       }
-      if (btnDoAll) {
-        if (promoData && promoData.promo) {
-          const user = window.currentUser;
-          const myArea = user?.area || 'cejas';
-          const promo = promoData.promo;
-          const AREA_CAPS = {
-            'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
-            'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
-            'facial':   ['facial']
-          };
-          const myCaps = AREA_CAPS[myArea] || [myArea];
-          const puedeTodo = promo.division && promo.division.length > 0 &&
-            promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
-          btnDoAll.style.display = puedeTodo ? 'block' : 'none';
-        } else {
-          btnDoAll.style.display = 'none';
-        }
+      if (!btnContSame) {
+        btnContSame = document.createElement('button');
+        btnContSame.id = 'finishContinueSameBtn';
+        btnContSame.className = 'btn-primary outline';
+        btnContSame.style.cssText = 'margin-bottom:10px;border-color:#2d6a4f;color:#2d6a4f;display:none;';
+        btnContSame.textContent = '🔄 Continuar con la misma promo (yo la termino)';
+        btnContSame.onclick = finishAndContinueSameStaff;
+        if (btnDoAll && btnDoAll.parentNode) btnDoAll.parentNode.insertBefore(btnContSame, btnDoAll.nextSibling);
+      }
+      if (promoData && promoData.promo) {
+        const user = window.currentUser;
+        const myArea = user?.area || 'cejas';
+        const promo = promoData.promo;
+        const AREA_CAPS = {
+          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
+          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
+          'facial':   ['facial']
+        };
+        const myCaps = AREA_CAPS[myArea] || [myArea];
+        const puedeTodo = promo.division && promo.division.length > 0 &&
+          promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+        if (btnDoAll) btnDoAll.style.display = puedeTodo ? 'block' : 'none';
+        if (btnContSame) btnContSame.style.display = puedeTodo ? 'block' : 'none';
+      } else {
+        if (btnDoAll) btnDoAll.style.display = 'none';
+        if (btnContSame) btnContSame.style.display = 'none';
       }
 
       // Actualizar texto de "Mandar a cobrar" según si hay split o no
@@ -4848,6 +4940,8 @@ if ('caches' in window) {
                 completedAreas: [],
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
+              // Actualizar botones de finalización con opciones de promo
+              setTimeout(() => updateFinishButtons(1), 300);
             }
           } else {
             // Sin promo: precio normal del servicio
@@ -9327,7 +9421,8 @@ if ('caches' in window) {
       </div>
     </div>
     <!-- Botón: hago todo el combo yo sola (solo visible cuando aplica) -->
-    <button class="btn-primary" id="finishDoAllBtn" style="margin-bottom: 10px; background: var(--success); display:none;" onclick="finishAndSendAll()">✅ Hice todo el combo yo sola — mandar a cobrar</button>
+    <button class="btn-primary" id="finishDoAllBtn" style="margin-bottom: 10px; background: #2d6a4f; display:none;" onclick="finishAndSendAll()">✅ Yo termino el combo completo — cobrar total</button>
+    <button class="btn-primary outline" id="finishContinueSameBtn" style="margin-bottom: 10px; border-color: #2d6a4f; color: #2d6a4f; display:none;" onclick="finishAndContinueSameStaff()">🔄 Continuar con la misma promo (yo la termino)</button>
     <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar (mi parte)</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
     <button class="btn-primary" style="margin-bottom: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndNextPromo()">🏷 Continuar con siguiente promo</button>
