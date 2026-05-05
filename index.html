@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95e - FIX PROMO: getMyPromoPrice suma todas las partes que puede hacer la staff (05/05/2026) -->
+<!-- NexServ v95f - PROMO TODO SOLA: botón "Hice todo el combo yo sola" en modal finalizar (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3846,6 +3846,27 @@ if ('caches' in window) {
   }
   
   // Opciones al finalizar servicio
+  async function finishAndSendAll() {
+    // Staff hizo toda la promo sola — recibe el precio total completo
+    const slot = window._finishSlot || 1;
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const promoData = window._finishPromoData;
+
+    if (promoData && promoData.promo) {
+      const precioTotal = promoData.promo.price; // precio completo de la promo
+      // Actualizar slotServices con el precio total
+      if (slotServices[slot] && slotServices[slot].length > 0) {
+        slotServices[slot][0].price = precioTotal;
+        slotServices[slot][0].montoComision = precioTotal;
+      }
+      window._finishFullPromo = true; // flag para que finishAndSend use precio completo
+    }
+
+    closeModal();
+    await finishAndSend();
+  }
+
   async function finishAndSend() {
     // Mandar directo a cobrar (finaliza completamente)
     closeModal();
@@ -4600,6 +4621,35 @@ if ('caches' in window) {
         document.getElementById('finishPromoInfo').style.display = 'none';
       }
       
+      // Mostrar botón "Hice todo el combo yo sola" si la staff puede hacer toda la promo
+      const btnDoAll = document.getElementById('finishDoAllBtn');
+      if (btnDoAll) {
+        if (promoData && promoData.promo) {
+          const user = window.currentUser;
+          const myArea = user?.area || 'cejas';
+          const promo = promoData.promo;
+          // Verificar si esta staff puede hacer todas las partes
+          const AREA_CAPS = {
+            'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
+            'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
+            'facial':   ['facial']
+          };
+          const myCaps = AREA_CAPS[myArea] || [myArea];
+          const puedeTodo = promo.division && promo.division.length > 0 &&
+            promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+          btnDoAll.style.display = puedeTodo ? 'block' : 'none';
+        } else {
+          btnDoAll.style.display = 'none';
+        }
+      }
+
+      // Actualizar texto de "Mandar a cobrar" según si hay split o no
+      const btnSend = document.querySelector('#finishOptionsModal button[onclick="finishAndSend()"]');
+      if (btnSend) {
+        const btnDoAllVisible = document.getElementById('finishDoAllBtn')?.style.display !== 'none';
+        btnSend.textContent = (promoData && btnDoAllVisible) ? '💰 Mandar a cobrar (solo mi parte)' : '💰 Mandar a cobrar';
+      }
+
       // Mostrar/ocultar boton "Continuar en otra area"
       const btnContinue = document.querySelector('#finishOptionsModal button[onclick="finishAndContinue()"]');
       if (btnContinue) {
@@ -9264,7 +9314,9 @@ if ('caches' in window) {
         Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
       </div>
     </div>
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
+    <!-- Botón: hago todo el combo yo sola (solo visible cuando aplica) -->
+    <button class="btn-primary" id="finishDoAllBtn" style="margin-bottom: 10px; background: var(--success); display:none;" onclick="finishAndSendAll()">✅ Hice todo el combo yo sola — mandar a cobrar</button>
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar (mi parte)</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
     <button class="btn-primary" style="margin-bottom: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndNextPromo()">🏷 Continuar con siguiente promo</button>
     <button class="btn-primary outline" style="margin-bottom: 10px; color: var(--danger); border-color: var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
