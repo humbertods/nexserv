@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95s - FIX: slot2 preload completo + precioRegular desde Sheet para slots 1 y 2 (05/05/2026) -->
+<!-- NexServ v95s - FIX: slot se rellena inmediatamente si promo existe en activePromos (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1047,8 +1047,8 @@ if ('caches' in window) {
       <div class="name" style="font-size: 24px;">¿Quién llegó?</div>
     </div>
 
-    <!-- Doble opción -->
-    <div class="double-action" style="margin-bottom: 24px;">
+    <!-- Triple opción -->
+    <div class="double-action" style="margin-bottom: 16px;">
       <div class="action-btn primary" onclick="show('arrivalExisting')">
         <span class="icon">📇</span>
         <span class="label">Clienta existente</span>
@@ -1058,6 +1058,14 @@ if ('caches' in window) {
         <span class="icon">✨</span>
         <span class="label">Clienta nueva</span>
         <span class="sub">registrarla ahora</span>
+      </div>
+    </div>
+    <!-- Tercera opción: venta directa de producto -->
+    <div onclick="abrirVentaDirectaProducto()" style="display:flex;align-items:center;gap:16px;background:var(--bg-card);border:2px solid var(--line);border-radius:var(--radius-sm);padding:18px 20px;cursor:pointer;margin-bottom:16px;transition:border-color .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
+      <span style="font-size:28px;">🛍</span>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--ink);">Solo compra de producto</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">Sin servicio — venta directa de producto</div>
       </div>
     </div>
 
@@ -3157,62 +3165,7 @@ if ('caches' in window) {
       }, 500);
       } // cierre else
     }
-    if (id === 'activeService2') {
-      restoreActivePromos();
-      recargarAutorizacionesStaff(2);
-      // Rellenar slot 2 con promo si está vacío pero hay promo en memoria
-      const _clientName2Now = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
-      const _clientKey2Now  = normalizeClientKey(_clientName2Now);
-      if (_clientName2Now && activePromos[_clientKey2Now] && (!slotServices[2] || slotServices[2].length === 0)) {
-        const _promo2  = activePromos[_clientKey2Now].promo;
-        const _price2  = getMyPromoPrice(_promo2, window.currentUser?.area || 'cejas');
-        slotServices[2] = [{ name: _promo2.name, price: _price2, area: window.currentUser?.area || 'cejas' }];
-        renderServicesForSlot(2);
-        document.getElementById('as2Total').textContent    = '$' + _price2;
-        document.getElementById('as2SvcCount').textContent = '1';
-        updateFinishButtons(2);
-      } else {
-        setTimeout(async () => {
-          const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
-          if (clientName2) {
-            const clientKey2s = normalizeClientKey(clientName2);
-            if (!activePromos[clientKey2s] && PROMOS.length > 0) {
-              try {
-                const r2 = await apiGet('getListaCompleta');
-                if (r2.success) {
-                  const atencion2 = [...(r2.enServicio||[])].find(a =>
-                    a.nombre === clientName2 || normalizeClientKey(a.nombre) === clientKey2s
-                  );
-                  if (atencion2 && atencion2.promoNombre) {
-                    const promoFull2 = PROMOS.find(p => p.name === atencion2.promoNombre);
-                    if (promoFull2) {
-                      const precioRegSheet2 = Number(atencion2.precioRegular) || promoFull2.regular;
-                      const promoConReg2    = Object.assign({}, promoFull2, { regular: precioRegSheet2 || promoFull2.regular });
-                      activePromos[clientKey2s] = {
-                        promo: promoConReg2, startedBy: window.currentUser?.area || 'cejas', completedAreas: [],
-                        _metadata: { displayName: clientName2 }
-                      };
-                      saveActivePromos();
-                      if (!window._as2PrecioRegular || window._as2PrecioRegular === 0) {
-                        window._as2PrecioRegular = precioRegSheet2;
-                      }
-                      const myPrice2s = getMyPromoPrice(promoFull2, window.currentUser?.area || 'cejas');
-                      slotServices[2] = [{ name: promoFull2.name, price: myPrice2s, area: window.currentUser?.area || 'cejas' }];
-                      renderServicesForSlot(2);
-                      document.getElementById('as2Total').textContent    = '$' + myPrice2s;
-                      document.getElementById('as2SvcCount').textContent = '1';
-                      updateFinishButtons(2);
-                    }
-                  }
-                }
-              } catch(e) { console.error('Error recargando promo slot2:', e); }
-            }
-          }
-          const ck2fin = normalizeClientKey(document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '');
-          if (activePromos[ck2fin]) updateFinishButtons(2);
-        }, 500);
-      }
-    }
+    if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
@@ -4849,11 +4802,9 @@ if ('caches' in window) {
     } else {
       totalFinal = String(total);
     }
-    // precioRegular: el valor guardado del Sheet (_as1PrecioRegular) es la fuente de verdad
-    // Fallback al catálogo PROMOS si el Sheet no lo tenía
-    const _regularBase = promoData ? (Number(window._as1PrecioRegular) > 0 ? Number(window._as1PrecioRegular) : Number(promoData.promo.regular)) : 0;
-    const _extrasRegular = promoData ? svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0) : 0;
-    const precioRegularFinal = promoData ? String(_regularBase + _extrasRegular) : String(total);
+    const precioRegularFinal = promoData
+      ? String(Number(promoData.promo.regular) + (svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)))
+      : String(total);
 
     window._finishingSlot = 1;
     window._finishingData = {
@@ -5038,11 +4989,6 @@ if ('caches' in window) {
     }));
     const desgloseAcumulado2 = (window._desgloseAcumulado || []).concat(desgloseSlot2);
     
-    // precioRegular slot2: usar _as2PrecioRegular (del Sheet) como fuente de verdad
-    const _regularBase2  = promoData ? (Number(window._as2PrecioRegular) > 0 ? Number(window._as2PrecioRegular) : Number(promoData.promo.regular)) : 0;
-    const _extrasRegular2 = promoData ? svcs.filter(s => s.name !== promoData.promo.name && s.status !== 'rechazado').reduce((sum,s) => sum + Number(s.price||0), 0) : 0;
-    const precioRegularSlot2 = promoData ? String(_regularBase2 + _extrasRegular2) : String(total);
-
     try {
       await apiPost('finalizarAtencion', {
         idEspera: window._as2IdEspera || '',
@@ -5052,7 +4998,7 @@ if ('caches' in window) {
         total: String(total),
         montoComision: String(montoComision),
         promoNombre: promoData ? promoData.promo.name : '',
-        precioRegular: precioRegularSlot2,
+        precioRegular: promoData ? String(promoData.promo.regular) : String(total),
         serviciosDetalle: desgloseAcumulado2
       });
     } catch (err) { console.error(err); }
@@ -5131,10 +5077,6 @@ if ('caches' in window) {
           slotServices[1] = [];
         }
         
-        // Guardar precioRegular real del ticket (columna P del Sheet) como fuente de verdad
-        // Esto sobrevive salidas/entradas al panel y evita recalcular desde PROMOS
-        window._as1PrecioRegular = Number(a1.precioRegular) || Number(a1.total) || 0;
-
         if (a1.servicio && a1.servicio !== '—') {
           const clientKey1 = normalizeClientKey(a1.nombre);
 
@@ -5153,14 +5095,8 @@ if ('caches' in window) {
                   area: myArea
                 });
               }
-              // Restaurar promo con precioRegular real del Sheet como referencia
-              // Si el catálogo PROMOS tiene el precio correcto, usarlo; si no, usar el del Sheet
-              const precioRegularSheet = Number(a1.precioRegular) || promoFull.regular;
-              const promoConRegularCorrecto = Object.assign({}, promoFull, {
-                regular: precioRegularSheet || promoFull.regular
-              });
               activePromos[clientKey1] = {
-                promo: promoConRegularCorrecto,
+                promo: promoFull,
                 startedBy: myArea,
                 completedAreas: [],
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
@@ -5196,63 +5132,6 @@ if ('caches' in window) {
         if (user.area === 'pestanas') {
           loadPestFichaQuick(a1.codigo.toLowerCase().replace(/-/g, ''), 1);
         }
-
-        // ── SLOT 2: precargar segunda clienta si cejas tiene doble atención ──
-        if (user.maxClients === 2 && result.atenciones.length > 1) {
-          const a2 = result.atenciones[1];
-          const codigoAnterior2 = window._as2Client;
-          const mismaClienta2 = codigoAnterior2 === a2.codigo;
-          const tieneServicios2 = slotServices[2] && slotServices[2].length > 0;
-
-          window._as2Client   = a2.codigo;
-          window._as2IdEspera = a2.idEspera || '';
-          window._as2PrecioRegular = Number(a2.precioRegular) || Number(a2.total) || 0;
-
-          document.getElementById('as2Avatar').textContent = a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          document.getElementById('as2Avatar').className   = 'client-avatar' + (a2.esTop ? ' is-top' : '');
-          document.getElementById('as2Name').textContent   = a2.nombre + (a2.esTop ? ' ⭐' : '');
-          document.getElementById('as2Code').textContent   = a2.codigo + ' · Llegó ' + a2.horaLlegada;
-          renderSecuenciaBanner(2, a2.secuencia || []);
-
-          if (!mismaClienta2 || !tieneServicios2) {
-            slotServices[2] = [];
-          }
-
-          if (a2.servicio && a2.servicio !== '—') {
-            const clientKey2 = normalizeClientKey(a2.nombre);
-
-            if (a2.promoNombre && String(a2.promoNombre).trim() !== '') {
-              const promoFull2 = PROMOS.find(p => p.name === a2.promoNombre);
-              if (promoFull2) {
-                const myArea2  = user.area || 'cejas';
-                const myPrice2 = getMyPromoPrice(promoFull2, myArea2);
-
-                if (!slotServices[2].find(s => s.name === a2.promoNombre || s.name === a2.servicio)) {
-                  slotServices[2].unshift({ name: a2.promoNombre, price: myPrice2, area: myArea2 });
-                }
-                const precioRegularSheet2  = Number(a2.precioRegular) || promoFull2.regular;
-                const promoConRegular2     = Object.assign({}, promoFull2, { regular: precioRegularSheet2 || promoFull2.regular });
-                activePromos[clientKey2]   = {
-                  promo: promoConRegular2, startedBy: myArea2, completedAreas: [],
-                  _metadata: { displayName: a2.nombre, clientCode: a2.codigo, loadedFrom: 'loadStaffHome-slot2' }
-                };
-                saveActivePromos();
-                setTimeout(() => updateFinishButtons(2), 300);
-              }
-            } else {
-              if (!slotServices[2].find(s => s.name === a2.servicio)) {
-                slotServices[2].unshift({ name: a2.servicio, price: Number(a2.total) || 0, area: a2.area });
-              }
-              if (activePromos[clientKey2]) delete activePromos[clientKey2];
-            }
-          }
-          renderServicesForSlot(2);
-          const total2 = slotServices[2].reduce((s, sv) => (sv.status === 'pendiente' || sv.status === 'rechazado') ? s : s + Number(sv.price || 0), 0);
-          document.getElementById('as2Total').textContent    = '$' + total2;
-          document.getElementById('as2SvcCount').textContent = slotServices[2].filter(s => s.status !== 'rechazado').length;
-        }
-        // ── fin SLOT 2 ──
-
       } else {
         section.style.display = 'none';
       }
@@ -5322,35 +5201,7 @@ if ('caches' in window) {
   }
 
   function loadActiveService(idx) {
-    // Slot 1 siempre está precargado por loadStaffHome.
-    // Slot 2: si los datos en DOM / slotServices están vacíos (p.ej. recarga de página),
-    // rellenar desde las variables globales que loadStaffHome ya set.
-    if (idx === 1) {
-      const slot = 2;
-      const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
-      if (!clientName2) return; // aún no hay segunda clienta
-      const clientKey2  = normalizeClientKey(clientName2);
-      // Si slotServices[2] ya tiene datos no hacer nada (evitar resetear servicios extra)
-      if (slotServices[2] && slotServices[2].length > 0) {
-        renderServicesForSlot(slot);
-        const t2 = slotServices[2].reduce((s,sv) => (sv.status==='pendiente'||sv.status==='rechazado')?s:s+Number(sv.price||0),0);
-        document.getElementById('as2Total').textContent    = '$' + t2;
-        document.getElementById('as2SvcCount').textContent = slotServices[2].filter(s=>s.status!=='rechazado').length;
-        return;
-      }
-      // slotServices[2] vacío → reconstruir desde activePromos si existe
-      const promoData2 = activePromos[clientKey2];
-      if (promoData2 && promoData2.promo) {
-        const myArea2  = window.currentUser?.area || 'cejas';
-        const myPrice2 = getMyPromoPrice(promoData2.promo, myArea2);
-        slotServices[2] = [{ name: promoData2.promo.name, price: myPrice2, area: myArea2 }];
-        renderServicesForSlot(slot);
-        document.getElementById('as2Total').textContent    = '$' + myPrice2;
-        document.getElementById('as2SvcCount').textContent = '1';
-        updateFinishButtons(slot);
-      }
-      // Si no hay promo en memoria, la lógica de show('activeService2') hará el fetch al backend
-    }
+    // Ya precargado en loadStaffHome
   }
   function setRetiro(isOurs, slot) {
     const yesBtn = document.getElementById('retiroYes' + slot);
@@ -6587,7 +6438,24 @@ if ('caches' in window) {
   window._apClienteNombre = null;
   window._apProductosEnTicket = {}; // { ticketId: [{nombre, precio, cantidad}] }
 
+  // === VENTA DIRECTA DE PRODUCTO (sin servicio) ===
+  function abrirVentaDirectaProducto() {
+    // Pedir nombre del comprador (opcional)
+    const nombre = prompt('¿Nombre de quien compra? (opcional, podés dejarlo vacío)') || 'Venta directa';
+    const idVenta = 'VENTA-' + Date.now();
+    window._apTicketId = idVenta;
+    window._apClienteNombre = nombre;
+    window._apEsVentaDirecta = true;
+    document.getElementById('apClienteName').textContent = '🛍 ' + nombre;
+    document.getElementById('apSearch').value = '';
+    filtrarProductosAP();
+    renderAPTicketItems();
+    document.getElementById('agregarProductoModal').classList.add('active');
+    show('mikaelaHome'); // volver al home de fondo
+  }
+
   function openAgregarProducto(idEspera, nombre, totalServicio) {
+    window._apEsVentaDirecta = false;
     window._apTicketId = idEspera;
     window._apClienteNombre = nombre;
     document.getElementById('apClienteName').textContent = 'Para: ' + nombre;
@@ -6705,33 +6573,43 @@ if ('caches' in window) {
     const id = window._apTicketId;
     const items = (id && window._apProductosEnTicket[id]) ? window._apProductosEnTicket[id] : [];
     if (items.length === 0) { closeModal(); return; }
+    const esVentaDirecta = window._apEsVentaDirecta === true;
+    const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
 
-    // Mostrar en la card del ticket los productos agregados
-    const ticketDiv = document.getElementById('productos-ticket-' + id);
-    if (ticketDiv) {
-      const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
-      ticketDiv.innerHTML = `
-        <div style="background:var(--accent-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">
-          <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">🛍 PRODUCTOS AGREGADOS</div>
-          ${items.map(i => `<div style="font-size:12px;font-weight:600;">• ${i.nombre} x${i.cantidad} = $${(i.precio*i.cantidad).toFixed(2)}</div>`).join('')}
-          <div style="font-size:12px;font-weight:800;color:var(--accent-deep);margin-top:4px;">Total productos: $${total.toFixed(2)}</div>
-        </div>
-      `;
+    // Si NO es venta directa, mostrar en la card del ticket
+    if (!esVentaDirecta) {
+      const ticketDiv = document.getElementById('productos-ticket-' + id);
+      if (ticketDiv) {
+        ticketDiv.innerHTML = `
+          <div style="background:var(--accent-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">
+            <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">🛍 PRODUCTOS AGREGADOS</div>
+            ${items.map(i => `<div style="font-size:12px;font-weight:600;">• ${i.nombre} x${i.cantidad} = $${(i.precio*i.cantidad).toFixed(2)}</div>`).join('')}
+            <div style="font-size:12px;font-weight:800;color:var(--accent-deep);margin-top:4px;">Total productos: $${total.toFixed(2)}</div>
+          </div>
+        `;
+      }
     }
 
     // Descontar stock
     descontarStockVenta(items);
     try {
       await apiPost('registrarVentaProductos', {
-        idEspera: id,
+        // Para venta directa no hay idEspera — el backend lo maneja con idEspera vacío
+        idEspera: esVentaDirecta ? '' : id,
         clienteNombre: window._apClienteNombre || '',
         productos: items,
-        total: items.reduce((s, i) => s + (i.precio * i.cantidad), 0)
+        total: total,
+        esVentaDirecta: esVentaDirecta
       });
     } catch(e) { console.error('Error registrando productos:', e); }
 
     closeModal();
-    showToast('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
+    // Limpiar ticket de venta directa
+    if (esVentaDirecta && window._apProductosEnTicket[id]) {
+      delete window._apProductosEnTicket[id];
+    }
+    window._apEsVentaDirecta = false;
+    showToast('✓ ' + (esVentaDirecta ? 'Venta registrada: $' + total.toFixed(2) : 'Productos registrados para ' + (window._apClienteNombre || 'la clienta')));
     window._productosMarca = null;
     cargarProductosMarca();
   }
