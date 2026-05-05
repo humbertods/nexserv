@@ -1047,8 +1047,8 @@ if ('caches' in window) {
       <div class="name" style="font-size: 24px;">¿Quién llegó?</div>
     </div>
 
-    <!-- Triple opción -->
-    <div class="double-action" style="margin-bottom: 16px;">
+    <!-- Doble opción -->
+    <div class="double-action" style="margin-bottom: 24px;">
       <div class="action-btn primary" onclick="show('arrivalExisting')">
         <span class="icon">📇</span>
         <span class="label">Clienta existente</span>
@@ -1059,67 +1059,6 @@ if ('caches' in window) {
         <span class="label">Clienta nueva</span>
         <span class="sub">registrarla ahora</span>
       </div>
-    </div>
-    <!-- Tercera opción: venta directa de producto -->
-    <div id="vdToggleBtn" onclick="toggleVentaDirecta()" style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-card);border:2px solid var(--line);border-radius:var(--radius-sm);padding:16px 20px;cursor:pointer;margin-bottom:0;transition:border-color .15s,border-radius .15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="if(!document.getElementById('vdForm').classList.contains('vd-open'))this.style.borderColor='var(--line)'">
-      <div style="display:flex;align-items:center;gap:14px;">
-        <span style="font-size:26px;">🛍</span>
-        <div>
-          <div style="font-size:15px;font-weight:700;color:var(--ink);">Solo compra de producto</div>
-          <div style="font-size:12px;color:var(--ink-soft);margin-top:1px;">Sin servicio — venta directa</div>
-        </div>
-      </div>
-      <span id="vdChevron" style="font-size:18px;transition:transform .2s;color:var(--ink-soft);">▾</span>
-    </div>
-
-    <!-- Formulario desplegable inline -->
-    <div id="vdForm" style="display:none;background:var(--bg-card);border:2px solid var(--accent);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:16px 18px 18px;margin-bottom:16px;">
-
-      <!-- Tipo de clienta -->
-      <div style="margin-bottom:12px;">
-        <select id="vdTipoCliente" onchange="vdOnTipoClienteChange()" style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%23888%22 stroke-width=%221.5%22 fill=%22none%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;">
-          <option value="">Clienta existente ▾</option>
-          <option value="existente">Clienta existente</option>
-          <option value="nueva">Clienta nueva</option>
-        </select>
-      </div>
-
-      <!-- Nombre clienta existente (búsqueda) -->
-      <div id="vdExistenteFields" style="margin-bottom:12px;">
-        <input id="vdNombreExistente" type="text" placeholder="Buscar clienta por nombre..." oninput="vdBuscarCliente(this.value)"
-          style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;">
-        <div id="vdClienteSuggestions" style="display:none;background:var(--bg-card);border:1.5px solid var(--line);border-radius:10px;margin-top:4px;max-height:140px;overflow-y:auto;"></div>
-      </div>
-
-      <!-- Nombre + apellido si es nueva -->
-      <div id="vdNuevaFields" style="display:none;margin-bottom:12px;">
-        <div style="display:flex;gap:8px;">
-          <input id="vdNuevaNombre" type="text" placeholder="Nombre" style="flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);">
-          <input id="vdNuevaApellido" type="text" placeholder="Apellido" style="flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);">
-        </div>
-      </div>
-
-      <!-- Lista de productos seleccionados -->
-      <div id="vdProductLines"></div>
-
-      <!-- Totales -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 4px;border-top:1px solid var(--line);margin-top:8px;">
-        <span style="font-size:14px;font-weight:600;color:var(--ink-soft);">Total</span>
-        <span id="vdTotal" style="font-size:18px;font-weight:800;color:var(--ink);">$0</span>
-      </div>
-
-      <!-- Forma de pago -->
-      <div style="margin:12px 0;">
-        <select id="vdFormaPago" style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%23888%22 stroke-width=%221.5%22 fill=%22none%22/></svg>');background-repeat:no-repeat;background-position:right 12px center;">
-          <option value="">Forma de pago ▾</option>
-          <option value="Efectivo">Efectivo</option>
-          <option value="Transferencia">Transferencia</option>
-          <option value="Tarjeta">Tarjeta</option>
-        </select>
-      </div>
-
-      <!-- Botón pagar -->
-      <button onclick="vdPagarAhora()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:16px;font-weight:800;color:var(--accent);cursor:pointer;letter-spacing:.3px;">Pagar ahora</button>
     </div>
 
     <div style="text-align: center; font-size: 12px; color: var(--ink-faint); font-weight: 500; line-height: 1.6;">
@@ -3504,7 +3443,13 @@ if ('caches' in window) {
     window._takingService = w.service;
     
     const topPart = w.isTop ? ' <span class="top-star">⭐ TOP</span>' : '';
-    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${w.service}</strong>.<br>Se registrará la hora automáticamente.`;
+    // Limpiar nombre del servicio si viene como JSON
+    let _svcDisplay = String(w.service || '');
+    if (_svcDisplay.trim().startsWith('{')) {
+      try { _svcDisplay = JSON.parse(_svcDisplay).nombre || _svcDisplay; }
+      catch(e) { const m = _svcDisplay.match(/"nombre"\s*:\s*"([^"]+)"/); if (m) _svcDisplay = m[1]; }
+    }
+    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${_svcDisplay}</strong>.<br>Se registrará la hora automáticamente.`;
 
     // Detectar si es servicio de depilación corporal con múltiples ítems
     const esDepi = w.area === 'depilacion' || String(w.service || '').toLowerCase().includes('depi') || String(w.service || '').toLowerCase().includes('bikini') || String(w.service || '').toLowerCase().includes('pierna') || String(w.service || '').toLowerCase().includes('axila');
@@ -3514,7 +3459,19 @@ if ('caches' in window) {
     if (esDepi) {
       // Parsear servicios individuales del ticket
       // El servicio puede venir como "Bikini completo + Medias piernas + Axilas" o similar
-      const servicioStr = String(w.service || '');
+      // Limpiar el servicio si viene como JSON {"nombre":"...","precio":...}
+      let servicioRaw = String(w.service || '');
+      if (servicioRaw.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(servicioRaw);
+          servicioRaw = parsed.nombre || parsed.name || servicioRaw;
+        } catch(e) {
+          // Si no parsea, extraer lo que está entre las primeras comillas de "nombre"
+          const m = servicioRaw.match(/"nombre"\s*:\s*"([^"]+)"/);
+          if (m) servicioRaw = m[1];
+        }
+      }
+      const servicioStr = servicioRaw;
       const partes = servicioStr.split(/\s*[\+\,]\s*/).map(s => s.trim()).filter(s => s && !s.includes('continuac') && !s.includes('completado'));
       
       // Intentar obtener precios del catálogo para cada parte
@@ -6491,175 +6448,7 @@ if ('caches' in window) {
   window._apClienteNombre = null;
   window._apProductosEnTicket = {}; // { ticketId: [{nombre, precio, cantidad}] }
 
-  // === VENTA DIRECTA DE PRODUCTO (sin servicio) ===
-  // ===== VENTA DIRECTA INLINE =====
-  window._vdLineas = [{ producto: '', precio: 0 }]; // array de líneas de producto
-  window._vdClienteSeleccionado = ''; // nombre final de la clienta
-
-  function toggleVentaDirecta() {
-    const form = document.getElementById('vdForm');
-    const btn  = document.getElementById('vdToggleBtn');
-    const chev = document.getElementById('vdChevron');
-    const open = form.style.display === 'block';
-    form.style.display = open ? 'none' : 'block';
-    chev.style.transform = open ? '' : 'rotate(180deg)';
-    btn.style.borderColor = open ? 'var(--line)' : 'var(--accent)';
-    btn.style.borderRadius = open ? 'var(--radius-sm)' : 'var(--radius-sm) var(--radius-sm) 0 0';
-    if (!open) {
-      // Asegurar productos cargados
-      if (!window._productosMarca || window._productosMarca.length === 0) cargarProductosMarca();
-      // Precargar directorio de clientas para el autocomplete
-      if (!window.CLIENT_DIRECTORY_CACHE || window.CLIENT_DIRECTORY_CACHE.length === 0) {
-        apiGet('getClientas').then(r => {
-          if (r.success) window.CLIENT_DIRECTORY_CACHE = r.clientas
-            .filter(c => c.codigo && c.nombre && /^C-\d{4}$/.test(String(c.codigo).trim()))
-            .map(c => ({ key: String(c.codigo).toLowerCase().replace(/-/g,''), code: String(c.codigo), name: String(c.nombre) }));
-        }).catch(()=>{});
-      }
-      window._vdLineas = [{ producto: '', precio: 0 }];
-      window._vdClienteSeleccionado = '';
-      vdRenderLineas();
-      vdActualizarTotal();
-      document.getElementById('vdTipoCliente').value = '';
-      document.getElementById('vdExistenteFields').style.display = 'block';
-      document.getElementById('vdNuevaFields').style.display = 'none';
-      document.getElementById('vdNombreExistente').value = '';
-      document.getElementById('vdClienteSuggestions').style.display = 'none';
-      document.getElementById('vdFormaPago').value = '';
-    }
-  }
-
-  function vdOnTipoClienteChange() {
-    const v = document.getElementById('vdTipoCliente').value;
-    document.getElementById('vdExistenteFields').style.display = (v === 'nueva') ? 'none' : 'block';
-    document.getElementById('vdNuevaFields').style.display = (v === 'nueva') ? 'block' : 'none';
-    window._vdClienteSeleccionado = '';
-  }
-
-  function vdBuscarCliente(q) {
-    window._vdClienteSeleccionado = '';
-    const sug = document.getElementById('vdClienteSuggestions');
-    if (!q || q.length < 2) { sug.style.display = 'none'; return; }
-    // Usar el cache del directorio de clientas
-    const lista = window.CLIENT_DIRECTORY_CACHE || [];
-    const found = lista.filter(c => {
-      const name = (c.name || c.nombre || '').toLowerCase();
-      return name.includes(q.toLowerCase());
-    }).slice(0, 6);
-    if (found.length === 0) { sug.style.display = 'none'; return; }
-    sug.innerHTML = found.map(c => {
-      const name = c.name || c.nombre || c.fullName || '';
-      return `<div onclick="vdSeleccionarCliente('${name.replace(/'/g,"\\'")}',this)"
-        style="padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--line);"
-        onmouseover="this.style.background='var(--accent-bg)'" onmouseout="this.style.background=''">
-        ${name}
-      </div>`;
-    }).join('');
-    sug.style.display = 'block';
-  }
-
-  function vdSeleccionarCliente(nombre, el) {
-    window._vdClienteSeleccionado = nombre;
-    document.getElementById('vdNombreExistente').value = nombre;
-    document.getElementById('vdClienteSuggestions').style.display = 'none';
-  }
-
-  function vdRenderLineas() {
-    const container = document.getElementById('vdProductLines');
-    const productos = window._productosMarca || [];
-    container.innerHTML = window._vdLineas.map((linea, idx) => {
-      const opts = productos.map(p =>
-        `<option value="${p.nombre}|${p.precio}" ${linea.producto === p.nombre ? 'selected' : ''}>${p.nombre} — $${p.precio}</option>`
-      ).join('');
-      return `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <select onchange="vdOnProductoChange(${idx},this)"
-            style="flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;background:var(--bg);color:var(--ink);appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22 viewBox=%220 0 12 8%22><path d=%22M1 1l5 5 5-5%22 stroke=%22%23888%22 stroke-width=%221.5%22 fill=%22none%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
-            <option value="">Producto... ▾</option>
-            ${opts}
-          </select>
-          <div style="min-width:46px;text-align:right;font-size:14px;font-weight:700;color:var(--ink);">
-            ${linea.precio > 0 ? '$' + linea.precio : ''}
-          </div>
-          ${window._vdLineas.length > 1
-            ? `<button onclick="vdQuitarLinea(${idx})" style="background:none;border:none;color:var(--danger,#e53);font-size:18px;cursor:pointer;padding:2px 4px;">✕</button>`
-            : '<div style="width:26px;"></div>'}
-        </div>`;
-    }).join('');
-    // Botón + Adicional
-    container.innerHTML += `
-      <button onclick="vdAgregarLinea()" style="width:100%;padding:9px;background:none;border:1.5px dashed var(--line);border-radius:10px;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink-soft);cursor:pointer;margin-bottom:4px;">+ Adicional</button>`;
-  }
-
-  function vdOnProductoChange(idx, sel) {
-    const val = sel.value;
-    if (!val) { window._vdLineas[idx] = { producto: '', precio: 0 }; }
-    else {
-      const [nombre, precio] = val.split('|');
-      window._vdLineas[idx] = { producto: nombre, precio: Number(precio) || 0 };
-    }
-    vdRenderLineas();
-    vdActualizarTotal();
-  }
-
-  function vdAgregarLinea() {
-    window._vdLineas.push({ producto: '', precio: 0 });
-    vdRenderLineas();
-  }
-
-  function vdQuitarLinea(idx) {
-    window._vdLineas.splice(idx, 1);
-    vdRenderLineas();
-    vdActualizarTotal();
-  }
-
-  function vdActualizarTotal() {
-    const total = window._vdLineas.reduce((s, l) => s + (l.precio || 0), 0);
-    document.getElementById('vdTotal').textContent = '$' + total.toFixed(2);
-  }
-
-  async function vdPagarAhora() {
-    const tipo = document.getElementById('vdTipoCliente').value;
-    let nombreCliente = '';
-    if (tipo === 'nueva') {
-      const n = (document.getElementById('vdNuevaNombre').value || '').trim();
-      const a = (document.getElementById('vdNuevaApellido').value || '').trim();
-      nombreCliente = (n + ' ' + a).trim() || 'Cliente';
-    } else {
-      nombreCliente = window._vdClienteSeleccionado || (document.getElementById('vdNombreExistente').value || '').trim() || 'Cliente';
-    }
-    const lineasValidas = window._vdLineas.filter(l => l.producto);
-    if (lineasValidas.length === 0) { showToast('⚠ Seleccioná al menos un producto'); return; }
-    const formaPago = document.getElementById('vdFormaPago').value;
-    if (!formaPago) { showToast('⚠ Seleccioná la forma de pago'); return; }
-    const total = lineasValidas.reduce((s, l) => s + l.precio, 0);
-    const productos = lineasValidas.map(l => ({ nombre: l.producto, precio: l.precio, cantidad: 1, subtotal: l.precio }));
-
-    // Descontar stock localmente
-    descontarStockVenta(productos);
-
-    try {
-      await apiPost('registrarVentaProductos', {
-        idEspera: '',
-        clienteNombre: nombreCliente,
-        productos,
-        total,
-        esVentaDirecta: true,
-        metodoPago: formaPago
-      });
-      showToast('✓ Venta registrada — $' + total.toFixed(2) + ' · ' + formaPago);
-      toggleVentaDirecta(); // cerrar el form
-      window._vdLineas = [{ producto: '', precio: 0 }];
-    } catch(e) {
-      console.error(e);
-      showToast('⚠ Error al registrar la venta');
-    }
-  }
-
-  function abrirVentaDirectaProducto() { toggleVentaDirecta(); } // alias por si queda alguna referencia
-
   function openAgregarProducto(idEspera, nombre, totalServicio) {
-    window._apEsVentaDirecta = false;
     window._apTicketId = idEspera;
     window._apClienteNombre = nombre;
     document.getElementById('apClienteName').textContent = 'Para: ' + nombre;
@@ -6777,43 +6566,33 @@ if ('caches' in window) {
     const id = window._apTicketId;
     const items = (id && window._apProductosEnTicket[id]) ? window._apProductosEnTicket[id] : [];
     if (items.length === 0) { closeModal(); return; }
-    const esVentaDirecta = window._apEsVentaDirecta === true;
-    const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
 
-    // Si NO es venta directa, mostrar en la card del ticket
-    if (!esVentaDirecta) {
-      const ticketDiv = document.getElementById('productos-ticket-' + id);
-      if (ticketDiv) {
-        ticketDiv.innerHTML = `
-          <div style="background:var(--accent-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">
-            <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">🛍 PRODUCTOS AGREGADOS</div>
-            ${items.map(i => `<div style="font-size:12px;font-weight:600;">• ${i.nombre} x${i.cantidad} = $${(i.precio*i.cantidad).toFixed(2)}</div>`).join('')}
-            <div style="font-size:12px;font-weight:800;color:var(--accent-deep);margin-top:4px;">Total productos: $${total.toFixed(2)}</div>
-          </div>
-        `;
-      }
+    // Mostrar en la card del ticket los productos agregados
+    const ticketDiv = document.getElementById('productos-ticket-' + id);
+    if (ticketDiv) {
+      const total = items.reduce((s, i) => s + (i.precio * i.cantidad), 0);
+      ticketDiv.innerHTML = `
+        <div style="background:var(--accent-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">
+          <div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px;">🛍 PRODUCTOS AGREGADOS</div>
+          ${items.map(i => `<div style="font-size:12px;font-weight:600;">• ${i.nombre} x${i.cantidad} = $${(i.precio*i.cantidad).toFixed(2)}</div>`).join('')}
+          <div style="font-size:12px;font-weight:800;color:var(--accent-deep);margin-top:4px;">Total productos: $${total.toFixed(2)}</div>
+        </div>
+      `;
     }
 
     // Descontar stock
     descontarStockVenta(items);
     try {
       await apiPost('registrarVentaProductos', {
-        // Para venta directa no hay idEspera — el backend lo maneja con idEspera vacío
-        idEspera: esVentaDirecta ? '' : id,
+        idEspera: id,
         clienteNombre: window._apClienteNombre || '',
         productos: items,
-        total: total,
-        esVentaDirecta: esVentaDirecta
+        total: items.reduce((s, i) => s + (i.precio * i.cantidad), 0)
       });
     } catch(e) { console.error('Error registrando productos:', e); }
 
     closeModal();
-    // Limpiar ticket de venta directa
-    if (esVentaDirecta && window._apProductosEnTicket[id]) {
-      delete window._apProductosEnTicket[id];
-    }
-    window._apEsVentaDirecta = false;
-    showToast('✓ ' + (esVentaDirecta ? 'Venta registrada: $' + total.toFixed(2) : 'Productos registrados para ' + (window._apClienteNombre || 'la clienta')));
+    showToast('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
     window._productosMarca = null;
     cargarProductosMarca();
   }
