@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95m - FIX: cejas puede hacer pestaña/lifting, AREA_CAPS actualizado (05/05/2026) -->
+<!-- NexServ v95n - FIX PROMO PERSIST: localStorage + restore después de PROMOS cargado (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3029,13 +3029,13 @@ if ('caches' in window) {
           data[k] = { promoName: p.promo.name, startedBy: p.startedBy, completedAreas: p.completedAreas || [], _metadata: p._metadata };
         }
       });
-      sessionStorage.setItem('nexserv_activePromos', JSON.stringify(data));
+      localStorage.setItem('nexserv_activePromos', JSON.stringify(data));
     } catch(e) {}
   }
 
   function restoreActivePromos() {
     try {
-      const raw = sessionStorage.getItem('nexserv_activePromos');
+      const raw = localStorage.getItem('nexserv_activePromos');
       if (!raw) return;
       const data = JSON.parse(raw);
       Object.keys(data).forEach(k => {
@@ -3075,8 +3075,8 @@ if ('caches' in window) {
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
-    if (id === 'activeService') { recargarAutorizacionesStaff(1); }
-    if (id === 'activeService2') { recargarAutorizacionesStaff(2); }
+    if (id === 'activeService') { restoreActivePromos(); recargarAutorizacionesStaff(1); setTimeout(() => updateFinishButtons(1), 400); }
+    if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); }
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
@@ -4931,11 +4931,11 @@ if ('caches' in window) {
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
     
-    // Restaurar promos activas persistidas (sobreviven recargas)
-    restoreActivePromos();
-
     // 🔧 Asegurar que PROMOS esté cargado ANTES de procesar atenciones
     await ensurePromosLoaded();
+
+    // Restaurar promos activas persistidas (después de cargar PROMOS)
+    restoreActivePromos();
     
     try {
       const result = await apiGet('getAtenciones', { chica: user.name });
@@ -6720,6 +6720,14 @@ if ('caches' in window) {
     btn.textContent = '✓ Confirmar cobro';
     btn.disabled = false;
     closeModal();
+    // Limpiar promo del localStorage
+    try {
+      const clientKey = normalizeClientKey(document.getElementById('cobrarClientName')?.textContent || '');
+      if (clientKey && activePromos[clientKey]) {
+        delete activePromos[clientKey];
+        saveActivePromos();
+      }
+    } catch(e) {}
     await loadPorCobrar();
 
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
