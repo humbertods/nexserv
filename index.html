@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95c - FIX assignDirect: trigger renderAssignDirect en show() (05/05/2026) -->
+<!-- NexServ v95d - FIX assignDirect: setTimeout 50ms + try/catch robusto (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2921,7 +2921,7 @@ if ('caches' in window) {
     if (id === 'ownerHome') loadOwnerHome();
     if (id === 'ownerPromos') renderPromos();
     if (id === 'staffPromos') await renderStaffPromos();
-    if (id === 'assignDirect') { renderAssignDirect(); }
+    if (id === 'assignDirect') { setTimeout(() => renderAssignDirect(), 50); }
     if (id === 'ownerReports') loadOwnerReports();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
@@ -9022,41 +9022,42 @@ if ('caches' in window) {
   }
 
   async function renderAssignDirect() {
-    // Mostrar staff inmediatamente sin esperar al backend
-    const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
-    const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicio = document.getElementById('arrService')?.value || '';
-    const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
-    
-    const topPart = isTop ? '⭐ ' : '';
-    document.getElementById('assignDirectClient').innerHTML = `
-      <div style="font-size: 13px; color: ${isTop ? 'var(--top-purple)' : 'var(--ink)'}; font-weight: 600;">
-        ${topPart}${nombre} · ${servicio}
-      </div>
-    `;
+    try {
+      const nombre = document.getElementById('arrSelName')?.textContent?.trim() || 'Clienta';
+      const area = document.getElementById('arrArea')?.value || 'Cejas';
+      const servicio = document.getElementById('arrService')?.value || '';
+      const isTop = document.getElementById('arrSelTop')?.style?.display !== 'none';
 
-    // Renderizar staff de inmediato (sin disponibilidad)
-    renderAssignDirectStaff({}, area);
+      const clientEl = document.getElementById('assignDirectClient');
+      if (clientEl) {
+        clientEl.innerHTML = `<div style="font-size:13px;color:${isTop?'var(--top-purple)':'var(--ink)'};font-weight:600;">${isTop?'⭐ ':''}${nombre}${servicio?' · '+servicio:''}</div>`;
+      }
 
-    // Luego cargar disponibilidad en background (máx 4 segundos)
+      // Mostrar staff inmediatamente
+      renderAssignDirectStaff({}, area);
+    } catch(e) {
+      console.error('renderAssignDirect error:', e);
+      // Fallback: mostrar staff sin datos de contexto
+      renderAssignDirectStaff({}, 'Cejas');
+    }
+
+    // Cargar disponibilidad en background
     try {
       const result = await Promise.race([
         apiGet('getListaCompleta'),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
       ]);
-      if (result.success) {
+      if (result && result.success) {
         const staffAvailability = {};
         [...(result.enServicio || []), ...(result.porCobrar || [])].forEach(item => {
           const chica = item.tomadaPor;
           if (!staffAvailability[chica]) staffAvailability[chica] = [];
           staffAvailability[chica].push(item.nombre);
         });
-        // Re-renderizar con disponibilidad real
+        const area = document.getElementById('arrArea')?.value || 'Cejas';
         renderAssignDirectStaff(staffAvailability, area);
       }
-    } catch(err) {
-      // Timeout — el staff ya está visible sin disponibilidad, no hacer nada
-    }
+    } catch(err) { /* timeout o error — staff ya visible */ }
   }
 
   function renderAssignDirectStaff(staffAvailability, area) {
