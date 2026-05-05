@@ -9372,12 +9372,14 @@ if ('caches' in window) {
     try {
       const nombre = document.getElementById('arrSelName')?.textContent?.trim() || 'Clienta';
       const area = document.getElementById('arrArea')?.value || 'Cejas';
-      const servicio = document.getElementById('arrService')?.value || '';
+      const _svcRaw1 = document.getElementById('arrService')?.value || '';
+      let _svcName1 = _svcRaw1;
+      try { if (_svcRaw1.startsWith('{')) _svcName1 = JSON.parse(_svcRaw1).nombre || _svcRaw1; } catch(e) {}
       const isTop = document.getElementById('arrSelTop')?.style?.display !== 'none';
 
       const clientEl = document.getElementById('assignDirectClient');
       if (clientEl) {
-        clientEl.innerHTML = `<div style="font-size:13px;color:${isTop?'var(--top-purple)':'var(--ink)'};font-weight:600;">${isTop?'⭐ ':''}${nombre}${servicio?' · '+servicio:''}</div>`;
+        clientEl.innerHTML = `<div style="font-size:13px;color:${isTop?'var(--top-purple)':'var(--ink)'};font-weight:600;">${isTop?'⭐ ':''}${nombre}${_svcName1?' · '+_svcName1:''}</div>`;
       }
 
       // Mostrar staff inmediatamente
@@ -9454,7 +9456,9 @@ if ('caches' in window) {
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
     const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicio = document.getElementById('arrService')?.value || '';
+    const _svcRawGA = document.getElementById('arrService')?.value || '';
+    let servicioGA = _svcRawGA, precioGA = 0;
+    try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
     const obs = document.getElementById('arrObs')?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     const promo = window._arrPromo || null;
@@ -9466,11 +9470,12 @@ if ('caches' in window) {
     const postData = {
       codigo: codigo,
       nombre: nombre,
-      servicio: servicio,
+      servicio: servicioGA,
       area: areaKey,
       prioridad: 'Normal',
       observaciones: obs,
       esTop: isTop ? 'Sí' : 'No',
+      total: precioGA,
       asignadaA: chica  // Asignación directa a esta chica
     };
 
