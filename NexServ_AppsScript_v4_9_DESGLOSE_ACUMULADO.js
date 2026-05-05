@@ -906,6 +906,37 @@ function handleConfirmarCobro(data) {
   const horaStr = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
   const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
 
+  // Primero encontrar el código de cliente del ticket cobrado
+  let codigoClienteCobrado = '';
+  let fechaCobro = '';
+  for (let i = 3; i < allData.length; i++) {
+    if (String(allData[i][0]).trim() === data.idEspera) {
+      codigoClienteCobrado = String(allData[i][3] || '').trim();
+      fechaCobro = String(allData[i][1] || '').trim(); // col B = fecha
+      break;
+    }
+  }
+
+  // Marcar TODOS los tickets 'Por cobrar' del mismo cliente del mismo día como Completada
+  // Esto maneja el caso de promos multi-área que generan múltiples filas
+  if (codigoClienteCobrado) {
+    for (let i = 3; i < allData.length; i++) {
+      const rowCodigo = String(allData[i][3] || '').trim();
+      const rowEstado = String(allData[i][8] || '').toLowerCase();
+      const rowFecha  = String(allData[i][1] || '').trim();
+      const rowId     = String(allData[i][0] || '').trim();
+      if (rowCodigo === codigoClienteCobrado
+          && rowFecha === fechaCobro
+          && (rowEstado === 'por cobrar' || rowEstado === 'en servicio')
+          && rowId !== data.idEspera) {
+        // Marcar filas hermanas como Completada también
+        ws.getRange(i + 1, 9).setValue('Completada');
+        ws.getRange(i + 1, 16).setValue(data.metodoPago || 'Efectivo');
+        ws.getRange(i + 1, 17).setValue(horaStr);
+      }
+    }
+  }
+
   for (let i = 3; i < allData.length; i++) {
     if (String(allData[i][0]).trim() === data.idEspera) {
       const row = i + 1;
@@ -1171,9 +1202,9 @@ function handleGetAtenciones(params) {
       horaToma: horaToma,
       observaciones: row[11] || '',
       total: row[12] || '0',
-      precioPromo: row[14] || row[12] || '0',  // col O (índice 14) = precioPromo
+      precioPromo: row[12] || '0',  // Agregar este campo explícitamente
       promoNombre: row[13] || '',
-      precioRegular: row[15] || row[14] || row[12] || '0'  // col P (índice 15) = precioRegular
+      precioRegular: row[14] || ''
     });
   }
   
