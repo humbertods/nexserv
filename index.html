@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95l - FIX MODAL: un solo botón extra "continuar misma promo" sin duplicar (05/05/2026) -->
+<!-- NexServ v95m - FIX: cejas puede hacer pestaña/lifting, AREA_CAPS actualizado (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2916,17 +2916,18 @@ if ('caches' in window) {
     if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
 
     // Áreas que puede hacer este staff
+    // IMPORTANTE: cejas puede hacer lifting de pestañas, retiro, bigote, depilaciones
     const AREA_FILTER_MAP = {
-      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil'],
-      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas'],
-      'facial':   ['facial']
+      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
+      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
+      'facial':   ['facial', '✨']
     };
     const myCapabilities = AREA_FILTER_MAP[myArea] || [myArea];
 
     // Ver cuáles divisiones puede hacer este staff
     const misPartes = promo.division.filter(d => {
       const areaD = String(d.area || '').toLowerCase();
-      return myCapabilities.some(cap => areaD.includes(cap));
+      return myCapabilities.some(cap => areaD.includes(cap.toLowerCase()));
     });
 
     if (misPartes.length === 0) return promo.price; // fallback al precio total
@@ -2961,14 +2962,14 @@ if ('caches' in window) {
 
     // Con promo multi-área — verificar si puede hacer todo sola
     const AREA_CAPS = {
-      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
-      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
-      'facial':   ['facial']
+      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
+      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
+      'facial':   ['facial', '✨']
     };
     const myCaps = AREA_CAPS[myArea] || [myArea];
     const promo = promoData.promo;
     const puedeTodo = promo.division && promo.division.length > 0 &&
-      promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+      promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
 
     let html = '';
     if (puedeTodo) {
@@ -4768,13 +4769,13 @@ if ('caches' in window) {
         const myArea = user?.area || 'cejas';
         const promo = promoData.promo;
         const AREA_CAPS = {
-          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
-          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
-          'facial':   ['facial']
+          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
+          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
+          'facial':   ['facial', '✨']
         };
         const myCaps = AREA_CAPS[myArea] || [myArea];
         const puedeTodo = promo.division && promo.division.length > 0 &&
-          promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+          promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
         if (btnDoAll) btnDoAll.style.display = puedeTodo ? 'block' : 'none';
         if (btnContSame) btnContSame.style.display = puedeTodo ? 'block' : 'none';
       } else {
@@ -4833,14 +4834,14 @@ if ('caches' in window) {
         const user = window.currentUser;
         const myArea = user?.area || 'cejas';
         const AREA_CAPS = {
-          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
-          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
-          'facial':   ['facial']
+          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
+          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
+          'facial':   ['facial', '✨']
         };
         const myCaps = AREA_CAPS[myArea] || [myArea];
         const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
           promoData.promo.division.length > 0 &&
-          promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+          promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
 
         // Remover botón extra anterior si existe
         const oldExtra = modal.querySelector('.finish-extra-btn');
