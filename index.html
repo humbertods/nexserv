@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95d - FIX assignDirect: setTimeout 50ms + try/catch robusto (05/05/2026) -->
+<!-- NexServ v95e - FIX PROMO: getMyPromoPrice suma todas las partes que puede hacer la staff (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2904,6 +2904,37 @@ if ('caches' in window) {
   // ============================================
   // UTILITY: Client Key Normalization
   // ============================================
+  // ============================================
+  // HELPER: calcular precio de promo para un staff según su área
+  // Si el staff puede hacer TODAS las partes de la promo, recibe el total completo
+  // Si solo puede hacer algunas partes, recibe la suma de esas partes
+  // ============================================
+  function getMyPromoPrice(promo, myArea) {
+    if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
+
+    // Áreas que puede hacer este staff
+    const AREA_FILTER_MAP = {
+      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil'],
+      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas'],
+      'facial':   ['facial']
+    };
+    const myCapabilities = AREA_FILTER_MAP[myArea] || [myArea];
+
+    // Ver cuáles divisiones puede hacer este staff
+    const misPartes = promo.division.filter(d => {
+      const areaD = String(d.area || '').toLowerCase();
+      return myCapabilities.some(cap => areaD.includes(cap));
+    });
+
+    if (misPartes.length === 0) return promo.price; // fallback al precio total
+    
+    // Si puede hacer TODAS las partes → precio total de la promo
+    if (misPartes.length === promo.division.length) return promo.price;
+
+    // Si puede hacer ALGUNAS → suma de sus partes
+    return misPartes.reduce((s, d) => s + Number(d.monto || 0), 0);
+  }
+
   function normalizeClientKey(name) {
     return String(name || '')
       .trim()
@@ -3474,13 +3505,7 @@ if ('caches' in window) {
               
               // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
               const myArea = user?.area || 'cejas';
-              const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-              const myDiv = promoFull.division ? promoFull.division.find(d =>
-                d.area === areaLabel || d.area.includes('Depilación') ||
-                (myArea === 'cejas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro'))) ||
-                (myArea === 'pestanas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro') || d.area.toLowerCase().includes('pestañ')))
-              ) : null;
-              const myPrice = myDiv ? myDiv.monto : promoFull.price;
+              const myPrice = getMyPromoPrice(promoFull, myArea);
               
               slotServices[1].push({
                 name: promoFull.name,
@@ -4745,14 +4770,7 @@ if ('caches' in window) {
             const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
             if (promoFull) {
               const myArea = user.area || 'cejas';
-              const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : myArea === 'facial' ? '✨ Facial' : myArea;
-              const myDiv = promoFull.division ? promoFull.division.find(d =>
-                d.area === areaLabel || d.area.toLowerCase().includes(myArea) ||
-                (myArea === 'cejas' && d.area.toLowerCase().includes('depil')) ||
-                (myArea === 'cejas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro'))) ||
-                (myArea === 'pestanas' && (d.area.toLowerCase().includes('lifting') || d.area.toLowerCase().includes('retiro') || d.area.toLowerCase().includes('pestañ') || d.area.toLowerCase().includes('pestaña')))
-              ) : null;
-              const myPrice = myDiv ? myDiv.monto : (a1.precioPromo || a1.total || 0);
+              const myPrice = getMyPromoPrice(promoFull, myArea);
 
               // Solo agregar si no existe ya
               if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
@@ -8467,10 +8485,8 @@ if ('caches' in window) {
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
     
-    // Obtener el precio que le corresponde a esta área
-    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
-    const myDiv = promo.division ? promo.division.find(d => d.area === areaLabel || d.area.includes('Depilación')) : null;
-    const myPrice = myDiv ? myDiv.monto : promo.price;
+    // Obtener el precio que le corresponde a esta área (suma todas las partes que puede hacer)
+    const myPrice = getMyPromoPrice(promo, myArea);
     
     // Agregar servicio de promo a slotServices
     const servicioPromo = {
@@ -8708,12 +8724,7 @@ if ('caches' in window) {
     // Limpiar servicios anteriores del slot y aplicar la promo
     slotServices[slot] = [];
     const myArea = user?.area || 'cejas';
-    const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
-    const myDiv = promoData.division ? promoData.division.find(d => {
-      const areaLower = (d.area||'').toLowerCase();
-      return areaLower.includes(myArea) || areaLower.includes(areaLabels[myArea]?.toLowerCase());
-    }) : null;
-    const myPrice = myDiv ? myDiv.monto : promoData.price;
+    const myPrice = getMyPromoPrice(promoData, myArea);
 
     slotServices[slot].push({
       name: promoData.name,
