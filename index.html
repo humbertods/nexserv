@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95o - FIX: devolverALista + recarga promo desde backend al entrar activeService (05/05/2026) -->
+<!-- NexServ v95p - FIX finishAndSendAll: llama finishSlot1 directamente con precio total (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4031,24 +4031,28 @@ if ('caches' in window) {
   
   // Opciones al finalizar servicio
   async function finishAndSendAll() {
-    // Staff hizo toda la promo sola — recibe el precio total completo
-    const slot = window._finishSlot || 1;
-    const user = window.currentUser;
+    const slot = window._finishSlot || window._finishingSlot || 1;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-    const promoData = window._finishPromoData;
+    const clientKey = normalizeClientKey(clientName);
+    const promoData = activePromos[clientKey] || window._finishPromoData;
 
+    // Actualizar precio a total completo de la promo
     if (promoData && promoData.promo) {
-      const precioTotal = promoData.promo.price; // precio completo de la promo
-      // Actualizar slotServices con el precio total
-      if (slotServices[slot] && slotServices[slot].length > 0) {
+      const precioTotal = promoData.promo.price;
+      if (!slotServices[slot] || slotServices[slot].length === 0) {
+        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }];
+      } else {
         slotServices[slot][0].price = precioTotal;
-        slotServices[slot][0].montoComision = precioTotal;
       }
-      window._finishFullPromo = true; // flag para que finishAndSend use precio completo
+      renderServicesForSlot(slot);
+      document.getElementById('as' + slot + 'Total').textContent = '$' + precioTotal;
+      window._finishFullPromo = true;
     }
 
     closeModal();
-    await finishAndSend();
+    // Llamar finishSlot directamente — ya tiene los servicios y precio correcto
+    if (slot === 1) await finishSlot1();
+    else await finishSlot2();
   }
 
   async function finishAndSend() {
