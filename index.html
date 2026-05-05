@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95n - FIX PROMO PERSIST: localStorage + restore después de PROMOS cargado (05/05/2026) -->
+<!-- NexServ v95o - FIX: devolverALista + recarga promo desde backend al entrar activeService (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3053,6 +3053,29 @@ if ('caches' in window) {
     } catch(e) {}
   }
 
+  async function devolverALista(slot) {
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    if (!clientName) return;
+    if (!confirm('¿Devolver a ' + clientName + ' a la lista de espera?')) return;
+    try {
+      const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+      await apiPost('devolverALista', {
+        idEspera: idEspera || '',
+        clienteNombre: clientName,
+        chicaNombre: window.currentUser?.name || ''
+      });
+      // Limpiar slot
+      slotServices[slot] = [];
+      if (window.currentUser && activeClients[window.currentUser.name]) {
+        activeClients[window.currentUser.name] = activeClients[window.currentUser.name].filter((_, i) => i !== slot - 1);
+      }
+      show('staffHome');
+      showToast('✓ ' + clientName + ' devuelta a la lista');
+    } catch(e) {
+      alert('Error al devolver a lista');
+    }
+  }
+
   function normalizeClientKey(name) {
     return String(name || '')
       .trim()
@@ -3075,8 +3098,50 @@ if ('caches' in window) {
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
-    if (id === 'activeService') { restoreActivePromos(); recargarAutorizacionesStaff(1); setTimeout(() => updateFinishButtons(1), 400); }
-    if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); }
+    if (id === 'activeService') {
+      restoreActivePromos();
+      recargarAutorizacionesStaff(1);
+      // Si hay clienta activa y no hay promo en memoria, intentar recargarla
+      setTimeout(async () => {
+        const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
+        if (clientName) {
+          const clientKey = normalizeClientKey(clientName);
+          if (!activePromos[clientKey] && PROMOS.length > 0) {
+            // Buscar si la clienta tiene promo en el backend
+            try {
+              const r = await apiGet('getListaCompleta');
+              if (r.success) {
+                const atencion = [...(r.enServicio||[])].find(a =>
+                  a.nombre === clientName || normalizeClientKey(a.nombre) === clientKey
+                );
+                if (atencion && atencion.promoNombre) {
+                  const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
+                  if (promoFull) {
+                    activePromos[clientKey] = {
+                      promo: promoFull,
+                      startedBy: window.currentUser?.area || 'cejas',
+                      completedAreas: [],
+                      _metadata: { displayName: clientName }
+                    };
+                    saveActivePromos();
+                    // Actualizar UI
+                    const myPrice = getMyPromoPrice(promoFull, window.currentUser?.area || 'cejas');
+                    if (slotServices[1] && slotServices[1].length === 0) {
+                      slotServices[1] = [{ name: promoFull.name, price: myPrice, area: window.currentUser?.area || 'cejas' }];
+                      renderServicesForSlot(1);
+                      document.getElementById('as1Total').textContent = '$' + myPrice;
+                      document.getElementById('as1SvcCount').textContent = '1';
+                    }
+                  }
+                }
+              }
+            } catch(e) {}
+          }
+        }
+        updateFinishButtons(1);
+      }, 500);
+    }
+    if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
