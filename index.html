@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v94w - FIX lifting: cejas/pestañas pueden hacer retiro/lifting en promos (04/05/2026) -->
+<!-- NexServ v94x - PRODUCTOS EN REPORTE: sección separada en owner home (04/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2832,6 +2832,42 @@ if ('caches' in window) {
             </div>
           </div>
         `).join('');
+
+        // Sección separada de ventas de productos
+        if (histResult.ventasProductos && histResult.ventasProductos.length > 0) {
+          histContainer.innerHTML += `
+            <div style="background:var(--bg-card);border-radius:16px;margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow-card);border-left:4px solid var(--accent);">
+              <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'"
+                style="display:flex;align-items:center;padding:14px 16px;cursor:pointer;gap:12px;">
+                <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🛍</div>
+                <div style="flex:1;">
+                  <div style="font-weight:700;font-size:15px;">Venta de productos</div>
+                  <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${histResult.ventasProductos.length} venta${histResult.ventasProductos.length!==1?'s':''} hoy · Sin comisión</div>
+                </div>
+                <div style="text-align:right;margin-right:8px;">
+                  <div style="font-size:18px;font-weight:800;color:var(--accent-deep);">$${Number(histResult.totalProductos||0).toFixed(2)}</div>
+                  <div style="font-size:11px;color:var(--ink-faint);">100% local</div>
+                </div>
+                <div style="color:var(--ink-faint);font-size:12px;">▼</div>
+              </div>
+              <div style="display:none;border-top:1px solid var(--line);padding:0 16px;">
+                ${histResult.ventasProductos.map((p,pi)=>`
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;${pi<histResult.ventasProductos.length-1?'border-bottom:1px solid var(--line);':''}">
+                    <div>
+                      <div style="font-size:13px;font-weight:600;">${p.cliente||'Clienta'}</div>
+                      <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${(p.producto||'').replace('🛍 ','')} · ${p.hora}</div>
+                    </div>
+                    <div style="font-size:15px;font-weight:700;color:var(--accent-deep);">$${Number(p.precio||0).toFixed(2)}</div>
+                  </div>
+                `).join('')}
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid var(--line);margin-top:2px;">
+                  <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">TOTAL PRODUCTOS</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${Number(histResult.totalProductos||0).toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
       } else {
         histContainer.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios registrados hoy</div>';
       }
