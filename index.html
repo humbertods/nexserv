@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v94z - FIX: async loadServiciosHistory (05/05/2026) -->
+<!-- NexServ v95 - FIX assignDirect: muestra staff inmediato, disponibilidad en background (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -8821,116 +8821,83 @@ if ('caches' in window) {
   }
 
   async function renderAssignDirect() {
-    await ensureCatalogoLoaded();
-    // Obtener datos de la clienta seleccionada
+    // Mostrar staff inmediatamente sin esperar al backend
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const area = document.getElementById('arrArea')?.value || 'Cejas';
     const servicio = document.getElementById('arrService')?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     
-    // Mostrar info de la clienta
     const topPart = isTop ? '⭐ ' : '';
     document.getElementById('assignDirectClient').innerHTML = `
       <div style="font-size: 13px; color: ${isTop ? 'var(--top-purple)' : 'var(--ink)'}; font-weight: 600;">
         ${topPart}${nombre} · ${servicio}
       </div>
     `;
-    
-    // Cargar lista de espera para obtener estado de cada staff
-    const staffAvailability = {};
+
+    // Renderizar staff de inmediato (sin disponibilidad)
+    renderAssignDirectStaff({}, area);
+
+    // Luego cargar disponibilidad en background (máx 4 segundos)
     try {
       const result = await Promise.race([
         apiGet('getListaCompleta'),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
       ]);
       if (result.success) {
+        const staffAvailability = {};
         [...(result.enServicio || []), ...(result.porCobrar || [])].forEach(item => {
-          const chicaNombre = item.tomadaPor;
-          if (!staffAvailability[chicaNombre]) staffAvailability[chicaNombre] = [];
-          staffAvailability[chicaNombre].push(item.nombre);
+          const chica = item.tomadaPor;
+          if (!staffAvailability[chica]) staffAvailability[chica] = [];
+          staffAvailability[chica].push(item.nombre);
         });
+        // Re-renderizar con disponibilidad real
+        renderAssignDirectStaff(staffAvailability, area);
       }
-    } catch (err) {
-      console.error('Error cargando disponibilidad:', err);
-      // Continuar sin disponibilidad — mostrar todas como libres
+    } catch(err) {
+      // Timeout — el staff ya está visible sin disponibilidad, no hacer nada
     }
-    
-    // Definir todo el staff del salón
+  }
+
+  function renderAssignDirectStaff(staffAvailability, area) {
     const allStaff = [
-      { name: 'María', area: 'Cejas', areas: ['cejas', 'depilacion'] },
-      { name: 'Keyla', area: 'Cejas', areas: ['cejas', 'depilacion'] },
-      { name: 'Lesly', area: 'Cejas', areas: ['cejas', 'depilacion'] },
-      { name: 'Rosa', area: 'Cejas', areas: ['cejas', 'depilacion'] },
+      { name: 'María',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Yadira', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
-      { name: 'Diana', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
-      { name: 'Laura', area: 'Facial', areas: ['facial'] }
+      { name: 'Diana',  area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
+      { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
     ];
-    
-    // Mapear área seleccionada
-    const areaMap = { 
-      'Cejas': 'cejas', 
-      'Depilación': 'depilacion', 
-      'Pestañas': 'pestanas', 
-      'Lifting / Retiro': 'retiro_lifting', 
-      'Facial': 'facial' 
-    };
+    const areaMap = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
     const areaKey = areaMap[area] || 'cejas';
-    
-    // Separar en disponibles para el área vs todas las demás
-    const forArea = [];
-    const others = [];
-    
+    const forArea = [], others = [];
+
     allStaff.forEach(staff => {
       const clients = staffAvailability[staff.name] || [];
       const isOccupied = clients.length > 0;
       const status = isOccupied ? 'Ocupada' : 'Libre';
       const statusBg = isOccupied ? 'var(--warning-bg)' : 'var(--success-bg)';
       const statusColor = isOccupied ? 'var(--warning)' : 'var(--success)';
-      const meta = isOccupied ? 
-        `${staff.area} · En servicio (${clients[0]})` : 
-        `${staff.area} · Disponible`;
-      const initials = staff.name.split(' ').map(n => n[0]).join('');
-      
-      const staffHtml = `
+      const meta = isOccupied ? `${staff.area} · En servicio (${clients[0]})` : `${staff.area} · Disponible`;
+      const initials = staff.name[0];
+      const html = `
         <div class="client-row" onclick="goAssign('${staff.name}')">
           <div class="client-avatar">${initials}</div>
           <div class="client-info">
             <div class="client-name">${staff.name}</div>
             <div class="client-meta">${meta}</div>
           </div>
-          <div style="background: ${statusBg}; color: ${statusColor}; font-size: 11px; padding: 4px 10px; border-radius: 100px; font-weight: 600;">${status}</div>
+          <div style="background:${statusBg};color:${statusColor};font-size:11px;padding:4px 10px;border-radius:100px;font-weight:600;">${status}</div>
         </div>
       `;
-      
-      if (staff.areas.includes(areaKey)) {
-        forArea.push(staffHtml);
-      } else {
-        others.push(staffHtml);
-      }
+      if (staff.areas.includes(areaKey)) forArea.push(html);
+      else others.push(html);
     });
-    
-    // Renderizar listas
-    let html = '';
-    
-    if (forArea.length > 0) {
-      html += `
-        <div class="section-title">Disponibles para ${area}</div>
-        <div class="card" style="padding: 8px 20px;">
-          ${forArea.join('')}
-        </div>
-      `;
-    }
-    
-    if (others.length > 0) {
-      html += `
-        <div class="section-title">Cualquier chica del salón</div>
-        <div class="card" style="padding: 8px 20px;">
-          ${others.join('')}
-        </div>
-      `;
-    }
-    
-    document.getElementById('assignDirectStaffList').innerHTML = html;
+
+    let out = '';
+    if (forArea.length > 0) out += `<div class="section-title">Disponibles para ${area}</div><div class="card" style="padding:8px 20px;">${forArea.join('')}</div>`;
+    if (others.length > 0) out += `<div class="section-title">Cualquier chica del salón</div><div class="card" style="padding:8px 20px;">${others.join('')}</div>`;
+    document.getElementById('assignDirectStaffList').innerHTML = out;
   }
 
   async function goAssign(chica) {
