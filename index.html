@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95j - FIX PROMO PERSIST: activePromos se guarda en sessionStorage (05/05/2026) -->
+<!-- NexServ v95k - FIX MODAL: botones reconstruidos dinámicamente al abrir (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4828,7 +4828,42 @@ if ('caches' in window) {
       }
       
       const modal = document.getElementById('finishOptionsModal');
-      if (modal) modal.classList.add('active');
+      if (modal) {
+        // Reconstruir los botones del modal completamente para garantizar que estén actualizados
+        const user = window.currentUser;
+        const myArea = user?.area || 'cejas';
+        const AREA_CAPS = {
+          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
+          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
+          'facial':   ['facial']
+        };
+        const myCaps = AREA_CAPS[myArea] || [myArea];
+        const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
+          promoData.promo.division.length > 0 &&
+          promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+
+        // Buscar div de botones o crear uno
+        let btnArea = modal.querySelector('.finish-btn-area');
+        if (!btnArea) {
+          btnArea = document.createElement('div');
+          btnArea.className = 'finish-btn-area';
+          modal.querySelector('.modal').appendChild(btnArea);
+        }
+
+        btnArea.innerHTML = `
+          ${puedeTodo ? `
+            <button class="btn-primary" style="margin-bottom:10px;background:#2d6a4f;" onclick="finishAndSendAll()">✅ Yo termino el combo completo — cobrar total</button>
+            <button class="btn-primary outline" style="margin-bottom:10px;border-color:#2d6a4f;color:#2d6a4f;" onclick="finishAndContinueSameStaff()">🔄 Continuar con la misma promo (yo la termino)</button>
+          ` : ''}
+          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishAndSend()">💰 ${promoData && puedeTodo ? 'Mandar a cobrar (mi parte)' : 'Mandar a cobrar'}</button>
+          ${promoData || hayAreasExtras ? `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinue()">➡️ Continuar en otra área${promoData ? ' (promo)' : ''}</button>` : ''}
+          <button class="btn-primary outline" style="margin-bottom:10px;color:var(--danger);border-color:var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
+          <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
+          <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
+        `;
+
+        modal.classList.add('active');
+      }
     }, 100);
   }
 
