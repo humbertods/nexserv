@@ -1171,9 +1171,9 @@ function handleGetAtenciones(params) {
       horaToma: horaToma,
       observaciones: row[11] || '',
       total: row[12] || '0',
-      precioPromo: row[12] || '0',  // Agregar este campo explícitamente
+      precioPromo: row[14] || row[12] || '0',  // col O (índice 14) = precioPromo
       promoNombre: row[13] || '',
-      precioRegular: row[14] || ''
+      precioRegular: row[15] || row[14] || row[12] || '0'  // col P (índice 15) = precioRegular
     });
   }
   
