@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v94x - PRODUCTOS EN REPORTE: sección separada en owner home (04/05/2026) -->
+<!-- NexServ v94y - ELIMINAR SERVICIO: botón 🗑 en historial Mikaela y owner (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2818,11 +2818,14 @@ if ('caches' in window) {
             <div id="staff-detail-${idx}" style="display: none; border-top: 1px solid var(--line); padding: 0 16px;">
               ${s.servicios.map((sv, si) => `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; ${si < s.servicios.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
-                  <div>
+                  <div style="flex:1;">
                     <div style="font-size: 13px; font-weight: 600;">${sv.cliente}</div>
                     <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${sv.servicio} · ${sv.hora}</div>
                   </div>
-                  <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Number(sv.precio || 0)}</div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Number(sv.precio || 0)}</div>
+                    <button onclick="confirmarEliminarOwner('${encodeURIComponent(JSON.stringify(sv))}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+                  </div>
                 </div>
               `).join('')}
               <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid var(--line); margin-top: 2px;">
@@ -2874,6 +2877,22 @@ if ('caches' in window) {
     } catch (err) {
       console.error('Error cargando owner home:', err);
     }
+  }
+
+  function confirmarEliminarOwner(svJson) {
+    let sv;
+    try { sv = JSON.parse(decodeURIComponent(svJson)); } catch(e) { return; }
+    const msg = `¿Eliminar este registro?\n\n• Cliente: ${sv.cliente}\n• Servicio: ${sv.servicio}\n• Monto: $${sv.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
+    if (!confirm(msg)) return;
+    eliminarServicio({
+      nombre: sv.cliente,
+      servicio: sv.servicio,
+      chica: sv.staff || sv.chica || '',
+      precio: sv.precio || 0,
+      comision: sv.comision || 0,
+      fecha: sv.fecha || '',
+      hora: sv.hora || ''
+    });
   }
 
   function toggleStaffHistorial(idx) {
@@ -5621,7 +5640,38 @@ if ('caches' in window) {
   }
   
   
-  async function loadServiciosHistory() {
+  function confirmarEliminarServicio(itemIdx) {
+    const item = window._historialItems && window._historialItems[itemIdx];
+    if (!item) return;
+    const msg = `¿Eliminar este registro?\n\n• Cliente: ${item.nombre || item.clienteNombre}\n• Servicio: ${item.servicio}\n• Staff: ${item.chica}\n• Monto: $${item.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
+    if (!confirm(msg)) return;
+    eliminarServicio(item);
+  }
+
+  async function eliminarServicio(item) {
+    try {
+      showToast('⏳ Eliminando registro...');
+      const result = await apiPost('eliminarServicio', {
+        fecha: item.fecha,
+        hora: item.hora,
+        cliente: item.nombre || item.clienteNombre || '',
+        staff: item.chica || '',
+        servicio: item.servicio || '',
+        precio: item.precio || 0,
+        comision: item.comision || 0
+      });
+      if (result.success) {
+        showToast('✓ Registro eliminado correctamente');
+        loadServiciosHistory(); // recargar
+      } else {
+        alert('Error al eliminar: ' + (result.error || 'desconocido'));
+      }
+    } catch(e) {
+      alert('Error de conexión al eliminar');
+    }
+  }
+
+  function loadServiciosHistory() {
     const semanaOffset = parseInt(document.getElementById('historyWeekSelect')?.value || '0');
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>';
@@ -5646,13 +5696,13 @@ if ('caches' in window) {
       const DIAS_ORDER = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
       const DIAS_LABEL = { 1:'Lunes', 2:'Martes', 3:'Miercoles', 4:'Jueves', 5:'Viernes', 6:'Sabado', 0:'Domingo' };
 
-      // Filtrar y agrupar por dia -> staff
+      // Filtrar y agrupar por dia -> staff — guardar referencia para eliminar
       const porDia = {};
       let totalSemana = 0, totalServicios = 0;
+      window._historialItems = []; // guardar todos los items para poder eliminarlos por índice
 
-      result.historial.forEach(function(h) {
+      result.historial.forEach(function(h, globalIdx) {
         if (!h.nombre && !h.clienteNombre) return;
-        // Parsear fecha
         const parts = String(h.fecha || '').split('/');
         if (parts.length !== 3) return;
         const fechaDate = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
@@ -5666,10 +5716,12 @@ if ('caches' in window) {
         const servicio = String(h.servicio || '—');
         const hora = String(h.hora || '');
         const metodo = String(h.metodoPago || 'Efectivo');
+        const itemIdx = window._historialItems.length;
+        window._historialItems.push({ ...h, _idx: itemIdx });
 
         if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, staff: {} };
         if (!porDia[diaN].staff[staff]) porDia[diaN].staff[staff] = { nombre: staff, total: 0, servicios: [] };
-        porDia[diaN].staff[staff].servicios.push({ cliente, servicio, valor, hora, metodo });
+        porDia[diaN].staff[staff].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
         porDia[diaN].staff[staff].total += valor;
         porDia[diaN].total += valor;
         totalSemana += valor;
@@ -5722,12 +5774,16 @@ if ('caches' in window) {
                     '</div>' +
                     '<div id="staff-hist-' + di + '-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
                       s.servicios.map(function(sv, svi) {
+                        const canDelete = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
                         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
-                          '<div>' +
+                          '<div style="flex:1;">' +
                             '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
                             '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
                           '</div>' +
-                          '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                          '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                            (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🗑</button>' : '') +
+                          '</div>' +
                         '</div>';
                       }).join('') +
                     '</div>' +
