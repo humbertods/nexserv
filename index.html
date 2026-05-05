@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95p - FIX finishAndSendAll: llama finishSlot1 directamente con precio total (05/05/2026) -->
+<!-- NexServ v95q - FIX: finishAndSendAll prepara slotServices antes de finishSlot1 (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4031,28 +4031,25 @@ if ('caches' in window) {
   
   // Opciones al finalizar servicio
   async function finishAndSendAll() {
-    const slot = window._finishSlot || window._finishingSlot || 1;
+    const slot = 1; // siempre slot 1 para cejas
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
     const promoData = activePromos[clientKey] || window._finishPromoData;
 
-    // Actualizar precio a total completo de la promo
     if (promoData && promoData.promo) {
       const precioTotal = promoData.promo.price;
-      if (!slotServices[slot] || slotServices[slot].length === 0) {
-        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }];
-      } else {
-        slotServices[slot][0].price = precioTotal;
-      }
+      // Asegurar que slotServices tiene el servicio con precio total
+      slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }];
       renderServicesForSlot(slot);
       document.getElementById('as' + slot + 'Total').textContent = '$' + precioTotal;
+      document.getElementById('as' + slot + 'SvcCount').textContent = '1';
       window._finishFullPromo = true;
     }
 
     closeModal();
-    // Llamar finishSlot directamente — ya tiene los servicios y precio correcto
-    if (slot === 1) await finishSlot1();
-    else await finishSlot2();
+    // Pequeña pausa para que el DOM se actualice antes de finalizar
+    await new Promise(r => setTimeout(r, 100));
+    await finishSlot1();
   }
 
   async function finishAndSend() {
