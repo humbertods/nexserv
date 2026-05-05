@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95i - PROMO: 2 botones verdes "yo termino" + "continuar misma promo" (05/05/2026) -->
+<!-- NexServ v95j - FIX PROMO PERSIST: activePromos se guarda en sessionStorage (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3018,6 +3018,40 @@ if ('caches' in window) {
     updateFinishButtons(slot);
   }
 
+  // Persistir activePromos en sessionStorage para sobrevivir recargas
+  function saveActivePromos() {
+    try {
+      const data = {};
+      Object.keys(activePromos).forEach(k => {
+        const p = activePromos[k];
+        if (p && p.promo) {
+          data[k] = { promoName: p.promo.name, startedBy: p.startedBy, completedAreas: p.completedAreas || [], _metadata: p._metadata };
+        }
+      });
+      sessionStorage.setItem('nexserv_activePromos', JSON.stringify(data));
+    } catch(e) {}
+  }
+
+  function restoreActivePromos() {
+    try {
+      const raw = sessionStorage.getItem('nexserv_activePromos');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      Object.keys(data).forEach(k => {
+        if (activePromos[k]) return; // ya existe
+        const promoFull = PROMOS.find(p => p.name === data[k].promoName);
+        if (promoFull) {
+          activePromos[k] = {
+            promo: promoFull,
+            startedBy: data[k].startedBy || 'cejas',
+            completedAreas: data[k].completedAreas || [],
+            _metadata: data[k]._metadata || {}
+          };
+        }
+      });
+    } catch(e) {}
+  }
+
   function normalizeClientKey(name) {
     return String(name || '')
       .trim()
@@ -3613,6 +3647,7 @@ if ('caches' in window) {
                   registeredAt: Date.now()
                 }
               };
+              saveActivePromos(); // persistir
               
               console.log('✅ Promo registered:', {
                 key: clientKey,
@@ -4863,6 +4898,9 @@ if ('caches' in window) {
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
     
+    // Restaurar promos activas persistidas (sobreviven recargas)
+    restoreActivePromos();
+
     // 🔧 Asegurar que PROMOS esté cargado ANTES de procesar atenciones
     await ensurePromosLoaded();
     
@@ -4940,6 +4978,7 @@ if ('caches' in window) {
                 completedAreas: [],
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
+              saveActivePromos(); // persistir en sessionStorage
               // Actualizar botones de finalización con opciones de promo
               setTimeout(() => updateFinishButtons(1), 300);
             }
