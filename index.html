@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95f - PROMO TODO SOLA: botón "Hice todo el combo yo sola" en modal finalizar (05/05/2026) -->
+<!-- NexServ v95g - FIX: finishDoAllBtn creado dinámicamente si no existe en HTML (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4622,13 +4622,25 @@ if ('caches' in window) {
       }
       
       // Mostrar botón "Hice todo el combo yo sola" si la staff puede hacer toda la promo
-      const btnDoAll = document.getElementById('finishDoAllBtn');
+      let btnDoAll = document.getElementById('finishDoAllBtn');
+      // Crear el botón dinámicamente si no existe (compatibilidad con HTML viejo)
+      if (!btnDoAll) {
+        btnDoAll = document.createElement('button');
+        btnDoAll.id = 'finishDoAllBtn';
+        btnDoAll.className = 'btn-primary';
+        btnDoAll.style.cssText = 'margin-bottom: 10px; background: var(--success); display: none;';
+        btnDoAll.textContent = '✅ Hice todo el combo yo sola — mandar a cobrar';
+        btnDoAll.onclick = finishAndSendAll;
+        // Insertarlo antes del primer botón del modal
+        const modal = document.getElementById('finishOptionsModal');
+        const firstBtn = modal?.querySelector('.btn-primary');
+        if (firstBtn) firstBtn.parentNode.insertBefore(btnDoAll, firstBtn);
+      }
       if (btnDoAll) {
         if (promoData && promoData.promo) {
           const user = window.currentUser;
           const myArea = user?.area || 'cejas';
           const promo = promoData.promo;
-          // Verificar si esta staff puede hacer todas las partes
           const AREA_CAPS = {
             'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
             'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
