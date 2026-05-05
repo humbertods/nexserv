@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95 - FIX assignDirect: muestra staff inmediato, disponibilidad en background (05/05/2026) -->
+<!-- NexServ v95b - OWNER REPORTS: diseño jerárquico día→staff→servicios con comisiones (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1951,27 +1951,24 @@ if ('caches' in window) {
     </div>
 
     <!-- Filtro de período -->
-    <div style="display: flex; gap: 6px; margin-bottom: 20px; background: var(--bg-card); border-radius: var(--radius-pill); padding: 5px; box-shadow: var(--shadow-card);">
-      <button onclick="switchPeriod('dia', this)" class="period-btn active-period" style="flex: 1; padding: 12px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .2s;">Hoy</button>
-      <button onclick="switchPeriod('semana', this)" class="period-btn" style="flex: 1; padding: 12px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); transition: all .2s;">Semana</button>
-      <button onclick="switchPeriod('mes', this)" class="period-btn" style="flex: 1; padding: 12px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); transition: all .2s;">Mes</button>
+    <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--bg-card);border-radius:var(--radius-pill);padding:5px;box-shadow:var(--shadow-card);">
+      <button onclick="ownerSetPeriod('hoy',this)" id="ownerPeriodHoy" class="period-btn active-period" style="flex:1;padding:12px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;">Hoy</button>
+      <button onclick="ownerSetPeriod('semana',this)" id="ownerPeriodSemana" class="period-btn" style="flex:1;padding:12px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--ink-soft);transition:all .2s;">Semana</button>
+      <button onclick="ownerSetPeriod('mes',this)" id="ownerPeriodMes" class="period-btn" style="flex:1;padding:12px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--ink-soft);transition:all .2s;">Mes</button>
     </div>
 
-    <!-- Filtro por chica -->
-    <div class="input-group" style="margin-bottom: 20px;">
-      <select id="reportStaff" onchange="renderReport()" style="padding: 14px 20px;">
-        <option value="all">👥 Todo el equipo</option>
-        <option value="maria">💅 María</option>
-        <option value="lesly">💅 Lesly</option>
-        <option value="keyla">💅 Keyla</option>
-        <option value="yadira">👁 Yadira</option>
-        <option value="diana">👁 Diana</option>
-        <option value="laura">✨ Laura</option>
-      </select>
+    <!-- Stats globales -->
+    <div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+      <div class="stat success"><div class="label">Servicios</div><div class="value" id="ownerRptServicios">0</div></div>
+      <div class="stat purple"><div class="label">Total</div><div class="value" id="ownerRptTotal">$0</div></div>
+      <div class="stat"><div class="label">Comisiones</div><div class="value" style="color:var(--danger);" id="ownerRptComm">$0</div></div>
     </div>
 
-    <!-- Contenido del reporte -->
-    <div id="reportContent"></div>
+    <!-- Lista por días -->
+    <div class="section-title">Servicios cobrados por Mikaela <span class="count" id="ownerRptCount">0</span></div>
+    <div id="ownerRptList">
+      <div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>
+    </div>
 
     <nav class="nav">
       <button onclick="show('ownerHome')"><span class="icon">⌂</span></button>
@@ -2924,7 +2921,7 @@ if ('caches' in window) {
     if (id === 'ownerHome') loadOwnerHome();
     if (id === 'ownerPromos') renderPromos();
     if (id === 'staffPromos') await renderStaffPromos();
-    if (id === 'ownerReports') renderReport();
+    if (id === 'ownerReports') loadOwnerReports();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
@@ -8006,16 +8003,219 @@ if ('caches' in window) {
     renderReport();
   }
 
-  async function renderReport() {
-    const container = document.getElementById('reportContent');
-    if (container) container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Cargando...</div>';
-    await loadReportData();
-    const staffKey = document.getElementById('reportStaff').value;
-    if (staffKey === 'all') {
-      renderTeamReport(container);
-    } else {
-      renderStaffReport(container, staffKey);
+  let _ownerRptPeriod = 'hoy';
+
+  function ownerSetPeriod(period, btn) {
+    _ownerRptPeriod = period;
+    document.querySelectorAll('.period-btn').forEach(b => {
+      b.style.background = 'transparent';
+      b.style.color = 'var(--ink-soft)';
+    });
+    if (btn) { btn.style.background = 'var(--ink)'; btn.style.color = 'white'; }
+    loadOwnerReports();
+  }
+
+  async function renderReport() { loadOwnerReports(); }
+
+  async function loadOwnerReports() {
+    const list = document.getElementById('ownerRptList');
+    if (!list) return;
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>';
+
+    try {
+      const result = await apiGet('getHistorial', { periodo: 'todo' });
+      if (!result.success || !result.historial) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin datos</div>';
+        return;
+      }
+
+      const now = new Date();
+      const DIAS_LABEL = { 1:'Lunes', 2:'Martes', 3:'Miercoles', 4:'Jueves', 5:'Viernes', 6:'Sabado', 0:'Domingo' };
+      const hoyNombre = DIAS_LABEL[now.getDay()];
+
+      // Calcular rango según período
+      let desde = new Date(0), hasta = new Date();
+      if (_ownerRptPeriod === 'hoy') {
+        desde = new Date(now); desde.setHours(0,0,0,0);
+      } else if (_ownerRptPeriod === 'semana') {
+        const dow = (now.getDay() + 6) % 7;
+        desde = new Date(now); desde.setDate(now.getDate() - dow); desde.setHours(0,0,0,0);
+      } else { // mes
+        desde = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      // Separar servicios y productos
+      const soloServicios = result.historial.filter(h => String(h.metodoPago||'').toLowerCase() !== 'producto');
+      const soloProductos = result.historial.filter(h => String(h.metodoPago||'').toLowerCase() === 'producto');
+
+      // Filtrar por período y agrupar por día → staff
+      const porDia = {};
+      let totalGlobal = 0, totalComm = 0, countServ = 0;
+      window._ownerRptItems = [];
+
+      soloServicios.forEach(h => {
+        const parts = String(h.fecha||'').split('/');
+        if (parts.length !== 3) return;
+        const fd = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
+        if (fd < desde || fd > hasta) return;
+
+        const diaN = DIAS_LABEL[fd.getDay()] || 'Otro';
+        const staff = String(h.chica || '—');
+        const valor = Number(h.precio || 0);
+        const comision = Number(h.comision || 0);
+        const itemIdx = window._ownerRptItems.length;
+        window._ownerRptItems.push({...h, _idx: itemIdx});
+
+        if (!porDia[diaN]) porDia[diaN] = { dia: diaN, fecha: fd, total: 0, comm: 0, staff: {} };
+        if (!porDia[diaN].staff[staff]) porDia[diaN].staff[staff] = { nombre: staff, total: 0, comm: 0, servicios: [] };
+        porDia[diaN].staff[staff].servicios.push({
+          cliente: h.nombre || h.clienteNombre || '—',
+          servicio: h.servicio || '—',
+          valor, comision,
+          hora: h.hora || '',
+          metodo: h.metodoPago || 'Efectivo',
+          itemIdx
+        });
+        porDia[diaN].staff[staff].total += valor;
+        porDia[diaN].staff[staff].comm += comision;
+        porDia[diaN].total += valor;
+        porDia[diaN].comm += comision;
+        totalGlobal += valor;
+        totalComm += comision;
+        countServ++;
+      });
+
+      // Filtrar productos por período
+      const prodFiltrados = soloProductos.filter(h => {
+        const parts = String(h.fecha||'').split('/');
+        if (parts.length !== 3) return false;
+        const fd = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
+        return fd >= desde && fd <= hasta;
+      });
+      const totalProductos = prodFiltrados.reduce((s, p) => s + Number(p.precio||0), 0);
+
+      // Stats globales
+      document.getElementById('ownerRptServicios').textContent = countServ;
+      document.getElementById('ownerRptTotal').textContent = '$' + (totalGlobal + totalProductos).toFixed(0);
+      document.getElementById('ownerRptComm').textContent = '$' + totalComm.toFixed(0);
+      document.getElementById('ownerRptCount').textContent = countServ;
+
+      const dias = Object.values(porDia).sort((a,b) => b.fecha - a.fecha);
+
+      if (dias.length === 0 && prodFiltrados.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin registros en este período</div>';
+        return;
+      }
+
+      // Render días
+      let html = dias.map((diaData, di) => {
+        const esHoy = diaData.dia === hoyNombre && _ownerRptPeriod !== 'mes';
+        const label = diaData.dia + (esHoy ? ' (HOY)' : '');
+        const staffList = Object.values(diaData.staff);
+
+        return `<div style="margin-bottom:6px;">
+          <div onclick="ownerToggleDia(${di})" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">
+            <div>
+              <div style="font-size:15px;font-weight:700;">${label}</div>
+              <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${staffList.length} staff · ${staffList.reduce((s,x)=>s+x.servicios.length,0)} servicios</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div>
+                <div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$${diaData.total.toFixed(0)}</div>
+                <div style="font-size:10px;color:var(--danger);text-align:right;">Com. $${diaData.comm.toFixed(1)}</div>
+              </div>
+              <div id="arrow-owner-dia-${di}" style="color:var(--ink-faint);font-size:11px;">▼</div>
+            </div>
+          </div>
+          <div id="owner-dia-${di}" style="display:none;padding:0 4px;">
+            ${staffList.map((s, si) => `
+              <div style="margin-top:4px;">
+                <div onclick="ownerToggleStaff(${di},${si})" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+                  <div>
+                    <div style="font-size:13px;font-weight:700;">${s.nombre}</div>
+                    <div style="font-size:11px;color:var(--ink-soft);">${s.servicios.length} servicio${s.servicios.length!==1?'s':''}</div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="text-align:right;">
+                      <div style="font-size:14px;font-weight:800;">$${s.total.toFixed(0)}</div>
+                      <div style="font-size:10px;color:var(--danger);">Com. $${s.comm.toFixed(1)}</div>
+                    </div>
+                    <div id="arrow-owner-staff-${di}-${si}" style="color:var(--ink-faint);font-size:11px;">▼</div>
+                  </div>
+                </div>
+                <div id="owner-staff-${di}-${si}" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">
+                  ${s.servicios.map((sv, svi) => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;${svi<s.servicios.length-1?'border-bottom:1px solid var(--line);':''}">
+                      <div style="flex:1;">
+                        <div style="font-size:13px;font-weight:600;">${sv.cliente}</div>
+                        <div style="font-size:11px;color:var(--ink-soft);">${sv.servicio} · ${sv.hora} · ${sv.metodo}</div>
+                        <div style="font-size:10px;color:var(--danger);margin-top:2px;">Com. $${sv.comision.toFixed(2)}</div>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="font-size:14px;font-weight:800;color:var(--success);">$${sv.valor.toFixed(0)}</div>
+                        <button onclick="confirmarEliminarServicio(${sv.itemIdx})" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                  <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid var(--line);margin-top:2px;">
+                    <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">SUBTOTAL</div>
+                    <div style="font-size:14px;font-weight:800;">$${s.total.toFixed(0)}</div>
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      }).join('');
+
+      // Sección de productos si hay
+      if (prodFiltrados.length > 0) {
+        html += `
+          <div style="margin-top:8px;">
+            <div class="section-title">Venta de productos</div>
+            <div style="background:var(--bg-card);border-radius:16px;padding:14px 16px;border-left:4px solid var(--accent);">
+              ${prodFiltrados.map(p => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);">
+                  <div>
+                    <div style="font-size:13px;font-weight:600;">${p.nombre||p.clienteNombre||'—'}</div>
+                    <div style="font-size:11px;color:var(--ink-soft);">${(p.servicio||'').replace('🛍 ','')} · ${p.hora||''}</div>
+                  </div>
+                  <div style="font-size:14px;font-weight:800;color:var(--accent-deep);">$${Number(p.precio||0).toFixed(2)}</div>
+                </div>
+              `).join('')}
+              <div style="display:flex;justify-content:space-between;padding:10px 0;margin-top:4px;">
+                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">TOTAL PRODUCTOS · Sin comisión</div>
+                <div style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalProductos.toFixed(2)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      list.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin registros</div>';
+
+    } catch(e) {
+      console.error(e);
+      list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Error cargando datos</div>';
     }
+  }
+
+  function ownerToggleDia(di) {
+    const el = document.getElementById('owner-dia-'+di);
+    const arrow = document.getElementById('arrow-owner-dia-'+di);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    if (arrow) arrow.textContent = open ? '▼' : '▲';
+  }
+
+  function ownerToggleStaff(di, si) {
+    const el = document.getElementById('owner-staff-'+di+'-'+si);
+    const arrow = document.getElementById('arrow-owner-staff-'+di+'-'+si);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : 'block';
+    if (arrow) arrow.textContent = open ? '▼' : '▲';
   }
 
   function renderTeamReport(el) {
