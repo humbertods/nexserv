@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95q - FIX: finishAndSendAll prepara slotServices antes de finishSlot1 (05/05/2026) -->
+<!-- NexServ v95r - FIX: updateFinishButtons después de llenar slotServices desde backend (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3124,21 +3124,25 @@ if ('caches' in window) {
                       _metadata: { displayName: clientName }
                     };
                     saveActivePromos();
-                    // Actualizar UI
+                    // Actualizar UI con precio correcto
                     const myPrice = getMyPromoPrice(promoFull, window.currentUser?.area || 'cejas');
-                    if (slotServices[1] && slotServices[1].length === 0) {
-                      slotServices[1] = [{ name: promoFull.name, price: myPrice, area: window.currentUser?.area || 'cejas' }];
-                      renderServicesForSlot(1);
-                      document.getElementById('as1Total').textContent = '$' + myPrice;
-                      document.getElementById('as1SvcCount').textContent = '1';
-                    }
+                    // Siempre cargar el servicio en slotServices
+                    slotServices[1] = [{ name: promoFull.name, price: myPrice, area: window.currentUser?.area || 'cejas' }];
+                    renderServicesForSlot(1);
+                    document.getElementById('as1Total').textContent = '$' + myPrice;
+                    document.getElementById('as1SvcCount').textContent = '1';
+                    // Actualizar botones DESPUÉS de llenar el slot
+                    updateFinishButtons(1);
                   }
                 }
               }
-            } catch(e) {}
+            } catch(e) { console.error('Error recargando promo:', e); }
           }
         }
-        updateFinishButtons(1);
+        // updateFinishButtons se llama dentro del bloque de recarga cuando hay datos
+        // Solo llamarlo aquí si no se llamó dentro (cuando la promo ya estaba en activePromos)
+        const clientKey2 = normalizeClientKey(clientName);
+        if (activePromos[clientKey2]) updateFinishButtons(1);
       }, 500);
     }
     if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
