@@ -11,7 +11,7 @@ if ('caches' in window) {
 }
 </script>
 <meta charset="UTF-8">
-<!-- NexServ v95r - FIX: updateFinishButtons después de llenar slotServices desde backend (05/05/2026) -->
+<!-- NexServ v95s - FIX: slot se rellena inmediatamente si promo existe en activePromos (05/05/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3101,8 +3101,19 @@ if ('caches' in window) {
     if (id === 'activeService') {
       restoreActivePromos();
       recargarAutorizacionesStaff(1);
-      // Si hay clienta activa y no hay promo en memoria, intentar recargarla
-      setTimeout(async () => {
+      // Rellenar slot con promo si está vacío pero hay promo en memoria
+      const _clientNameNow = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
+      const _clientKeyNow = normalizeClientKey(_clientNameNow);
+      if (_clientNameNow && activePromos[_clientKeyNow] && (!slotServices[1] || slotServices[1].length === 0)) {
+        const _promo = activePromos[_clientKeyNow].promo;
+        const _price = getMyPromoPrice(_promo, window.currentUser?.area || 'cejas');
+        slotServices[1] = [{ name: _promo.name, price: _price, area: window.currentUser?.area || 'cejas' }];
+        renderServicesForSlot(1);
+        document.getElementById('as1Total').textContent = '$' + _price;
+        document.getElementById('as1SvcCount').textContent = '1';
+        updateFinishButtons(1);
+      } else {
+        setTimeout(async () => {
         const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
         if (clientName) {
           const clientKey = normalizeClientKey(clientName);
@@ -3144,6 +3155,7 @@ if ('caches' in window) {
         const clientKey2 = normalizeClientKey(clientName);
         if (activePromos[clientKey2]) updateFinishButtons(1);
       }, 500);
+      } // cierre else
     }
     if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
     // Detener polling si el staff navega a otra pantalla
