@@ -9496,7 +9496,7 @@ if ('caches' in window) {
         window._arrPromo = null;
         
         // Notificar solo a la chica asignada
-        simulateNotif('staff', `${nombre} asignada directamente`, (isTop ? '⭐ ' : '') + servicio, isTop);
+        simulateNotif('staff', `${nombre} asignada directamente`, (isTop ? '⭐ ' : '') + servicioGA, isTop);
         
         alert(`✓ ${nombre} asignada directamente a ${chica}. Notificación enviada.`);
         setTimeout(() => { show('mikaelaHome'); }, 600);
