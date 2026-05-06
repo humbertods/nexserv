@@ -4138,8 +4138,31 @@ if ('caches' in window) {
     const data = window._finishingData;
     const slot = window._finishingSlot;
 
-    // Construir desglose de servicios para el ticket de cobro
+    // Reconstruir desde slotServices en este momento (fuente de verdad)
+    // Esto garantiza que servicios extra aprobados DESPUÉS de abrir el modal queden incluidos
     const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    
+    // Recalcular total y nombres frescos
+    const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
+    let totalFresh;
+    if (promoDataFresh) {
+      const extrasAprobados = svcsAprobados.filter(s => s.name !== promoDataFresh.promo.name);
+      const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      totalFresh = String(promoDataFresh.promo.price + totalExtras);
+    } else {
+      totalFresh = String(svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0));
+    }
+    const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
+
+    // Recalcular precioRegular fresco
+    const _regularBase = promoDataFresh
+      ? (Number(window._as1PrecioRegular) > 0 ? Number(window._as1PrecioRegular) : Number(promoDataFresh.promo.regular))
+      : 0;
+    const _extrasRegular = promoDataFresh
+      ? svcsAprobados.filter(s => s.name !== promoDataFresh.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)
+      : 0;
+    const precioRegularFresh = promoDataFresh ? String(_regularBase + _extrasRegular) : totalFresh;
+
     const desgloseActual = svcsAprobados.map(s => ({
       staff: user?.name || '',
       servicio: s.name,
@@ -4155,10 +4178,10 @@ if ('caches' in window) {
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
         clienteCodigo: window._as1Client || '',
-        servicio: data.svcNames,
-        total: data.total,
+        servicio: svcNamesFresh,
+        total: totalFresh,
         promoNombre: data.promoNombre,
-        precioRegular: data.precioRegular,
+        precioRegular: precioRegularFresh,
         serviciosDetalle: desgloseAcumulado
       });
     } catch (err) { console.error(err); }
