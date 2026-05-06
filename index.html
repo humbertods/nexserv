@@ -4394,7 +4394,10 @@ if ('caches' in window) {
       const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
       
       // montoYaHecho = suma real de todos los servicios aprobados (promo + extras como retiro)
-      const montoYaHecho   = svcsAprobadosAhora.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      // Usar el total del Sheet como fuente de verdad si está disponible y es mayor
+      const montoYaHechoMemoria = svcsAprobadosAhora.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      const montoYaHechoSheet   = Number(data.total) || 0; // data.total viene de finishSlot1 que recalcula fresco
+      const montoYaHecho   = Math.max(montoYaHechoMemoria, montoYaHechoSheet);
       const montoSiguiente = siguienteDivision ? (Number(siguienteDivision.monto) || 0) : 0;
       const totalAcumulado = montoYaHecho + montoSiguiente;
 
