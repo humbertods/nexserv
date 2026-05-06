@@ -882,19 +882,49 @@ function handleContinuarPromoALista(data) {
       const obsActual = String(allData[i][11] || '');
       const nuevaObs = (obsActual ? obsActual + ' | ' : '') + '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre + ' · Falta: ' + data.areasFaltantes;
       
+      // Usar totalAcumulado si viene del frontend, sino montoSiguienteArea
+      const totalNuevoTicket = data.totalAcumulado || data.montoSiguienteArea || '0';
+      
+      // Limpiar el nombre del servicio — quitar prefijos de historial como [✅Diana:...]
+      let servicioLimpio = String(data.areasFaltantes || '');
+      // Si viene con texto de historial (contiene [✅ o emoji de staff), extraer solo el nombre del servicio
+      if (servicioLimpio.includes('[') || servicioLimpio.includes('✅')) {
+        // Intentar extraer la parte después del | si existe
+        const partes = servicioLimpio.split('|');
+        servicioLimpio = partes[partes.length - 1].trim();
+        // Si sigue teniendo brackets, limpiar
+        servicioLimpio = servicioLimpio.replace(/\[.*?\]/g, '').trim();
+      }
+
       ws.appendRow([
         newId, fechaStr, allData[i][2], allData[i][3], nombre,
-        data.areasFaltantes + ' (continuación promo)',
+        servicioLimpio + ' (continuación promo)',
         data.nuevaArea || allData[i][6],
         allData[i][7] || 'Normal',
         'Esperando', '', '', nuevaObs,
-        data.montoSiguienteArea || '0',
+        totalNuevoTicket,
         allData[i][13] || '', // N: promoNombre (hereda del original)
         allData[i][14] || '', // O: precioRegular (hereda del original)
         '',                   // P: precioPromo (vacío, será llenado al cobrar)
         '',                   // Q: secuencia (no aplica para continuación)
         allData[i][17] || '' // R: promasExtra (hereda del original para que no se pierdan)
       ]);
+      
+      // Copiar el desglose de la staff anterior al nuevo ticket (col S)
+      // Para que el total se acumule correctamente cuando la siguiente staff finalice
+      if (data.desgloseChica) {
+        try {
+          const desgloseAnterior = typeof data.desgloseChica === 'string'
+            ? JSON.parse(data.desgloseChica) : data.desgloseChica;
+          // Combinar con desglose existente del ticket original
+          let desgloseOriginal = [];
+          const colSOriginal = allData[i][18];
+          if (colSOriginal) { try { desgloseOriginal = JSON.parse(colSOriginal); } catch(e) {} }
+          const desgloseAcum = [...desgloseOriginal, ...desgloseAnterior];
+          const lastRowNew = ws.getLastRow();
+          ws.getRange(lastRowNew, 19).setValue(JSON.stringify(desgloseAcum));
+        } catch(e) {}
+      }
       
       return { success: true };
     }
