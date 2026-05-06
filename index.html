@@ -6335,6 +6335,7 @@ if ('caches' in window) {
     try {
       const result = await apiGet('getPorCobrar');
       if (result.success && result.porCobrar && result.porCobrar.length > 0) {
+        window._mkPorCobrarData = result.porCobrar;
         countEl.textContent = result.porCobrar.length;
         list.innerHTML = result.porCobrar.map(p => `
           <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid var(--success);">
@@ -6355,12 +6356,21 @@ if ('caches' in window) {
                   data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                   data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
                   style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
-                <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}')"
+                <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\'")}','${(p.servicio||'').replace(/'/g,"\'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"\'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}')"
                   style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">⏳ Esperar</button>
               </div>
             </div>
+            <!-- Asignar al cobro -->
+            <div id="asignarRow-${p.idEspera}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+              <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;">+ AGREGAR AL COBRO DE ESTA CLIENTA:</div>
+              <div id="asignarOpciones-${p.idEspera}" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            </div>
           </div>
         `).join('');
+        if (window._mkEsperandoCobro && window._mkEsperandoCobro.length > 0) {
+          mkActualizarAsignarOpciones();
+          mkRenderEsperandoCobro();
+        }
       } else {
         countEl.textContent = '0';
         list.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>';
