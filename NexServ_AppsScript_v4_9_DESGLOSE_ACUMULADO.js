@@ -630,6 +630,10 @@ function handleFinalizarAtencion(data) {
         ws.getRange(row, 9).setValue('Por cobrar');
         ws.getRange(row, 14).setValue(data.promoNombre || '');
 
+        // CRÍTICO: actualizar col F con el servicio completo (promo + extras)
+        // Sin esto, los servicios extra aprobados se pierden al pasar a Por cobrar
+        if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
+
         // Si hay desglose multi-staff, recalcular total acumulado
         let totalFinal = Number(data.total || 0);
         if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
@@ -906,30 +910,6 @@ function handleConfirmarCobro(data) {
   const horaStr = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
   const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
 
-  // Buscar código cliente del ticket cobrado para limpiar filas hermanas
-  let codigoClienteCobrado = '';
-  let fechaCobro = '';
-  for (let i = 3; i < allData.length; i++) {
-    if (String(allData[i][0]).trim() === data.idEspera) {
-      codigoClienteCobrado = String(allData[i][3] || '').trim();
-      fechaCobro = String(allData[i][1] || '').trim();
-      break;
-    }
-  }
-  // Marcar todas las filas hermanas (misma clienta, mismo día, Por cobrar) como Completada
-  if (codigoClienteCobrado) {
-    for (let i = 3; i < allData.length; i++) {
-      if (String(allData[i][3]||'').trim() === codigoClienteCobrado
-          && String(allData[i][1]||'').trim() === fechaCobro
-          && ['por cobrar','en servicio'].includes(String(allData[i][8]||'').toLowerCase())
-          && String(allData[i][0]||'').trim() !== data.idEspera) {
-        ws.getRange(i + 1, 9).setValue('Completada');
-        ws.getRange(i + 1, 16).setValue(data.metodoPago || 'Efectivo');
-        ws.getRange(i + 1, 17).setValue(horaStr);
-      }
-    }
-  }
-
   for (let i = 3; i < allData.length; i++) {
     if (String(allData[i][0]).trim() === data.idEspera) {
       const row = i + 1;
@@ -1195,9 +1175,9 @@ function handleGetAtenciones(params) {
       horaToma: horaToma,
       observaciones: row[11] || '',
       total: row[12] || '0',
-      precioPromo: row[14] || row[12] || '0',
+      precioPromo: row[12] || '0',  // Agregar este campo explícitamente
       promoNombre: row[13] || '',
-      precioRegular: row[15] || row[14] || row[12] || '0'
+      precioRegular: row[14] || ''
     });
   }
   
