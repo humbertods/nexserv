@@ -9939,7 +9939,7 @@ if ('caches' in window) {
       }
       row.style.display = 'block';
       opcionesEl.innerHTML = lista.map((c, idx) => `
-        <button onclick="mkAsignarAlCobro('${idEspera}', ${idx})"
+        <button onclick="mkAsignarAlCobroById('${idEspera}', '${c.idEspera}')"
           style="padding:7px 12px;background:var(--accent-bg);color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">
           + ${c.nombre.split(' ')[0]}
         </button>
@@ -9948,6 +9948,24 @@ if ('caches' in window) {
   }
 
   // Abre el cobrarModal con múltiples clientas combinadas
+  // Versión robusta que busca por idEspera en vez de índice numérico
+  function mkAsignarAlCobroById(idEsperaPrincipal, idEsperaAsignada) {
+    // Recargar _mkPorCobrarData desde el backend si está vacío
+    if (!window._mkPorCobrarData || window._mkPorCobrarData.length === 0) {
+      apiGet('getPorCobrar').then(r => {
+        window._mkPorCobrarData = r.porCobrar || [];
+        mkAsignarAlCobroById(idEsperaPrincipal, idEsperaAsignada);
+      });
+      return;
+    }
+    const principal = window._mkPorCobrarData.find(p => p.idEspera === idEsperaPrincipal);
+    const asignada  = window._mkEsperandoCobro?.find(c => c.idEspera === idEsperaAsignada);
+    if (!principal) { showToast('⚠ No se encontró la clienta principal'); return; }
+    if (!asignada)  { showToast('⚠ No se encontró la clienta asignada'); return; }
+    const idxEsperando = window._mkEsperandoCobro.indexOf(asignada);
+    mkAsignarAlCobro(idEsperaPrincipal, idxEsperando);
+  }
+
   function mkAsignarAlCobro(idEsperaPrincipal, idxEsperando) {
     const principal = window._mkPorCobrarData?.find(p => p.idEspera === idEsperaPrincipal);
     const asignada  = window._mkEsperandoCobro[idxEsperando];
