@@ -4389,15 +4389,17 @@ if ('caches' in window) {
     
     try {
       // Llamar al backend para devolver a lista de espera
-      // totalAcumulado = lo que ya cobró esta área + lo que cobrará la siguiente
-      const montoYaHecho   = Number(miDivision.monto) || 0;
+      // totalAcumulado = lo que ya cobró esta área (promo + extras) + lo que cobrará la siguiente
+      const svcsActuales = slotServices[slot] || [];
+      const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+      
+      // montoYaHecho = suma real de todos los servicios aprobados (promo + extras como retiro)
+      const montoYaHecho   = svcsAprobadosAhora.reduce((sum, s) => sum + Number(s.price || 0), 0);
       const montoSiguiente = siguienteDivision ? (Number(siguienteDivision.monto) || 0) : 0;
       const totalAcumulado = montoYaHecho + montoSiguiente;
 
-      // Desglose de esta staff para el nuevo ticket de continuación
-      const svcsActuales = slotServices[slot] || [];
-      const desgloseEstaChica = svcsActuales
-        .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+      // Desglose completo de esta staff (promo + todos los extras aprobados)
+      const desgloseEstaChica = svcsAprobadosAhora
         .map(s => ({ staff: user?.name || '', servicio: s.name, area: s.area || '', monto: Number(s.price || 0) }));
 
       const result = await apiPost('continuarPromoALista', {
