@@ -4432,8 +4432,10 @@ if ('caches' in window) {
         
         const promasExtMsg = (data.promasExtraPendientes || []).map(p => p.nombre).join(' + ');
         const faltaTotal = serviciosFaltantes + (promasExtMsg ? ' + ' + promasExtMsg : '');
+        // Mostrar resumen completo con todos los servicios realizados (promo + extras)
+        const resumenServicios = svcsAprobadosAhora.map(s => s.name + ' $' + s.price).join(' + ');
         alert('Servicio completado.\n\n' +
-              '- ' + areaActual.toUpperCase() + ': $' + miDivision.monto + ' (completado)\n' +
+              '- ' + areaActual.toUpperCase() + ': ' + resumenServicios + ' = $' + montoYaHecho + ' (completado)\n' +
               '- Falta: ' + faltaTotal + '\n\n' +
               'La clienta volvio a lista de espera para continuar.');
         show('staffHome');
