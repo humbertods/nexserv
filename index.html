@@ -9777,10 +9777,8 @@ if ('caches' in window) {
         Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
       </div>
     </div>
-    <!-- Botón: hago todo el combo yo sola (solo visible cuando aplica) -->
-    <button class="btn-primary" id="finishDoAllBtn" style="margin-bottom: 10px; background: #2d6a4f; display:none;" onclick="finishAndSendAll()">✅ Yo termino el combo completo — cobrar total</button>
-    <button class="btn-primary outline" id="finishContinueSameBtn" style="margin-bottom: 10px; border-color: #2d6a4f; color: #2d6a4f; display:none;" onclick="finishAndContinueSameStaff()">🔄 Continuar con la misma promo (yo la termino)</button>
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar (mi parte)</button>
+    <!-- Botón: hago todo el combo yo sola (solo visible cuando aplica) - se crean dinámicamente -->
+    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
     <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
     <button class="btn-primary" style="margin-bottom: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndNextPromo()">🏷 Continuar con siguiente promo</button>
     <button class="btn-primary outline" style="margin-bottom: 10px; color: var(--danger); border-color: var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
