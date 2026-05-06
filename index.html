@@ -4147,16 +4147,30 @@ if ('caches' in window) {
     const slot = window._finishingSlot;
 
     // Reconstruir desde slotServices en este momento (fuente de verdad)
-    // Esto garantiza que servicios extra aprobados DESPUÉS de abrir el modal queden incluidos
     const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
     
+    // Leer total del Sheet para incluir servicios de áreas anteriores (ej: retiro de Yadira)
+    let totalDesdeSheet = 0;
+    try {
+      const atencionesR = await apiGet('getAtenciones', { chica: user?.name || '' });
+      const atencionActual = atencionesR.atenciones?.find(a => 
+        a.nombre === data.clientName || a.codigo === window._as1Client
+      );
+      if (atencionActual && Number(atencionActual.total) > 0) {
+        totalDesdeSheet = Number(atencionActual.total);
+      }
+    } catch(e) {}
+
     // Recalcular total y nombres frescos
     const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
     let totalFresh;
+    let totalSoloEstaStaff; // solo lo que hizo esta staff (para el desglose)
     if (promoDataFresh) {
       const extrasAprobados = svcsAprobados.filter(s => s.name !== promoDataFresh.promo.name);
       const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      totalFresh = String(promoDataFresh.promo.price + totalExtras);
+      totalSoloEstaStaff = promoDataFresh.promo.price + totalExtras;
+      // Usar el mayor entre memoria y Sheet (Sheet incluye servicios de áreas anteriores)
+      totalFresh = String(Math.max(totalSoloEstaStaff, totalDesdeSheet));
     } else {
       totalFresh = String(svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0));
     }
@@ -4171,12 +4185,19 @@ if ('caches' in window) {
       : 0;
     const precioRegularFresh = promoDataFresh ? String(_regularBase + _extrasRegular) : totalFresh;
 
-    const desgloseActual = svcsAprobados.map(s => ({
-      staff: user?.name || '',
-      servicio: s.name,
-      area: s.area || '',
-      monto: Number(s.price || 0)
-    }));
+    // Desglose de esta staff: si el Sheet tiene un total mayor (por áreas anteriores),
+    // el monto de esta staff es solo lo que ella hizo (totalSoloEstaStaff o suma de svcs)
+    const _montoEstaStaff = typeof totalSoloEstaStaff !== 'undefined' 
+      ? totalSoloEstaStaff 
+      : svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const desgloseActual = svcsAprobados.length === 1
+      ? [{ staff: user?.name || '', servicio: svcsAprobados[0].name, area: svcsAprobados[0].area || '', monto: Number(svcsAprobados[0].price || 0) }]
+      : svcsAprobados.map(s => ({
+          staff: user?.name || '',
+          servicio: s.name,
+          area: s.area || '',
+          monto: Number(s.price || 0)
+        }));
     // Si hay historial previo (enganche multi-área), acumularlo
     const desgloseAcumulado = (window._desgloseAcumulado || []).concat(desgloseActual);
     
@@ -4732,6 +4753,9 @@ if ('caches' in window) {
         document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
         document.getElementById('as' + slotNum + 'SvcCount').textContent =
           slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
+        // CRÍTICO: Sincronizar al Sheet cuando cambia el estado de una autorización
+        // Esto asegura que el Sheet tenga el total correcto antes de finalizar
+        syncServiciosBackend(slotNum, totalRecalc);
       }
 
       // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
@@ -6330,39 +6354,8 @@ if ('caches' in window) {
       const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
-        // Sincronizar servicios al Sheet usando el staffNombre devuelto por el backend
-        // (el staff que tiene la clienta, no Mikaela que está aprobando)
-        try {
-          const staffDelServicio = result.staffNombre || '';
-          const clienteDelServicio = result.clienteNombre || '';
-          const clienteCodigoDelServicio = result.clienteCodigo || '';
-
-          // Buscar en slotServices el slot que corresponde a esta clienta/staff
-          for (const slot of [1, 2]) {
-            const svcs = slotServices[slot] || [];
-            if (svcs.length === 0) continue;
-            // Marcar el servicio con este authId como aprobado localmente
-            const svcMatch = svcs.find(s => s.authId === reqId);
-            if (svcMatch) svcMatch.status = 'aprobado';
-            // Calcular total con todos los aprobados
-            const nuevoTotal = svcs
-              .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
-              .reduce((sum, s) => sum + Number(s.price || 0), 0);
-            const activeNames = svcs
-              .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
-              .map(s => s.name).join(' + ');
-            if (!activeNames) continue;
-            // Llamar directamente con el nombre del staff correcto (no currentUser)
-            await apiPost('updateServiciosAtencion', {
-              chicaNombre: staffDelServicio,
-              clienteNombre: clienteDelServicio,
-              clienteCodigo: clienteCodigoDelServicio,
-              servicios: activeNames,
-              total: String(nuevoTotal)
-            });
-          }
-        } catch(syncErr) { console.error('Error sync post-aprobacion:', syncErr); }
-
+        // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
+        // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
         await renderAuthorizations(); // Reload list
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
