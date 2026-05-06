@@ -6535,19 +6535,6 @@ if ('caches' in window) {
     `}).join('');
   }
 
-  async function cargarProductosMarca() {
-    try {
-      const result = await apiGet('getMarcaProductos');
-      if (result.success && result.productos) {
-        window._productosMarca = result.productos;
-      } else {
-        window._productosMarca = [];
-      }
-    } catch(e) {
-      window._productosMarca = [];
-    }
-  }
-
   function agregarProductoATicket(nombre, precio) {
     const id = window._apTicketId;
     if (!id) return;
@@ -9639,7 +9626,10 @@ if ('caches' in window) {
     btn.style.borderColor = open ? 'var(--line)' : 'var(--accent)';
     btn.style.borderRadius = open ? 'var(--radius-sm)' : 'var(--radius-sm) var(--radius-sm) 0 0';
     if (!open) {
-      if (!window._productosMarca || window._productosMarca.length === 0) cargarProductosMarca();
+      // Cargar productos y esperar antes de renderizar el dropdown
+      if (!window._productosMarca || window._productosMarca.length === 0) {
+        cargarProductosMarca().then(() => vdRenderLineas());
+      }
       if (!window.CLIENT_DIRECTORY_CACHE || window.CLIENT_DIRECTORY_CACHE.length === 0) {
         apiGet('getClientas').then(r => {
           if (r.success) window.CLIENT_DIRECTORY_CACHE = r.clientas
