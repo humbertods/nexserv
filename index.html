@@ -9986,7 +9986,10 @@ if ('caches' in window) {
     document.getElementById('cobrarPromoBanner').style.display = 'none';
     document.getElementById('cobrarTarjetaAviso').style.display = 'none';
 
-    // Resetear método de pago
+    // Resetear método de pago y guardar total grupal para selectPago
+    window._cobrarTotalPromo    = totalCombinado.toFixed(2);
+    window._cobrarTotalRegular  = totalCombinado.toFixed(2);
+    window._cobrarTienePromo    = false; // cobro grupal = sin lógica de promo/tarjeta
     document.querySelectorAll('#cobrarModal .pago-btn').forEach((b, i) => {
       b.style.background = i === 0 ? 'var(--success)' : 'var(--bg-card)';
       b.style.borderColor = i === 0 ? 'var(--success)' : 'var(--line)';
