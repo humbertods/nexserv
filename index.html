@@ -5150,8 +5150,11 @@ if ('caches' in window) {
                 area: a1.area
               });
             }
-            // Limpiar promo residual
-            if (activePromos[clientKey1]) delete activePromos[clientKey1];
+            // Limpiar promo residual de esta clienta (puede ser un servicio nuevo sin promo)
+            if (activePromos[clientKey1]) {
+              delete activePromos[clientKey1];
+              saveActivePromos(); // actualizar localStorage
+            }
           }
         }
         renderServicesForSlot(1);
