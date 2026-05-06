@@ -6302,7 +6302,24 @@ if ('caches' in window) {
       const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
-        alert('✓ Servicio aprobado. El staff puede continuar.');
+        // Sincronizar servicios al Sheet inmediatamente después de aprobar
+        // Esto actualiza col F con el servicio extra recién aprobado
+        try {
+          // Sincronizar ambos slots activos al Sheet para reflejar el servicio aprobado
+          for (const slot of [1, 2]) {
+            const svcs = slotServices[slot] || [];
+            if (svcs.length === 0) continue;
+            // Marcar el servicio con este authId como aprobado localmente
+            const svcMatch = svcs.find(s => s.authId === reqId);
+            if (svcMatch) svcMatch.status = 'aprobado';
+            // Calcular total con todos los aprobados
+            const nuevoTotal = svcs
+              .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+              .reduce((sum, s) => sum + Number(s.price || 0), 0);
+            await syncServiciosBackend(slot, nuevoTotal);
+          }
+        } catch(syncErr) { console.error('Error sync post-aprobacion:', syncErr); }
+
         await renderAuthorizations(); // Reload list
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
