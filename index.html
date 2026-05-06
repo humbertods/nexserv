@@ -4117,11 +4117,19 @@ if ('caches' in window) {
 
     if (promoData && promoData.promo) {
       const precioTotal = promoData.promo.price;
-      // Asegurar que slotServices tiene el servicio con precio total
-      slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }];
+      // Preservar servicios extras aprobados — solo asegurar que la promo principal esté
+      const svcsActuales = slotServices[slot] || [];
+      const tienePromo = svcsActuales.find(s => s.name === promoData.promo.name);
+      if (!tienePromo) {
+        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }, ...svcsActuales];
+      }
+      // Recalcular total con extras
+      const totalConExtras = slotServices[slot]
+        .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+        .reduce((sum, s) => sum + Number(s.price || 0), 0);
       renderServicesForSlot(slot);
-      document.getElementById('as' + slot + 'Total').textContent = '$' + precioTotal;
-      document.getElementById('as' + slot + 'SvcCount').textContent = '1';
+      document.getElementById('as' + slot + 'Total').textContent = '$' + totalConExtras;
+      document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
       window._finishFullPromo = true;
     }
 
