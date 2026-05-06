@@ -4982,22 +4982,8 @@ if ('caches' in window) {
           promoData.promo.division.length > 0 &&
           promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
 
-        // Remover botón extra anterior si existe
-        const oldExtra = modal.querySelector('.finish-extra-btn');
-        if (oldExtra) oldExtra.remove();
-
-        // Agregar UN solo botón extra si la staff puede hacer toda la promo
-        if (puedeTodo) {
-          const extraBtn = document.createElement('button');
-          extraBtn.className = 'btn-primary finish-extra-btn';
-          extraBtn.style.cssText = 'margin-bottom:10px;background:#2d6a4f;width:100%;';
-          extraBtn.textContent = '🔄 Continuar con la misma promo (yo la termino)';
-          extraBtn.onclick = finishAndContinueSameStaff;
-          // Insertarlo al inicio del modal, antes del primer botón existente
-          const modalInner = modal.querySelector('.modal');
-          const firstBtn = modalInner?.querySelector('.btn-primary');
-          if (firstBtn) firstBtn.parentNode.insertBefore(extraBtn, firstBtn);
-        }
+        // Limpiar cualquier botón extra residual
+        modal.querySelectorAll('.finish-extra-btn').forEach(b => b.remove());
 
         modal.classList.add('active');
       }
@@ -9290,6 +9276,12 @@ if ('caches' in window) {
   }
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
+    
+    // Limpiar botones dinámicos del modal de finalización para evitar duplicados
+    const btnDoAllEl = document.getElementById('finishDoAllBtn');
+    if (btnDoAllEl) btnDoAllEl.remove();
+    const btnContSameEl = document.getElementById('finishContinueSameBtn');
+    if (btnContSameEl) btnContSameEl.remove();
     
     // Si se está cerrando el modal de nueva clienta, resetear el formulario
     if (document.getElementById('newClientModal').classList.contains('active')) {
