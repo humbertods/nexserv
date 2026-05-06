@@ -6310,10 +6310,14 @@ if ('caches' in window) {
       const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
-        // Sincronizar servicios al Sheet inmediatamente después de aprobar
-        // Esto actualiza col F con el servicio extra recién aprobado
+        // Sincronizar servicios al Sheet usando el staffNombre devuelto por el backend
+        // (el staff que tiene la clienta, no Mikaela que está aprobando)
         try {
-          // Sincronizar ambos slots activos al Sheet para reflejar el servicio aprobado
+          const staffDelServicio = result.staffNombre || '';
+          const clienteDelServicio = result.clienteNombre || '';
+          const clienteCodigoDelServicio = result.clienteCodigo || '';
+
+          // Buscar en slotServices el slot que corresponde a esta clienta/staff
           for (const slot of [1, 2]) {
             const svcs = slotServices[slot] || [];
             if (svcs.length === 0) continue;
@@ -6324,7 +6328,18 @@ if ('caches' in window) {
             const nuevoTotal = svcs
               .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
               .reduce((sum, s) => sum + Number(s.price || 0), 0);
-            await syncServiciosBackend(slot, nuevoTotal);
+            const activeNames = svcs
+              .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+              .map(s => s.name).join(' + ');
+            if (!activeNames) continue;
+            // Llamar directamente con el nombre del staff correcto (no currentUser)
+            await apiPost('updateServiciosAtencion', {
+              chicaNombre: staffDelServicio,
+              clienteNombre: clienteDelServicio,
+              clienteCodigo: clienteCodigoDelServicio,
+              servicios: activeNames,
+              total: String(nuevoTotal)
+            });
           }
         } catch(syncErr) { console.error('Error sync post-aprobacion:', syncErr); }
 
