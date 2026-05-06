@@ -9983,24 +9983,7 @@ if ('caches' in window) {
       </div>
     `).join('');
 
-    document.getElementById('cobrarSubtotal').textContent = '$' + totalCombinado.toFixed(2);
-    document.getElementById('cobrarTotal').textContent = '$' + totalCombinado.toFixed(2);
-
-    // Mostrar banner de promo si alguna clienta tiene promo
-    const promoBannerEl = document.getElementById('cobrarPromoBanner');
-    const tarjetaAvisoEl = document.getElementById('cobrarTarjetaAviso');
-    tarjetaAvisoEl.style.display = 'none';
-    if (hayPromoGrupal) {
-      const nombresPromo = clientas.filter(c => c.promoNombre).map(c => c.promoNombre).join(', ');
-      document.getElementById('cobrarPromoName').textContent = nombresPromo;
-      promoBannerEl.style.display = 'block';
-    } else {
-      promoBannerEl.style.display = 'none';
-    }
-
-    // Calcular totales grupales considerando promos
-    // totalPromo = suma de precios promo de cada clienta
-    // totalRegular = suma de precios regulares (para cuando pagan con tarjeta)
+    // Calcular totales grupales considerando promos (ANTES de usarlos)
     const totalGrupalPromo    = clientas.reduce((s, c) => s + (Number(c.total)||0), 0);
     const totalGrupalRegular  = clientas.reduce((s, c) => s + (Number(c.precioRegular || c.total)||0), 0);
     const hayPromoGrupal      = clientas.some(c => c.promoNombre && c.promoNombre.trim() !== '');
@@ -10010,6 +9993,21 @@ if ('caches' in window) {
     window._cobrarTienePromo   = hayPromoGrupal;
     window._cobroGrupal.totalPromo   = totalGrupalPromo;
     window._cobroGrupal.totalRegular = totalGrupalRegular;
+
+    document.getElementById('cobrarSubtotal').textContent = '$' + totalGrupalPromo.toFixed(2);
+    document.getElementById('cobrarTotal').textContent = '$' + totalGrupalPromo.toFixed(2);
+
+    // Mostrar banner de promo si alguna clienta tiene promo
+    const promoBannerEl  = document.getElementById('cobrarPromoBanner');
+    const tarjetaAvisoEl = document.getElementById('cobrarTarjetaAviso');
+    tarjetaAvisoEl.style.display = 'none';
+    if (hayPromoGrupal) {
+      const nombresPromo = clientas.filter(c => c.promoNombre).map(c => c.promoNombre).join(', ');
+      document.getElementById('cobrarPromoName').textContent = nombresPromo;
+      promoBannerEl.style.display = 'block';
+    } else {
+      promoBannerEl.style.display = 'none';
+    }
     document.querySelectorAll('#cobrarModal .pago-btn').forEach((b, i) => {
       b.style.background = i === 0 ? 'var(--success)' : 'var(--bg-card)';
       b.style.borderColor = i === 0 ? 'var(--success)' : 'var(--line)';
