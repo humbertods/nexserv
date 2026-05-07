@@ -9664,8 +9664,10 @@ if ('caches' in window) {
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
     try {
-      const result = await apiPost('addListaEspera', postData);
-      console.log('📥 Respuesta de addListaEspera:', result);
+      const tienePromoGA = promo !== null;
+      const accionGA = tienePromoGA ? 'addListaEspera' : 'addServicioNormal';
+      const result = await apiPost(accionGA, postData);
+      console.log('📥 Respuesta de ' + accionGA + ':', result);
       
       if (result && result.success) {
         console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
