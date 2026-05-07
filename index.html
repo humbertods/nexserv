@@ -4975,113 +4975,62 @@ if ('caches' in window) {
       } else {
         document.getElementById('finishPromoInfo').style.display = 'none';
       }
-      
-      // Mostrar/ocultar botones de "yo termino el combo" si la staff puede hacer toda la promo
-      let btnDoAll = document.getElementById('finishDoAllBtn');
-      let btnContSame = document.getElementById('finishContinueSameBtn');
-      // Crear botones dinámicamente si no existen (compatibilidad con HTML viejo)
-      if (!btnDoAll) {
-        btnDoAll = document.createElement('button');
-        btnDoAll.id = 'finishDoAllBtn';
-        btnDoAll.className = 'btn-primary';
-        btnDoAll.style.cssText = 'margin-bottom:10px;background:#2d6a4f;display:none;';
-        btnDoAll.textContent = '✅ Yo termino el combo completo — cobrar total';
-        btnDoAll.onclick = finishAndSendAll;
-        const modal = document.getElementById('finishOptionsModal');
-        const firstBtn = modal?.querySelector('.btn-primary');
-        if (firstBtn) firstBtn.parentNode.insertBefore(btnDoAll, firstBtn);
-      }
-      if (!btnContSame) {
-        btnContSame = document.createElement('button');
-        btnContSame.id = 'finishContinueSameBtn';
-        btnContSame.className = 'btn-primary outline';
-        btnContSame.style.cssText = 'margin-bottom:10px;border-color:#2d6a4f;color:#2d6a4f;display:none;';
-        btnContSame.textContent = '🔄 Continuar con la misma promo (yo la termino)';
-        btnContSame.onclick = finishAndContinueSameStaff;
-        if (btnDoAll && btnDoAll.parentNode) btnDoAll.parentNode.insertBefore(btnContSame, btnDoAll.nextSibling);
-      }
-      if (promoData && promoData.promo) {
-        const user = window.currentUser;
-        const myArea = user?.area || 'cejas';
-        const promo = promoData.promo;
-        const AREA_CAPS = {
-          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
-          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
-          'facial':   ['facial', '✨']
-        };
-        const myCaps = AREA_CAPS[myArea] || [myArea];
-        const puedeTodo = promo.division && promo.division.length > 0 &&
-          promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
-        if (btnDoAll) btnDoAll.style.display = puedeTodo ? 'block' : 'none';
-        if (btnContSame) btnContSame.style.display = puedeTodo ? 'block' : 'none';
-      } else {
-        if (btnDoAll) btnDoAll.style.display = 'none';
-        if (btnContSame) btnContSame.style.display = 'none';
-      }
 
-      // Actualizar texto de "Mandar a cobrar" según si hay split o no
-      const btnSend = document.querySelector('#finishOptionsModal button[onclick="finishAndSend()"]');
-      if (btnSend) {
-        const btnDoAllVisible = document.getElementById('finishDoAllBtn')?.style.display !== 'none';
-        btnSend.textContent = (promoData && btnDoAllVisible) ? '💰 Mandar a cobrar (solo mi parte)' : '💰 Mandar a cobrar';
-      }
+      // ── Lógica de visibilidad de los 7 botones ──────────────────
+      const user = window.currentUser;
+      const myArea = user?.area || 'cejas';
+      const AREA_CAPS = {
+        'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja'],
+        'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña'],
+        'facial':   ['facial']
+      };
+      const myCaps = AREA_CAPS[myArea] || [myArea];
 
-      // Mostrar/ocultar boton "Continuar en otra area"
-      const btnContinue = document.querySelector('#finishOptionsModal button[onclick="finishAndContinue()"]');
-      if (btnContinue) {
-        if (promoData || hayAreasExtras) {
-          btnContinue.style.display = 'block';
-          const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
-          btnContinue.textContent = promoData
-            ? '➡️ Continuar en otra área (promo)'
-            : '➡️ Continuar en otra área: ' + areasLabel;
+      const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
+        promoData.promo.division.length > 0 &&
+        promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap)));
+
+      const tieneSecuencia = promoData || hayAreasExtras || promasExtraPendientes.length > 0;
+
+      const esUltimaArea = promoData && promoData.completedAreas && promoData.promo.division &&
+        (promoData.completedAreas.length >= promoData.promo.division.length - 1);
+
+      // BTN 1: Yo hago toda la promo
+      const b1 = document.getElementById('finishDoAllBtn');
+      if (b1) b1.style.display = (puedeTodo && promoData) ? 'block' : 'none';
+
+      // BTN 2: Finalizar servicio
+      const b2 = document.getElementById('finishSendBtn');
+      if (b2) {
+        if (promoData && tieneSecuencia && !esUltimaArea && !puedeTodo) {
+          b2.style.display = 'none';
         } else {
-          btnContinue.style.display = 'none';
+          b2.style.display = 'block';
+          b2.textContent = promoData ? '💰 Finalizar servicio (solo mi parte)' : '💰 Finalizar servicio';
         }
       }
 
-      // Mostrar/ocultar boton "Continuar con siguiente promo"
-      const btnNextPromo = document.querySelector('#finishOptionsModal button[onclick="finishAndNextPromo()"]');
-      if (btnNextPromo) {
-        if (promasExtraPendientes.length > 0) {
-          const siguientePromo = promasExtraPendientes[0];
-          // Determinar area de la siguiente promo desde su division
-          const promoFull = PROMOS.find(p => p.name === siguientePromo.nombre);
-          let sigArea = 'cejas'; // default
-          if (promoFull && promoFull.division && promoFull.division.length > 0) {
-            const div0 = String(promoFull.division[0].area || '').toLowerCase();
-            if (div0.includes('facial')) sigArea = 'facial';
-            else if (div0.includes('pesta')) sigArea = 'pestanas';
-            else if (div0.includes('depil') || div0.includes('corporal') || div0.includes('bikini')) sigArea = 'depilacion';
-            else sigArea = 'cejas';
-          }
-          siguientePromo._area = sigArea; // guardar para enviar al backend
-          btnNextPromo.style.display = 'block';
-          const areaLabel = { cejas: 'Cejas/Depilacion', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial' }[sigArea] || sigArea;
-          btnNextPromo.textContent = '🏷 Continuar con: ' + siguientePromo.nombre + ' (' + areaLabel + ' · $' + siguientePromo.precio + ')';
+      // BTN 3: Promo completada (última área)
+      const b3 = document.getElementById('finishPromoCompleteBtn');
+      if (b3) b3.style.display = (promoData && esUltimaArea && !puedeTodo) ? 'block' : 'none';
+
+      // BTN 4: Continuar siguiente área
+      const b4 = document.getElementById('finishContinueBtn');
+      if (b4) {
+        if (tieneSecuencia && !esUltimaArea && !puedeTodo) {
+          b4.style.display = 'block';
+          const areasLabel = areasExtras.length > 0
+            ? areasExtras.map(a => areaDisplayMap[a] || a).join(', ')
+            : promasExtraPendientes.length > 0 ? promasExtraPendientes[0].nombre : 'siguiente área';
+          b4.textContent = '➡️ Continuar siguiente área: ' + areasLabel;
         } else {
-          btnNextPromo.style.display = 'none';
+          b4.style.display = 'none';
         }
       }
-      
+
       const modal = document.getElementById('finishOptionsModal');
       if (modal) {
-        // Solo agregar/mostrar el botón extra "continuar misma promo" si corresponde
-        const user = window.currentUser;
-        const myArea = user?.area || 'cejas';
-        const AREA_CAPS = {
-          'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
-          'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
-          'facial':   ['facial', '✨']
-        };
-        const myCaps = AREA_CAPS[myArea] || [myArea];
-        const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
-          promoData.promo.division.length > 0 &&
-          promoData.promo.division.every(d => myCaps.some(cap => String(d.area||'').toLowerCase().includes(cap.toLowerCase())));
-
-        // Limpiar cualquier botón extra residual
         modal.querySelectorAll('.finish-extra-btn').forEach(b => b.remove());
-
         modal.classList.add('active');
       }
     }, 100);
@@ -10093,12 +10042,38 @@ if ('caches' in window) {
         Completaste tu parte del servicio. ¿Qué hacemos con la clienta?
       </div>
     </div>
-    <!-- Botón: hago todo el combo yo sola (solo visible cuando aplica) - se crean dinámicamente -->
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishAndSend()">💰 Mandar a cobrar</button>
-    <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndContinue()">➡️ Continuar en otra área</button>
-    <button class="btn-primary" style="margin-bottom: 10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndNextPromo()">🏷 Continuar con siguiente promo</button>
-    <button class="btn-primary outline" style="margin-bottom: 10px; color: var(--danger); border-color: var(--danger);" onclick="finishAndRetire()">🚪 Retirar clienta — cobrar solo lo realizado</button>
-    <button class="btn-primary outline" style="margin-bottom: 10px;" onclick="finishAndReturn()">↩️ Devolver a lista (no continuará)</button>
+
+    <!-- BTN 1: Yo hago toda la promo (solo visible si staff puede hacer todas las áreas) -->
+    <button id="finishDoAllBtn" class="btn-primary" style="margin-bottom:10px; background:#2d6a4f; display:none;" onclick="finishAndSendAll()">
+      ✅ Yo hago toda la promo — cobrar total
+    </button>
+
+    <!-- BTN 2: Finalizar servicio (servicio normal o promo de 1 área) -->
+    <button id="finishSendBtn" class="btn-primary" style="margin-bottom:10px;" onclick="finishAndSend()">
+      💰 Finalizar servicio
+    </button>
+
+    <!-- BTN 3: Promo completada (última área, manda total acumulado a Mikaela) -->
+    <button id="finishPromoCompleteBtn" class="btn-primary" style="margin-bottom:10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndSend()">
+      🏁 Promo completada — cobrar total
+    </button>
+
+    <!-- BTN 4: Continuar siguiente área (congela parte actual, pasa a siguiente área de secuencia) -->
+    <button id="finishContinueBtn" class="btn-primary outline" style="margin-bottom:10px; display:none;" onclick="finishAndContinue()">
+      ➡️ Continuar siguiente área
+    </button>
+
+    <!-- BTN 5: Retirar clienta (cobra solo lo realizado, cancela el resto) -->
+    <button id="finishRetireBtn" class="btn-primary outline" style="margin-bottom:10px; color:var(--danger); border-color:var(--danger);" onclick="finishAndRetire()">
+      🚪 Retirar clienta — cobrar solo lo realizado
+    </button>
+
+    <!-- BTN 6: Devolver a lista -->
+    <button id="finishReturnBtn" class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndReturn()">
+      ↩️ Devolver a lista de espera
+    </button>
+
+    <!-- BTN 7: Cancelar -->
     <button class="btn-primary outline" onclick="closeModal()">❌ Cancelar</button>
   </div>
 </div>
