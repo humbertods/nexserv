@@ -1603,6 +1603,39 @@ function updateComision(chicaNombre, precio) {
 // para que Mikaela vea en tiempo real qué servicios tiene la clienta
 // ============================================
 function handleUpdateServiciosAtencion(data) {
+  // Intentar primero en ServicioNormal (tickets SN-)
+  try {
+    const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const rowsN = wsN.getDataRange().getValues();
+    for (let i = 1; i < rowsN.length; i++) {
+      const id     = String(rowsN[i][0]||'').trim();
+      const estado = String(rowsN[i][8]||'').toLowerCase();
+      const tomada = String(rowsN[i][9]||'').trim();
+      const nombre = String(rowsN[i][4]||'').trim();
+      const codigo = String(rowsN[i][3]||'').trim();
+      const matchN = nombre === data.clienteNombre;
+      const matchC = data.clienteCodigo && codigo === String(data.clienteCodigo).trim();
+      if (id.startsWith('SN-') && estado === 'en servicio' && tomada === data.chicaNombre && (matchN || matchC)) {
+        const row = i + 1;
+        wsN.getRange(row, 6).setValue(data.servicios || '');
+        wsN.getRange(row, 13).setValue(data.total || '0');
+        // Si viene con datos de promo, actualizar columnas promo
+        if (data.promoNombre) {
+          wsN.getRange(row, 14).setValue(data.promoNombre);   // N = Promo nombre
+          // Guardar precioPromo y precioRegular en Desglose JSON
+          const desgloseActual = String(rowsN[i][17]||'');
+          let desglose = {};
+          try { desglose = JSON.parse(desgloseActual); } catch(e) { desglose = {}; }
+          desglose.precioPromo    = data.precioPromo    || data.total || '0';
+          desglose.precioRegular  = data.precioRegular  || '0';
+          wsN.getRange(row, 18).setValue(JSON.stringify(desglose)); // R = Desglose JSON
+        }
+        return { success: true };
+      }
+    }
+  } catch(eN) {}
+
+  // Fallback: buscar en ListaEspera (tickets LE-)
   const ws = getSheet('ListaEspera');
   const allData = ws.getDataRange().getValues();
 
@@ -3032,7 +3065,20 @@ function handleConfirmarCobroNormal(data) {
       const areaStr       = area.toLowerCase();
       const pct           = areaStr.includes('facial') ? 0.4 : 0.3;
       const montoComision = (data.montoComision !== undefined && data.montoComision !== null && data.montoComision !== '')
-        ? Number(data.montoComision) : totalCobrado;
+        ? Number(data.montoComision)
+        : (() => {
+            // Si tiene promo y pagó con tarjeta → comisión sobre precio regular
+            const promoNombreRow = String(rows[i][13]||'').trim();
+            if (promoNombreRow && metodoPago === 'Tarjeta') {
+              try {
+                const desglose = JSON.parse(String(rows[i][17]||'{}'));
+                if (desglose.precioRegular && Number(desglose.precioRegular) > 0) {
+                  return Number(desglose.precioRegular);
+                }
+              } catch(e) {}
+            }
+            return totalCobrado;
+          })();
       const comision = Math.round(montoComision * pct * 100) / 100;
 
       // TOP flag
