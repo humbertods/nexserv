@@ -2882,6 +2882,27 @@ function handleTomarServicioNormal(data) {
       ws.getRange(row, 10).setValue(data.chicaNombre || '');
       ws.getRange(row, 11).setValue(hora);
 
+      // Crear registro en Atenciones para que el panel de staff lo vea
+      try {
+        const wsA = getSheet('Atenciones');
+        const fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+        const codigoCliente = String(rows[i][3]||'');
+        const nombreCliente = String(rows[i][4]||'');
+        const servicio      = String(rows[i][5]||'');
+        const area          = String(rows[i][6]||'');
+        // Buscar último ID de atención
+        const aData = wsA.getDataRange().getValues();
+        let maxAt = 0;
+        for (let j = 3; j < aData.length; j++) {
+          const aid = String(aData[j][0]||'');
+          if (aid.startsWith('AT-')) { const n = parseInt(aid.replace('AT-','')); if (n > maxAt) maxAt = n; }
+        }
+        const atId = 'AT-' + String(maxAt + 1).padStart(4, '0');
+        // Columnas Atenciones: A=ID | B=Fecha | C=HoraEntrada | D=HoraSalida | E=CódigoCliente | F=Cliente | G=Staff | H=Servicio | I=Estado | J=Total | K=MetodoPago | L=idEspera
+        wsA.appendRow([atId, fecha, hora, '', codigoCliente, nombreCliente,
+          data.chicaNombre||'', servicio, 'En servicio', '', '', id, area]);
+      } catch(eA) {}
+
       return { success: true, message: 'Clienta tomada' };
     }
     return { success: false, message: 'Ticket no encontrado o no está esperando' };
@@ -2906,9 +2927,19 @@ function handleFinalizarServicioNormal(data) {
 
       const row = i + 1;
       ws.getRange(row, 9).setValue('Por cobrar');
-      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio); // actualizar con extras
+      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
       ws.getRange(row, 13).setValue(Number(data.total || rows[i][12] || 0));
       if (data.serviciosDetalle) ws.getRange(row, 18).setValue(JSON.stringify(data.serviciosDetalle));
+
+      // Actualizar Atenciones a "Por cobrar"
+      try {
+        cerrarAtencion(data.idEspera,
+          data.chicaNombre || String(rows[i][9]||''),
+          String(rows[i][4]||''),
+          data.servicio || String(rows[i][5]||''),
+          Number(data.total || rows[i][12] || 0),
+          '', 'Por cobrar');
+      } catch(eA) {}
 
       // Comisión parcial
       if (data.chicaNombre && Number(data.total) > 0) {
@@ -2948,18 +2979,57 @@ function handleConfirmarCobroNormal(data) {
       ws.getRange(row, 16).setValue(hora);
       ws.getRange(row, 17).setValue(totalCobrado);
 
+      const codigoCliente = String(rows[i][3] || '');
+      const nombreCliente = String(rows[i][4] || '');
+      const servicio      = String(rows[i][5] || '');
+      const area          = String(rows[i][6] || '');
+      const chicaNombre   = String(rows[i][9] || '');
+      const areaStr       = area.toLowerCase();
+      const pct           = areaStr.includes('facial') ? 0.4 : 0.3;
+      const montoComision = (data.montoComision !== undefined && data.montoComision !== null && data.montoComision !== '')
+        ? Number(data.montoComision) : totalCobrado;
+      const comision = Math.round(montoComision * pct * 100) / 100;
+
+      // TOP flag
+      let topStr = '';
+      try {
+        const wsC = getSheet('Clientas');
+        const cData = wsC.getDataRange().getValues();
+        for (let j = 3; j < cData.length; j++) {
+          if (String(cData[j][0]).trim() === codigoCliente.trim()) {
+            if (String(cData[j][7]||'').toLowerCase().includes('sí')) topStr = '⭐';
+            break;
+          }
+        }
+      } catch(e) {}
+
+      // Actualizar visita clienta
+      try { updateVisitaClienta(codigoCliente); } catch(e) {}
+
+      // Actualizar comisión de la chica
+      try { if (chicaNombre && montoComision > 0) updateComision(chicaNombre, montoComision); } catch(e) {}
+
       // HistorialOwner
       try {
         const wsH = getSheet('HistorialOwner');
-        const pct = String(rows[i][6]||'').toLowerCase().includes('facial') ? 0.4 : 0.3;
-        const comision = Math.round(totalCobrado * pct * 100) / 100;
-        wsH.appendRow([
-          fecha, hora,
-          String(rows[i][3]||''), String(rows[i][4]||''), '',
-          String(rows[i][5]||''), String(rows[i][6]||''), String(rows[i][9]||''),
-          totalCobrado, comision, metodoPago
-        ]);
+        wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, topStr,
+          servicio, area, chicaNombre, totalCobrado, comision, metodoPago]);
       } catch(eH) {}
+
+      // CierresPagos
+      try {
+        const wsPagos = getSheet('CierresPagos');
+        const desgloseStr = data.serviciosDetalle && data.serviciosDetalle.length > 0
+          ? JSON.stringify(data.serviciosDetalle) : '';
+        wsPagos.appendRow([now, hora, nombreCliente, chicaNombre, servicio,
+          totalCobrado, metodoPago, desgloseStr]);
+      } catch(eP) {}
+
+      // Atenciones (para que Lesly vea el servicio completado y su comisión)
+      try {
+        cerrarAtencion(data.idEspera, chicaNombre, nombreCliente, servicio,
+          totalCobrado, metodoPago, 'Completado');
+      } catch(eA) {}
 
       // ServiciosExtras: llenar col K con este ID
       try {
