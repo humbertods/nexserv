@@ -843,14 +843,18 @@ function handleContinuarPromoALista(data) {
       ws.getRange(row, 9).setValue('Completada');
       ws.getRange(row, 16).setValue('Pendiente cobro final'); // metodoPago temporal
       ws.getRange(row, 17).setValue(horaStr);
-      ws.getRange(row, 18).setValue(data.montoChica || '0');
+      // Usar total real del Sheet si disponible (incluye extras aprobados)
+      const montoRealSheet = Number(allData[i][12] || 0);
+      const montoFinalChica = montoRealSheet > 0 ? montoRealSheet : Number(data.montoChica || 0);
+      ws.getRange(row, 18).setValue(String(montoFinalChica));
       
       // Actualizar servicio con lo que hizo esta chica
       ws.getRange(row, 6).setValue(data.servicioActualizado || allData[i][5]);
       
-      // Registrar comisión de esta chica
-      if (data.montoChica && Number(data.montoChica) > 0) {
-        updateComision(data.chicaNombre, Number(data.montoChica));
+      // Registrar comisión de esta chica (usar total real del Sheet)
+      const montoParaComision = montoFinalChica > 0 ? montoFinalChica : Number(data.montoChica || 0);
+      if (montoParaComision > 0) {
+        updateComision(data.chicaNombre, montoParaComision);
       }
       
       // Escribir en HistorialOwner para la parte de esta chica
@@ -863,7 +867,7 @@ function handleContinuarPromoALista(data) {
         wsH.appendRow([
           fechaStr, horaStr, allData[i][3], nombre, '',
           data.areaCompletada + ' (parte de promo)', allData[i][6], data.chicaNombre,
-          Number(data.montoChica) || 0, comision, 'Pendiente cobro final'
+          montoParaComision || 0, Math.round(montoParaComision * pct * 100) / 100, 'Pendiente cobro final'
         ]);
       } catch(e) {}
       
@@ -883,8 +887,17 @@ function handleContinuarPromoALista(data) {
       const obsActual = String(allData[i][11] || '');
       const nuevaObs = (obsActual ? obsActual + ' | ' : '') + '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre + ' · Falta: ' + data.areasFaltantes;
       
-      // Usar totalAcumulado si viene del frontend, sino montoSiguienteArea
-      const totalNuevoTicket = data.totalAcumulado || data.montoSiguienteArea || '0';
+      // Total del nuevo ticket = lo que cobró esta área (del Sheet, incluye extras) + siguiente área
+      // Leer total real de col M del ticket actual (incluye extras aprobados)
+      const totalEstaAreaSheet = Number(allData[i][12] || 0); // col M = índice 12
+      const montoSiguiente = Number(data.montoSiguienteArea || 0);
+      
+      // Si el Sheet tiene más que lo que dice el frontend (por extras), usar el del Sheet
+      const totalFrontend = Number(data.totalAcumulado || 0);
+      const totalNuevoTicket = String(Math.max(totalFrontend, totalEstaAreaSheet > 0 ? totalEstaAreaSheet + montoSiguiente : 0) || data.montoSiguienteArea || '0');
+      
+      // Guardar también el monto real de esta área (para comisiones correctas)
+      const montoChicaReal = totalEstaAreaSheet > 0 ? totalEstaAreaSheet : Number(data.montoChica || 0);
       
       // Limpiar el nombre del servicio — quitar prefijos de historial como [✅Diana:...]
       let servicioLimpio = String(data.areasFaltantes || '');
@@ -911,21 +924,37 @@ function handleContinuarPromoALista(data) {
         allData[i][17] || '' // R: promasExtra (hereda del original para que no se pierdan)
       ]);
       
-      // Copiar el desglose de la staff anterior al nuevo ticket (col S)
-      // Para que el total se acumule correctamente cuando la siguiente staff finalice
-      if (data.desgloseChica) {
-        try {
-          const desgloseAnterior = typeof data.desgloseChica === 'string'
-            ? JSON.parse(data.desgloseChica) : data.desgloseChica;
-          // Combinar con desglose existente del ticket original
-          let desgloseOriginal = [];
-          const colSOriginal = allData[i][18];
-          if (colSOriginal) { try { desgloseOriginal = JSON.parse(colSOriginal); } catch(e) {} }
-          const desgloseAcum = [...desgloseOriginal, ...desgloseAnterior];
+      // Copiar el desglose al nuevo ticket (col S)
+      // Combinar: desglose existente del ticket original + desglose de esta staff
+      try {
+        let desgloseOriginal = [];
+        const colSOriginal = allData[i][18];
+        if (colSOriginal) { try { desgloseOriginal = JSON.parse(String(colSOriginal)); } catch(e) {} }
+        
+        let desgloseEstaChica = [];
+        if (data.desgloseChica) {
+          try {
+            desgloseEstaChica = typeof data.desgloseChica === 'string'
+              ? JSON.parse(data.desgloseChica) : data.desgloseChica;
+          } catch(e) {}
+        }
+        
+        // Si no vino desglose del frontend, crear uno básico con los datos disponibles
+        if (desgloseEstaChica.length === 0 && montoFinalChica > 0) {
+          desgloseEstaChica = [{ 
+            staff: data.chicaNombre, 
+            servicio: data.servicioActualizado || data.servicio || 'Servicio', 
+            area: data.areaCompletada || '', 
+            monto: montoFinalChica 
+          }];
+        }
+        
+        const desgloseAcum = [...desgloseOriginal, ...desgloseEstaChica];
+        if (desgloseAcum.length > 0) {
           const lastRowNew = ws.getLastRow();
           ws.getRange(lastRowNew, 19).setValue(JSON.stringify(desgloseAcum));
-        } catch(e) {}
-      }
+        }
+      } catch(e) {}
       
       return { success: true };
     }
@@ -949,6 +978,23 @@ function handleConfirmarCobro(data) {
       ws.getRange(row, 16).setValue(data.metodoPago || 'Efectivo');
       ws.getRange(row, 17).setValue(horaStr);
       ws.getRange(row, 18).setValue(data.totalCobrado || '0');
+
+      // Actualizar col K de ServiciosExtras con el ID del ticket cobrado
+      try {
+        const wsExt = getSheet('ServiciosExtras');
+        if (wsExt) {
+          const extData = wsExt.getDataRange().getValues();
+          const codCliente = String(allData[i][3] || '').trim();
+          const fechaHoy = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
+          for (let e = 1; e < extData.length; e++) {
+            if (String(extData[e][5]||'').trim() === codCliente &&
+                String(extData[e][0]||'').trim() === fechaHoy &&
+                String(extData[e][10]||'').trim() === '') {
+              wsExt.getRange(e + 1, 11).setValue(data.idEspera || '');
+            }
+          }
+        }
+      } catch(eExt) {}
       
       // Datos de la atención
       const codigoCliente = allData[i][3] || '';
@@ -2188,9 +2234,42 @@ function handleAprobarAutorizacion(data) {
   
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === String(data.authId).trim()) {
-      // Actualizar estado
+      const now = new Date();
+      const horaAprobacion = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
+      const fechaAprobacion = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
+
+      // Actualizar estado en Autorizaciones
       ws.getRange(i + 1, 11).setValue('aprobado');
-      ws.getRange(i + 1, 12).setValue('Aprobado por Mikaela el ' + Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM HH:mm'));
+      ws.getRange(i + 1, 12).setValue('Aprobado por Mikaela el ' + fechaAprobacion + ' ' + horaAprobacion);
+
+      // ── Registrar en ServiciosExtras ──
+      try {
+        let wsExt = getSheet('ServiciosExtras');
+        if (!wsExt) {
+          const ss = SpreadsheetApp.openById(SHEET_ID);
+          wsExt = ss.insertSheet('ServiciosExtras');
+          wsExt.getRange(1, 1, 1, 11).setValues([[
+            'Fecha', 'Hora solicitud', 'Hora aprobación', 'Staff',
+            'Cliente', 'Código', 'Servicio extra', 'Área', 'Precio',
+            'Estado', 'ID Ticket (cobro final)'
+          ]]);
+          wsExt.getRange(1, 1, 1, 11).setFontWeight('bold');
+          wsExt.setFrozenRows(1);
+        }
+        wsExt.appendRow([
+          fechaAprobacion,                                              // A: Fecha
+          Utilities.formatDate(rows[i][1], 'America/Guayaquil', 'HH:mm'), // B: Hora solicitud
+          horaAprobacion,                                               // C: Hora aprobación
+          String(rows[i][5] || ''),                                     // D: Staff
+          String(rows[i][4] || ''),                                     // E: Cliente
+          String(rows[i][3] || ''),                                     // F: Código
+          String(rows[i][6] || ''),                                     // G: Servicio extra
+          String(rows[i][7] || ''),                                     // H: Área
+          Number(rows[i][8] || 0),                                      // I: Precio
+          'Aprobado',                                                   // J: Estado
+          ''                                                            // K: ID Ticket (se llena al cobrar)
+        ]);
+      } catch(eExt) { Logger.log('Error escribiendo ServiciosExtras: ' + eExt); }
       
       return { 
         success: true, 
