@@ -76,6 +76,7 @@ function doPost(e) {
       case 'updateFichaFacial': result = handleUpdateFichaFacial(data); break;
       case 'addFichaCejasPigmento': result = handleAddFichaCejasPigmento(data); break;
       case 'cierreSemanal': result = handleCierreSemanal(data); break;
+      case 'verificarCierreAutomatico': result = handleVerificarCierreAutomatico(); break;
       case 'pagoIndividual': result = handlePagoIndividual(data); break;
       case 'bloquearUsuario': result = handleBloquearUsuario(data); break;
       case 'asignarServicioNormal': result = handleAsignarServicioNormal(data); break;
@@ -1768,7 +1769,82 @@ function handleCierreSemanal(data) {
     wsCom.getRange(i + 1, 6).setValue(0); // col F = comisión
   }
 
+  // Actualizar cabecera de Comisiones con la nueva semana
+  try {
+    const nowDate = new Date();
+    const diaSemana = nowDate.getDay();
+    const diasDesdeElLunes = (diaSemana + 6) % 7;
+    const lunesProximo = new Date(nowDate);
+    lunesProximo.setDate(nowDate.getDate() - diasDesdeElLunes + 7); // próximo lunes
+    lunesProximo.setHours(0, 0, 0, 0);
+    const sabadoProximo = new Date(lunesProximo);
+    sabadoProximo.setDate(lunesProximo.getDate() + 5);
+
+    const fmt = (d) => Utilities.formatDate(d, 'America/Guayaquil', 'dd/MM/yyyy');
+    
+    // Número de semana del año
+    const primerDiaAnio = new Date(lunesProximo.getFullYear(), 0, 1);
+    const semanaNum = Math.ceil(((lunesProximo - primerDiaAnio) / 86400000 + primerDiaAnio.getDay() + 1) / 7);
+    
+    const nuevaLabel = 'Semana ' + semanaNum + ' · Lunes ' + fmt(lunesProximo) + ' — Sábado ' + fmt(sabadoProximo) + ' · Corte manual';
+    wsCom.getRange(2, 1).setValue(nuevaLabel);
+  } catch(e) {}
+
   return { success: true, message: 'Semana cerrada y comisiones reseteadas' };
+}
+
+function handleVerificarCierreAutomatico() {
+  const wsCom = getSheet('Comisiones');
+  const comData = wsCom.getDataRange().getValues();
+  const now = new Date();
+  
+  // Obtener el lunes de la semana actual
+  const diaSemana = now.getDay(); // 0=Dom, 1=Lun...6=Sab
+  const diasDesdeElLunes = (diaSemana + 6) % 7;
+  const lunesActual = new Date(now);
+  lunesActual.setDate(now.getDate() - diasDesdeElLunes);
+  lunesActual.setHours(0, 0, 0, 0);
+  
+  // Leer la fecha de inicio guardada en la hoja (fila 2, col B)
+  const fechaInicioRaw = comData[1] ? comData[1][1] : null;
+  if (!fechaInicioRaw) return { success: false, message: 'No hay fecha de inicio en Comisiones' };
+  
+  let fechaInicio;
+  if (fechaInicioRaw instanceof Date) {
+    fechaInicio = fechaInicioRaw;
+  } else {
+    const partes = String(fechaInicioRaw).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (!partes) return { success: false, message: 'Formato de fecha no reconocido' };
+    fechaInicio = new Date(Number(partes[3]), Number(partes[2])-1, Number(partes[1]));
+  }
+  fechaInicio.setHours(0, 0, 0, 0);
+  
+  // Si el lunes actual es posterior a la fecha de inicio guardada, hay que hacer cierre
+  if (lunesActual <= fechaInicio) {
+    return { success: true, cierreRealizado: false, message: 'Semana actual - no se necesita cierre' };
+  }
+  
+  // Calcular semana y período
+  const sabado = new Date(lunesActual);
+  sabado.setDate(lunesActual.getDate() + 5);
+  const fmt = (d) => Utilities.formatDate(d, 'America/Guayaquil', 'dd/MM/yyyy');
+  
+  // Obtener número de semana del año
+  const primerDiaAnio = new Date(lunesActual.getFullYear(), 0, 1);
+  const semanaNum = Math.ceil(((lunesActual - primerDiaAnio) / 86400000 + primerDiaAnio.getDay() + 1) / 7);
+  
+  const semanaLabel = 'Semana ' + semanaNum;
+  const periodoLabel = 'Lunes ' + fmt(lunesActual) + ' — Sábado ' + fmt(sabado);
+  
+  // Ejecutar cierre
+  handleCierreSemanal({ semana: semanaLabel, periodo: periodoLabel });
+  
+  // Actualizar fecha de inicio en fila 2
+  wsCom.getRange(2, 1).setValue(semanaLabel + ' · ' + periodoLabel + ' · Corte automático');
+  wsCom.getRange(2, 2).setValue(fmt(lunesActual));
+  wsCom.getRange(2, 3).setValue(fmt(sabado));
+  
+  return { success: true, cierreRealizado: true, message: 'Cierre automático realizado: ' + semanaLabel };
 }
 
 function handlePagoIndividual(data) {
