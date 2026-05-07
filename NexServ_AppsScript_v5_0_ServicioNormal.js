@@ -40,6 +40,7 @@ function doGet(e) {
       case 'getAutorizaciones': result = handleGetAutorizaciones(); break;
       case 'getServiciosCobrados': result = handleGetServiciosCobrados(e.parameter); break;
       case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
+      case 'inicializarPestanas': result = handleInicializarPestanas(); break;
       case 'limpiarAtenciones': result = handleLimpiarAtenciones(); break;
       case 'getMarcaProductos': result = handleGetMarcaProductos(); break;
       default: result = { error: 'Acción no reconocida' };
