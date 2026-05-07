@@ -3227,6 +3227,14 @@ if ('caches' in window) {
     }
   }
 
+  // Inicializar pestañas una sola vez por sesión
+  let _pestanasInicializadas = false;
+  async function inicializarPestanasUnaVez() {
+    if (_pestanasInicializadas) return;
+    _pestanasInicializadas = true;
+    try { await apiGet('inicializarPestanas'); } catch(e) {}
+  }
+
   async function doLogin() {
     const u = document.getElementById('loginUser').value.trim().toLowerCase();
     const p = document.getElementById('loginPass').value.trim();
@@ -3243,6 +3251,7 @@ if ('caches' in window) {
     const localUser = USERS[u] || USERS[p];
     
     try {
+      inicializarPestanasUnaVez(); // crear pestañas si no existen (no bloquea)
       const result = await apiGet('login', { user: u, pass: p });
       if (result.success) {
         const r = result.user;
@@ -9516,8 +9525,11 @@ if ('caches' in window) {
     console.log('📤 Enviando a lista de espera:', postData);
 
     try {
-      const result = await apiPost('addListaEspera', postData);
-      console.log('📥 Respuesta de addListaEspera:', result);
+      // Ruta: si tiene promo → ListaEspera (flujo promo), si no → ServicioNormal
+      const tienePromo = window._arrPromo || (postData.promoNombre && postData.promoNombre.trim() !== '');
+      const accionAdd = tienePromo ? 'addListaEspera' : 'addServicioNormal';
+      const result = await apiPost(accionAdd, postData);
+      console.log('📥 Respuesta de ' + accionAdd + ':', result);
       
       if (result && result.success) {
         console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
