@@ -62,9 +62,27 @@ function doPost(e) {
       case 'updateClienta': result = handleUpdateClienta(data); break;
       case 'updateClientaFull': result = handleUpdateClientaFull(data); break;
       case 'addListaEspera': result = handleAddListaEspera(data); break;
-      case 'tomarClienta': result = handleTomarClienta(data); break;
-      case 'finalizarAtencion': result = handleFinalizarAtencion(data); break;
-      case 'confirmarCobro': result = handleConfirmarCobro(data); break;
+      case 'tomarClienta':
+        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
+          result = handleTomarServicioNormal(data);
+        } else {
+          result = handleTomarClienta(data);
+        }
+        break;
+      case 'finalizarAtencion':
+        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
+          result = handleFinalizarServicioNormal(data);
+        } else {
+          result = handleFinalizarAtencion(data);
+        }
+        break;
+      case 'confirmarCobro':
+        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
+          result = handleConfirmarCobroNormal(data);
+        } else {
+          result = handleConfirmarCobro(data);
+        }
+        break;
       case 'addServicio': result = handleAddServicio(data); break;
       case 'updateServiciosAtencion': result = handleUpdateServiciosAtencion(data); break;
       case 'devolverALista': result = handleDevolverALista(data); break;
@@ -77,6 +95,12 @@ function doPost(e) {
       case 'addFichaCejasPigmento': result = handleAddFichaCejasPigmento(data); break;
       case 'cierreSemanal': result = handleCierreSemanal(data); break;
       case 'verificarCierreAutomatico': result = handleVerificarCierreAutomatico(); break;
+      case 'inicializarPestanas': result = handleInicializarPestanas(); break;
+      case 'addServicioNormal': result = handleAddServicioNormal(data); break;
+      case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
+      case 'tomarServicioNormal': result = handleTomarServicioNormal(data); break;
+      case 'finalizarServicioNormal': result = handleFinalizarServicioNormal(data); break;
+      case 'confirmarCobroNormal': result = handleConfirmarCobroNormal(data); break;
       case 'pagoIndividual': result = handlePagoIndividual(data); break;
       case 'bloquearUsuario': result = handleBloquearUsuario(data); break;
       case 'asignarServicioNormal': result = handleAsignarServicioNormal(data); break;
@@ -766,6 +790,16 @@ function handleGetListaCompleta() {
     else if (estado === 'por cobrar') porCobrar.push(item);
   }
 
+  // Merge con ServicioNormal
+  try {
+    const snResult = handleGetServicioNormal({});
+    if (snResult.success) {
+      esperando.push(...snResult.esperando);
+      enServicio.push(...snResult.enServicio);
+      porCobrar.push(...snResult.porCobrar);
+    }
+  } catch(e) {}
+
   return { success: true, esperando: esperando, enServicio: enServicio, porCobrar: porCobrar };
 }
 
@@ -810,6 +844,12 @@ function handleGetPorCobrar() {
       if (String(cData[i][7] || '').toLowerCase().includes('sí')) topMap[cData[i][0]] = true;
     }
     porCobrar.forEach(p => { if (topMap[p.codigo]) p.esTop = true; });
+  } catch(e) {}
+
+  // Merge con ServicioNormal
+  try {
+    const snR = handleGetServicioNormal({});
+    if (snR.success) porCobrar.push(...snR.porCobrar);
   } catch(e) {}
 
   return { success: true, porCobrar: porCobrar };
@@ -2614,3 +2654,269 @@ function handleEliminarServicio(data) {
     return { success: false, error: e.toString() };
   }
 }
+
+// ============================================================
+// PESTAÑAS NUEVAS: ServicioNormal y ServicioPromo
+// ============================================================
+
+var COLS_NORMAL = [
+  'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área','Prioridad',
+  'Estado','Tomada por','Hora tomada','Observaciones','Total',
+  'Promo nombre','Método pago','Hora cobro','Total cobrado','Desglose (JSON)'
+];
+
+var COLS_PROMO = [
+  'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área actual','Prioridad',
+  'Estado','Tomada por','Hora tomada','Observaciones','Total acumulado',
+  'Promo nombre','Precio promo','Precio regular','Área completada','Desglose staff (JSON)'
+];
+
+function getOrCreateSheet(nombre, columnas) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let ws = ss.getSheetByName(nombre);
+  if (!ws) {
+    ws = ss.insertSheet(nombre);
+    ws.getRange(1, 1, 1, columnas.length).setValues([columnas]);
+    ws.getRange(1, 1, 1, columnas.length).setFontWeight('bold').setBackground('#f0f0f0');
+    ws.setFrozenRows(1);
+    ws.setColumnWidth(1, 90);
+    ws.setColumnWidth(5, 160);
+    ws.setColumnWidth(6, 200);
+  }
+  return ws;
+}
+
+function handleInicializarPestanas() {
+  try {
+    getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    return { success: true, message: 'Pestañas ServicioNormal y ServicioPromo listas' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── Generar ID único para ServicioNormal ──────────────────────
+function getNextIdNormal() {
+  const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+  const data = ws.getDataRange().getValues();
+  let max = 0;
+  for (let i = 1; i < data.length; i++) {
+    const id = String(data[i][0] || '');
+    if (id.startsWith('SN-')) {
+      const n = parseInt(id.replace('SN-', '')) || 0;
+      if (n > max) max = n;
+    }
+  }
+  return 'SN-' + String(max + 1).padStart(4, '0');
+}
+
+// ── AGREGAR clienta a ServicioNormal ─────────────────────────
+function handleAddServicioNormal(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const now = new Date();
+    const tz = 'America/Guayaquil';
+    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
+    const id    = getNextIdNormal();
+
+    ws.appendRow([
+      id,                          // A: ID
+      fecha,                       // B: Fecha
+      hora,                        // C: Hora llegada
+      data.codigo   || '',         // D: Código cliente
+      data.nombre   || '',         // E: Nombre
+      data.servicio || '',         // F: Servicio
+      data.area     || '',         // G: Área
+      data.prioridad|| 'Normal',   // H: Prioridad
+      'Esperando',                 // I: Estado
+      data.asignadaA|| '',         // J: Tomada por (asignación directa si aplica)
+      '',                          // K: Hora tomada
+      data.observaciones || '',    // L: Observaciones
+      Number(data.total || 0),     // M: Total
+      '',                          // N: Promo nombre (vacío — servicio normal)
+      '',                          // O: Método pago
+      '',                          // P: Hora cobro
+      '',                          // Q: Total cobrado
+      ''                           // R: Desglose JSON
+    ]);
+
+    return { success: true, id: id, message: 'Clienta agregada a ServicioNormal' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── LEER lista de ServicioNormal ──────────────────────────────
+function handleGetServicioNormal(params) {
+  try {
+    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const data = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const area = params && params.area ? String(params.area).toLowerCase() : '';
+
+    const esperando  = [];
+    const enServicio = [];
+    const porCobrar  = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row    = data[i];
+      const estado = String(row[8] || '').toLowerCase().trim();
+      if (!['esperando','en servicio','por cobrar'].includes(estado)) continue;
+
+      // Filtro por área si viene
+      const rowArea = String(row[6] || '').toLowerCase();
+      if (area && !rowArea.includes(area) && area !== 'todas') continue;
+
+      const item = {
+        idEspera    : String(row[0] || ''),
+        fecha       : String(row[1] || ''),
+        horaLlegada : row[2] instanceof Date ? Utilities.formatDate(row[2], tz, 'HH:mm') : String(row[2]||''),
+        codigo      : String(row[3] || ''),
+        nombre      : String(row[4] || ''),
+        servicio    : String(row[5] || ''),
+        area        : String(row[6] || ''),
+        prioridad   : String(row[7] || 'Normal'),
+        estado      : String(row[8] || ''),
+        tomadaPor   : String(row[9] || ''),
+        horaTomada  : row[10] instanceof Date ? Utilities.formatDate(row[10], tz, 'HH:mm') : String(row[10]||''),
+        observaciones: String(row[11] || ''),
+        total       : String(row[12] || '0'),
+        metodoPago  : String(row[14] || ''),
+        fuente      : 'ServicioNormal'
+      };
+
+      if (estado === 'esperando')   esperando.push(item);
+      else if (estado === 'en servicio') enServicio.push(item);
+      else if (estado === 'por cobrar')  porCobrar.push(item);
+    }
+
+    return { success: true, esperando, enServicio, porCobrar };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── TOMAR clienta de ServicioNormal ──────────────────────────
+function handleTomarServicioNormal(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+
+    for (let i = 1; i < rows.length; i++) {
+      const id     = String(rows[i][0] || '').trim();
+      const estado = String(rows[i][8] || '').toLowerCase().trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      if (estado !== 'esperando') continue;
+
+      const row = i + 1;
+      ws.getRange(row, 9).setValue('En servicio');
+      ws.getRange(row, 10).setValue(data.chicaNombre || '');
+      ws.getRange(row, 11).setValue(hora);
+
+      return { success: true, message: 'Clienta tomada' };
+    }
+    return { success: false, message: 'Ticket no encontrado o no está esperando' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── FINALIZAR servicio normal → Por cobrar ────────────────────
+function handleFinalizarServicioNormal(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+
+    for (let i = 1; i < rows.length; i++) {
+      const id     = String(rows[i][0] || '').trim();
+      const estado = String(rows[i][8] || '').toLowerCase().trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      if (estado !== 'en servicio') continue;
+
+      const row = i + 1;
+      ws.getRange(row, 9).setValue('Por cobrar');
+      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio); // actualizar con extras
+      ws.getRange(row, 13).setValue(Number(data.total || rows[i][12] || 0));
+      if (data.serviciosDetalle) ws.getRange(row, 18).setValue(JSON.stringify(data.serviciosDetalle));
+
+      // Comisión parcial
+      if (data.chicaNombre && Number(data.total) > 0) {
+        updateComision(data.chicaNombre, Number(data.total));
+      }
+
+      return { success: true, message: 'Servicio finalizado, listo para cobrar' };
+    }
+    return { success: false, message: 'Ticket no encontrado' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── CONFIRMAR cobro de ServicioNormal ─────────────────────────
+function handleConfirmarCobroNormal(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const now = new Date();
+    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
+    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+
+    for (let i = 1; i < rows.length; i++) {
+      const id     = String(rows[i][0] || '').trim();
+      const estado = String(rows[i][8] || '').toLowerCase().trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      if (!['por cobrar','en servicio'].includes(estado)) continue;
+
+      const row = i + 1;
+      const totalCobrado = Number(data.totalCobrado || rows[i][12] || 0);
+      const metodoPago   = data.metodoPago || 'Efectivo';
+
+      ws.getRange(row, 9).setValue('Completada');
+      ws.getRange(row, 15).setValue(metodoPago);
+      ws.getRange(row, 16).setValue(hora);
+      ws.getRange(row, 17).setValue(totalCobrado);
+
+      // HistorialOwner
+      try {
+        const wsH = getSheet('HistorialOwner');
+        const pct = String(rows[i][6]||'').toLowerCase().includes('facial') ? 0.4 : 0.3;
+        const comision = Math.round(totalCobrado * pct * 100) / 100;
+        wsH.appendRow([
+          fecha, hora,
+          String(rows[i][3]||''), String(rows[i][4]||''), '',
+          String(rows[i][5]||''), String(rows[i][6]||''), String(rows[i][9]||''),
+          totalCobrado, comision, metodoPago
+        ]);
+      } catch(eH) {}
+
+      // ServiciosExtras: llenar col K con este ID
+      try {
+        const wsExt = getSheet('ServiciosExtras');
+        if (wsExt) {
+          const extData = wsExt.getDataRange().getValues();
+          const cod = String(rows[i][3]||'').trim();
+          for (let e = 1; e < extData.length; e++) {
+            if (String(extData[e][5]||'').trim() === cod &&
+                String(extData[e][0]||'').trim() === fecha &&
+                String(extData[e][10]||'').trim() === '') {
+              wsExt.getRange(e+1, 11).setValue(id);
+            }
+          }
+        }
+      } catch(eE) {}
+
+      return { success: true, message: 'Cobro confirmado' };
+    }
+    return { success: false, message: 'Ticket no encontrado' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
