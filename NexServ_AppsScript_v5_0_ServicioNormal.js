@@ -490,6 +490,38 @@ function handleGetListaEspera() {
     lista.forEach(l => { if (topMap[l.codigo]) l.esTop = 'Sí'; });
   } catch(e) {}
 
+  // Merge con ServicioNormal (tickets SN- esperando)
+  try {
+    const snR = handleGetServicioNormal({});
+    if (snR.success && snR.esperando) {
+      snR.esperando.forEach(sn => {
+        lista.push({
+          id          : sn.idEspera,
+          fecha       : sn.fecha,
+          horaLlegada : sn.horaLlegada,
+          codigo      : sn.codigo,
+          nombre      : sn.nombre,
+          servicio    : sn.servicio,
+          area        : sn.area,
+          prioridad   : sn.prioridad || 'Normal',
+          estado      : sn.estado || 'Esperando',
+          tomadaPor   : sn.tomadaPor || '',
+          horaToma    : sn.horaTomada || '',
+          observaciones: sn.observaciones || '',
+          total       : Number(sn.total || 0),
+          promoNombre : '',
+          precioPromo : '',
+          precioRegular: '',
+          secuencia   : [],
+          promasExtra : [],
+          esTop       : sn.esTop || 'No',
+          asignadaA   : sn.asignadaA || '',
+          fuente      : 'ServicioNormal'
+        });
+      });
+    }
+  } catch(e) {}
+
   return { success: true, lista: lista };
 }
 
