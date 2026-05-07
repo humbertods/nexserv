@@ -9211,7 +9211,7 @@ if ('caches' in window) {
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>
             <div style="font-size:14px;font-weight:800;">${promo.name}</div>
-            <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${(promo.services||[]).join(' + ')}</div>
+            <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${Array.isArray(promo.services) ? promo.services.join(' + ') : (promo.services||'')}</div>
           </div>
           <div style="text-align:right;flex-shrink:0;margin-left:12px;">
             <div style="font-size:18px;font-weight:800;color:var(--accent-deep);">$${promo.price}</div>
