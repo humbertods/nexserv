@@ -1287,6 +1287,51 @@ function handleGetServiciosHoy(params) {
     });
   }
   
+  // Merge con ServicioNormal (tickets SN- completados hoy)
+  try {
+    const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+    const dataN = wsN.getDataRange().getValues();
+    for (let i = 1; i < dataN.length; i++) {
+      const row = dataN[i];
+      const id = String(row[0]||'').trim();
+      if (!id.startsWith('SN-')) continue;
+      const estado = String(row[8]||'').toLowerCase();
+      if (estado !== 'completada') continue;
+
+      let fechaStr = '';
+      if (row[1] instanceof Date) {
+        fechaStr = Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy');
+      } else { fechaStr = String(row[1]||''); }
+      if (fechaStr !== hoy) continue;
+
+      const tomadaPor = String(row[9]||'').trim();
+      if (params.chica && tomadaPor !== params.chica) continue;
+
+      const horaToma  = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10]||'');
+      const horaCobro = row[15] instanceof Date ? Utilities.formatDate(row[15], 'America/Guayaquil', 'HH:mm') : String(row[15]||'');
+      const area = String(row[6]||'').toLowerCase();
+      const totalCobrado = Number(row[16]||row[12]||0);
+      const porcentaje = area.includes('facial') ? 0.4 : 0.3;
+      const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
+
+      servicios.push({
+        nombre     : String(row[4]||''),
+        servicio   : String(row[5]||''),
+        area       : String(row[6]||''),
+        horaToma   : horaToma,
+        total      : row[16]||row[12]||'0',
+        metodoPago : String(row[14]||'Efectivo'),
+        tomadaPor  : tomadaPor,
+        fecha      : fechaStr,
+        promoNombre: '',
+        precioRegular: '',
+        observaciones: String(row[11]||''),
+        horaCobro  : horaCobro,
+        comision   : comision
+      });
+    }
+  } catch(e) {}
+
   return { success: true, servicios: servicios };
 }
 
