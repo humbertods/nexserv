@@ -4096,7 +4096,7 @@ if ('caches' in window) {
     document.getElementById('addServiceModal').classList.add('active');
   }
 
-  async function syncServiciosBackend(slot, total) {
+  async function syncServiciosBackend(slot, total, promoData) {
     const user = window.currentUser;
     if (!user) return;
     const svcs = slotServices[slot] || [];
@@ -4107,13 +4107,20 @@ if ('caches' in window) {
       : (document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '');
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     try {
-      await apiPost('updateServiciosAtencion', {
+      const payload = {
         chicaNombre: user.name,
         clienteNombre: clientName,
         clienteCodigo: clientCode || '',
         servicios: activeNames,
         total: String(total || 0)
-      });
+      };
+      // Si viene con datos de promo, incluirlos para actualizar ServicioNormal
+      if (promoData) {
+        payload.promoNombre    = promoData.promoNombre;
+        payload.precioPromo    = promoData.precioPromo;
+        payload.precioRegular  = promoData.precioRegular;
+      }
+      await apiPost('updateServiciosAtencion', payload);
     } catch(e) { console.error('Error sync servicios:', e); }
   }
   
@@ -9247,8 +9254,12 @@ if ('caches' in window) {
     document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
     document.getElementById('as' + slot + 'SvcCount').textContent = '1';
 
-    // Sincronizar con backend
-    syncServiciosBackend(slot, myPrice);
+    // Sincronizar con backend — incluir datos de promo para actualizar ServicioNormal
+    syncServiciosBackend(slot, myPrice, {
+      promoNombre   : promoData.name,
+      precioPromo   : myPrice,
+      precioRegular : promoData.regular
+    });
 
     closeModal();
     showNotif('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
