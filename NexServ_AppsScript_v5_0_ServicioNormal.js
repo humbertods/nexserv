@@ -985,11 +985,78 @@ function handleGetPorCobrar() {
 // CONTINUAR PROMO: La chica terminó su parte, devolver a lista para la siguiente área
 // ============================================
 function handleContinuarPromoALista(data) {
+  const now = new Date();
+  const horaStr  = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
+  const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
+  const idEspera = String(data.idEspera || '').trim();
+
+  // Detectar fuente: SP- → ServicioPromo, SN- → ServicioNormal, LE- → ListaEspera
+  if (idEspera.startsWith('SP-') || idEspera.startsWith('SN-')) {
+    const sheetName  = idEspera.startsWith('SP-') ? 'ServicioPromo' : 'ServicioNormal';
+    const COLS       = idEspera.startsWith('SP-') ? COLS_PROMO : COLS_NORMAL;
+    const ws         = getOrCreateSheet(sheetName, COLS);
+    const allData    = ws.getDataRange().getValues();
+
+    for (let i = 1; i < allData.length; i++) {
+      const id     = String(allData[i][0] || '').trim();
+      const estado = String(allData[i][8] || '').toLowerCase();
+      if (id !== idEspera) continue;
+      if (estado !== 'en servicio') continue;
+
+      const row = i + 1;
+      // Marcar como completada (parte de promo)
+      ws.getRange(row, 9).setValue('Completada');
+      ws.getRange(row, 10).setValue(data.chicaNombre || '');
+      const montoChica = Number(allData[i][12] || data.montoChica || 0);
+      ws.getRange(row, 13).setValue(montoChica);
+
+      // Registrar comisión de esta chica
+      if (montoChica > 0) { try { updateComision(data.chicaNombre, montoChica); } catch(e) {} }
+
+      // Escribir en HistorialOwner
+      try {
+        const areaStr = String(allData[i][6] || '').toLowerCase();
+        const pct = areaStr.includes('facial') ? 0.4 : 0.3;
+        const wsH = getSheet('HistorialOwner');
+        wsH.appendRow([fechaStr, horaStr, allData[i][3], allData[i][4], '',
+          data.areaCompletada + ' (parte de promo)', allData[i][6], data.chicaNombre,
+          montoChica, Math.round(montoChica * pct * 100) / 100, 'Pendiente cobro final']);
+      } catch(e) {}
+
+      // Crear nuevo registro SP- para la siguiente área
+      const newId = getNextIdPromo();
+      const precioNormal = Number(allData[i][idEspera.startsWith('SP-') ? 19 : 19] || allData[i][15] || 0);
+      const precioPromo  = Number(allData[i][idEspera.startsWith('SP-') ? 20 : 20] || allData[i][14] || 0);
+      const obsActual    = String(allData[i][11] || '');
+      const nuevaObs     = (obsActual ? obsActual + ' | ' : '') +
+        '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre +
+        ' · Falta: ' + data.areasFaltantes;
+      const montoSiguiente = Number(data.montoSiguienteArea || 0);
+
+      const wsNew = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+      wsNew.appendRow([
+        newId, fechaStr, horaStr,
+        allData[i][3], allData[i][4],       // Código, Nombre
+        data.areasFaltantes || '',           // Servicio = área faltante
+        data.nuevaArea || '',                // Área
+        allData[i][7] || 'Normal',           // Prioridad
+        'Esperando',                         // Estado
+        '', '', nuevaObs,                    // Tomada por, Hora tomada, Obs
+        montoSiguiente,                      // Total
+        data.promoNombre || allData[i][13] || '', // Promo nombre
+        precioPromo, precioNormal, '',       // Precio promo, Precio regular, Área completada
+        JSON.stringify([{ area: data.areaCompletada, monto: montoChica, staff: data.chicaNombre }]), // Desglose
+        'SP', precioNormal, precioPromo      // Tipo, Precio Normal, Precio Promo
+      ]);
+
+      return { success: true, newId: newId };
+    }
+    return { success: false, message: 'Ticket ' + idEspera + ' no encontrado en ' + sheetName };
+  }
+
+  // Flujo original para LE-
   const ws = getSheet('ListaEspera');
   const allData = ws.getDataRange().getValues();
-  const now = new Date();
-  const horaStr = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-  const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
 
   for (let i = 3; i < allData.length; i++) {
     const id = String(allData[i][0] || '').trim();
