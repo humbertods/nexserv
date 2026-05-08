@@ -3044,11 +3044,11 @@ if ('caches' in window) {
     } else {
       // Necesita otra staff para completar
       html += `
-        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="window.finishSlot${slot1?1:2}(); return false;">
-          ➡️ Terminé mi parte — continuar en otra área
+        <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
+          ➡️ Continuar siguiente área
         </button>
-        <button class="btn-primary" style="margin-bottom:10px;" onclick="finishAndSend()">
-          💰 Mandar a cobrar (mi parte)
+        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
+          💰 Mandar a cobrar (solo mi parte)
         </button>`;
     }
     btnContainer.innerHTML = html;
@@ -4344,6 +4344,32 @@ if ('caches' in window) {
     show('staffHome');
   }
   
+  async function finishSlotAndContinue(slot) {
+    // Prepara los datos del slot igual que finishSlot1/2 y llama finishAndContinue
+    window._finishingSlot = slot;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const promoData  = activePromos[clientKey];
+    const svcs       = slotServices[slot] || [];
+    const total      = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+                          .reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const svcNames   = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+                          .map(s => s.name).join(' + ');
+
+    window._finishingData = {
+      clientKey,
+      clientName,
+      total: String(total),
+      svcNames,
+      promoNombre : promoData?.promo?.name || '',
+      precioRegular: promoData?.promo?.regular || String(total),
+      areasExtras  : [],
+      promasExtraPendientes: []
+    };
+
+    await finishAndContinue();
+  }
+
   async function finishAndContinue() {
     // Pasar a otra área (devolver a lista de espera para que otra staff la tome)
     closeModal();
