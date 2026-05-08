@@ -885,7 +885,24 @@ function handleGetPorCobrar() {
   // Merge con ServicioNormal
   try {
     const snR = handleGetServicioNormal({});
-    if (snR.success) porCobrar.push(...snR.porCobrar);
+    if (snR.success) {
+      snR.porCobrar.forEach(sn => {
+        porCobrar.push({
+          idEspera      : sn.idEspera,
+          codigo        : sn.codigo,
+          nombre        : sn.nombre,
+          servicio      : sn.servicio,
+          area          : sn.area,
+          tomadaPor     : sn.tomadaPor,
+          total         : sn.tipo === 'SP' ? sn.precioPromo : sn.precioNormal,
+          promoNombre   : sn.promoNombre,
+          precioRegular : sn.precioNormal,  // col T = precio normal siempre
+          tipo          : sn.tipo,
+          serviciosDetalle: null,
+          esTop         : false
+        });
+      });
+    }
   } catch(e) {}
 
   return { success: true, porCobrar: porCobrar };
@@ -1620,27 +1637,17 @@ function handleUpdateServiciosAtencion(data) {
         const row = i + 1;
         wsN.getRange(row, 6).setValue(data.servicios || '');
         wsN.getRange(row, 13).setValue(data.total || '0');
-        // Si viene con datos de promo, actualizar columnas promo
         if (data.promoNombre) {
-          wsN.getRange(row, 14).setValue(data.promoNombre);   // N = Promo nombre
-          // Guardar precioRegular preservando el array de servicios existente
-          const desgloseActual = String(rowsN[i][17]||'');
-          let desgloseArr = [];
-          let promoMeta = {};
-          try {
-            const parsed = JSON.parse(desgloseActual);
-            if (Array.isArray(parsed)) {
-              desgloseArr = parsed;
-            } else if (parsed && parsed._servicios) {
-              desgloseArr = parsed._servicios;
-              promoMeta = parsed;
-            }
-          } catch(e) {}
-          promoMeta._promoNombre   = data.promoNombre;
-          promoMeta._precioPromo   = data.precioPromo   || data.total || '0';
-          promoMeta._precioRegular = data.precioRegular || '0';
-          if (desgloseArr.length > 0) promoMeta._servicios = desgloseArr;
-          wsN.getRange(row, 18).setValue(JSON.stringify(promoMeta));
+          // Tipo = SP, Precio Normal = regular, Precio Promo = myPrice
+          wsN.getRange(row, 14).setValue(data.promoNombre);  // N: Promo nombre
+          wsN.getRange(row, 19).setValue('SP');               // S: Tipo
+          wsN.getRange(row, 20).setValue(Number(data.precioRegular || data.total || 0)); // T: Precio Normal
+          wsN.getRange(row, 21).setValue(Number(data.precioPromo   || data.total || 0)); // U: Precio Promo
+        } else {
+          // Tipo = SN, solo Precio Normal
+          wsN.getRange(row, 19).setValue('SN');               // S: Tipo
+          wsN.getRange(row, 20).setValue(Number(data.total || 0)); // T: Precio Normal
+          wsN.getRange(row, 21).setValue('');                 // U: Precio Promo vacío
         }
         return { success: true };
       }
@@ -2817,13 +2824,15 @@ function handleEliminarServicio(data) {
 var COLS_NORMAL = [
   'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área','Prioridad',
   'Estado','Tomada por','Hora tomada','Observaciones','Total',
-  'Promo nombre','Método pago','Hora cobro','Total cobrado','Desglose (JSON)'
+  'Promo nombre','Método pago','Hora cobro','Total cobrado','Desglose (JSON)',
+  'Tipo','Precio Normal','Precio Promo'
 ];
 
 var COLS_PROMO = [
   'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área actual','Prioridad',
   'Estado','Tomada por','Hora tomada','Observaciones','Total acumulado',
-  'Promo nombre','Precio promo','Precio regular','Área completada','Desglose staff (JSON)'
+  'Promo nombre','Precio promo','Precio regular','Área completada','Desglose staff (JSON)',
+  'Tipo','Precio Normal','Precio Promo'
 ];
 
 function getOrCreateSheet(nombre, columnas) {
@@ -2886,15 +2895,18 @@ function handleAddServicioNormal(data) {
       data.area     || '',         // G: Área
       data.prioridad|| 'Normal',   // H: Prioridad
       'Esperando',                 // I: Estado
-      data.asignadaA|| '',         // J: Tomada por (asignación directa si aplica)
+      data.asignadaA|| '',         // J: Tomada por
       '',                          // K: Hora tomada
       data.observaciones || '',    // L: Observaciones
       Number(data.total || 0),     // M: Total
-      '',                          // N: Promo nombre (vacío — servicio normal)
+      '',                          // N: Promo nombre
       '',                          // O: Método pago
       '',                          // P: Hora cobro
       '',                          // Q: Total cobrado
-      ''                           // R: Desglose JSON
+      '',                          // R: Desglose JSON
+      'SN',                        // S: Tipo (SN=normal, SP=promo)
+      Number(data.total || 0),     // T: Precio Normal
+      ''                           // U: Precio Promo
     ]);
 
     return { success: true, id: id, message: 'Clienta agregada a ServicioNormal' };
@@ -2924,6 +2936,10 @@ function handleGetServicioNormal(params) {
       const rowArea = String(row[6] || '').toLowerCase();
       if (area && !rowArea.includes(area) && area !== 'todas') continue;
 
+      const tipo         = String(row[18] || 'SN').trim(); // S: Tipo SN/SP
+      const precioNormal = Number(row[19] || row[12] || 0); // T: Precio Normal
+      const precioPromo  = Number(row[20] || 0);            // U: Precio Promo
+
       const item = {
         idEspera    : String(row[0] || ''),
         fecha       : String(row[1] || ''),
@@ -2940,18 +2956,11 @@ function handleGetServicioNormal(params) {
         total       : String(row[12] || '0'),
         promoNombre : String(row[13] || ''),
         metodoPago  : String(row[14] || ''),
-        precioRegular: (() => {
-          try {
-            const raw = String(row[17] || '');
-            if (!raw) return String(row[12] || '0');
-            const d = JSON.parse(raw);
-            // Nuevo formato con _precioRegular
-            if (d._precioRegular && Number(d._precioRegular) > 0) return String(d._precioRegular);
-            // Formato viejo con precioRegular directo
-            if (d.precioRegular && Number(d.precioRegular) > 0) return String(d.precioRegular);
-          } catch(e) {}
-          return String(row[12] || '0');
-        })(),
+        tipo        : tipo,
+        precioNormal: String(precioNormal),
+        precioPromo : String(precioPromo),
+        // precioRegular para compatibilidad con cobrarDesdeBtn
+        precioRegular: tipo === 'SP' ? String(precioNormal) : String(precioNormal),
         fuente      : 'ServicioNormal'
       };
 
@@ -3092,21 +3101,17 @@ function handleConfirmarCobroNormal(data) {
       const montoComision = (data.montoComision !== undefined && data.montoComision !== null && data.montoComision !== '')
         ? Number(data.montoComision)
         : (() => {
-            // Si tiene promo y pagó con tarjeta → comisión sobre precio regular
-            const promoNombreRow = String(rows[i][13]||'').trim();
-            if (promoNombreRow && metodoPago === 'Tarjeta') {
-              try {
-                const raw = String(rows[i][17]||'');
-                const desglose = JSON.parse(raw);
-                // Nuevo formato
-                if (desglose._precioRegular && Number(desglose._precioRegular) > 0) {
-                  return Number(desglose._precioRegular);
-                }
-                // Formato viejo
-                if (desglose.precioRegular && Number(desglose.precioRegular) > 0) {
-                  return Number(desglose.precioRegular);
-                }
-              } catch(e) {}
+            // Leer Tipo (col S=19), Precio Normal (col T=20), Precio Promo (col U=21)
+            const tipo        = String(rows[i][18] || 'SN').trim();
+            const precioNormal = Number(rows[i][19] || rows[i][12] || 0);
+            const precioPromo  = Number(rows[i][20] || 0);
+            if (tipo === 'SP' && metodoPago === 'Tarjeta') {
+              // Promo + Tarjeta → comisión sobre Precio Normal
+              return precioNormal > 0 ? precioNormal : totalCobrado;
+            }
+            if (tipo === 'SP') {
+              // Promo + Efectivo/Transfer → comisión sobre Precio Promo
+              return precioPromo > 0 ? precioPromo : totalCobrado;
             }
             return totalCobrado;
           })();
