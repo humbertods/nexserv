@@ -3859,7 +3859,9 @@ if ('caches' in window) {
           if (user.area === 'pestanas') {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
-        } else {
+
+          // Mostrar modal de confirmación de servicio (enganche)
+          setTimeout(() => showConfirmServiceModal(1), 400);
           window._as2Client = a.codigo;
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as2Avatar').textContent = initials;
@@ -3929,6 +3931,9 @@ if ('caches' in window) {
           if (user.area === 'pestanas') {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
           }
+
+          // Mostrar modal de confirmación de servicio (enganche)
+          setTimeout(() => showConfirmServiceModal(2), 400);
         }
         
         if (user && user.maxClients === 2) {
@@ -4128,6 +4133,10 @@ if ('caches' in window) {
         payload.precioPromo    = promoData.precioPromo;
         payload.precioRegular  = promoData.precioRegular;
       }
+      // Incluir idEspera para actualización precisa en el Sheet
+      const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+      if (idEspera) payload.idEspera = idEspera;
+
       await apiPost('updateServiciosAtencion', payload);
     } catch(e) { console.error('Error sync servicios:', e); }
   }
@@ -4161,6 +4170,51 @@ if ('caches' in window) {
     // Pequeña pausa para que el DOM se actualice antes de finalizar
     await new Promise(r => setTimeout(r, 100));
     await finishSlot1();
+  }
+
+  function showConfirmServiceModal(slot) {
+    const slotStr = String(slot);
+    const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const svcs = slotServices[slot] || [];
+    const svcName = svcs.length > 0 ? svcs.map(s => s.name).join(' + ') : '—';
+    const svcPrice = svcs.reduce((sum, s) => sum + Number(s.price || 0), 0);
+
+    document.getElementById('confirmSvcClientName').textContent = clientName;
+    document.getElementById('confirmSvcName').textContent = svcName;
+    document.getElementById('confirmSvcPrice').textContent = svcPrice > 0 ? '$' + svcPrice : '—';
+
+    // Título diferente si es enganche
+    const esEnganche = window._esEnganche || false;
+    document.getElementById('confirmSvcTitle').textContent = esEnganche
+      ? '🔄 Servicio de enganche' : '📋 Servicio asignado';
+
+    window._confirmSvcSlot = slot;
+    document.getElementById('confirmServiceModal').classList.add('active');
+  }
+
+  function confirmServiceAndClose() {
+    closeModal();
+    // Ya está todo cargado — no hay nada más que hacer
+    showToast('✅ Servicio confirmado');
+  }
+
+  function changeServiceFromModal() {
+    closeModal();
+    const slot = window._confirmSvcSlot || 1;
+    // Abrir el selector de servicio/promo en modo enganche (sin necesitar autorización)
+    window._addServiceSlot = slot;
+    window._modoEnganche = true; // no requiere autorización de Mikaela
+    window._editEngancheIdx = 0; // reemplazar el servicio en posición 0
+    openAddService(slot);
+    // Cambiar título y ocultar nota
+    setTimeout(() => {
+      const modalTitle = document.querySelector('#addServiceModal .modal-title');
+      if (modalTitle) modalTitle.textContent = '🔄 Cambiar servicio';
+      const noteWrapper = document.getElementById('addSvcNoteWrapper');
+      if (noteWrapper) noteWrapper.style.display = 'none';
+      const confirmBtn = document.getElementById('addSvcConfirmBtn');
+      if (confirmBtn) confirmBtn.textContent = 'Confirmar cambio';
+    }, 100);
   }
 
   async function finishAndSend() {
@@ -10072,6 +10126,31 @@ if ('caches' in window) {
 <!-- ============================================ -->
 <!-- GLOBAL MODALS (Outside all screens for proper z-index) -->
 <!-- ============================================ -->
+<!-- Modal: Confirmar o Cambiar servicio de enganche -->
+<div class="modal-bg" id="confirmServiceModal">
+  <div class="modal-card">
+    <div class="modal-title" id="confirmSvcTitle">📋 Servicio asignado</div>
+    <div style="text-align:center; margin-bottom:20px;">
+      <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:6px;"></div>
+      <div style="background:var(--bg-card);border-radius:14px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servicio asignado</div>
+        <div id="confirmSvcName" style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:4px;"></div>
+        <div id="confirmSvcPrice" style="font-size:22px;font-weight:900;color:var(--accent-deep);"></div>
+      </div>
+      <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">
+        Asesorá a la clienta y confirmá o cambiá el servicio.
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="confirmServiceAndClose()">
+      ✅ Confirmar servicio
+    </button>
+    <button class="btn-primary outline" style="margin-bottom:10px;" onclick="changeServiceFromModal()">
+      🔄 Cambiar servicio
+    </button>
+    <button class="btn-primary outline" onclick="closeModal()">Cancelar</button>
+  </div>
+</div>
+
 <div class="modal-bg" id="finishOptionsModal">
   <div class="modal">
     <div class="modal-handle"></div>
