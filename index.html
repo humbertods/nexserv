@@ -4361,10 +4361,11 @@ if ('caches' in window) {
       clientName,
       total: String(total),
       svcNames,
-      promoNombre : promoData?.promo?.name || '',
+      promoNombre  : promoData?.promo?.name || '',
       precioRegular: promoData?.promo?.regular || String(total),
       areasExtras  : [],
-      promasExtraPendientes: []
+      promasExtraPendientes: [],
+      idEspera     : slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '')
     };
 
     await finishAndContinue();
