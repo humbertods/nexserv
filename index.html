@@ -9568,7 +9568,7 @@ if ('caches' in window) {
     try {
       // Ruta: si tiene promo → ListaEspera (flujo promo), si no → ServicioNormal
       const tienePromo = window._arrPromo || (postData.promoNombre && postData.promoNombre.trim() !== '');
-      const accionAdd = tienePromo ? 'addListaEspera' : 'addServicioNormal';
+      const accionAdd = tienePromo ? 'addServicioPromo' : 'addServicioNormal';
       const result = await apiPost(accionAdd, postData);
       console.log('📥 Respuesta de ' + accionAdd + ':', result);
       
@@ -9706,7 +9706,7 @@ if ('caches' in window) {
 
     try {
       const tienePromoGA = promo !== null;
-      const accionGA = tienePromoGA ? 'addListaEspera' : 'addServicioNormal';
+      const accionGA = tienePromoGA ? 'addServicioPromo' : 'addServicioNormal';
       const result = await apiPost(accionGA, postData);
       console.log('📥 Respuesta de ' + accionGA + ':', result);
       
