@@ -10129,25 +10129,19 @@ if ('caches' in window) {
 <!-- ============================================ -->
 <!-- Modal: Confirmar o Cambiar servicio de enganche -->
 <div class="modal-bg" id="confirmServiceModal">
-  <div class="modal-card">
-    <div class="modal-title" id="confirmSvcTitle">📋 Servicio asignado</div>
+  <div class="modal-card" style="background:var(--bg-card);border-radius:24px;padding:24px;max-width:420px;width:90%;margin:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+    <div class="modal-title" id="confirmSvcTitle" style="font-size:17px;font-weight:800;text-align:center;margin-bottom:16px;">📋 Servicio asignado</div>
     <div style="text-align:center; margin-bottom:20px;">
-      <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:6px;"></div>
-      <div style="background:var(--bg-card);border-radius:14px;padding:14px;margin-bottom:12px;">
+      <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:10px;"></div>
+      <div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid var(--line);">
         <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servicio asignado</div>
         <div id="confirmSvcName" style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:4px;"></div>
-        <div id="confirmSvcPrice" style="font-size:22px;font-weight:900;color:var(--accent-deep);"></div>
+        <div id="confirmSvcPrice" style="font-size:24px;font-weight:900;color:var(--accent-deep);"></div>
       </div>
-      <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">
-        Asesorá a la clienta y confirmá o cambiá el servicio.
-      </div>
+      <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">Asesorá a la clienta y confirmá o cambiá el servicio.</div>
     </div>
-    <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="confirmServiceAndClose()">
-      ✅ Confirmar servicio
-    </button>
-    <button class="btn-primary outline" style="margin-bottom:10px;" onclick="changeServiceFromModal()">
-      🔄 Cambiar servicio
-    </button>
+    <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="confirmServiceAndClose()">✅ Confirmar servicio</button>
+    <button class="btn-primary outline" style="margin-bottom:10px;" onclick="changeServiceFromModal()">🔄 Cambiar servicio</button>
     <button class="btn-primary outline" onclick="closeModal()">Cancelar</button>
   </div>
 </div>
