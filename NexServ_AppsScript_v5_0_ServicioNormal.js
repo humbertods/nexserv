@@ -1623,13 +1623,24 @@ function handleUpdateServiciosAtencion(data) {
         // Si viene con datos de promo, actualizar columnas promo
         if (data.promoNombre) {
           wsN.getRange(row, 14).setValue(data.promoNombre);   // N = Promo nombre
-          // Guardar precioPromo y precioRegular en Desglose JSON
+          // Guardar precioRegular preservando el array de servicios existente
           const desgloseActual = String(rowsN[i][17]||'');
-          let desglose = {};
-          try { desglose = JSON.parse(desgloseActual); } catch(e) { desglose = {}; }
-          desglose.precioPromo    = data.precioPromo    || data.total || '0';
-          desglose.precioRegular  = data.precioRegular  || '0';
-          wsN.getRange(row, 18).setValue(JSON.stringify(desglose)); // R = Desglose JSON
+          let desgloseArr = [];
+          let promoMeta = {};
+          try {
+            const parsed = JSON.parse(desgloseActual);
+            if (Array.isArray(parsed)) {
+              desgloseArr = parsed;
+            } else if (parsed && parsed._servicios) {
+              desgloseArr = parsed._servicios;
+              promoMeta = parsed;
+            }
+          } catch(e) {}
+          promoMeta._promoNombre   = data.promoNombre;
+          promoMeta._precioPromo   = data.precioPromo   || data.total || '0';
+          promoMeta._precioRegular = data.precioRegular || '0';
+          if (desgloseArr.length > 0) promoMeta._servicios = desgloseArr;
+          wsN.getRange(row, 18).setValue(JSON.stringify(promoMeta));
         }
         return { success: true };
       }
@@ -2930,12 +2941,15 @@ function handleGetServicioNormal(params) {
         promoNombre : String(row[13] || ''),
         metodoPago  : String(row[14] || ''),
         precioRegular: (() => {
-          // Intentar leer precioRegular del desglose JSON (col R=18)
           try {
-            const d = JSON.parse(String(row[17] || '{}'));
+            const raw = String(row[17] || '');
+            if (!raw) return String(row[12] || '0');
+            const d = JSON.parse(raw);
+            // Nuevo formato con _precioRegular
+            if (d._precioRegular && Number(d._precioRegular) > 0) return String(d._precioRegular);
+            // Formato viejo con precioRegular directo
             if (d.precioRegular && Number(d.precioRegular) > 0) return String(d.precioRegular);
           } catch(e) {}
-          // Fallback: si no hay promo, precioRegular = total
           return String(row[12] || '0');
         })(),
         fuente      : 'ServicioNormal'
@@ -3082,7 +3096,13 @@ function handleConfirmarCobroNormal(data) {
             const promoNombreRow = String(rows[i][13]||'').trim();
             if (promoNombreRow && metodoPago === 'Tarjeta') {
               try {
-                const desglose = JSON.parse(String(rows[i][17]||'{}'));
+                const raw = String(rows[i][17]||'');
+                const desglose = JSON.parse(raw);
+                // Nuevo formato
+                if (desglose._precioRegular && Number(desglose._precioRegular) > 0) {
+                  return Number(desglose._precioRegular);
+                }
+                // Formato viejo
                 if (desglose.precioRegular && Number(desglose.precioRegular) > 0) {
                   return Number(desglose.precioRegular);
                 }
