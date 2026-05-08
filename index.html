@@ -9200,12 +9200,12 @@ if ('caches' in window) {
   }
 
   function applyPromoFromAddSvc(promoData) {
-    // El staff cambia el servicio por una promo — no requiere autorización de Mikaela
-    // pero sí notifica el cambio
     const slot = window._addServiceSlot || 1;
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-    
+    const clientKey = normalizeClientKey(clientName);
+    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+
     // Limpiar servicios anteriores del slot y aplicar la promo
     slotServices[slot] = [];
     const myArea = user?.area || 'cejas';
@@ -9218,25 +9218,38 @@ if ('caches' in window) {
       status: undefined
     });
 
-    // Registrar promo activa
-    const clientKey = normalizeClientKey(clientName);
+    // Registrar promo activa usando el clientKey correcto
     activePromos[clientKey] = {
       promo: promoData,
       startedBy: myArea,
       completedAreas: [],
       _metadata: { displayName: clientName }
     };
+    saveActivePromos();
 
     renderServicesForSlot(slot);
     document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
     document.getElementById('as' + slot + 'SvcCount').textContent = '1';
 
-    // Sincronizar con backend — incluir datos de promo para actualizar ServicioNormal
-    syncServiciosBackend(slot, myPrice, {
-      promoNombre   : promoData.name,
-      precioPromo   : myPrice,
-      precioRegular : promoData.regular
-    });
+    // Actualizar Sheet directamente con promoNombre + precioRegular
+    // Esto garantiza que Mikaela vea el cambio y el cobro detecte la promo
+    if (idEspera) {
+      apiPost('updateServiciosAtencion', {
+        idEspera      : idEspera,
+        chicaNombre   : user.name,
+        clienteNombre : clientName,
+        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+        servicios     : promoData.name,
+        total         : String(myPrice),
+        promoNombre   : promoData.name,
+        precioPromo   : String(myPrice),
+        precioRegular : String(promoData.regular || myPrice)
+      }).then(r => {
+        console.log('✅ Promo actualizada en Sheet:', r);
+      }).catch(e => {
+        console.warn('⚠ No se pudo actualizar promo en Sheet:', e);
+      });
+    }
 
     closeModal();
     showNotif('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
