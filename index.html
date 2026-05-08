@@ -9181,8 +9181,9 @@ if ('caches' in window) {
       list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;padding:20px;">No hay promos activas</div>';
       return;
     }
-    list.innerHTML = activePromosList.map(promo => `
-      <div onclick="applyPromoFromAddSvc(${JSON.stringify(promo).replace(/'/g,'&#39;').replace(/"/g,'&quot;')})" 
+    window._addSvcPromosList = activePromosList;
+    list.innerHTML = activePromosList.map((promo, idx) => `
+      <div onclick="applyPromoFromAddSvc(${idx})" 
            style="background:var(--bg-card);border-radius:16px;padding:14px 16px;margin-bottom:10px;cursor:pointer;border:2px solid var(--line);transition:all .15s;"
            onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--line)'">
         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -9199,7 +9200,9 @@ if ('caches' in window) {
     `).join('');
   }
 
-  function applyPromoFromAddSvc(promoData) {
+  function applyPromoFromAddSvc(promoIdx) {
+    const promoData = (window._addSvcPromosList || PROMOS.filter(p => p.active))[promoIdx];
+    if (!promoData) return;
     const slot = window._addServiceSlot || 1;
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
