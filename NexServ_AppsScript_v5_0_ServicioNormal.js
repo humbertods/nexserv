@@ -1419,8 +1419,8 @@ function handleGetAtenciones(params) {
           observaciones: sn.observaciones || '',
           total       : sn.total || '0',
           precioPromo : sn.total || '0',
-          promoNombre : '',
-          precioRegular: sn.total || '0',
+          promoNombre : sn.promoNombre || '',
+          precioRegular: sn.precioRegular || sn.total || '0',
           fuente      : 'ServicioNormal'
         });
       });
