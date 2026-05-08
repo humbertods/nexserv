@@ -9232,7 +9232,7 @@ if ('caches' in window) {
     document.getElementById('as' + slot + 'SvcCount').textContent = '1';
 
     // Actualizar Sheet directamente con promoNombre + precioRegular
-    // Esto garantiza que Mikaela vea el cambio y el cobro detecte la promo
+    console.log('🔍 applyPromoFromAddSvc — idEspera:', idEspera, '| clientName:', clientName, '| promo:', promoData.name, '| regular:', promoData.regular);
     if (idEspera) {
       apiPost('updateServiciosAtencion', {
         idEspera      : idEspera,
