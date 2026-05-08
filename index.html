@@ -4122,11 +4122,12 @@ if ('caches' in window) {
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     try {
       const payload = {
-        chicaNombre: user.name,
-        clienteNombre: clientName,
-        clienteCodigo: clientCode || '',
-        servicios: activeNames,
-        total: String(total || 0)
+        chicaNombre   : user.name,
+        clienteNombre : clientName,
+        clienteCodigo : clientCode || '',
+        servicios     : activeNames,
+        total         : String(total || 0),
+        tipo          : 'SN'
       };
       // Si viene con datos de promo, incluirlos para actualizar ServicioNormal
       if (promoData) {
@@ -6763,40 +6764,16 @@ if ('caches' in window) {
 
   function cobrarDesdeBtn(btn) {
     const idEspera = btn.dataset.id || '';
-    const nombre = btn.dataset.nombre || '';
+    const nombre   = btn.dataset.nombre || '';
     const servicio = btn.dataset.servicio || '';
-    const chica = btn.dataset.chica || '';
-    const total = btn.dataset.total || '0';
-    let regular = btn.dataset.regular || total;
-    let promo = btn.dataset.promo || '';
+    const chica    = btn.dataset.chica || '';
+    const total    = btn.dataset.total || '0';
+    const regular  = btn.dataset.regular || total;
+    const promo    = btn.dataset.promo || '';
     let desglose = null;
     try {
       if (btn.dataset.desglose) desglose = JSON.parse(decodeURIComponent(btn.dataset.desglose));
     } catch(e) {}
-
-    // Si el Sheet no tiene promoNombre, intentar recuperar de activePromos (estado local)
-    // También corregir precioRegular si activePromos tiene el valor correcto
-    const clientKey = normalizeClientKey(nombre);
-    const localPromo = activePromos[clientKey];
-    if (!promo || promo === '' || promo === 'undefined') {
-      if (localPromo && localPromo.promo) {
-        promo = localPromo.promo.name || '';
-        regular = String(localPromo.promo.regular || total);
-      } else if (localPromo && localPromo.promoName) {
-        promo = localPromo.promoName;
-        const promoFull = (window.PROMOS || []).find(p => p.name === promo);
-        if (promoFull) regular = String(promoFull.regular || total);
-      }
-    } else if (promo && localPromo && localPromo.promo) {
-      // Promo ya detectada del Sheet — pero verificar que regular sea el correcto
-      // activePromos siempre tiene el regular correcto del objeto promo completo
-      regular = String(localPromo.promo.regular || regular);
-    } else if (promo) {
-      // Promo del Sheet pero no en activePromos — buscar en PROMOS por nombre
-      const promoFull = (window.PROMOS || []).find(p => p.name === promo);
-      if (promoFull) regular = String(promoFull.regular || regular);
-    }
-
     openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
   }
 
@@ -9304,12 +9281,13 @@ if ('caches' in window) {
         servicios     : promoData.name,
         total         : String(myPrice),
         promoNombre   : promoData.name,
+        tipo          : 'SP',
         precioPromo   : String(myPrice),
         precioRegular : String(promoData.regular || promoData.price || myPrice)
       }).then(r => {
-        console.log('✅ Promo actualizada en Sheet:', r);
+        console.log('✅ Promo SP actualizada en Sheet:', r);
       }).catch(e => {
-        console.warn('⚠ No se pudo actualizar promo en Sheet:', e);
+        console.warn('⚠ Error actualizando promo en Sheet:', e);
       });
     }
 
