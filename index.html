@@ -3862,6 +3862,7 @@ if ('caches' in window) {
 
           // Mostrar modal de confirmación de servicio (enganche)
           setTimeout(() => showConfirmServiceModal(1), 400);
+        } else {
           window._as2Client = a.codigo;
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as2Avatar').textContent = initials;
