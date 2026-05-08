@@ -3643,6 +3643,9 @@ if ('caches' in window) {
     
     // Guardar la promo disponible (si existe) pero NO aplicarla automáticamente
     const takingData = window._takingData;
+    const takingId = String(window._takingId || '');
+    const clientKey = normalizeClientKey(window._takingClient || '');
+
     if (takingData && takingData.promoNombre && takingData.promoNombre.trim() !== '') {
       window._availablePromo = {
         name: takingData.promoNombre,
@@ -3651,6 +3654,11 @@ if ('caches' in window) {
       };
     } else {
       window._availablePromo = null;
+      // Si es SN- (servicio normal sin promo), limpiar cualquier promo residual de esta clienta
+      if (takingId.startsWith('SN-') && clientKey) {
+        delete activePromos[clientKey];
+        saveActivePromos();
+      }
     }
     // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
