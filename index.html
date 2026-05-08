@@ -3864,8 +3864,8 @@ if ('caches' in window) {
           setTimeout(() => showConfirmServiceModal(1), 400);
         } else {
           window._as2Client = a.codigo;
-          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          document.getElementById('as2Avatar').textContent = initials;
+          const initials2b = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          document.getElementById('as2Avatar').textContent = initials2b;
           document.getElementById('as2Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
           document.getElementById('as2Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
           document.getElementById('as2Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
