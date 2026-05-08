@@ -6775,22 +6775,26 @@ if ('caches' in window) {
     } catch(e) {}
 
     // Si el Sheet no tiene promoNombre, intentar recuperar de activePromos (estado local)
+    // También corregir precioRegular si activePromos tiene el valor correcto
+    const clientKey = normalizeClientKey(nombre);
+    const localPromo = activePromos[clientKey];
     if (!promo || promo === '' || promo === 'undefined') {
-      const clientKey = normalizeClientKey(nombre);
-      const localPromo = activePromos[clientKey];
       if (localPromo && localPromo.promo) {
         promo = localPromo.promo.name || '';
-        const myArea = window.currentUser?.area || 'cejas';
-        const myPrice = getMyPromoPrice(localPromo.promo, myArea);
-        regular = String(localPromo.promo.regular || myPrice || total);
+        regular = String(localPromo.promo.regular || total);
       } else if (localPromo && localPromo.promoName) {
-        // Restaurado desde localStorage — cruzar con PROMOS para recuperar precio regular
         promo = localPromo.promoName;
         const promoFull = (window.PROMOS || []).find(p => p.name === promo);
-        if (promoFull) {
-          regular = String(promoFull.regular || total);
-        }
+        if (promoFull) regular = String(promoFull.regular || total);
       }
+    } else if (promo && localPromo && localPromo.promo) {
+      // Promo ya detectada del Sheet — pero verificar que regular sea el correcto
+      // activePromos siempre tiene el regular correcto del objeto promo completo
+      regular = String(localPromo.promo.regular || regular);
+    } else if (promo) {
+      // Promo del Sheet pero no en activePromos — buscar en PROMOS por nombre
+      const promoFull = (window.PROMOS || []).find(p => p.name === promo);
+      if (promoFull) regular = String(promoFull.regular || regular);
     }
 
     openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
@@ -9301,7 +9305,7 @@ if ('caches' in window) {
         total         : String(myPrice),
         promoNombre   : promoData.name,
         precioPromo   : String(myPrice),
-        precioRegular : String(promoData.regular || myPrice)
+        precioRegular : String(promoData.regular || promoData.price || myPrice)
       }).then(r => {
         console.log('✅ Promo actualizada en Sheet:', r);
       }).catch(e => {
