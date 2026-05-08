@@ -40,6 +40,7 @@ function doGet(e) {
       case 'getAutorizaciones': result = handleGetAutorizaciones(); break;
       case 'getServiciosCobrados': result = handleGetServiciosCobrados(e.parameter); break;
       case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
+      case 'getServicioPromo':  result = handleGetServicioPromo(e.parameter);  break;
       case 'inicializarPestanas': result = handleInicializarPestanas(); break;
       case 'limpiarAtenciones': result = handleLimpiarAtenciones(); break;
       case 'getMarcaProductos': result = handleGetMarcaProductos(); break;
@@ -69,6 +70,8 @@ function doPost(e) {
         if (!data.idEspera && data.idListaEspera) data.idEspera = data.idListaEspera;
         if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
           result = handleTomarServicioNormal(data);
+        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
+          result = handleTomarServicioPromo(data);
         } else {
           result = handleTomarClienta(data);
         }
@@ -76,6 +79,8 @@ function doPost(e) {
       case 'finalizarAtencion':
         if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
           result = handleFinalizarServicioNormal(data);
+        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
+          result = handleFinalizarServicioPromo(data);
         } else {
           result = handleFinalizarAtencion(data);
         }
@@ -83,6 +88,8 @@ function doPost(e) {
       case 'confirmarCobro':
         if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
           result = handleConfirmarCobroNormal(data);
+        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
+          result = handleConfirmarCobroPromo(data);
         } else {
           result = handleConfirmarCobro(data);
         }
@@ -101,6 +108,7 @@ function doPost(e) {
       case 'verificarCierreAutomatico': result = handleVerificarCierreAutomatico(); break;
       case 'inicializarPestanas': result = handleInicializarPestanas(); break;
       case 'addServicioNormal': result = handleAddServicioNormal(data); break;
+      case 'addServicioPromo':  result = handleAddServicioPromo(data);  break;
       case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
       case 'tomarServicioNormal': result = handleTomarServicioNormal(data); break;
       case 'finalizarServicioNormal': result = handleFinalizarServicioNormal(data); break;
@@ -509,14 +517,48 @@ function handleGetListaEspera() {
           horaToma    : sn.horaTomada || '',
           observaciones: sn.observaciones || '',
           total       : Number(sn.total || 0),
-          promoNombre : '',
-          precioPromo : '',
-          precioRegular: '',
+          promoNombre : sn.promoNombre || '',
+          precioPromo : sn.precioPromo || '',
+          precioRegular: sn.precioNormal || '',
+          tipo        : sn.tipo || 'SN',
           secuencia   : [],
           promasExtra : [],
           esTop       : sn.esTop || 'No',
           asignadaA   : sn.asignadaA || '',
           fuente      : 'ServicioNormal'
+        });
+      });
+    }
+  } catch(e) {}
+
+  // Merge con ServicioPromo (tickets SP- esperando)
+  try {
+    const spR = handleGetServicioPromo({});
+    if (spR.success && spR.esperando) {
+      spR.esperando.forEach(sp => {
+        lista.push({
+          id          : sp.idEspera,
+          fecha       : sp.fecha,
+          horaLlegada : sp.horaLlegada,
+          codigo      : sp.codigo,
+          nombre      : sp.nombre,
+          servicio    : sp.servicio,
+          area        : sp.area,
+          prioridad   : sp.prioridad || 'Normal',
+          estado      : sp.estado || 'Esperando',
+          tomadaPor   : sp.tomadaPor || '',
+          horaToma    : sp.horaTomada || '',
+          observaciones: sp.observaciones || '',
+          total       : Number(sp.total || 0),
+          promoNombre : sp.promoNombre || '',
+          precioPromo : sp.precioPromo || '',
+          precioRegular: sp.precioNormal || '',
+          tipo        : sp.tipo || 'SP',
+          secuencia   : [],
+          promasExtra : [],
+          esTop       : 'No',
+          asignadaA   : '',
+          fuente      : 'ServicioPromo'
         });
       });
     }
@@ -826,13 +868,21 @@ function handleGetListaCompleta() {
     else if (estado === 'por cobrar') porCobrar.push(item);
   }
 
-  // Merge con ServicioNormal
+  // Merge con ServicioNormal y ServicioPromo
   try {
     const snResult = handleGetServicioNormal({});
     if (snResult.success) {
       esperando.push(...snResult.esperando);
       enServicio.push(...snResult.enServicio);
       porCobrar.push(...snResult.porCobrar);
+    }
+  } catch(e) {}
+  try {
+    const spResult = handleGetServicioPromo({});
+    if (spResult.success) {
+      esperando.push(...spResult.esperando);
+      enServicio.push(...spResult.enServicio);
+      porCobrar.push(...spResult.porCobrar);
     }
   } catch(e) {}
 
@@ -896,8 +946,31 @@ function handleGetPorCobrar() {
           tomadaPor     : sn.tomadaPor,
           total         : sn.tipo === 'SP' ? sn.precioPromo : sn.precioNormal,
           promoNombre   : sn.promoNombre,
-          precioRegular : sn.precioNormal,  // col T = precio normal siempre
+          precioRegular : sn.precioNormal,
           tipo          : sn.tipo,
+          serviciosDetalle: null,
+          esTop         : false
+        });
+      });
+    }
+  } catch(e) {}
+
+  // Merge con ServicioPromo
+  try {
+    const spR = handleGetServicioPromo({});
+    if (spR.success) {
+      spR.porCobrar.forEach(sp => {
+        porCobrar.push({
+          idEspera      : sp.idEspera,
+          codigo        : sp.codigo,
+          nombre        : sp.nombre,
+          servicio      : sp.servicio,
+          area          : sp.area,
+          tomadaPor     : sp.tomadaPor,
+          total         : sp.precioPromo || sp.precioNormal,
+          promoNombre   : sp.promoNombre,
+          precioRegular : sp.precioNormal,
+          tipo          : sp.tipo || 'SP',
           serviciosDetalle: null,
           esTop         : false
         });
@@ -1349,6 +1422,54 @@ function handleGetServiciosHoy(params) {
     }
   } catch(e) {}
 
+  // Merge con ServicioPromo (tickets SP- completados hoy)
+  try {
+    const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const dataP = wsP.getDataRange().getValues();
+    for (let i = 1; i < dataP.length; i++) {
+      const row = dataP[i];
+      const id = String(row[0]||'').trim();
+      if (!id.startsWith('SP-')) continue;
+      const estado = String(row[8]||'').toLowerCase();
+      if (estado !== 'completada') continue;
+
+      let fechaStr = '';
+      if (row[1] instanceof Date) {
+        fechaStr = Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy');
+      } else { fechaStr = String(row[1]||''); }
+      if (fechaStr !== hoy) continue;
+
+      const tomadaPor = String(row[9]||'').trim();
+      if (params.chica && tomadaPor !== params.chica) continue;
+
+      const horaToma  = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10]||'');
+      const horaCobro = row[15] instanceof Date ? Utilities.formatDate(row[15], 'America/Guayaquil', 'HH:mm') : String(row[15]||'');
+      const precioNormal = Number(row[19] || row[15] || 0);
+      const precioPromo  = Number(row[20] || row[14] || 0);
+      const totalCobrado = Number(row[16] || precioPromo || 0);
+      const area = String(row[6]||'').toLowerCase();
+      const porcentaje = area.includes('facial') ? 0.4 : 0.3;
+      const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
+
+      servicios.push({
+        nombre     : String(row[4]||''),
+        servicio   : String(row[5]||''),
+        area       : String(row[6]||''),
+        horaToma   : horaToma,
+        total      : String(totalCobrado),
+        metodoPago : String(row[14]||'Efectivo'),
+        tomadaPor  : tomadaPor,
+        fecha      : fechaStr,
+        promoNombre: String(row[13]||''),
+        precioRegular: String(precioNormal),
+        observaciones: String(row[11]||''),
+        horaCobro  : horaCobro,
+        comision   : comision,
+        tipo       : 'SP'
+      });
+    }
+  } catch(e) {}
+
   return { success: true, servicios: servicios };
 }
 
@@ -1420,7 +1541,6 @@ function handleGetAtenciones(params) {
     const snR = handleGetServicioNormal(params || {});
     if (snR.success && snR.enServicio) {
       snR.enServicio.forEach(sn => {
-        // Filtro por chica si aplica
         if (params && params.chica && sn.tomadaPor !== params.chica) return;
         atenciones.push({
           idEspera    : sn.idEspera,
@@ -1435,10 +1555,40 @@ function handleGetAtenciones(params) {
           horaToma    : sn.horaTomada || '',
           observaciones: sn.observaciones || '',
           total       : sn.total || '0',
-          precioPromo : sn.total || '0',
+          precioPromo : sn.precioPromo || sn.total || '0',
           promoNombre : sn.promoNombre || '',
-          precioRegular: sn.precioRegular || sn.total || '0',
+          precioRegular: sn.precioNormal || sn.total || '0',
+          tipo        : sn.tipo || 'SN',
           fuente      : 'ServicioNormal'
+        });
+      });
+    }
+  } catch(e) {}
+
+  // Merge con ServicioPromo (tickets SP- en servicio)
+  try {
+    const spR = handleGetServicioPromo(params || {});
+    if (spR.success && spR.enServicio) {
+      spR.enServicio.forEach(sp => {
+        if (params && params.chica && sp.tomadaPor !== params.chica) return;
+        atenciones.push({
+          idEspera    : sp.idEspera,
+          fecha       : sp.fecha,
+          horaLlegada : sp.horaLlegada,
+          codigo      : sp.codigo,
+          nombre      : sp.nombre,
+          servicio    : sp.servicio,
+          area        : sp.area,
+          prioridad   : sp.prioridad || 'Normal',
+          tomadaPor   : sp.tomadaPor,
+          horaToma    : sp.horaTomada || '',
+          observaciones: sp.observaciones || '',
+          total       : sp.total || '0',
+          precioPromo : sp.precioPromo || sp.total || '0',
+          promoNombre : sp.promoNombre || '',
+          precioRegular: sp.precioNormal || sp.total || '0',
+          tipo        : sp.tipo || 'SP',
+          fuente      : 'ServicioPromo'
         });
       });
     }
@@ -1653,6 +1803,37 @@ function handleUpdateServiciosAtencion(data) {
       }
     }
   } catch(eN) {}
+
+  // Intentar en ServicioPromo (tickets SP-)
+  try {
+    const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const rowsP = wsP.getDataRange().getValues();
+    for (let i = 1; i < rowsP.length; i++) {
+      const id     = String(rowsP[i][0]||'').trim();
+      const estado = String(rowsP[i][8]||'').toLowerCase();
+      const tomada = String(rowsP[i][9]||'').trim();
+      const nombre = String(rowsP[i][4]||'').trim();
+      const codigo = String(rowsP[i][3]||'').trim();
+      const matchId = data.idEspera && id === String(data.idEspera).trim();
+      const matchN  = nombre === data.clienteNombre;
+      const matchC  = data.clienteCodigo && codigo === String(data.clienteCodigo).trim();
+      if (id.startsWith('SP-') && estado === 'en servicio' && (matchId || (tomada === data.chicaNombre && (matchN || matchC)))) {
+        const row = i + 1;
+        wsP.getRange(row, 6).setValue(data.servicios || '');
+        wsP.getRange(row, 13).setValue(data.total || '0');
+        if (data.promoNombre) {
+          wsP.getRange(row, 14).setValue(data.promoNombre);
+          wsP.getRange(row, 19).setValue('SP');
+          wsP.getRange(row, 20).setValue(Number(data.precioRegular || data.total || 0));
+          wsP.getRange(row, 21).setValue(Number(data.precioPromo   || data.total || 0));
+        } else {
+          wsP.getRange(row, 19).setValue(data.tipo || 'SP');
+          wsP.getRange(row, 20).setValue(Number(data.total || 0));
+        }
+        return { success: true };
+      }
+    }
+  } catch(eP) {}
 
   // Fallback: buscar en ListaEspera (tickets LE-)
   const ws = getSheet('ListaEspera');
@@ -2860,6 +3041,64 @@ function handleInicializarPestanas() {
   }
 }
 
+// ── Generar ID único para ServicioPromo ──────────────────────
+function getNextIdPromo() {
+  const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+  const data = ws.getDataRange().getValues();
+  let max = 0;
+  for (let i = 1; i < data.length; i++) {
+    const id = String(data[i][0] || '');
+    if (id.startsWith('SP-')) {
+      const n = parseInt(id.replace('SP-', '')) || 0;
+      if (n > max) max = n;
+    }
+  }
+  return 'SP-' + String(max + 1).padStart(4, '0');
+}
+
+// ── AGREGAR clienta a ServicioPromo ──────────────────────────
+function handleAddServicioPromo(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const now = new Date();
+    const tz = 'America/Guayaquil';
+    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
+    const id    = getNextIdPromo();
+
+    const precioPromo   = Number(data.precioPromo   || data.total || 0);
+    const precioRegular = Number(data.precioRegular || precioPromo);
+
+    ws.appendRow([
+      id,                          // A: ID
+      fecha,                       // B: Fecha
+      hora,                        // C: Hora llegada
+      data.codigo    || '',        // D: Código cliente
+      data.nombre    || '',        // E: Nombre
+      data.servicio  || data.promoNombre || '', // F: Servicio
+      data.area      || '',        // G: Área actual
+      data.prioridad || 'Normal',  // H: Prioridad
+      'Esperando',                 // I: Estado
+      data.asignadaA || '',        // J: Tomada por
+      '',                          // K: Hora tomada
+      data.observaciones || '',    // L: Observaciones
+      precioPromo,                 // M: Total acumulado
+      data.promoNombre || '',      // N: Promo nombre
+      precioPromo,                 // O: Precio promo
+      precioRegular,               // P: Precio regular
+      '',                          // Q: Área completada
+      '',                          // R: Desglose staff JSON
+      'SP',                        // S: Tipo
+      precioRegular,               // T: Precio Normal
+      precioPromo                  // U: Precio Promo
+    ]);
+
+    return { success: true, id: id, message: 'Clienta agregada a ServicioPromo' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
 // ── Generar ID único para ServicioNormal ──────────────────────
 function getNextIdNormal() {
   const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
@@ -2910,6 +3149,63 @@ function handleAddServicioNormal(data) {
     ]);
 
     return { success: true, id: id, message: 'Clienta agregada a ServicioNormal' };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+// ── LEER lista de ServicioPromo ───────────────────────────────
+function handleGetServicioPromo(params) {
+  try {
+    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const data = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const area = params && params.area ? String(params.area).toLowerCase() : '';
+
+    const esperando  = [];
+    const enServicio = [];
+    const porCobrar  = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row    = data[i];
+      const estado = String(row[8] || '').toLowerCase().trim();
+      if (!['esperando','en servicio','por cobrar'].includes(estado)) continue;
+      const rowArea = String(row[6] || '').toLowerCase();
+      if (area && !rowArea.includes(area) && area !== 'todas') continue;
+
+      const tipo         = String(row[18] || 'SP').trim();
+      const precioNormal = Number(row[19] || row[15] || 0);
+      const precioPromo  = Number(row[20] || row[14] || 0);
+
+      const item = {
+        idEspera    : String(row[0] || ''),
+        fecha       : String(row[1] || ''),
+        horaLlegada : row[2] instanceof Date ? Utilities.formatDate(row[2], tz, 'HH:mm') : String(row[2]||''),
+        codigo      : String(row[3] || ''),
+        nombre      : String(row[4] || ''),
+        servicio    : String(row[5] || ''),
+        area        : String(row[6] || ''),
+        prioridad   : String(row[7] || 'Normal'),
+        estado      : String(row[8] || ''),
+        tomadaPor   : String(row[9] || ''),
+        horaTomada  : row[10] instanceof Date ? Utilities.formatDate(row[10], tz, 'HH:mm') : String(row[10]||''),
+        observaciones: String(row[11] || ''),
+        total       : tipo === 'SP' ? String(precioPromo) : String(precioNormal),
+        promoNombre : String(row[13] || ''),
+        metodoPago  : String(row[14] || ''),
+        tipo        : tipo,
+        precioNormal: String(precioNormal),
+        precioPromo : String(precioPromo),
+        precioRegular: String(precioNormal),
+        fuente      : 'ServicioPromo'
+      };
+
+      if (estado === 'esperando')    esperando.push(item);
+      else if (estado === 'en servicio') enServicio.push(item);
+      else if (estado === 'por cobrar')  porCobrar.push(item);
+    }
+
+    return { success: true, esperando, enServicio, porCobrar };
   } catch(e) {
     return { success: false, message: String(e) };
   }
@@ -2973,6 +3269,148 @@ function handleGetServicioNormal(params) {
   } catch(e) {
     return { success: false, message: String(e) };
   }
+}
+
+// ── TOMAR clienta de ServicioPromo ───────────────────────────
+function handleTomarServicioPromo(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+
+    for (let i = 1; i < rows.length; i++) {
+      const id     = String(rows[i][0] || '').trim();
+      const estado = String(rows[i][8] || '').toLowerCase().trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      if (estado !== 'esperando') continue;
+
+      const row = i + 1;
+      ws.getRange(row, 9).setValue('En servicio');
+      ws.getRange(row, 10).setValue(data.chicaNombre || '');
+      ws.getRange(row, 11).setValue(hora);
+
+      // Crear registro en Atenciones
+      try {
+        const wsA = getSheet('Atenciones');
+        const fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+        const aData = wsA.getDataRange().getValues();
+        let maxAt = 0;
+        for (let j = 3; j < aData.length; j++) {
+          const aid = String(aData[j][0]||'');
+          if (aid.startsWith('AT-')) { const n = parseInt(aid.replace('AT-','')); if (n > maxAt) maxAt = n; }
+        }
+        const atId = 'AT-' + String(maxAt + 1).padStart(4, '0');
+        wsA.appendRow([atId, fecha, hora, '', String(rows[i][3]||''), String(rows[i][4]||''),
+          data.chicaNombre||'', String(rows[i][5]||''), 'En servicio', '', '', id, String(rows[i][6]||'')]);
+      } catch(eA) {}
+
+      return { success: true, message: 'Clienta tomada' };
+    }
+    return { success: false, message: 'Ticket SP no encontrado' };
+  } catch(e) { return { success: false, message: String(e) }; }
+}
+
+// ── FINALIZAR servicio promo → Por cobrar ─────────────────────
+function handleFinalizarServicioPromo(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+
+    for (let i = 1; i < rows.length; i++) {
+      const id     = String(rows[i][0] || '').trim();
+      const estado = String(rows[i][8] || '').toLowerCase().trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      if (estado !== 'en servicio') continue;
+
+      const row = i + 1;
+      ws.getRange(row, 9).setValue('Por cobrar');
+      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
+      if (data.total) ws.getRange(row, 13).setValue(Number(data.total));
+      if (data.serviciosDetalle) ws.getRange(row, 18).setValue(JSON.stringify(data.serviciosDetalle));
+
+      // Actualizar Atenciones
+      try { cerrarAtencion(id, data.chicaNombre || String(rows[i][9]||''),
+        String(rows[i][4]||''), data.servicio || String(rows[i][5]||''),
+        Number(data.total || rows[i][12] || 0), '', 'Por cobrar'); } catch(eA) {}
+
+      return { success: true };
+    }
+    return { success: false, message: 'Ticket SP no encontrado' };
+  } catch(e) { return { success: false, message: String(e) }; }
+}
+
+// ── CONFIRMAR COBRO de ServicioPromo ─────────────────────────
+function handleConfirmarCobroPromo(data) {
+  try {
+    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+    const rows = ws.getDataRange().getValues();
+    const tz = 'America/Guayaquil';
+    const now = new Date();
+    const hora = Utilities.formatDate(now, tz, 'HH:mm');
+    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+
+    for (let i = 1; i < rows.length; i++) {
+      const id = String(rows[i][0] || '').trim();
+      if (id !== String(data.idEspera).trim()) continue;
+      const estado = String(rows[i][8] || '').toLowerCase();
+      if (estado !== 'por cobrar') continue;
+
+      const metodoPago   = data.metodoPago || 'Efectivo';
+      const tipo         = String(rows[i][18] || 'SP').trim();
+      const precioNormal = Number(rows[i][19] || rows[i][15] || 0);
+      const precioPromo  = Number(rows[i][20] || rows[i][14] || 0);
+
+      // Tarjeta con promo → cobrar precio normal, sino precio promo
+      const totalCobrado = (tipo === 'SP' && metodoPago === 'Tarjeta')
+        ? (precioNormal > 0 ? precioNormal : Number(data.totalCobrado || 0))
+        : Number(data.totalCobrado || precioPromo || 0);
+
+      const row = i + 1;
+      ws.getRange(row, 9).setValue('Completada');
+      ws.getRange(row, 15).setValue(metodoPago);
+      ws.getRange(row, 16).setValue(hora);
+      ws.getRange(row, 17).setValue(totalCobrado);
+
+      const codigoCliente = String(rows[i][3]||'');
+      const nombreCliente = String(rows[i][4]||'');
+      const servicio      = String(rows[i][5]||'');
+      const area          = String(rows[i][6]||'');
+      const chicaNombre   = String(rows[i][9]||'');
+      const pct           = area.toLowerCase().includes('facial') ? 0.4 : 0.3;
+
+      // Monto para comisión
+      const montoComision = (tipo === 'SP' && metodoPago === 'Tarjeta')
+        ? (precioNormal > 0 ? precioNormal : totalCobrado)
+        : (precioPromo > 0 ? precioPromo : totalCobrado);
+      const comision = Math.round(montoComision * pct * 100) / 100;
+
+      try { updateVisitaClienta(codigoCliente); } catch(e) {}
+      try { if (chicaNombre && montoComision > 0) updateComision(chicaNombre, montoComision); } catch(e) {}
+
+      // HistorialOwner
+      try {
+        const wsH = getSheet('HistorialOwner');
+        wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
+          servicio, area, chicaNombre, totalCobrado, comision, metodoPago]);
+      } catch(eH) {}
+
+      // CierresPagos
+      try {
+        const wsPagos = getSheet('CierresPagos');
+        wsPagos.appendRow([now, hora, nombreCliente, chicaNombre, servicio,
+          totalCobrado, metodoPago, '']);
+      } catch(eP) {}
+
+      // Cerrar Atenciones
+      try { cerrarAtencion(id, chicaNombre, nombreCliente, servicio,
+        totalCobrado, metodoPago, 'Completado'); } catch(eA) {}
+
+      return { success: true, totalCobrado: totalCobrado };
+    }
+    return { success: false, message: 'Ticket SP no encontrado para cobro' };
+  } catch(e) { return { success: false, message: String(e) }; }
 }
 
 // ── TOMAR clienta de ServicioNormal ──────────────────────────
