@@ -1613,9 +1613,10 @@ function handleUpdateServiciosAtencion(data) {
       const tomada = String(rowsN[i][9]||'').trim();
       const nombre = String(rowsN[i][4]||'').trim();
       const codigo = String(rowsN[i][3]||'').trim();
+      const matchId = data.idEspera && id === String(data.idEspera).trim();
       const matchN = nombre === data.clienteNombre;
       const matchC = data.clienteCodigo && codigo === String(data.clienteCodigo).trim();
-      if (id.startsWith('SN-') && estado === 'en servicio' && tomada === data.chicaNombre && (matchN || matchC)) {
+      if (id.startsWith('SN-') && estado === 'en servicio' && (matchId || (tomada === data.chicaNombre && (matchN || matchC)))) {
         const row = i + 1;
         wsN.getRange(row, 6).setValue(data.servicios || '');
         wsN.getRange(row, 13).setValue(data.total || '0');
@@ -2926,7 +2927,17 @@ function handleGetServicioNormal(params) {
         horaTomada  : row[10] instanceof Date ? Utilities.formatDate(row[10], tz, 'HH:mm') : String(row[10]||''),
         observaciones: String(row[11] || ''),
         total       : String(row[12] || '0'),
+        promoNombre : String(row[13] || ''),
         metodoPago  : String(row[14] || ''),
+        precioRegular: (() => {
+          // Intentar leer precioRegular del desglose JSON (col R=18)
+          try {
+            const d = JSON.parse(String(row[17] || '{}'));
+            if (d.precioRegular && Number(d.precioRegular) > 0) return String(d.precioRegular);
+          } catch(e) {}
+          // Fallback: si no hay promo, precioRegular = total
+          return String(row[12] || '0');
+        })(),
         fuente      : 'ServicioNormal'
       };
 
