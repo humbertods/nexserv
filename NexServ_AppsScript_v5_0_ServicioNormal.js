@@ -1028,9 +1028,11 @@ function handleContinuarPromoALista(data) {
       const precioNormal = Number(allData[i][idEspera.startsWith('SP-') ? 19 : 19] || allData[i][15] || 0);
       const precioPromo  = Number(allData[i][idEspera.startsWith('SP-') ? 20 : 20] || allData[i][14] || 0);
       const obsActual    = String(allData[i][11] || '');
+      const areasYaCompletadas = [data.areaCompletada].filter(Boolean);
       const nuevaObs     = (obsActual ? obsActual + ' | ' : '') +
         '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre +
-        ' · Falta: ' + data.areasFaltantes;
+        ' · Falta: ' + data.areasFaltantes +
+        ' · _completedAreas:' + JSON.stringify(areasYaCompletadas);
       const montoSiguiente = Number(data.montoSiguienteArea || 0);
 
       const wsNew = getOrCreateSheet('ServicioPromo', COLS_PROMO);
