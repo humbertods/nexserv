@@ -967,9 +967,9 @@ function handleGetPorCobrar() {
           servicio      : sp.servicio,
           area          : sp.area,
           tomadaPor     : sp.tomadaPor,
-          total         : sp.precioPromo || sp.precioNormal,
+          total         : sp.total || sp.precioPromo || sp.precioNormal, // col M = precio de esta área
           promoNombre   : sp.promoNombre,
-          precioRegular : sp.precioNormal,
+          precioRegular : sp.precioNormal,  // col T = precio normal total
           tipo          : sp.tipo || 'SP',
           serviciosDetalle: null,
           esTop         : false
@@ -3433,10 +3433,19 @@ function handleConfirmarCobroPromo(data) {
       const precioNormal = Number(rows[i][19] || rows[i][15] || 0);
       const precioPromo  = Number(rows[i][20] || rows[i][14] || 0);
 
-      // Tarjeta con promo → cobrar precio normal, sino precio promo
-      const totalCobrado = (tipo === 'SP' && metodoPago === 'Tarjeta')
-        ? (precioNormal > 0 ? precioNormal : Number(data.totalCobrado || 0))
-        : Number(data.totalCobrado || precioPromo || 0);
+      // precioMiArea = col M = lo que cobró esta staff por su parte
+      const precioMiArea = Number(rows[i][12] || 0);
+
+      // Para tarjeta: calcular precio normal proporcional de esta área
+      // Si es la única área (toda la promo), usar precioNormal completo
+      // Si es una parte, calcular proporción: (precioMiArea/precioPromo) * precioNormal
+      let totalCobrado;
+      if (tipo === 'SP' && metodoPago === 'Tarjeta' && precioNormal > 0 && precioPromo > 0 && precioMiArea > 0) {
+        const proporcion = precioMiArea / precioPromo;
+        totalCobrado = Math.round(precioNormal * proporcion * 100) / 100;
+      } else {
+        totalCobrado = precioMiArea > 0 ? precioMiArea : Number(data.totalCobrado || precioPromo || 0);
+      }
 
       const row = i + 1;
       ws.getRange(row, 9).setValue('Completada');
@@ -3450,9 +3459,6 @@ function handleConfirmarCobroPromo(data) {
       const area          = String(rows[i][6]||'');
       const chicaNombre   = String(rows[i][9]||'');
       const pct           = area.toLowerCase().includes('facial') ? 0.4 : 0.3;
-
-      // precioMiArea = col M = lo que cobró esta staff por su parte
-      const precioMiArea = Number(rows[i][12] || 0);
 
       // Monto para comisión = solo la parte de esta staff
       // Si pagó con tarjeta y hay promo → calcular proporción del precio normal
