@@ -3451,27 +3451,38 @@ function handleConfirmarCobroPromo(data) {
       const chicaNombre   = String(rows[i][9]||'');
       const pct           = area.toLowerCase().includes('facial') ? 0.4 : 0.3;
 
-      // Monto para comisión
-      const montoComision = (tipo === 'SP' && metodoPago === 'Tarjeta')
-        ? (precioNormal > 0 ? precioNormal : totalCobrado)
-        : (precioPromo > 0 ? precioPromo : totalCobrado);
+      // precioMiArea = col M = lo que cobró esta staff por su parte
+      const precioMiArea = Number(rows[i][12] || 0);
+
+      // Monto para comisión = solo la parte de esta staff
+      // Si pagó con tarjeta y hay promo → calcular proporción del precio normal
+      let montoComision;
+      if (tipo === 'SP' && metodoPago === 'Tarjeta' && precioNormal > 0 && precioPromo > 0) {
+        // Proporción: precioMiArea representa X% del precioPromo total
+        // La comisión debe ser sobre esa misma proporción del precioNormal
+        const proporcion = precioPromo > 0 ? precioMiArea / precioPromo : 1;
+        montoComision = Math.round(precioNormal * proporcion * 100) / 100;
+      } else {
+        montoComision = precioMiArea > 0 ? precioMiArea : totalCobrado;
+      }
       const comision = Math.round(montoComision * pct * 100) / 100;
 
       try { updateVisitaClienta(codigoCliente); } catch(e) {}
       try { if (chicaNombre && montoComision > 0) updateComision(chicaNombre, montoComision); } catch(e) {}
 
-      // HistorialOwner
+      // HistorialOwner — registrar monto de esta staff (no el total de la promo)
       try {
         const wsH = getSheet('HistorialOwner');
         wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
-          servicio, area, chicaNombre, totalCobrado, comision, metodoPago]);
+          servicio + ' (promo ' + (String(rows[i][13]||'')) + ')', area,
+          chicaNombre, montoComision, comision, metodoPago]);
       } catch(eH) {}
 
-      // CierresPagos
+      // CierresPagos — monto de esta staff
       try {
         const wsPagos = getSheet('CierresPagos');
         wsPagos.appendRow([now, hora, nombreCliente, chicaNombre, servicio,
-          totalCobrado, metodoPago, '']);
+          montoComision, metodoPago, 'parte de promo']);
       } catch(eP) {}
 
       // Cerrar Atenciones
