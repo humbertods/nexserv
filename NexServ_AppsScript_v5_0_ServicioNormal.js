@@ -3137,6 +3137,8 @@ function handleAddServicioPromo(data) {
 
     const precioPromo   = Number(data.precioPromo   || data.total || 0);
     const precioRegular = Number(data.precioRegular || precioPromo);
+    // precioMiArea = precio de la primera área que va a atender
+    const precioMiArea  = Number(data.precioMiArea  || precioPromo);
 
     ws.appendRow([
       id,                          // A: ID
@@ -3151,15 +3153,15 @@ function handleAddServicioPromo(data) {
       data.asignadaA || '',        // J: Tomada por
       '',                          // K: Hora tomada
       data.observaciones || '',    // L: Observaciones
-      precioPromo,                 // M: Total acumulado
+      precioMiArea,                // M: Total acumulado (precio de esta área)
       data.promoNombre || '',      // N: Promo nombre
-      precioPromo,                 // O: Precio promo
-      precioRegular,               // P: Precio regular
+      precioPromo,                 // O: Precio promo total
+      precioRegular,               // P: Precio regular total
       '',                          // Q: Área completada
       '',                          // R: Desglose staff JSON
       'SP',                        // S: Tipo
-      precioRegular,               // T: Precio Normal
-      precioPromo                  // U: Precio Promo
+      precioRegular,               // T: Precio Normal total
+      precioPromo                  // U: Precio Promo total
     ]);
 
     return { success: true, id: id, message: 'Clienta agregada a ServicioPromo' };
