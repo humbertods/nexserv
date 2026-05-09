@@ -3809,10 +3809,11 @@ if ('caches' in window) {
               // Restaurar completedAreas desde observaciones del ticket si existe
               let restoredCompletedAreas = [];
               try {
-                const obsText = a.observaciones || a.obs || '';
-                const match = obsText.match(/_completedAreas:(\[[^\]]*\])/);
+                const obsText = a.observaciones || a.obs || a.obsGeneral || '';
+                const match = obsText.match(/_completedAreas:(\[.*?\])/);
                 if (match) restoredCompletedAreas = JSON.parse(match[1]);
-              } catch(e) {}
+                console.log('🔍 obsText:', obsText, '| completedAreas restored:', restoredCompletedAreas);
+              } catch(e) { console.warn('completedAreas parse error:', e); }
               activePromos[clientKey] = {
                 promo: promoFull,
                 startedBy: myArea,
@@ -5293,8 +5294,8 @@ if ('caches' in window) {
                 startedBy: myArea,
                 completedAreas: (() => {
                   try {
-                    const obsText = a1.observaciones || a1.obs || '';
-                    const match = obsText.match(/_completedAreas:(\[[^\]]*\])/);
+                    const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
+                    const match = obsText.match(/_completedAreas:(\[.*?\])/);
                     return match ? JSON.parse(match[1]) : [];
                   } catch(e) { return []; }
                 })(),
@@ -9603,9 +9604,16 @@ if ('caches' in window) {
 
     // Incluir primera promo (compatibilidad) y secuencia adicional
     if (promo) {
-      postData.promoNombre = promo.name;
-      postData.precioPromo = promo.price;
+      postData.promoNombre  = promo.name;
+      postData.precioPromo  = promo.price;
       postData.precioRegular = promo.regular;
+      // precioMiArea = precio de la primera división (área inicial)
+      const myAreaKey = areaKey;
+      const firstDiv  = (promo.division || []).find(d =>
+        String(d.area||'').toLowerCase().includes(myAreaKey) ||
+        myAreaKey.includes(String(d.area||'').toLowerCase())
+      );
+      postData.precioMiArea = firstDiv ? Number(firstDiv.monto || firstDiv.price || promo.price) : Number(promo.price);
     }
     // Promos adicionales (2 y 3)
     const promasExtra = _arrPromos.filter(p => p !== null).slice(1);
