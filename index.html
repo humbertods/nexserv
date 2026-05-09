@@ -4530,7 +4530,8 @@ if ('caches' in window) {
     // Siguiente área y su precio
     const siguienteArea = areasFaltantes[0];
     const siguienteLabel = areaMap[siguienteArea];
-    const siguienteDivision = promo.division.find(d => d.area === siguienteLabel);
+    const siguienteDivision = promo.division.find(d => d.area === siguienteLabel || String(d.area||'').includes(siguienteLabel) || siguienteLabel.includes(String(d.area||'')));
+    console.log('🔍 siguienteArea:', siguienteArea, '| siguienteLabel:', siguienteLabel, '| division areas:', promo.division.map(d=>d.area), '| siguienteDivision:', siguienteDivision);
     
     // Nombres de servicios faltantes
     const serviciosFaltantes = areasFaltantes.map(a => {
@@ -6081,7 +6082,7 @@ if ('caches' in window) {
             // Partes ya completadas (de otras áreas)
             partesPrevias.forEach(parte => {
               // "✅ cejas completado por María · Sigue: Pestañas"
-              const matchArea = parte.match(/✅\s*([\w\/]+)\s+completado por\s+([^·]+)/i);
+              const matchArea = parte.match(/✅\s*([\w\/áéíóúñ]+)\s+completad[ao] por\s+([^·]+)/i);
               if (matchArea) {
                 const areaComp = matchArea[1].trim().toLowerCase();
                 const staffComp = matchArea[2].trim();
@@ -6120,16 +6121,23 @@ if ('caches' in window) {
             if (a.promoNombre) {
               const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
               if (promoFull && promoFull.division) {
-                // Determinar áreas ya procesadas
+                const areaActualNorm = String(a.area||'').toLowerCase()
+                  .replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                // Áreas ya procesadas: completadas + actual
                 const areasYa = new Set();
                 partesPrevias.forEach(p => {
                   const m = p.match(/✅\s*([\w\/]+)\s+completad/i);
                   if (m) areasYa.add(m[1].trim().toLowerCase());
                 });
-                areasYa.add(String(a.area||'').toLowerCase()); // área actual
-                // Mostrar las que faltan
+                // Agregar área actual con normalización
+                areasYa.add(areaActualNorm);
+                if (areaActualNorm === 'pestanas') areasYa.add('pestañas');
+                if (areaActualNorm === 'cejas') areasYa.add('cejas');
+
                 promoFull.division.forEach(d => {
-                  const dArea = String(d.area||'').toLowerCase();
+                  const dArea = String(d.area||'').toLowerCase()
+                    .replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n')
+                    .replace('pestañas','pestanas').replace('pestaña','pestanas');
                   const matched = [...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea));
                   if (!matched) {
                     const icon = areaIcons[dArea] || '⏳';
