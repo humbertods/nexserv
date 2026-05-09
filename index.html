@@ -2971,9 +2971,11 @@ if ('caches' in window) {
     // Áreas que puede hacer este staff
     // IMPORTANTE: cejas puede hacer lifting de pestañas, retiro, bigote, depilaciones
     const AREA_FILTER_MAP = {
-      'cejas':    ['cejas', 'depilacion', 'retiro_lifting', 'lifting', 'retiro', 'bigote', 'depil', 'ceja', 'pestañ', 'pestaña', '👁'],
-      'pestanas': ['pestanas', 'retiro_lifting', 'lifting', 'retiro', 'pestañas', 'pestaña', '👁'],
-      'facial':   ['facial', '✨']
+      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
+                   'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas', 'retiro_lifting'],
+      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen',
+                   'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura'],
+      'facial':   ['facial', 'hidra', 'limpieza']
     };
     const myCapabilities = AREA_FILTER_MAP[myArea] || [myArea];
 
@@ -3825,8 +3827,9 @@ if ('caches' in window) {
                 }
               };
               saveActivePromos(); // persistir
-              
-              console.log('✅ Promo registered:', {
+
+              // Actualizar botones de finalización con las completedAreas restauradas
+              setTimeout(() => updateFinishButtons(1), 400);
                 key: clientKey,
                 display: a.nombre,
                 promo: promoFull.name,
