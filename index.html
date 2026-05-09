@@ -3806,10 +3806,17 @@ if ('caches' in window) {
               
               // Registrar promo activa con key normalizada
               const clientKey = normalizeClientKey(a.nombre);
+              // Restaurar completedAreas desde observaciones del ticket si existe
+              let restoredCompletedAreas = [];
+              try {
+                const obsText = a.observaciones || a.obs || '';
+                const match = obsText.match(/_completedAreas:(\[[^\]]*\])/);
+                if (match) restoredCompletedAreas = JSON.parse(match[1]);
+              } catch(e) {}
               activePromos[clientKey] = {
                 promo: promoFull,
                 startedBy: myArea,
-                completedAreas: [],
+                completedAreas: restoredCompletedAreas,
                 _metadata: {
                   displayName: a.nombre,
                   clientCode: a.codigo,
@@ -5284,7 +5291,13 @@ if ('caches' in window) {
               activePromos[clientKey1] = {
                 promo: promoFull,
                 startedBy: myArea,
-                completedAreas: [],
+                completedAreas: (() => {
+                  try {
+                    const obsText = a1.observaciones || a1.obs || '';
+                    const match = obsText.match(/_completedAreas:(\[[^\]]*\])/);
+                    return match ? JSON.parse(match[1]) : [];
+                  } catch(e) { return []; }
+                })(),
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
               saveActivePromos(); // persistir en sessionStorage
