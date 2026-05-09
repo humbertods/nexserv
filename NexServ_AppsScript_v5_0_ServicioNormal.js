@@ -1004,8 +1004,8 @@ function handleContinuarPromoALista(data) {
       if (estado !== 'en servicio') continue;
 
       const row = i + 1;
-      // Marcar como completada (parte de promo)
-      ws.getRange(row, 9).setValue('Completada');
+      // Marcar como completada parcial (continuará en otra área)
+      ws.getRange(row, 9).setValue('Completada-parcial');
       ws.getRange(row, 10).setValue(data.chicaNombre || '');
       const montoChica = Number(allData[i][12] || data.montoChica || 0);
       ws.getRange(row, 13).setValue(montoChica);
@@ -1500,7 +1500,8 @@ function handleGetServiciosHoy(params) {
       const id = String(row[0]||'').trim();
       if (!id.startsWith('SP-')) continue;
       const estado = String(row[8]||'').toLowerCase();
-      if (estado !== 'completada') continue;
+      // Mostrar tanto completada (cobrada) como completada-parcial (parte hecha, sigue en otra área)
+      if (estado !== 'completada' && estado !== 'completada-parcial') continue;
 
       let fechaStr = '';
       if (row[1] instanceof Date) {
@@ -1513,24 +1514,23 @@ function handleGetServiciosHoy(params) {
 
       const horaToma  = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10]||'');
       const horaCobro = row[15] instanceof Date ? Utilities.formatDate(row[15], 'America/Guayaquil', 'HH:mm') : String(row[15]||'');
-      const precioNormal = Number(row[19] || row[15] || 0);
-      const precioPromo  = Number(row[20] || row[14] || 0);
-      const totalCobrado = Number(row[16] || precioPromo || 0);
+      // Usar col M (precioMiArea) para la comisión de esta staff
+      const precioMiArea = Number(row[12] || 0);
       const area = String(row[6]||'').toLowerCase();
       const porcentaje = area.includes('facial') ? 0.4 : 0.3;
-      const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
+      const comision = Math.round(precioMiArea * porcentaje * 100) / 100;
 
       servicios.push({
         nombre     : String(row[4]||''),
         servicio   : String(row[5]||''),
         area       : String(row[6]||''),
         horaToma   : horaToma,
-        total      : String(totalCobrado),
-        metodoPago : String(row[14]||'Efectivo'),
+        total      : String(precioMiArea),
+        metodoPago : estado === 'completada-parcial' ? 'Pendiente cobro' : String(row[14]||'Efectivo'),
         tomadaPor  : tomadaPor,
         fecha      : fechaStr,
         promoNombre: String(row[13]||''),
-        precioRegular: String(precioNormal),
+        precioRegular: String(Number(row[19]||0)),
         observaciones: String(row[11]||''),
         horaCobro  : horaCobro,
         comision   : comision,
