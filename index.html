@@ -6088,11 +6088,22 @@ if ('caches' in window) {
                 const staffComp = matchArea[2].trim();
                 const icon = areaIcons[areaComp] || '✅';
                 const label = areaLabels[areaComp] || areaComp;
+                // Intentar extraer monto desde el desglose del ticket si está disponible
+                let montoStr = '';
+                if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+                  const entrada = a.serviciosDetalle.find(d =>
+                    String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
+                    String(d.area||'').toLowerCase().includes(areaComp)
+                  );
+                  if (entrada && Number(entrada.monto) > 0) {
+                    montoStr = ' · <strong>$' + Number(entrada.monto).toFixed(2) + '</strong>';
+                  }
+                }
                 timelineHTML += `
                   <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
                     <div style="flex:1;">
-                      <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${staffComp}</div>
+                      <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${staffComp}${montoStr}</div>
                       <div style="font-size:10px;color:var(--ink-faint);font-weight:500;">✅ Completado</div>
                     </div>
                     <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div>
