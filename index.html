@@ -3044,11 +3044,25 @@ if ('caches' in window) {
           ➡️ Siguiente servicio del combo
         </button>`;
     } else {
-      // Necesita otra staff para completar
+      // Verificar si es la última área
+      const completedAreas = promoData.completedAreas || [];
+      const totalAreas = promo.division ? promo.division.length : 1;
+      const esUltimaArea = completedAreas.length >= totalAreas - 1;
+
+      if (esUltimaArea) {
+        // Última área — promo completada
+        html += `
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="finishAndSendAll()">
+            🏁 Promo completada — cobrar total
+          </button>`;
+      } else {
+        // Necesita otra staff para completar
+        html += `
+          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
+            ➡️ Continuar siguiente área
+          </button>`;
+      }
       html += `
-        <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
-          ➡️ Continuar siguiente área
-        </button>
         <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
           💰 Mandar a cobrar (solo mi parte)
         </button>`;
