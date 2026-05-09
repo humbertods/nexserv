@@ -4555,11 +4555,10 @@ if ('caches' in window) {
       const svcsActuales = slotServices[slot] || [];
       const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
       
-      // montoYaHecho = suma real de todos los servicios aprobados (promo + extras como retiro)
-      // Usar el total del Sheet como fuente de verdad si está disponible y es mayor
+      // montoYaHecho = solo la parte de esta staff (no el total de la promo)
+      // Para promos multi-área usamos la memoria (slotServices) que tiene el precio de su área
       const montoYaHechoMemoria = svcsAprobadosAhora.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      const montoYaHechoSheet   = Number(data.total) || 0; // data.total viene de finishSlot1 que recalcula fresco
-      const montoYaHecho   = Math.max(montoYaHechoMemoria, montoYaHechoSheet);
+      const montoYaHecho = montoYaHechoMemoria > 0 ? montoYaHechoMemoria : (Number(data.total) || 0);
       const montoSiguiente = siguienteDivision ? (Number(siguienteDivision.monto) || 0) : 0;
       const totalAcumulado = montoYaHecho + montoSiguiente;
 
