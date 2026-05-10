@@ -4240,9 +4240,16 @@ if ('caches' in window) {
     document.getElementById('confirmServiceModal').classList.add('active');
   }
 
-  function confirmServiceAndClose() {
+  async function confirmServiceAndClose() {
     closeModal();
-    // Ya está todo cargado — no hay nada más que hacer
+    // Confirmar al backend que la staff aceptó el servicio → volver a "En servicio"
+    try {
+      const slot = window._confirmSvcSlot || 1;
+      const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      if (idEspera) {
+        await apiPost('confirmarServicioStaff', { idEspera });
+      }
+    } catch(e) {}
     showToast('✅ Servicio confirmado');
   }
 
@@ -6212,15 +6219,19 @@ if ('caches' in window) {
             const labelActual = areaLabels[areaActualKey] || a.area || 'Servicio';
             // Servicio actual: limpiar "(continuación promo)" si viene de enganche
             const servicioLimpio = String(a.servicio || '').replace('(continuación promo)', '').replace('(continuacion promo)', '').trim();
+            const esPendConf = a.pendienteConfirmacion === true;
+            const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
+            const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
+            const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
             timelineHTML += `
-              <div style="display:flex;align-items:center;gap:8px;padding:7px 0;${partesPrevias.length > 0 ? '' : ''}">
-                <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
+                <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
                 <div style="flex:1;">
-                  <div style="font-size:12px;font-weight:800;color:var(--info);">${labelActual} · ${a.tomadaPor}</div>
+                  <div style="font-size:12px;font-weight:800;color:${badgeColor};">${labelActual} · ${a.tomadaPor}</div>
                   <div style="font-size:11px;color:var(--ink-soft);font-weight:500;">${servicioLimpio}</div>
-                  <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}</div>
+                  <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf ? ' · Esperando que la staff confirme' : ''}</div>
                 </div>
-                <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div>
+                <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div>
               </div>`;
 
             // Áreas pendientes (las que faltan de la promo)
@@ -9622,25 +9633,30 @@ if ('caches' in window) {
     }
 
     // MODO NORMAL: requiere nota y autorización de Mikaela
-    const note = document.getElementById('addSvcNote').value.trim();
-    if (!note || note.length < 10) {
-      alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+    // Solo validar nota si NO estamos en modo enganche
+    if (!window._modoEnganche) {
+      const note = document.getElementById('addSvcNote').value.trim();
+      if (!note || note.length < 10) {
+        alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+        return;
+      }
+      svc.status = 'pendiente';
+      svc.note = note;
+      svc.requestedBy = user?.name || 'Staff';
+      svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+      if (addServiceToSlot(slot, svc)) {
+        document.getElementById('addSvcNote').value = '';
+        closeModal();
+        await sendAuthorizationRequest(clientName, svc, slot);
+        recargarAutorizacionesStaff(slot);
+        alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
+      }
       return;
     }
-    
-    // Marcar como pendiente de autorización
-    svc.status = 'pendiente';
-    svc.note = note;
-    svc.requestedBy = user?.name || 'Staff';
-    svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
-    
-    if (addServiceToSlot(slot, svc)) {
-      document.getElementById('addSvcNote').value = '';
-      closeModal();
-      await sendAuthorizationRequest(clientName, svc, slot);
-      recargarAutorizacionesStaff(slot);
-      alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
-    }
+
+    // MODO ENGANCHE: llegamos aquí si _modoEnganche estaba true pero no se procesó arriba
+    // (por si el bloque enganche de arriba falló por alguna razón de índice)
+    window._modoEnganche = false;
   }
   
   async function sendAuthorizationRequest(clientName, service, slot) {
