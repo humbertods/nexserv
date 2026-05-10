@@ -4270,97 +4270,96 @@ if ('caches' in window) {
     closeModal();
     const user = window.currentUser;
     const data = window._finishingData;
-    const slot = window._finishingSlot;
+    const slot = window._finishingSlot || 1;
 
-    // Reconstruir desde slotServices en este momento (fuente de verdad)
-    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
-    
-    // Leer total del Sheet para incluir servicios de áreas anteriores (ej: retiro de Yadira)
-    let totalDesdeSheet = 0;
+    // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
+    // Siempre consultar el backend para no depender de _as1IdEspera en memoria
+    let idEsperaActual = window._as1IdEspera || '';
+    let miTicketSheet = null;
+
     try {
-      const atencionesR = await apiGet('getAtenciones', { chica: user?.name || '' });
-      const atencionActual = atencionesR.atenciones?.find(a => 
-        a.nombre === data.clientName || a.codigo === window._as1Client
-      );
-      if (atencionActual && Number(atencionActual.total) > 0) {
-        totalDesdeSheet = Number(atencionActual.total);
+      const spData = await apiGet('getServicioPromo');
+      if (spData.success) {
+        const todosLosTickets = [
+          ...(spData.enServicio || []),
+          ...(spData.porCobrar  || [])
+        ];
+        miTicketSheet = todosLosTickets.find(t =>
+          t.tomadaPor === user?.name &&
+          (t.nombre === data.clientName || t.codigo === window._as1Client)
+        );
+        if (miTicketSheet) {
+          idEsperaActual = miTicketSheet.idEspera;
+          window._as1IdEspera = idEsperaActual;
+        }
       }
     } catch(e) {}
 
-    // Recalcular total y nombres frescos
-    const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
-    let totalFresh;
-    let totalSoloEstaStaff; // solo lo que hizo esta staff (para el desglose)
-    if (promoDataFresh) {
-      const extrasAprobados = svcsAprobados.filter(s => s.name !== promoDataFresh.promo.name);
-      const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      totalSoloEstaStaff = promoDataFresh.promo.price + totalExtras;
-      // Usar el mayor entre memoria y Sheet (Sheet incluye servicios de áreas anteriores)
-      totalFresh = String(Math.max(totalSoloEstaStaff, totalDesdeSheet));
-    } else {
-      totalFresh = String(svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0));
-    }
-    const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
-
-    // Recalcular precioRegular fresco
-    const _regularBase = promoDataFresh
-      ? (Number(window._as1PrecioRegular) > 0 ? Number(window._as1PrecioRegular) : Number(promoDataFresh.promo.regular))
-      : 0;
-    const _extrasRegular = promoDataFresh
-      ? svcsAprobados.filter(s => s.name !== promoDataFresh.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)
-      : 0;
-    const precioRegularFresh = promoDataFresh ? String(_regularBase + _extrasRegular) : totalFresh;
-
-    // Desglose de esta staff: si el Sheet tiene un total mayor (por áreas anteriores),
-    // el monto de esta staff es solo lo que ella hizo (totalSoloEstaStaff o suma de svcs)
-    const _montoEstaStaff = typeof totalSoloEstaStaff !== 'undefined' 
-      ? totalSoloEstaStaff 
-      : svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const desgloseActual = svcsAprobados.length === 1
-      ? [{ staff: user?.name || '', servicio: svcsAprobados[0].name, area: svcsAprobados[0].area || '', monto: Number(svcsAprobados[0].price || 0) }]
-      : svcsAprobados.map(s => ({
-          staff: user?.name || '',
-          servicio: s.name,
-          area: s.area || '',
-          monto: Number(s.price || 0)
-        }));
-    // Si el ticket es SP-, leer el desglose ya guardado en el sheet (áreas anteriores)
-    // para acumularlo con el de esta staff (la última área)
-    let desgloseDelSheet = window._desgloseAcumulado || [];
-    const idEsperaActual = window._as1IdEspera || '';
     const esTicketSP = idEsperaActual.startsWith('SP-');
-    if (esTicketSP && desgloseDelSheet.length === 0) {
-      try {
-        const spData = await apiGet('getServicioPromo');
-        if (spData.success) {
-          const allSP = [...(spData.esperando||[]), ...(spData.enServicio||[]), ...(spData.porCobrar||[])];
-          const miTicket = allSP.find(t => t.idEspera === idEsperaActual);
-          if (miTicket && miTicket.serviciosDetalle && miTicket.serviciosDetalle.length > 0) {
-            desgloseDelSheet = miTicket.serviciosDetalle;
-          }
-        }
-      } catch(e) {}
+
+    // ── PASO 2: Obtener servicios aprobados ────────────────────────────────────
+    let svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+
+    // Si memoria está vacía, reconstruir desde el ticket del sheet
+    if (svcsAprobados.length === 0 && miTicketSheet) {
+      const montoSheet = Number(miTicketSheet.total || miTicketSheet.precioPromo || 0);
+      if (montoSheet > 0) {
+        svcsAprobados = [{
+          name: miTicketSheet.promoNombre || miTicketSheet.servicio || data.svcNames || 'Servicio',
+          price: montoSheet,
+          area: miTicketSheet.area || user?.area || ''
+        }];
+      }
     }
-    // Acumular: áreas anteriores + esta staff (sin duplicar por staff+servicio)
+
+    // Fallback final: usar datos de _finishingData
+    if (svcsAprobados.length === 0 && Number(data.total) > 0) {
+      svcsAprobados = [{
+        name: data.svcNames || 'Servicio',
+        price: Number(data.total),
+        area: user?.area || ''
+      }];
+    }
+
+    // ── PASO 3: Calcular totales ───────────────────────────────────────────────
+    const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
+    const totalSoloEstaStaff = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const totalFresh = String(totalSoloEstaStaff || Number(data.total) || 0);
+    const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
+    const precioRegularFresh = promoDataFresh
+      ? String(Number(promoDataFresh.promo.regular || promoDataFresh.promo.price))
+      : totalFresh;
+
+    // ── PASO 4: Construir desglose ─────────────────────────────────────────────
+    const desgloseActual = svcsAprobados.map(s => ({
+      staff: user?.name || '',
+      servicio: s.name,
+      area: s.area || user?.area || '',
+      monto: Number(s.price || 0)
+    }));
+
+    let desgloseDelSheet = window._desgloseAcumulado || [];
+    if (esTicketSP && desgloseDelSheet.length === 0 && miTicketSheet?.serviciosDetalle?.length > 0) {
+      desgloseDelSheet = miTicketSheet.serviciosDetalle;
+    }
     const desgloseAcumulado = [...desgloseDelSheet];
     desgloseActual.forEach(nuevo => {
       const yaExiste = desgloseAcumulado.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
       if (!yaExiste) desgloseAcumulado.push(nuevo);
     });
 
+    // ── PASO 5: Llamar al backend ──────────────────────────────────────────────
     try {
       if (esTicketSP) {
-        // Ticket SP-: usar finalizarServicioPromo para que registre comisión correctamente
         await apiPost('finalizarServicioPromo', {
           idEspera: idEsperaActual,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
           servicio: svcNamesFresh,
-          total: _montoEstaStaff > 0 ? String(_montoEstaStaff) : totalFresh,
+          total: totalFresh,
           serviciosDetalle: desgloseAcumulado
         });
       } else {
-        // Ticket LE-: flujo normal
         await apiPost('finalizarAtencion', {
           idEspera: idEsperaActual,
           chicaNombre: user?.name || '',
