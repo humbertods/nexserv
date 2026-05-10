@@ -3037,7 +3037,7 @@ if ('caches' in window) {
     if (puedeTodo) {
       // Puede hacer todo el combo sola
       html += `
-        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="finishAndSendAll()">
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
           ✅ Terminé todo el combo — mandar a cobrar
         </button>
         <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">
@@ -3052,7 +3052,7 @@ if ('caches' in window) {
       if (esUltimaArea) {
         // Última área — promo completada
         html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="finishAndSendAll()">
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
             🏁 Promo completada — cobrar total
           </button>`;
       } else {
@@ -4179,33 +4179,45 @@ if ('caches' in window) {
   
   // Opciones al finalizar servicio
   async function finishAndSendAll() {
-    const slot = 1; // siempre slot 1 para cejas
+    const slot = window._finishingSlot || 1;
+    const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
     const promoData = activePromos[clientKey] || window._finishPromoData;
 
     if (promoData && promoData.promo) {
       const precioTotal = promoData.promo.price;
-      // Preservar servicios extras aprobados — solo asegurar que la promo principal esté
       const svcsActuales = slotServices[slot] || [];
+      // Asegurar que la promo principal esté en los servicios
       const tienePromo = svcsActuales.find(s => s.name === promoData.promo.name);
       if (!tienePromo) {
-        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: window.currentUser?.area || 'cejas' }, ...svcsActuales];
+        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: user?.area || 'cejas' }, ...svcsActuales];
       }
-      // Recalcular total con extras
-      const totalConExtras = slotServices[slot]
-        .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
-        .reduce((sum, s) => sum + Number(s.price || 0), 0);
-      renderServicesForSlot(slot);
-      document.getElementById('as' + slot + 'Total').textContent = '$' + totalConExtras;
-      document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
-      window._finishFullPromo = true;
     }
 
+    // Calcular totales frescos
+    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const totalFinal = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const svcNames = svcsAprobados.map(s => s.name).join(' + ') || 'Servicio';
+    const precioRegularFinal = promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalFinal);
+
+    // Llenar _finishingData y _finishingSlot para que finishAndSend tenga todo
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey: clientKey,
+      clientName: clientName,
+      svcNames: svcNames,
+      total: String(totalFinal),
+      promoNombre: promoData ? promoData.promo.name : '',
+      precioRegular: precioRegularFinal,
+      areasExtras: [],
+      promasExtraPendientes: []
+    };
+    window._finishFullPromo = true;
+
     closeModal();
-    // Pequeña pausa para que el DOM se actualice antes de finalizar
     await new Promise(r => setTimeout(r, 100));
-    await finishSlot1();
+    await finishAndSend();
   }
 
   function showConfirmServiceModal(slot) {
