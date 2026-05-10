@@ -4407,11 +4407,15 @@ if ('caches' in window) {
       return;
     }
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
+    if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
+    window._as1IdEspera = '';
+    window._as1Client = '';
     slotServices[slot] = [];
     if (user && activeClients[user.name]) {
       activeClients[user.name].splice(slot - 1, 1);
       updateCapacityUI(user.name);
     }
+    saveActivePromos();
     
     alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
     show('staffHome');
