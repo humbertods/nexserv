@@ -9241,7 +9241,7 @@ if ('caches' in window) {
     activePromos[promoClientKey] = {
       promo: promo,
       startedBy: myArea,
-      completedAreas: [myArea]
+      completedAreas: []   // vacío: se llena al terminar cada área, no al iniciar
     };
     
     // Ocultar banner de promo asignada si existe
