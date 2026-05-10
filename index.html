@@ -5121,12 +5121,13 @@ if ('caches' in window) {
     // Guardar datos en variable global para usar en las opciones
     // Si hay promo, el total es el precio de la promo + cualquier servicio extra aprobado (no de la promo)
     let totalFinal;
+    let miPrecioPromo = 0;
     if (promoData) {
       // Servicios extra: aprobados que NO son la promo principal
       const extrasAprobados = svcsAprobados.filter(s => s.name !== promoData.promo.name);
       const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
       // Usar el precio de la parte de ESTA staff (no el total de la promo)
-      const miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea);
+      miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea);
       totalFinal = String(miPrecioPromo + totalExtras);
     } else {
       totalFinal = String(total);
@@ -9522,7 +9523,7 @@ if ('caches' in window) {
     }
 
     closeModal();
-    showNotif('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
+    showToast('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
   }
 
   function openAddService(slot) {
