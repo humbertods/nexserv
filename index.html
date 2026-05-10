@@ -5118,12 +5118,22 @@ if ('caches' in window) {
       // Servicios extra: aprobados que NO son la promo principal
       const extrasAprobados = svcsAprobados.filter(s => s.name !== promoData.promo.name);
       const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      totalFinal = String(promoData.promo.price + totalExtras);
+      // Usar el precio de la parte de ESTA staff (no el total de la promo)
+      const miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea);
+      totalFinal = String(miPrecioPromo + totalExtras);
     } else {
       totalFinal = String(total);
     }
+    const miPrecioRegular = promoData
+      ? (() => {
+          // Precio regular proporcional: si la promo tiene división, sumar el precio regular de mi área
+          // Como no tenemos precio regular por área, usamos la proporción: miPrecioPromo / promo.price * promo.regular
+          const ratio = (promoData.promo.price > 0) ? (miPrecioPromo / promoData.promo.price) : 1;
+          return Math.round(Number(promoData.promo.regular) * ratio);
+        })()
+      : total;
     const precioRegularFinal = promoData
-      ? String(Number(promoData.promo.regular) + (svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)))
+      ? String(miPrecioRegular + (svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)))
       : String(total);
 
     window._finishingSlot = 1;
