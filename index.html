@@ -5343,6 +5343,9 @@ if ('caches' in window) {
         const codigoAnterior = window._as1Client;
         const mismaClienta = codigoAnterior === a1.codigo;
         const tieneServicios = slotServices[1] && slotServices[1].length > 0;
+
+        // CRÍTICO: actualizar _as1IdEspera con el ID real del ticket activo (puede ser SP- o LE-)
+        window._as1IdEspera = a1.idEspera || window._as1IdEspera || '';
         
         window._as1Client = a1.codigo;
         document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
