@@ -4312,21 +4312,55 @@ if ('caches' in window) {
           area: s.area || '',
           monto: Number(s.price || 0)
         }));
-    // Si hay historial previo (enganche multi-área), acumularlo
-    const desgloseAcumulado = (window._desgloseAcumulado || []).concat(desgloseActual);
-    
+    // Si el ticket es SP-, leer el desglose ya guardado en el sheet (áreas anteriores)
+    // para acumularlo con el de esta staff (la última área)
+    let desgloseDelSheet = window._desgloseAcumulado || [];
+    const idEsperaActual = window._as1IdEspera || '';
+    const esTicketSP = idEsperaActual.startsWith('SP-');
+    if (esTicketSP && desgloseDelSheet.length === 0) {
+      try {
+        const spData = await apiGet('getServicioPromo');
+        if (spData.success) {
+          const allSP = [...(spData.esperando||[]), ...(spData.enServicio||[]), ...(spData.porCobrar||[])];
+          const miTicket = allSP.find(t => t.idEspera === idEsperaActual);
+          if (miTicket && miTicket.serviciosDetalle && miTicket.serviciosDetalle.length > 0) {
+            desgloseDelSheet = miTicket.serviciosDetalle;
+          }
+        }
+      } catch(e) {}
+    }
+    // Acumular: áreas anteriores + esta staff (sin duplicar por staff+servicio)
+    const desgloseAcumulado = [...desgloseDelSheet];
+    desgloseActual.forEach(nuevo => {
+      const yaExiste = desgloseAcumulado.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
+      if (!yaExiste) desgloseAcumulado.push(nuevo);
+    });
+
     try {
-      await apiPost('finalizarAtencion', {
-        idEspera: window._as1IdEspera || '',
-        chicaNombre: user?.name || '',
-        clienteNombre: data.clientName,
-        clienteCodigo: window._as1Client || '',
-        servicio: svcNamesFresh,
-        total: totalFresh,
-        promoNombre: data.promoNombre,
-        precioRegular: precioRegularFresh,
-        serviciosDetalle: desgloseAcumulado
-      });
+      if (esTicketSP) {
+        // Ticket SP-: usar finalizarServicioPromo para que registre comisión correctamente
+        await apiPost('finalizarServicioPromo', {
+          idEspera: idEsperaActual,
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          servicio: svcNamesFresh,
+          total: _montoEstaStaff > 0 ? String(_montoEstaStaff) : totalFresh,
+          serviciosDetalle: desgloseAcumulado
+        });
+      } else {
+        // Ticket LE-: flujo normal
+        await apiPost('finalizarAtencion', {
+          idEspera: idEsperaActual,
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          clienteCodigo: window._as1Client || '',
+          servicio: svcNamesFresh,
+          total: totalFresh,
+          promoNombre: data.promoNombre,
+          precioRegular: precioRegularFresh,
+          serviciosDetalle: desgloseAcumulado
+        });
+      }
     } catch (err) { console.error(err); }
 
     // Si había depilación compartida, crear ticket con las partes restantes
@@ -5200,20 +5234,53 @@ if ('caches' in window) {
       area: s.area || '',
       monto: Number(s.price || 0)
     }));
-    const desgloseAcumulado2 = (window._desgloseAcumulado || []).concat(desgloseSlot2);
-    
+
+    // Leer desglose previo del sheet si es ticket SP- (áreas anteriores ya registradas)
+    let desgloseDelSheet2 = window._desgloseAcumulado || [];
+    const idEspera2 = window._as2IdEspera || '';
+    const esTicketSP2 = idEspera2.startsWith('SP-');
+    if (esTicketSP2 && desgloseDelSheet2.length === 0) {
+      try {
+        const spData2 = await apiGet('getServicioPromo');
+        if (spData2.success) {
+          const allSP2 = [...(spData2.esperando||[]), ...(spData2.enServicio||[]), ...(spData2.porCobrar||[])];
+          const miTicket2 = allSP2.find(t => t.idEspera === idEspera2);
+          if (miTicket2 && miTicket2.serviciosDetalle && miTicket2.serviciosDetalle.length > 0) {
+            desgloseDelSheet2 = miTicket2.serviciosDetalle;
+          }
+        }
+      } catch(e) {}
+    }
+    // Acumular sin duplicar
+    const desgloseAcumulado2 = [...desgloseDelSheet2];
+    desgloseSlot2.forEach(nuevo => {
+      const yaExiste = desgloseAcumulado2.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
+      if (!yaExiste) desgloseAcumulado2.push(nuevo);
+    });
+
     try {
-      await apiPost('finalizarAtencion', {
-        idEspera: window._as2IdEspera || '',
-        chicaNombre: user?.name || '',
-        clienteNombre: clientName,
-        servicio: svcNames,
-        total: String(total),
-        montoComision: String(montoComision),
-        promoNombre: promoData ? promoData.promo.name : '',
-        precioRegular: promoData ? String(promoData.promo.regular) : String(total),
-        serviciosDetalle: desgloseAcumulado2
-      });
+      if (esTicketSP2) {
+        await apiPost('finalizarServicioPromo', {
+          idEspera: idEspera2,
+          chicaNombre: user?.name || '',
+          clienteNombre: clientName,
+          servicio: svcNames,
+          total: String(total),
+          serviciosDetalle: desgloseAcumulado2
+        });
+      } else {
+        await apiPost('finalizarAtencion', {
+          idEspera: idEspera2,
+          chicaNombre: user?.name || '',
+          clienteNombre: clientName,
+          servicio: svcNames,
+          total: String(total),
+          montoComision: String(montoComision),
+          promoNombre: promoData ? promoData.promo.name : '',
+          precioRegular: promoData ? String(promoData.promo.regular) : String(total),
+          serviciosDetalle: desgloseAcumulado2
+        });
+      }
     } catch (err) { console.error(err); }
 
     window._desgloseAcumulado = [];
