@@ -10355,6 +10355,19 @@ if ('caches' in window) {
     document.getElementById('cobrarModal').classList.add('active');
   }
 
+  // ── Exponer funciones al scope global para uso en onclick handlers ──
+  window.finishAndSend         = finishAndSend;
+  window.finishAndSendAll      = finishAndSendAll;
+  window.finishAndContinue     = finishAndContinue;
+  window.finishAndContinueSameStaff = finishAndContinueSameStaff;
+  window.finishSlotAndContinue = finishSlotAndContinue;
+  window.finishAndNextPromo    = finishAndNextPromo;
+  window.finishAndRetire       = finishAndRetire;
+  window.finishAndReturn       = finishAndReturn;
+  window.confirmServiceAndClose = confirmServiceAndClose;
+  window.finishSlot1           = finishSlot1;
+  window.finishSlot2           = finishSlot2;
+
 </script>
 
 <!-- ============================================ -->
