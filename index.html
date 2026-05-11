@@ -4210,6 +4210,8 @@ if ('caches' in window) {
       total: String(totalFinal),
       promoNombre: promoData ? promoData.promo.name : '',
       precioRegular: precioRegularFinal,
+      idEspera: slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || ''),
+      clienteCodigo: slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
       areasExtras: [],
       promasExtraPendientes: []
     };
@@ -4280,27 +4282,30 @@ if ('caches' in window) {
     const slot = window._finishingSlot || 1;
 
     // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
-    // Siempre consultar el backend para no depender de _as1IdEspera en memoria
-    let idEsperaActual = window._as1IdEspera || '';
+    // Prioridad: _finishingData.idEspera > _as1IdEspera > buscar en backend
+    let idEsperaActual = data.idEspera || window._as1IdEspera || '';
     let miTicketSheet = null;
 
-    try {
-      const spData = await apiGet('getServicioPromo');
-      if (spData.success) {
-        const todosLosTickets = [
-          ...(spData.enServicio || []),
-          ...(spData.porCobrar  || [])
-        ];
-        miTicketSheet = todosLosTickets.find(t =>
-          t.tomadaPor === user?.name &&
-          (t.nombre === data.clientName || t.codigo === window._as1Client)
-        );
-        if (miTicketSheet) {
-          idEsperaActual = miTicketSheet.idEspera;
-          window._as1IdEspera = idEsperaActual;
+    // Solo buscar en ServicioPromo si parece SP- o si no tenemos idEspera
+    if (!idEsperaActual || idEsperaActual.startsWith('SP-')) {
+      try {
+        const spData = await apiGet('getServicioPromo');
+        if (spData.success) {
+          const todosLosTickets = [
+            ...(spData.enServicio || []),
+            ...(spData.porCobrar  || [])
+          ];
+          miTicketSheet = todosLosTickets.find(t =>
+            t.tomadaPor === user?.name &&
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
+          );
+          if (miTicketSheet) {
+            idEsperaActual = miTicketSheet.idEspera;
+            window._as1IdEspera = idEsperaActual;
+          }
         }
-      }
-    } catch(e) {}
+      } catch(e) {}
+    }
 
     const esTicketSP = idEsperaActual.startsWith('SP-');
 
@@ -4379,7 +4384,21 @@ if ('caches' in window) {
           serviciosDetalle: desgloseAcumulado
         });
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); }
+
+    // ── LIMPIEZA: siempre limpiar el slot independientemente del resultado del backend ──
+    if (activePromos[data.clientName]) delete activePromos[data.clientName];
+    if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
+    window._as1IdEspera = '';
+    window._as1Client = '';
+    window._finishingData = null;
+    window._desgloseAcumulado = [];
+    slotServices[slot] = [];
+    if (user && activeClients[user.name]) {
+      activeClients[user.name] = (activeClients[user.name] || []).filter((_, i) => i !== slot - 1);
+      updateCapacityUI(user.name);
+    }
+    saveActivePromos();
 
     // Si había depilación compartida, crear ticket con las partes restantes
     if (window._depiRestPending && window._depiRestPending.length > 0) {
@@ -4388,7 +4407,7 @@ if ('caches' in window) {
       const obsDepi = `✅ ${data.svcNames} completado por ${user?.name || 'Staff'} · Pendiente: ${restNames}`;
       try {
         await apiPost('continuarPromoALista', {
-          idEspera: window._as1IdEspera || '',
+          idEspera: idEsperaActual || '',
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
           servicio: restNames,
@@ -4403,28 +4422,17 @@ if ('caches' in window) {
         });
       } catch(e) { console.error(e); }
       window._depiRestPending = [];
-      alert(`✓ Tu parte lista. ${restNames} quedó en lista de espera para otra staff.`);
       show('staffHome');
-      slotServices[slot] = [];
-      if (user && activeClients[user.name]) {
-        activeClients[user.name].splice(slot - 1, 1);
-        updateCapacityUI(user.name);
-      }
+      await new Promise(r => setTimeout(r, 300));
+      loadStaffHome();
+      alert(`✓ Tu parte lista. ${restNames} quedó en lista de espera para otra staff.`);
       return;
     }
-    if (activePromos[data.clientName]) delete activePromos[data.clientName];
-    if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
-    window._as1IdEspera = '';
-    window._as1Client = '';
-    slotServices[slot] = [];
-    if (user && activeClients[user.name]) {
-      activeClients[user.name].splice(slot - 1, 1);
-      updateCapacityUI(user.name);
-    }
-    saveActivePromos();
-    
-    alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
+
     show('staffHome');
+    await new Promise(r => setTimeout(r, 300));
+    loadStaffHome();
+    alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
   }
   
   async function finishSlotAndContinue(slot) {
