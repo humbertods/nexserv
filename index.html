@@ -1173,6 +1173,19 @@ if ('caches' in window) {
         <div id="arrServicePriceDisplay" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--accent);"></div>
       </div>
 
+      <!-- SERVICIOS ADICIONALES -->
+      <div id="serviciosAdicionalesContainer"></div>
+
+      <button id="btnServicioAdicional" onclick="agregarServicioAdicional()" style="
+        width: 100%; padding: 13px; margin-top: 10px; margin-bottom: 4px;
+        background: var(--bg); border: 2px dashed var(--line);
+        border-radius: var(--radius-sm); font-family: inherit;
+        font-size: 13px; font-weight: 700; color: var(--ink-soft);
+        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      ">
+        ➕ Servicio adicional
+      </button>
+
       <div class="section-title" style="margin-top: 16px;">Prioridad</div>
       <div class="priority-picker">
         <div class="priority-option especial" onclick="pickPriority(this)">
@@ -7333,6 +7346,10 @@ if ('caches' in window) {
     document.getElementById('arrivalSearch').style.display = 'none';
     document.getElementById('arrivalForm').style.display = 'block';
     
+    // Resetear servicios adicionales
+    document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
+    _numServiciosAdicionales = 0;
+
     // Cargar servicios del área inicial
     loadServicesForArea();
     // Resetear promos y secuencia al cambiar de clienta
@@ -7417,6 +7434,174 @@ if ('caches' in window) {
     } else {
       priceDiv.style.display = 'none';
     }
+  }
+
+  // ── SERVICIOS ADICIONALES ──────────────────────────────────
+  let _numServiciosAdicionales = 0;
+
+  function agregarServicioAdicional() {
+    if (_numServiciosAdicionales >= 4) {
+      alert('Máximo 4 servicios adicionales (5 en total)');
+      return;
+    }
+    _numServiciosAdicionales++;
+    const idx = _numServiciosAdicionales;
+    const container = document.getElementById('serviciosAdicionalesContainer');
+
+    const slot = document.createElement('div');
+    slot.id = 'adicionalSlot-' + idx;
+    slot.style.cssText = 'background:var(--bg-card);border:1.5px solid var(--line);border-radius:16px;padding:14px;margin-top:10px;';
+
+    slot.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:800;color:var(--ink);">Servicio adicional ${idx}</span>
+        <button onclick="quitarServicioAdicional(${idx})" style="background:var(--error-bg,#fee2e2);color:#dc2626;border:none;border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">✕ Quitar</button>
+      </div>
+
+      <!-- Tipo: Normal o Promo -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <button id="btnNormal-${idx}" onclick="setTipoAdicional(${idx},'normal')" style="padding:9px;border-radius:10px;border:2px solid var(--accent);background:var(--accent);color:white;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🛠 Normal</button>
+        <button id="btnPromo-${idx}" onclick="setTipoAdicional(${idx},'promo')" style="padding:9px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🎁 Promo</button>
+      </div>
+
+      <!-- Área -->
+      <div class="input-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Área</label>
+        <select id="areaAdicional-${idx}" onchange="loadServicesAdicional(${idx})" style="font-size:13px;">
+          <option value="">Seleccionar área...</option>
+          <option value="cejas">Cejas</option>
+          <option value="depilacion">Depilación</option>
+          <option value="pestanas">Pestañas</option>
+          <option value="retiro_lifting">Lifting / Retiro</option>
+          <option value="facial">Facial</option>
+        </select>
+      </div>
+
+      <!-- Servicio (normal) -->
+      <div id="servicioNormalBox-${idx}" class="input-group" style="margin-bottom:4px;">
+        <label style="font-size:11px;">Servicio tentativo</label>
+        <select id="servicioAdicional-${idx}" style="font-size:13px;">
+          <option value="">Primero seleccioná el área</option>
+        </select>
+        <div id="precioAdicional-${idx}" style="display:none;margin-top:6px;padding:8px;background:var(--bg);border-radius:10px;font-size:12px;font-weight:700;color:var(--accent);"></div>
+      </div>
+
+      <!-- Promo -->
+      <div id="servicioPromoBox-${idx}" style="display:none;" class="input-group">
+        <label style="font-size:11px;">Promo</label>
+        <select id="promoAdicional-${idx}" onchange="onPromoAdicionalChange(${idx})" style="font-size:13px;">
+          <option value="">Seleccionar promo...</option>
+        </select>
+        <div id="precioPromoAdicional-${idx}" style="display:none;margin-top:6px;padding:8px;background:var(--bg);border-radius:10px;font-size:12px;font-weight:700;color:var(--accent);"></div>
+      </div>
+    `;
+
+    container.appendChild(slot);
+
+    // Inicializar tipo como "normal"
+    slot.dataset.tipo = 'normal';
+
+    // Cargar promos en el select de promo
+    const promoSel = document.getElementById('promoAdicional-' + idx);
+    if (window.PROMOS_DATA) {
+      window.PROMOS_DATA.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular });
+        opt.textContent = p.name + ' — $' + p.price;
+        promoSel.appendChild(opt);
+      });
+    }
+
+    // Listener para select de servicio normal
+    document.getElementById('servicioAdicional-' + idx).addEventListener('change', function() {
+      const priceDiv = document.getElementById('precioAdicional-' + idx);
+      if (this.value) {
+        const d = JSON.parse(this.value);
+        priceDiv.textContent = '💵 Precio: $' + d.precio;
+        priceDiv.style.display = 'block';
+      } else {
+        priceDiv.style.display = 'none';
+      }
+    });
+  }
+
+  function setTipoAdicional(idx, tipo) {
+    const slot = document.getElementById('adicionalSlot-' + idx);
+    slot.dataset.tipo = tipo;
+    const btnN = document.getElementById('btnNormal-' + idx);
+    const btnP = document.getElementById('btnPromo-' + idx);
+    const boxN = document.getElementById('servicioNormalBox-' + idx);
+    const boxP = document.getElementById('servicioPromoBox-' + idx);
+    if (tipo === 'normal') {
+      btnN.style.cssText += ';border-color:var(--accent);background:var(--accent);color:white;';
+      btnP.style.cssText += ';border-color:var(--line);background:var(--bg);color:var(--ink-soft);';
+      boxN.style.display = 'block';
+      boxP.style.display = 'none';
+    } else {
+      btnP.style.cssText += ';border-color:var(--accent);background:var(--accent);color:white;';
+      btnN.style.cssText += ';border-color:var(--line);background:var(--bg);color:var(--ink-soft);';
+      boxP.style.display = 'block';
+      boxN.style.display = 'none';
+    }
+  }
+
+  async function loadServicesAdicional(idx) {
+    const area = document.getElementById('areaAdicional-' + idx)?.value;
+    const sel = document.getElementById('servicioAdicional-' + idx);
+    if (!area || !sel) return;
+    sel.innerHTML = '<option value="">Cargando...</option>';
+    const servicios = (window.CATALOGO || {})[area] || [];
+    sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
+    servicios.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area });
+      opt.textContent = s.name + ' — $' + s.price;
+      sel.appendChild(opt);
+    });
+  }
+
+  function onPromoAdicionalChange(idx) {
+    const sel = document.getElementById('promoAdicional-' + idx);
+    const priceDiv = document.getElementById('precioPromoAdicional-' + idx);
+    if (sel.value) {
+      const d = JSON.parse(sel.value);
+      priceDiv.textContent = '🎁 Promo: $' + d.precio + ' (regular $' + d.regular + ')';
+      priceDiv.style.display = 'block';
+    } else {
+      priceDiv.style.display = 'none';
+    }
+  }
+
+  function quitarServicioAdicional(idx) {
+    const slot = document.getElementById('adicionalSlot-' + idx);
+    if (slot) slot.remove();
+    // Reajustar contador
+    const remaining = document.querySelectorAll('[id^="adicionalSlot-"]').length;
+    _numServiciosAdicionales = remaining;
+  }
+
+  function getServiciosAdicionalesData() {
+    // Recolectar todos los servicios adicionales configurados
+    const slots = document.querySelectorAll('[id^="adicionalSlot-"]');
+    const result = [];
+    slots.forEach(slot => {
+      const idx = slot.id.replace('adicionalSlot-', '');
+      const tipo = slot.dataset.tipo || 'normal';
+      const area = document.getElementById('areaAdicional-' + idx)?.value;
+      if (!area) return;
+      if (tipo === 'normal') {
+        const selVal = document.getElementById('servicioAdicional-' + idx)?.value;
+        if (!selVal) return;
+        const d = JSON.parse(selVal);
+        result.push({ tipo: 'normal', area, nombre: d.nombre, precio: d.precio });
+      } else {
+        const selVal = document.getElementById('promoAdicional-' + idx)?.value;
+        if (!selVal) return;
+        const d = JSON.parse(selVal);
+        result.push({ tipo: 'promo', area, nombre: d.nombre, precio: d.precio, regular: d.regular });
+      }
+    });
+    return result;
   }
   
   // Toggle del selector de servicios
