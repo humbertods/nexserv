@@ -949,6 +949,69 @@ function handleGetListaCompleta() {
     }
   } catch(e) {}
 
+  // Merge con TicketMulti
+  try {
+    const tmR = handleGetTicketMulti({});
+    if (tmR.success) {
+      // Áreas en espera → esperando
+      (tmR.activos || []).forEach(function(tm) {
+        var tieneEnServicio = false;
+        (tm.areas || []).forEach(function(a) {
+          if (String(a.estado || '').toLowerCase() === 'en servicio') tieneEnServicio = true;
+        });
+        // Si algún área está en servicio, mostrar en enServicio
+        if (tieneEnServicio) {
+          enServicio.push({
+            idEspera:  tm.idEspera,
+            codigo:    tm.codigo,
+            nombre:    tm.nombre,
+            servicio:  'Multi (' + tm.areas.length + ' servicios)',
+            area:      'multi',
+            tomadaPor: (tm.areas || []).filter(function(a){return a.staff;}).map(function(a){return a.staff;}).join(', ') || '—',
+            total:     tm.precioPromo,
+            estado:    tm.estado,
+            horaToma:  (tm.areas[0] && tm.areas[0].hora) ? tm.areas[0].hora : '',
+            areas:     tm.areas,
+            fuente:    'TicketMulti'
+          });
+        } else {
+          // Todo en espera
+          (tm.areas || []).forEach(function(a) {
+            if (String(a.estado || '').toLowerCase() !== 'esperando') return;
+            esperando.push({
+              idEspera:  tm.idEspera,
+              codigo:    tm.codigo,
+              nombre:    tm.nombre,
+              servicio:  a.tentativo || 'Multi-servicio',
+              area:      a.area || 'multi',
+              tomadaPor: '',
+              total:     a.precio || 0,
+              estado:    'Esperando',
+              fuente:    'TicketMulti',
+              areaIdx:   a.idx
+            });
+          });
+        }
+      });
+      // Por cobrar
+      (tmR.porCobrar || []).forEach(function(tm) {
+        porCobrar.push({
+          idEspera:     tm.idEspera,
+          codigo:       tm.codigo,
+          nombre:       tm.nombre,
+          servicio:     'Multi (' + tm.areas.length + ' servicios)',
+          area:         'multi',
+          tomadaPor:    (tm.areas || []).map(function(a){return a.staff;}).filter(Boolean).join(', '),
+          total:        tm.precioPromo,
+          precioRegular: tm.precioNormal,
+          areas:        tm.areas,
+          fuente:       'TicketMulti',
+          esTop:        false
+        });
+      });
+    }
+  } catch(e) {}
+
   return { success: true, esperando: esperando, enServicio: enServicio, porCobrar: porCobrar };
 }
 
