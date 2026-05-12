@@ -3403,7 +3403,7 @@ function handleAddServicioNormal(data) {
       '',                          // O: Método pago
       '',                          // P: Hora cobro
       '',                          // Q: Total cobrado
-      '',                          // R: Desglose JSON
+      data.serviciosDetalle ? JSON.stringify(data.serviciosDetalle) : '', // R: Desglose JSON (servicios combinados)
       'SN',                        // S: Tipo (SN=normal, SP=promo)
       Number(data.total || 0),     // T: Precio Normal
       ''                           // U: Precio Promo
@@ -3520,6 +3520,7 @@ function handleGetServicioNormal(params) {
         precioPromo : String(precioPromo),
         // precioRegular para compatibilidad con cobrarDesdeBtn
         precioRegular: tipo === 'SP' ? String(precioNormal) : String(precioNormal),
+        serviciosDetalle: (function(){ try { return row[17] ? JSON.parse(row[17]) : null; } catch(e) { return null; } })(), // col R = servicios combinados
         fuente      : 'ServicioNormal'
       };
 

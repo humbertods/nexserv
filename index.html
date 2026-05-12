@@ -3809,9 +3809,22 @@ if ('caches' in window) {
               price: servicioPrecio,
               area: a.area
             });
-            renderServicesForSlot(1);
-            document.getElementById('as1Total').textContent = '$' + servicioPrecio;
-            document.getElementById('as1SvcCount').textContent = '1';
+            // Si tiene serviciosDetalle (mismo área combinado), cargar todos
+            if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
+              slotServices[1] = a.serviciosDetalle.map(sd => ({
+                name: sd.servicio || sd.nombre || sd.name || '',
+                price: Number(sd.precio || sd.price || 0),
+                area: a.area, status: undefined
+              }));
+              const totalCombinado = slotServices[1].reduce((s, v) => s + Number(v.price), 0);
+              renderServicesForSlot(1);
+              document.getElementById('as1Total').textContent = '$' + totalCombinado;
+              document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
+            } else {
+              renderServicesForSlot(1);
+              document.getElementById('as1Total').textContent = '$' + servicioPrecio;
+              document.getElementById('as1SvcCount').textContent = '1';
+            }
           }
           
           // Limpiar promo residual si este servicio no tiene promo
@@ -10176,6 +10189,48 @@ if ('caches' in window) {
         });
       });
 
+      // ── DETECCIÓN: ¿Todos del mismo área? ──────────────────
+      const areasUnicas = [...new Set(areasMulti.map(a => a.area))];
+      const todosMismaArea = areasUnicas.length === 1;
+
+      if (todosMismaArea) {
+        // Mismo área — combinar en un solo ticket SN/SP con servicios listados
+        const serviciosCombinados = areasMulti.map(a => a.tentativo).join(' + ');
+        const precioTotal = areasMulti.reduce((s, a) => s + Number(a.precio || 0), 0);
+        const precioNormalTotal = areasMulti.reduce((s, a) => s + Number(a.precioNormal || a.precio || 0), 0);
+        const tienePromoEnLote = areasMulti.some(a => a.tipo === 'promo');
+
+        postData.servicio = serviciosCombinados;
+        postData.total = precioTotal;
+        postData.serviciosDetalle = areasMulti.map(a => ({
+          servicio: a.tentativo,
+          precio: a.precio,
+          tipo: a.tipo
+        }));
+
+        // Limpiar slots adicionales
+        document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
+        _numServiciosAdicionales = 0;
+
+        try {
+          const tienePromo = window._arrPromo || tienePromoEnLote;
+          const accionAdd = tienePromo ? 'addServicioPromo' : 'addServicioNormal';
+          const result = await apiPost(accionAdd, postData);
+          if (result && result.success) {
+            window._arrPromo = null;
+            simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + serviciosCombinados, isTop);
+            setTimeout(() => { show('mikaelaHome'); }, 600);
+          } else {
+            alert('Error al agregar: ' + (result?.error || result?.message || 'Error desconocido'));
+          }
+        } catch(err) {
+          alert('Error de conexión: ' + err.message);
+        }
+        return;
+      }
+      // ── FIN MISMO ÁREA ─────────────────────────────────────
+
+      // Áreas diferentes → crear Ticket Multi
       const tmData = {
         codigo:       codigo,
         nombre:       nombre,
