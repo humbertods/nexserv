@@ -7286,6 +7286,13 @@ if ('caches' in window) {
     const filtered = CLIENT_DIRECTORY_CACHE.filter(c => 
       c.name.toLowerCase().includes(search) || c.code.toLowerCase().includes(search)
     );
+
+    // Ordenar por primer apellido (segunda palabra del nombre completo)
+    filtered.sort((a, b) => {
+      const apellidoA = (a.name.trim().split(' ')[1] || a.name.trim()).toLowerCase();
+      const apellidoB = (b.name.trim().split(' ')[1] || b.name.trim()).toLowerCase();
+      return apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+    });
     if (filtered.length === 0) {
       list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No se encontró ninguna clienta. <span style="color: var(--accent-deep); cursor: pointer; font-weight: 700;" onclick="openNewClient(); show(\'clientDirectory\');">¿Registrar nueva?</span></div>';
       return;
@@ -7540,7 +7547,14 @@ if ('caches' in window) {
 
     const filtered = search 
       ? CLIENT_DIRECTORY_CACHE.filter(c => c.name.toLowerCase().includes(search) || c.code.toLowerCase().includes(search))
-      : CLIENT_DIRECTORY_CACHE;
+      : [...CLIENT_DIRECTORY_CACHE];
+
+    // Ordenar por primer apellido (segunda palabra del nombre)
+    filtered.sort((a, b) => {
+      const apellidoA = (a.name.trim().split(' ')[1] || a.name.trim()).toLowerCase();
+      const apellidoB = (b.name.trim().split(' ')[1] || b.name.trim()).toLowerCase();
+      return apellidoA.localeCompare(apellidoB, 'es', { sensitivity: 'base' });
+    });
     
     document.getElementById('clientCount').textContent = filtered.length;
     
