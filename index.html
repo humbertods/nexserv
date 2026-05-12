@@ -4554,8 +4554,13 @@ if ('caches' in window) {
         const histRealizados = svcsRealizados.filter(function(s){ return !svcsExtras.includes(s); }).map(function(s){ return s.name + ' $' + s.price; }).join(' + ');
         const servicioHistorial = (histRealizados ? '[✅' + (user && user.name ? user.name : '') + ': ' + histRealizados + '] | ' : '') + servicioSiguiente;
 
-        const result = await apiPost('finalizarAtencion', {
-          idEspera: window._as1IdEspera || '',
+        const idEsperaActual = window._as1IdEspera || '';
+        const accionFin = idEsperaActual.startsWith('SN-') ? 'finalizarServicioNormal'
+                        : idEsperaActual.startsWith('SP-') ? 'finalizarServicioPromo'
+                        : 'finalizarAtencion';
+
+        const result = await apiPost(accionFin, {
+          idEspera: idEsperaActual,
           chicaNombre: user && user.name ? user.name : '',
           clienteNombre: displayName,
           clienteCodigo: window._as1Client || '',

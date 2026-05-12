@@ -3757,6 +3757,23 @@ function handleFinalizarServicioNormal(data) {
       if (estado !== 'en servicio') continue;
 
       const row = i + 1;
+
+      // Si viene nuevaArea → devolver a lista de espera para siguiente staff
+      if (data.nuevaArea && !data.esRetiro) {
+        ws.getRange(row, 9).setValue('Esperando');
+        ws.getRange(row, 10).setValue('');
+        ws.getRange(row, 11).setValue('');
+        ws.getRange(row, 7).setValue(String(data.nuevaArea).toLowerCase());
+        ws.getRange(row, 6).setValue(data.servicio || data.servicioSiguiente || '');
+        ws.getRange(row, 13).setValue(Number(data.total || 0));
+        const obsActual = String(rows[i][11] || '');
+        ws.getRange(row, 12).setValue((obsActual ? obsActual + ' | ' : '') + '✅ ' + (data.areaCompletada||'') + ' completado por ' + (data.chicaNombre||'') + ' · Sigue: ' + (data.areasFaltantes||''));
+        if (data.chicaNombre && data.montoChica && Number(data.montoChica) > 0) {
+          updateComision(data.chicaNombre, Number(data.montoChica));
+        }
+        return { success: true, message: 'Área completada, clienta devuelta a lista de espera' };
+      }
+
       ws.getRange(row, 9).setValue('Por cobrar');
       if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
       ws.getRange(row, 13).setValue(Number(data.total || rows[i][12] || 0));
