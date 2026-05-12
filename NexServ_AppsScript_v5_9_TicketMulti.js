@@ -73,6 +73,8 @@ function doPost(e) {
           result = handleTomarServicioNormal(data);
         } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
           result = handleTomarServicioPromo(data);
+        } else if (data.idEspera && String(data.idEspera).startsWith('TM-')) {
+          result = handleTomarAreaTicketMulti({ idEspera: data.idEspera, chicaNombre: data.chicaNombre });
         } else {
           result = handleTomarClienta(data);
         }
@@ -570,6 +572,44 @@ function handleGetListaEspera() {
           esTop       : 'No',
           asignadaA   : '',
           fuente      : 'ServicioPromo'
+        });
+      });
+    }
+  } catch(e) {}
+
+  // Merge con TicketMulti (tickets TM- esperando — primera área sin tomar)
+  try {
+    const tmR = handleGetTicketMulti({});
+    if (tmR.success && tmR.activos) {
+      tmR.activos.forEach(function(tm) {
+        // Solo agregar áreas que están en estado "Esperando"
+        (tm.areas || []).forEach(function(a) {
+          if (String(a.estado || '').toLowerCase() !== 'esperando') return;
+          lista.push({
+            id          : tm.idEspera,
+            fecha       : tm.areas[0] ? tm.areas[0].hora : '',
+            horaLlegada : '',
+            codigo      : tm.codigo,
+            nombre      : tm.nombre,
+            servicio    : a.tentativo || '',
+            area        : a.area || 'multi',
+            prioridad   : tm.prioridad || 'Normal',
+            estado      : 'Esperando',
+            tomadaPor   : '',
+            horaToma    : '',
+            observaciones: tm.observaciones || '',
+            total       : a.precio || 0,
+            promoNombre : '',
+            precioPromo : '',
+            precioRegular: '',
+            tipo        : 'TM',
+            secuencia   : [],
+            promasExtra : [],
+            esTop       : 'No',
+            asignadaA   : '',
+            fuente      : 'TicketMulti',
+            areaIdx     : a.idx
+          });
         });
       });
     }
