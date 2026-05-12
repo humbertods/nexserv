@@ -1669,6 +1669,37 @@ function handleGetAtenciones(params) {
     }
   } catch(e) {}
 
+  // Merge con ServicioPromo (tickets SP- en servicio)
+  try {
+    const spR = handleGetServicioPromo(params || {});
+    if (spR.success && spR.enServicio) {
+      spR.enServicio.forEach(function(sp) {
+        if (params && params.chica && sp.tomadaPor !== params.chica) return;
+        if (String(sp.estado || '').toLowerCase() === 'por cobrar') return;
+        atenciones.push({
+          idEspera    : sp.idEspera,
+          fecha       : sp.fecha,
+          horaLlegada : sp.horaLlegada,
+          codigo      : sp.codigo,
+          nombre      : sp.nombre,
+          servicio    : sp.servicio,
+          area        : sp.area,
+          prioridad   : sp.prioridad || 'Normal',
+          tomadaPor   : sp.tomadaPor,
+          horaToma    : sp.horaTomada || '',
+          observaciones: sp.observaciones || '',
+          total       : sp.total || '0',
+          precioPromo : sp.precioPromo || sp.total || '0',
+          promoNombre : sp.promoNombre || '',
+          precioRegular: sp.precioNormal || sp.total || '0',
+          tipo        : sp.tipo || 'SP',
+          fuente      : 'ServicioPromo',
+          pendienteConfirmacion: false
+        });
+      });
+    }
+  } catch(e) {}
+
   // Merge con TicketMulti — mostrar áreas asignadas a esta staff
   try {
     const chicaFiltroTM = (params && params.chica) ? String(params.chica) : '';
