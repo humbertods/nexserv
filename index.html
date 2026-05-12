@@ -3019,6 +3019,20 @@ if ('caches' in window) {
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
 
+    // ── TICKET MULTI ─────────────────────────────────────────
+    const idEsperaActual = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    if (idEsperaActual.startsWith('TM-')) {
+      btnContainer.innerHTML = `
+        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+          ✅ Completado — siguiente servicio
+        </button>
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMultiFinal()">
+          🎯 Completado multi-servicio — mandar a cobrar
+        </button>`;
+      return;
+    }
+    // ── FIN TICKET MULTI ─────────────────────────────────────
+
     if (!promoData || !promoData.promo) {
       // Sin promo — botón normal
       btnContainer.innerHTML = `
@@ -6325,12 +6339,21 @@ if ('caches' in window) {
           cobrarList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>';
         } else {
           window._mkPorCobrarData = porCobrar;
-          cobrarList.innerHTML = porCobrar.map(p => `
-            <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid var(--success);">
+          cobrarList.innerHTML = porCobrar.map(p => {
+            const esTM = p.fuente === 'TicketMulti';
+            let desgloseData = p.serviciosDetalle;
+            if (!desgloseData && esTM && p.areas) {
+              desgloseData = p.areas.map(a => ({
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area, monto: a.precio
+              }));
+            }
+            const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
+            return `
+            <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid ${esTM ? 'var(--accent)' : 'var(--success)'};">
               <div style="display: flex; align-items: center; gap: 12px;">
                 <div class="client-avatar ${p.esTop ? 'is-top' : ''}" style="flex-shrink: 0;">${p.nombre.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
                 <div style="flex: 1;">
-                  <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}</div>
+                  <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}${esTM ? ' <span style=\"font-size:10px;background:var(--accent);color:white;padding:2px 7px;border-radius:100px;font-weight:700;\">MULTI</span>' : ''}</div>
                   <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${p.servicio} · atendida por ${p.tomadaPor}</div>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
@@ -6342,9 +6365,9 @@ if ('caches' in window) {
                     data-total="${p.total||'0'}"
                     data-regular="${p.precioRegular||p.total||'0'}"
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
-                    data-desglose="${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}"
+                    data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${p.serviciosDetalle ? encodeURIComponent(JSON.stringify(p.serviciosDetalle)) : ''}')"
+                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}')"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">⏳ Esperar</button>
                   <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}')"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🛍 + Producto</button>
@@ -6358,8 +6381,8 @@ if ('caches' in window) {
               <!-- Productos agregados a este ticket -->
               <div id="productos-ticket-${p.idEspera}" style="margin-top: 8px;"></div>
             </div>
-          `).join('');
-          // Actualizar opciones de asignación si hay clientas esperando
+          `;
+          }).join('');
           if (window._mkEsperandoCobro && window._mkEsperandoCobro.length > 0) mkActualizarAsignarOpciones();
           mkRenderEsperandoCobro();
         }
@@ -7533,16 +7556,45 @@ if ('caches' in window) {
     const boxN = document.getElementById('servicioNormalBox-' + idx);
     const boxP = document.getElementById('servicioPromoBox-' + idx);
     if (tipo === 'normal') {
-      btnN.style.cssText += ';border-color:var(--accent);background:var(--accent);color:white;';
-      btnP.style.cssText += ';border-color:var(--line);background:var(--bg);color:var(--ink-soft);';
+      btnN.style.background = 'var(--accent)'; btnN.style.color = 'white'; btnN.style.borderColor = 'var(--accent)';
+      btnP.style.background = 'var(--bg)'; btnP.style.color = 'var(--ink-soft)'; btnP.style.borderColor = 'var(--line)';
       boxN.style.display = 'block';
       boxP.style.display = 'none';
     } else {
-      btnP.style.cssText += ';border-color:var(--accent);background:var(--accent);color:white;';
-      btnN.style.cssText += ';border-color:var(--line);background:var(--bg);color:var(--ink-soft);';
+      btnP.style.background = 'var(--accent)'; btnP.style.color = 'white'; btnP.style.borderColor = 'var(--accent)';
+      btnN.style.background = 'var(--bg)'; btnN.style.color = 'var(--ink-soft)'; btnN.style.borderColor = 'var(--line)';
       boxP.style.display = 'block';
       boxN.style.display = 'none';
+      // Cargar promos al momento de cambiar a tipo promo
+      cargarPromasEnSlot(idx);
     }
+  }
+
+  function cargarPromasEnSlot(idx) {
+    const promoSel = document.getElementById('promoAdicional-' + idx);
+    if (!promoSel) return;
+    const promosActivas = (PROMOS || []).filter(p => p.active);
+    if (promosActivas.length === 0) {
+      // Intentar cargar si aún no están disponibles
+      ensurePromosLoaded().then(() => {
+        const pa = (PROMOS || []).filter(p => p.active);
+        promoSel.innerHTML = '<option value="">Seleccionar promo...</option>';
+        pa.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, id: p.id });
+          opt.textContent = p.name + ' — $' + p.price;
+          promoSel.appendChild(opt);
+        });
+      });
+      return;
+    }
+    promoSel.innerHTML = '<option value="">Seleccionar promo...</option>';
+    promosActivas.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, id: p.id });
+      opt.textContent = p.name + ' — $' + p.price;
+      promoSel.appendChild(opt);
+    });
   }
 
   async function loadServicesAdicional(idx) {
@@ -7550,30 +7602,18 @@ if ('caches' in window) {
     const sel  = document.getElementById('servicioAdicional-' + idx);
     if (!area || !sel) return;
 
-    // Mapear valor del select al key del catálogo
-    const areaKey = { cejas:'cejas', depilacion:'depilacion', pestanas:'pestanas', retiro_lifting:'retiro_lifting', facial:'facial' }[area] || area;
-    const servicios = CATALOGO[areaKey] || [];
-
+    const servicios = CATALOGO[area] || [];
     sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
     servicios.forEach(s => {
       const opt = document.createElement('option');
-      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area: areaKey });
+      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area });
       opt.textContent = s.name + ' — $' + s.price;
       sel.appendChild(opt);
     });
 
-    // También filtrar promos del select de promo para mostrar solo las de esta área
-    const promoSel = document.getElementById('promoAdicional-' + idx);
-    if (promoSel) {
-      promoSel.innerHTML = '<option value="">Seleccionar promo...</option>';
-      const promosActivas = (PROMOS || []).filter(p => p.active);
-      promosActivas.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, id: p.id });
-        opt.textContent = p.name + ' — $' + p.price;
-        promoSel.appendChild(opt);
-      });
-    }
+    // Si estamos en modo promo, recargar promos también
+    const slot = document.getElementById('adicionalSlot-' + idx);
+    if (slot?.dataset.tipo === 'promo') cargarPromasEnSlot(idx);
   }
 
   function onPromoAdicionalChange(idx) {
@@ -10095,7 +10135,63 @@ if ('caches' in window) {
       postData.secuencia = _secuencia;
     }
 
-    console.log('📤 Enviando a lista de espera:', postData);
+    // ── DETECCIÓN TICKET MULTI ──────────────────────────────
+    const adicionales = getServiciosAdicionalesData();
+    const esMulti = adicionales.length > 0;
+
+    if (esMulti) {
+      // Construir array de áreas para TicketMulti
+      const areaMapMulti = { 'Cejas':'cejas', 'Depilación':'depilacion', 'Pestañas':'pestanas', 'Lifting / Retiro':'retiro_lifting', 'Facial':'facial' };
+      const areasMulti = [];
+
+      // Área principal (servicio 1)
+      if (servicio || (promo && promo.name)) {
+        areasMulti.push({
+          tentativo:   promo ? promo.name : servicio,
+          area:        areaKey,
+          precio:      promo ? promo.price : precio,
+          precioNormal: promo ? promo.regular : precio,
+          tipo:        promo ? 'promo' : 'normal'
+        });
+      }
+
+      // Servicios adicionales
+      adicionales.forEach(a => {
+        areasMulti.push({
+          tentativo:    a.nombre,
+          area:         a.area,
+          precio:       a.precio,
+          precioNormal: a.regular || a.precio,
+          tipo:         a.tipo
+        });
+      });
+
+      const tmData = {
+        codigo:       codigo,
+        nombre:       nombre,
+        prioridad:    prioridad,
+        observaciones: obs,
+        areas:        areasMulti
+      };
+
+      try {
+        const result = await apiPost('crearTicketMulti', tmData);
+        if (result && result.success) {
+          window._arrPromo = null;
+          document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
+          _numServiciosAdicionales = 0;
+          simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
+          alert('✅ Ticket multi-servicio creado (' + result.id + ')');
+          setTimeout(() => { show('mikaelaHome'); }, 400);
+        } else {
+          alert('Error al crear ticket multi: ' + (result?.message || 'Error desconocido'));
+        }
+      } catch(err) {
+        alert('Error de conexión: ' + err.message);
+      }
+      return;
+    }
+    // ── FIN TICKET MULTI ─────────────────────────────────────
 
     try {
       // Ruta: si tiene promo → ListaEspera (flujo promo), si no → ServicioNormal
@@ -10636,7 +10732,61 @@ if ('caches' in window) {
     document.getElementById('cobrarModal').classList.add('active');
   }
 
-  // ── Exponer funciones al scope global para uso en onclick handlers ──
+  // ── TICKET MULTI — funciones de la staff ──────────────────
+  async function completarAreaMulti() {
+    const slot = window._finishingSlot || 1;
+    const user = window.currentUser;
+    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+    try {
+      const r = await apiPost('completarAreaTicketMulti', {
+        idEspera,
+        chicaNombre: user?.name || ''
+      });
+      if (r.success) {
+        slotServices[slot] = [];
+        window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        show('staffHome');
+        await new Promise(r => setTimeout(r, 300));
+        loadStaffHome();
+        alert('✅ Tu parte completada. El sistema continúa con el siguiente servicio.');
+      } else {
+        alert('Error: ' + r.message);
+      }
+    } catch(e) { alert('Error de conexión'); }
+  }
+
+  async function completarAreaMultiFinal() {
+    const slot = window._finishingSlot || 1;
+    const user = window.currentUser;
+    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+    try {
+      const r = await apiPost('completarAreaTicketMulti', {
+        idEspera,
+        chicaNombre: user?.name || '',
+        esUltima: true
+      });
+      if (r.success) {
+        slotServices[slot] = [];
+        window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        show('staffHome');
+        await new Promise(r => setTimeout(r, 300));
+        loadStaffHome();
+        alert('🎯 Multi-servicio completado. Clienta enviada a cobrar con Mikaela.');
+      } else {
+        alert('Error: ' + r.message);
+      }
+    } catch(e) { alert('Error de conexión'); }
+  }
+  window.completarAreaMulti      = completarAreaMulti;
+  window.completarAreaMultiFinal = completarAreaMultiFinal;
   window.finishAndSend         = finishAndSend;
   window.finishAndSendAll      = finishAndSendAll;
   window.finishAndContinue     = finishAndContinue;
