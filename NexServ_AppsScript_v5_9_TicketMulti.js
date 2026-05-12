@@ -587,7 +587,7 @@ function handleGetListaEspera() {
           if (String(a.estado || '').toLowerCase() !== 'esperando') return;
           lista.push({
             id          : tm.idEspera,
-            fecha       : tm.areas[0] ? tm.areas[0].hora : '',
+            fecha       : '',
             horaLlegada : '',
             codigo      : tm.codigo,
             nombre      : tm.nombre,
@@ -3943,8 +3943,35 @@ function handleCrearTicketMulti(data) {
     // areas: array de { tentativo, area, precio, precioNormal, tipo }
     const areas = data.areas || [];
 
+    // ── AGRUPAR POR ÁREA ────────────────────────────────────
+    // Si varios servicios son del mismo área, combinarlos en uno solo
+    var areaGroups = {}; // { 'cejas': { tentativo, precio, precioNormal, tipo } }
+    var areaOrder  = []; // mantener el orden de aparición
+
+    areas.forEach(function(a) {
+      var aKey = String(a.area || 'otro').toLowerCase();
+      if (!areaGroups[aKey]) {
+        areaGroups[aKey] = {
+          area: a.area,
+          tentativo: a.tentativo || '',
+          precio: Number(a.precio || 0),
+          precioNormal: Number(a.precioNormal || a.precio || 0),
+          tipo: a.tipo || 'normal'
+        };
+        areaOrder.push(aKey);
+      } else {
+        // Mismo área — combinar nombre y sumar precio
+        areaGroups[aKey].tentativo += ' + ' + (a.tentativo || '');
+        areaGroups[aKey].precio    += Number(a.precio || 0);
+        areaGroups[aKey].precioNormal += Number(a.precioNormal || a.precio || 0);
+      }
+    });
+
+    var areasAgrupadas = areaOrder.map(function(k) { return areaGroups[k]; });
+    // ── FIN AGRUPACIÓN ──────────────────────────────────────
+
     // Construir fila de 37 columnas (A=0 → AK=36)
-    const row = Array(37).fill('');
+    var row = Array(37).fill('');
     row[0]  = id;
     row[1]  = fecha;
     row[2]  = hora;
@@ -3953,31 +3980,31 @@ function handleCrearTicketMulti(data) {
     row[5]  = 'Activo';
     row[6]  = data.prioridad || 'Normal';
     row[7]  = data.observaciones || '';
-    row[8]  = ''; // MetodoPago — se llena al cobrar
-    row[9]  = ''; // HoraCobro
+    row[8]  = '';
+    row[9]  = '';
 
-    let precioNormalTotal = 0;
-    let precioPromoTotal  = 0;
+    var precioNormalTotal = 0;
+    var precioPromoTotal  = 0;
 
-    areas.forEach((a, i) => {
-      if (i > 3) return; // máximo 4 áreas
-      const base = TM_AREA_COL[i];
-      row[base]     = a.tentativo  || ''; // Tentativo
-      row[base + 1] = '';                  // Confirmado (vacío hasta que staff confirme)
-      row[base + 2] = '';                  // Staff
-      row[base + 3] = 'Esperando';         // Estado
-      row[base + 4] = '';                  // Hora toma
-      row[TM_PRECIO_COL[i]] = Number(a.precio || 0);
-      precioNormalTotal += Number(a.precioNormal || a.precio || 0);
-      precioPromoTotal  += Number(a.precio || 0);
+    areasAgrupadas.forEach(function(a, i) {
+      if (i > 3) return;
+      var base = TM_AREA_COL[i];
+      row[base]     = (a.area || '') + '||' + (a.tentativo || '');
+      row[base + 1] = '';
+      row[base + 2] = '';
+      row[base + 3] = 'Esperando';
+      row[base + 4] = '';
+      row[TM_PRECIO_COL[i]] = a.precio;
+      precioNormalTotal += a.precioNormal;
+      precioPromoTotal  += a.precio;
     });
 
-    row[34] = precioNormalTotal; // AI = Precio normal total
-    row[35] = precioPromoTotal;  // AJ = Precio promo total
-    row[36] = '';                // AK = Total cobrado
+    row[34] = precioNormalTotal;
+    row[35] = precioPromoTotal;
+    row[36] = '';
 
     ws.appendRow(row);
-    return { success: true, id };
+    return { success: true, id, areasCount: areasAgrupadas.length };
   } catch(e) { return { success: false, message: String(e) }; }
 }
 
@@ -4004,12 +4031,21 @@ function handleGetTicketMulti(params) {
 
       // Construir areas
       const areas = [];
-      TM_AREA_COL.forEach((base, i) => {
-        const tentativo = String(row[base]     || '').trim();
-        if (!tentativo) return;
+      TM_AREA_COL.forEach(function(base, i) {
+        const rawTentativo = String(row[base] || '').trim();
+        if (!rawTentativo) return;
+        // Parsear área del prefijo "area||servicio"
+        var areaVal = '';
+        var tentativoVal = rawTentativo;
+        if (rawTentativo.indexOf('||') !== -1) {
+          var parts = rawTentativo.split('||');
+          areaVal = parts[0];
+          tentativoVal = parts[1] || rawTentativo;
+        }
         areas.push({
           idx: i + 1,
-          tentativo,
+          area:      areaVal,
+          tentativo: tentativoVal,
           confirmado: String(row[base + 1] || '').trim(),
           staff:      String(row[base + 2] || '').trim(),
           estado:     String(row[base + 3] || 'Esperando').trim(),
