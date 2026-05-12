@@ -7637,26 +7637,36 @@ if ('caches' in window) {
   }
 
   function getServiciosAdicionalesData() {
-    // Recolectar todos los servicios adicionales configurados
     const slots = document.querySelectorAll('[id^="adicionalSlot-"]');
     const result = [];
     slots.forEach(slot => {
       const idx = slot.id.replace('adicionalSlot-', '');
       const tipo = slot.dataset.tipo || 'normal';
-      const area = document.getElementById('areaAdicional-' + idx)?.value;
+      const areaEl = document.getElementById('areaAdicional-' + idx);
+      const area = areaEl ? areaEl.value : '';
+      console.log('🔍 Slot', idx, '| tipo:', tipo, '| area:', area);
       if (!area) return;
       if (tipo === 'normal') {
-        const selVal = document.getElementById('servicioAdicional-' + idx)?.value;
+        const selEl = document.getElementById('servicioAdicional-' + idx);
+        const selVal = selEl ? selEl.value : '';
+        console.log('  normal selVal:', selVal);
         if (!selVal) return;
-        const d = JSON.parse(selVal);
-        result.push({ tipo: 'normal', area, nombre: d.nombre, precio: d.precio });
+        try {
+          const d = JSON.parse(selVal);
+          result.push({ tipo: 'normal', area, nombre: d.nombre, precio: d.precio });
+        } catch(e) { console.error('Error parsing normal:', e); }
       } else {
-        const selVal = document.getElementById('promoAdicional-' + idx)?.value;
+        const selEl = document.getElementById('promoAdicional-' + idx);
+        const selVal = selEl ? selEl.value : '';
+        console.log('  promo selVal:', selVal);
         if (!selVal) return;
-        const d = JSON.parse(selVal);
-        result.push({ tipo: 'promo', area, nombre: d.nombre, precio: d.precio, regular: d.regular });
+        try {
+          const d = JSON.parse(selVal);
+          result.push({ tipo: 'promo', area, nombre: d.nombre, precio: d.precio, regular: d.regular });
+        } catch(e) { console.error('Error parsing promo:', e); }
       }
     });
+    console.log('📦 serviciosAdicionales resultado:', result.length, result);
     return result;
   }
   
