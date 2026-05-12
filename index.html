@@ -7501,12 +7501,12 @@ if ('caches' in window) {
     // Inicializar tipo como "normal"
     slot.dataset.tipo = 'normal';
 
-    // Cargar promos en el select de promo
+    // Cargar promos activas en el select de promo
     const promoSel = document.getElementById('promoAdicional-' + idx);
-    if (window.PROMOS_DATA) {
-      window.PROMOS_DATA.forEach(p => {
+    if (promoSel && PROMOS && PROMOS.length > 0) {
+      PROMOS.filter(p => p.active).forEach(p => {
         const opt = document.createElement('option');
-        opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular });
+        opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, id: p.id });
         opt.textContent = p.name + ' — $' + p.price;
         promoSel.appendChild(opt);
       });
@@ -7547,17 +7547,33 @@ if ('caches' in window) {
 
   async function loadServicesAdicional(idx) {
     const area = document.getElementById('areaAdicional-' + idx)?.value;
-    const sel = document.getElementById('servicioAdicional-' + idx);
+    const sel  = document.getElementById('servicioAdicional-' + idx);
     if (!area || !sel) return;
-    sel.innerHTML = '<option value="">Cargando...</option>';
-    const servicios = (window.CATALOGO || {})[area] || [];
+
+    // Mapear valor del select al key del catálogo
+    const areaKey = { cejas:'cejas', depilacion:'depilacion', pestanas:'pestanas', retiro_lifting:'retiro_lifting', facial:'facial' }[area] || area;
+    const servicios = CATALOGO[areaKey] || [];
+
     sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
     servicios.forEach(s => {
       const opt = document.createElement('option');
-      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area });
+      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area: areaKey });
       opt.textContent = s.name + ' — $' + s.price;
       sel.appendChild(opt);
     });
+
+    // También filtrar promos del select de promo para mostrar solo las de esta área
+    const promoSel = document.getElementById('promoAdicional-' + idx);
+    if (promoSel) {
+      promoSel.innerHTML = '<option value="">Seleccionar promo...</option>';
+      const promosActivas = (PROMOS || []).filter(p => p.active);
+      promosActivas.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, id: p.id });
+        opt.textContent = p.name + ' — $' + p.price;
+        promoSel.appendChild(opt);
+      });
+    }
   }
 
   function onPromoAdicionalChange(idx) {
