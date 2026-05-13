@@ -10358,6 +10358,53 @@ if ('caches' in window) {
 
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
+    // ── DETECCIÓN TICKET MULTI en asignación directa ─────────
+    const adicionalesGA = getServiciosAdicionalesData();
+    if (adicionalesGA.length > 0) {
+      const areasMultiGA = [];
+      if (servicioGA || (promo && promo.name)) {
+        areasMultiGA.push({
+          tentativo:    promo ? promo.name : servicioGA,
+          area:         areaKey,
+          precio:       promo ? promo.price : precioGA,
+          precioNormal: promo ? promo.regular : precioGA,
+          tipo:         promo ? 'promo' : 'normal'
+        });
+      }
+      adicionalesGA.forEach(a => {
+        areasMultiGA.push({
+          tentativo:    a.nombre,
+          area:         a.area,
+          precio:       a.precio,
+          precioNormal: a.regular || a.precio,
+          tipo:         a.tipo
+        });
+      });
+      try {
+        const tmResult = await apiPost('crearTicketMulti', {
+          codigo:       codigo,
+          nombre:       nombre,
+          prioridad:    'Normal',
+          observaciones: obs,
+          areas:        areasMultiGA
+        });
+        if (tmResult && tmResult.success) {
+          window._arrPromo = null;
+          document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
+          _numServiciosAdicionales = 0;
+          simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
+          alert('✅ Ticket multi-servicio creado (' + tmResult.id + ')');
+          setTimeout(() => { show('mikaelaHome'); }, 400);
+        } else {
+          alert('Error al crear ticket multi: ' + (tmResult?.message || 'Error'));
+        }
+      } catch(err) {
+        alert('Error de conexión: ' + err.message);
+      }
+      return;
+    }
+    // ── FIN TICKET MULTI ─────────────────────────────────────
+
     try {
       const tienePromoGA = promo !== null;
       const accionGA = tienePromoGA ? 'addServicioPromo' : 'addServicioNormal';
