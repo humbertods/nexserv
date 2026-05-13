@@ -3152,10 +3152,11 @@ if ('caches' in window) {
     const myArea = user?.area || 'cejas';
 
     // ── TICKET MULTI ─────────────────────────────────────────
-    if (idEsperaActual.startsWith('TM-')) {
+    const _idEsperaSlot = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    if (_idEsperaSlot.startsWith('TM-')) {
       apiGet('getTicketMulti').then(function(tmData) {
         if (!tmData.success) return;
-        var tm = (tmData.activos || []).find(function(t) { return t.idEspera === idEsperaActual; });
+        var tm = (tmData.activos || []).find(function(t) { return t.idEspera === _idEsperaSlot; });
         if (!tm) return;
         var miNombre = user && user.name ? user.name : '';
         var areasDeOtros = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() === 'esperando'; });
@@ -3193,9 +3194,12 @@ if ('caches' in window) {
 
     // Con promo multi-área — verificar si puede hacer todo sola
     const AREA_CAPS = {
+      // Cejas staff (María, Keyla, Lesly) también hacen pestañas/lifting/retiro
       'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
                    'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas',
-                   'retiro lifting', 'retiro_lifting'],
+                   'retiro lifting', 'retiro_lifting',
+                   'pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen',
+                   'pelo a pelo', 'clasicas', 'clásicas', 'efecto'],
       'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen', 'pelo a pelo',
                    'efecto aura', 'efecto muñeca', 'clasicas', 'clásicas', 'natural'],
       'facial':   ['facial', 'hidra', 'limpieza']
@@ -3204,9 +3208,11 @@ if ('caches' in window) {
     const promo = promoData.promo;
     const puedeTodo = promo.division && promo.division.length > 0 &&
       promo.division.every(d => {
-        const dArea = String(d.area||'').toLowerCase();
+        // division.area puede tener emojis: '👁 Pestañas' → normalizar
+        const dArea = String(d.area||'').toLowerCase().replace(/[^\w\s]/gi,' ').trim();
         const dSvc  = String(d.servicio||d.service||'').toLowerCase();
-        return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap));
+        const dRealArea = String(d.realArea||'').toLowerCase();
+        return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
       });
 
     let html = '';
@@ -4460,20 +4466,17 @@ if ('caches' in window) {
     const clientKey = normalizeClientKey(clientName);
     const promoData = activePromos[clientKey] || window._finishPromoData;
 
+    // Para "hago toda la promo": usar el precio total de la promo, no solo el servicio actual
     if (promoData && promoData.promo) {
       const precioTotal = promoData.promo.price;
-      const svcsActuales = slotServices[slot] || [];
-      // Asegurar que la promo principal esté en los servicios
-      const tienePromo = svcsActuales.find(s => s.name === promoData.promo.name);
-      if (!tienePromo) {
-        slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: user?.area || 'cejas' }, ...svcsActuales];
-      }
+      // Reemplazar slotServices con la promo completa al precio total
+      slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: user?.area || 'cejas' }];
     }
 
     // Calcular totales frescos
     const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
-    const totalFinal = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const svcNames = svcsAprobados.map(s => s.name).join(' + ') || 'Servicio';
+    const totalFinal = promoData ? Number(promoData.promo.price) : svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const svcNames = promoData ? promoData.promo.name : (svcsAprobados.map(s => s.name).join(' + ') || 'Servicio');
     const precioRegularFinal = promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalFinal);
 
     // Llenar _finishingData y _finishingSlot para que finishAndSend tenga todo
@@ -5576,7 +5579,9 @@ if ('caches' in window) {
       const AREA_CAPS = {
         'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
                      'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas',
-                     'retiro lifting', 'retiro_lifting'],
+                     'retiro lifting', 'retiro_lifting',
+                     'pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen',
+                     'pelo a pelo', 'clasicas', 'clásicas', 'efecto'],
         'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen', 'pelo a pelo',
                      'efecto aura', 'efecto muñeca', 'clasicas', 'clásicas', 'natural'],
         'facial':   ['facial', 'hidra', 'limpieza']
@@ -5586,9 +5591,12 @@ if ('caches' in window) {
       const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
         promoData.promo.division.length > 0 &&
         promoData.promo.division.every(d => {
-          const dArea = String(d.area||'').toLowerCase();
+          // Normalizar: division.area puede tener emojis como '👁 Pestañas', '💅 Cejas'
+          const rawArea = String(d.area||'');
+          const dArea = rawArea.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
           const dSvc  = String(d.servicio||d.service||'').toLowerCase();
-          return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap));
+          const dRealArea = String(d.realArea||'').toLowerCase();
+          return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
         });
 
       const tieneSecuencia = promoData || hayAreasExtras || promasExtraPendientes.length > 0;
