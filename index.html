@@ -10735,7 +10735,23 @@ if ('caches' in window) {
   async function renderAssignDirect() {
     try {
       const nombre = document.getElementById('arrSelName')?.textContent?.trim() || 'Clienta';
-      const area = document.getElementById('arrArea')?.value || 'Cejas';
+      // Leer área correctamente según el formulario activo
+      const _tipoRD = window._arrTipo || 'normal';
+      let area = 'Cejas';
+      if (_tipoRD === 'multi') {
+        area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+      } else if (_tipoRD === 'promo') {
+        // Para promo: usar el área de la primera promo seleccionada
+        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+        if (promo && promo.division && promo.division.length > 0) {
+          const firstDiv = promo.division[0];
+          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
+          const divArea = String(firstDiv.area || '').toLowerCase();
+          area = areaMapRD[divArea] || 'Cejas';
+        }
+      } else {
+        area = document.getElementById('arrArea')?.value || 'Cejas';
+      }
       const _svcRaw5 = document.getElementById('arrService')?.value || '';
       let _svcName5 = _svcRaw5;
       try { if (_svcRaw5.startsWith('{')) _svcName5 = JSON.parse(_svcRaw5).nombre || _svcRaw5; } catch(e) {}
@@ -10766,8 +10782,12 @@ if ('caches' in window) {
           if (!staffAvailability[chica]) staffAvailability[chica] = [];
           staffAvailability[chica].push(item.nombre);
         });
-        const area = document.getElementById('arrArea')?.value || 'Cejas';
-        renderAssignDirectStaff(staffAvailability, area);
+        const _tipoRD2 = window._arrTipo || 'normal';
+        let area2 = 'Cejas';
+        if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
+        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[String(p2.division[0].area||'').toLowerCase()]||'Cejas'; } }
+        else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
+        renderAssignDirectStaff(staffAvailability, area2);
       }
     } catch(err) { /* timeout o error — staff ya visible */ }
   }
@@ -10818,10 +10838,24 @@ if ('caches' in window) {
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
-    const areaEl = tipo === 'multi' ? document.getElementById('arrAreaMulti') : document.getElementById('arrArea');
     const svcEl  = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
     const obsEl  = tipo === 'promo' ? document.getElementById('arrObsPromo') : tipo === 'multi' ? document.getElementById('arrObsMulti') : document.getElementById('arrObs');
-    const area = areaEl?.value || 'Cejas';
+
+    // Leer área correctamente según tipo
+    let area = 'Cejas';
+    if (tipo === 'multi') {
+      area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+    } else if (tipo === 'promo') {
+      // Para promo: área de la primera promo asignada
+      const promoGA = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p => p));
+      if (promoGA && promoGA.division && promoGA.division.length > 0) {
+        const divAreaGA = String(promoGA.division[0].area || '').toLowerCase();
+        const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
+        area = areaMapGA[divAreaGA] || 'Cejas';
+      }
+    } else {
+      area = document.getElementById('arrArea')?.value || 'Cejas';
+    }
     const _svcRawGA = svcEl?.value || '';
     let servicioGA = _svcRawGA, precioGA = 0;
     try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
