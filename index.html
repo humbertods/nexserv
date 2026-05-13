@@ -1756,6 +1756,88 @@ if ('caches' in window) {
     </div>
 
     <!-- MODAL: NUEVA FICHA CEJAS EFECTO POLVO -->
+    <!-- Modal: Registrar Visita Facial -->
+    <div class="modal-bg" id="registrarVisitaFacialModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">✨ Registrar visita facial</div>
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:16px;text-align:center;">Se guardará en el historial (últimas 5 visitas)</div>
+        <div class="input-group">
+          <label>Servicio realizado</label>
+          <input type="text" id="rvfServicio" placeholder="Ej: Limpieza facial profunda">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Precio cobrado ($)</label>
+          <input type="number" id="rvfPrecio" placeholder="0">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Procedimiento / Equipos usados</label>
+          <input type="text" id="rvfProcedimiento" placeholder="Ej: Ultrasonido + peeling enzimático">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Productos usados</label>
+          <input type="text" id="rvfProductos" placeholder="Ej: Sérum vitamina C, mascarilla kaolín">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Observaciones</label>
+          <textarea id="rvfObs" placeholder="Estado de la piel, reacciones, recomendaciones..." style="min-height:70px;resize:vertical;"></textarea>
+        </div>
+        <button id="rvfGuardarBtn" class="btn-primary" onclick="guardarVisitaFacial()" style="background:linear-gradient(135deg,var(--success),#2d5a3a);margin-top:18px;">💾 Guardar visita</button>
+        <button class="btn-secondary" onclick="closeModal()" style="margin-top:10px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal: Registrar Visita Pestañas -->
+    <div class="modal-bg" id="registrarVisitaPestanasModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">👁 Registrar visita de pestañas</div>
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:16px;text-align:center;">Se guardará en el historial (últimas 5 visitas)</div>
+        <div class="input-group">
+          <label>Servicio realizado</label>
+          <input type="text" id="rvpServicio" placeholder="Ej: Pelo a pelo clásicas fullset">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Precio ($)</label>
+          <input type="number" id="rvpPrecio" placeholder="0">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Modelo</label>
+          <select id="rvpModelo">
+            <option value="">Seleccionar...</option>
+            <option>Pelo a pelo clásicas</option>
+            <option>Pelo a pelo clásicas XXL</option>
+            <option>Volumen ruso 2D-3D</option>
+            <option>Volumen ruso 4D-6D</option>
+            <option>Mega volumen</option>
+            <option>Lifting + tinte</option>
+            <option>Retoque</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Diseño</label>
+          <select id="rvpDiseno">
+            <option value="">Seleccionar...</option>
+            <option>Muñeca</option>
+            <option>Cat eye</option>
+            <option>Natural</option>
+            <option>Ardilla</option>
+            <option>Open eye</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Tallas</label>
+          <input type="text" id="rvpTallas" placeholder="Ej: 10-12">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Observaciones</label>
+          <textarea id="rvpObs" placeholder="Estado de las pestañas, recomendaciones..." style="min-height:60px;resize:vertical;"></textarea>
+        </div>
+        <button id="rvpGuardarBtn" class="btn-primary" onclick="guardarVisitaPestanas()" style="background:linear-gradient(135deg,var(--top-purple),#5b21b6);margin-top:18px;">💾 Guardar visita</button>
+        <button class="btn-secondary" onclick="closeModal()" style="margin-top:10px;">Cancelar</button>
+      </div>
+    </div>
+
     <div class="modal-bg" id="newCejasPigmentoModal">
       <div class="modal">
         <div class="modal-handle"></div>
@@ -3076,45 +3158,25 @@ if ('caches' in window) {
         var tm = (tmData.activos || []).find(function(t) { return t.idEspera === idEsperaActual; });
         if (!tm) return;
         var miNombre = user && user.name ? user.name : '';
-        var areasDeOtros = (tm.areas || []).filter(function(a) {
-          return String(a.estado||'').toLowerCase() === 'esperando';
-        });
-        var siguienteEsperando = areasDeOtros.length > 0 ? areasDeOtros[0] : null;
-        var hayMasAreasSinCompletar = (tm.areas || []).filter(function(a) {
-          var est = String(a.estado||'').toLowerCase();
-          return est !== 'completado' && a.staff !== miNombre;
-        }).length > 0;
+        var areasDeOtros = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() === 'esperando'; });
+        var sig = areasDeOtros.length > 0 ? areasDeOtros[0] : null;
+        var hayMas = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() !== 'completado' && a.staff !== miNombre; }).length > 0;
         var slotN = slot1 ? 1 : 2;
-        if (!hayMasAreasSinCompletar) {
-          btnContainer.innerHTML = `
-            <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">
-              🎯 Completado — mandar a cobrar
-            </button>`;
+        if (!hayMas) {
+          btnContainer.innerHTML = `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🎯 Completado — mandar a cobrar</button>`;
         } else {
-          var labelSiguiente = siguienteEsperando ? (siguienteEsperando.tentativo || siguienteEsperando.area || 'siguiente área') : 'siguiente área';
+          var lbl = sig ? (sig.tentativo || sig.area || 'siguiente área') : 'siguiente área';
           btnContainer.innerHTML = `
-            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">
-              🔁 Yo hago también: ${labelSiguiente}
-            </button>
-            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">
-              ✅ Completé mi parte — pasa a compañera
-            </button>
-            <button class="btn-primary" style="margin-bottom:10px;background:var(--danger);color:white;" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">
-              🛑 Retirar clienta — cobrar solo lo realizado
-            </button>`;
+            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">🔁 Yo hago también: ${lbl}</button>
+            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">✅ Completé mi parte — pasa a compañera</button>
+            <button class="btn-primary" style="margin-bottom:10px;background:var(--danger);color:white;" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🛑 Retirar clienta — cobrar solo lo realizado</button>`;
         }
       }).catch(function() {
         var slotN = slot1 ? 1 : 2;
         btnContainer.innerHTML = `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">
-            🔁 Yo hago la siguiente área también
-          </button>
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">
-            ✅ Completé mi parte — pasa a compañera
-          </button>
-          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">
-            🎯 Completado — mandar a cobrar
-          </button>`;
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">🔁 Yo hago la siguiente área también</button>
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">✅ Completé mi parte — pasa a compañera</button>
+          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🎯 Completado — mandar a cobrar</button>`;
       });
       return;
     }
@@ -6015,7 +6077,7 @@ if ('caches' in window) {
   }
 
   function renderSecuencia() {
-    // Soporta formulario normal (secuenciaList) y multi (secuenciaListMulti)
+    // Soporta normal y multi
     const list = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
     const empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
     if (!list) return;
@@ -6316,41 +6378,8 @@ if ('caches' in window) {
         } else {
           atenList.innerHTML = enServicio.map(a => {
             const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-            const areaIcons = { cejas: '💅', depilacion: '🪒', depilación: '🪒', pestanas: '👁', pestañas: '👁', retiro_lifting: '✨', facial: '🌿' };
-            const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', depilación: 'Depilación', pestanas: 'Pestañas', pestañas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
-
-            let timelineHTML = '';
-            const esTM = a.fuente === 'TicketMulti' && a.areas && a.areas.length > 0;
-
-            if (esTM) {
-              // ── TICKET MULTI: desglose real por área ──
-              (a.areas || []).forEach((ar, arIdx) => {
-                const aKey = String(ar.area || '').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, s => s === 'é' ? 'e' : 'n');
-                const icon = areaIcons[aKey] || areaIcons[ar.area] || '🔄';
-                const label = areaLabels[aKey] || areaLabels[ar.area] || ar.area || 'Servicio';
-                const serv = ar.tentativo || ar.confirmado || '';
-                const precio = ar.precio || 0;
-                const est = String(ar.estado || '').toLowerCase();
-                const notLast = arIdx < (a.areas.length - 1);
-                if (est === 'completado') {
-                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
-                    <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div></div>`;
-                } else if (est === 'en servicio') {
-                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
-                    <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
-                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
-                } else {
-                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;${notLast?'border-bottom:1px solid var(--line);':''}">
-                    <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv}</div><div style="font-size:10px;color:var(--ink-faint);">⏳ Pendiente</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
-                }
-              });
-            } else {
-            // ── TICKET NORMAL / PROMO: timeline original ──
+            const areaIcons = { cejas: '💅', depilacion: '💅', pestanas: '👁', retiro_lifting: '👁', facial: '✨' };
+            const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
 
             // Parsear historial de áreas completadas desde observaciones
             // Formato: "✅ cejas completado por María · Sigue: Pestañas | ✅ ..."
@@ -6358,6 +6387,7 @@ if ('caches' in window) {
             const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
 
             // Construir timeline: partes completadas + parte actual
+            let timelineHTML = '';
 
             // Partes ya completadas (de otras áreas)
             partesPrevias.forEach(parte => {
@@ -6451,19 +6481,17 @@ if ('caches' in window) {
               }
             }
 
-            } // fin else ticket normal/promo
-
             // Total visible (si ya hay monto)
             const totalStr = a.total && Number(a.total) > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${Number(a.total).toFixed(2)}</span></div>` : '';
-            const tmBadge = esTM ? ` <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>` : '';
+
             const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
 
             return `
-            <div style="background:var(--bg-card);border-radius:var(--radius-card);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow-card);border-left:4px solid ${esTM?'var(--accent)':'var(--info)'};">
+            <div style="background:var(--bg-card);border-radius:var(--radius-card);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow-card);border-left:4px solid var(--info);">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
                 <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink:0;">${initials}</div>
                 <div style="flex:1;">
-                  <div style="font-size:15px;font-weight:800;">${a.nombre}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}${tmBadge}</div>
+                  <div style="font-size:15px;font-weight:800;">${a.nombre}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}</div>
                   <div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">${a.codigo} · llegó ${a.horaLlegada || '?'}</div>
                 </div>
               </div>
@@ -8820,10 +8848,37 @@ if ('caches' in window) {
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
 
-  function openClientProfile(key) {
+  async function openClientProfile(key) {
     currentProfileClient = key;
     const c = CLIENT_PROFILES[key];
     if (!c) return;
+
+    // Cargar fichas y historial del servidor al abrir el perfil
+    try {
+      const pr = await apiGet('getPerfilFichas', { codigo: c.code });
+      if (pr.success) {
+        if (pr.fichasPestanas && pr.fichasPestanas.length > 0) {
+          if (!c.pestanas) c.pestanas = { fichas: [], history: [] };
+          c.pestanas.fichas = pr.fichasPestanas;
+        }
+        if (pr.fichaFacial) {
+          if (!c.facial) c.facial = { history: [] };
+          c.facial.ficha = pr.fichaFacial;
+        }
+        if (pr.historialFacial && pr.historialFacial.length > 0) {
+          if (!c.facial) c.facial = { history: [] };
+          c.facial.history = pr.historialFacial.map(h => ({
+            service: h.servicio, price: h.precio, date: h.fecha, by: h.staff,
+            procedimiento: h.procedimiento, productosUsados: h.productosUsados, obs: h.obs
+          }));
+        }
+        // Fichas de cejas pigmento (se renderizan directo desde backend en renderPigmentoTab)
+        if (pr.fichasPigmento) {
+          if (!c.pigmento) c.pigmento = {};
+          c.pigmento._cached = pr.fichasPigmento; // cache para renderPigmentoTab
+        }
+      }
+    } catch(e) { /* no bloquear si falla */ }
     
     document.getElementById('profileAvatar').textContent = c.initials;
     document.getElementById('profileAvatar').className = 'client-avatar' + (c.isTop ? ' is-top' : '');
@@ -8901,6 +8956,8 @@ if ('caches' in window) {
     const ficha = fichas.find(f => f.activa) || fichas[0] || null;
     const history = data?.history || [];
     const obsArea = data?.obsArea || '';
+    const _u = window.currentUser;
+    const canRegPest = _u?.area === 'pestanas' || _u?.role === 'owner' || _u?.role === 'admin';
     
     // Determinar si retiro es gratis o $10
     const retiroPrice = currentProfileClient ? getRetiroPrice(currentProfileClient) : 10;
@@ -8947,7 +9004,10 @@ if ('caches' in window) {
           <button class="btn-primary" onclick="editPestanasFicha('${currentProfileClient}')" style="width: 100%;">➕ Crear ficha de pestañas</button>
         </div>
       `}
-      <div class="section-title">Historial de pestañas${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:8px;">
+        <div class="section-title" style="margin:0;">Historial de pestañas${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
+        ${canRegPest ? '<button onclick="openRegistrarVisitaPestanas()" style="padding:7px 14px;background:linear-gradient(135deg,var(--top-purple),#5b21b6);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">➕ Registrar visita</button>' : ''}
+      </div>
       ${history.length > 0 ? `
         <div class="card" style="padding: 10px 14px;">
           ${history.map((h, i) => `
@@ -9077,7 +9137,10 @@ if ('caches' in window) {
         </div>
       `}
       ${ficha && (window.currentUser?.area === 'facial' || window.currentUser?.role === 'owner') ? '<button onclick="openFacialForm(true)" style="width: 100%; padding: 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink); margin-bottom: 16px;">✏️ Editar ficha facial</button>' : ''}
-      <div class="section-title">Historial facial${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;margin-bottom:8px;">
+        <div class="section-title" style="margin:0;">Historial facial${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
+        <button onclick="openRegistrarVisitaFacial()" style="padding:7px 14px;background:linear-gradient(135deg,var(--success),#2d5a3a);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;">➕ Registrar visita</button>
+      </div>
       ${history.length > 0 ? `
         <div class="card" style="padding: 10px 14px;">
           ${history.map((h, i) => `
@@ -9099,13 +9162,22 @@ if ('caches' in window) {
     el.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando fichas...</div>';
     
     try {
-      const result = await apiGet('getFichaCejasPigmento', { codigo: codigo });
-      const fichas = result.success ? (result.fichas || []) : [];
+      // Usar cache si está disponible (cargado al abrir el perfil), si no, pedir al servidor
+      const c = CLIENT_PROFILES[currentProfileClient];
+      const cached = c?.pigmento?._cached;
+      let fichas;
+      if (cached && cached.some && cached.some(f => String(f.codigo||'').trim() === String(codigo).trim())) {
+        fichas = cached;
+        if (c.pigmento) c.pigmento._cached = null; // usar una vez y limpiar
+      } else {
+        const result = await apiGet('getFichaCejasPigmento', { codigo: codigo });
+        fichas = result.success ? (result.fichas || []) : [];
+      }
       const numSesiones = fichas.length;
       
       // Determinar acceso (staff de cejas + owner)
       const user = window.currentUser;
-      const canEdit = user?.area === 'cejas' || user?.role === 'owner';
+      const canEdit = user?.area === 'cejas' || user?.role === 'owner' || user?.role === 'admin';
       
       // Calcular próximo retoque si hay sesiones
       let proxRetoque = null;
@@ -11069,27 +11141,92 @@ if ('caches' in window) {
       }
     } catch(e) { alert('Error de conexión'); }
   }
+
+  function openRegistrarVisitaFacial() {
+    const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    ['rvfServicio','rvfPrecio','rvfProcedimiento','rvfProductos','rvfObs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    document.getElementById('registrarVisitaFacialModal').classList.add('active');
+  }
+  async function guardarVisitaFacial() {
+    const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    const servicio = document.getElementById('rvfServicio').value.trim();
+    if (!servicio) { alert('Indicá el servicio realizado'); return; }
+    const btn = document.getElementById('rvfGuardarBtn');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+      const user = window.currentUser;
+      const result = await apiPost('addVisitaFacial', {
+        codigo: c.code, nombre: c.name, servicio,
+        precio: Number(document.getElementById('rvfPrecio').value) || 0,
+        staff: user?.name || '',
+        procedimiento: document.getElementById('rvfProcedimiento').value.trim(),
+        productosUsados: document.getElementById('rvfProductos').value.trim(),
+        obs: document.getElementById('rvfObs').value.trim()
+      });
+      if (result && result.success) {
+        if (!c.facial) c.facial = { history: [] };
+        if (!c.facial.history) c.facial.history = [];
+        const today = new Date();
+        const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
+        c.facial.history.unshift({ service: servicio, price: Number(document.getElementById('rvfPrecio').value)||0, date: fecha, by: user?.name||'', procedimiento: document.getElementById('rvfProcedimiento').value.trim(), productosUsados: document.getElementById('rvfProductos').value.trim(), obs: document.getElementById('rvfObs').value.trim() });
+        if (c.facial.history.length > 5) c.facial.history = c.facial.history.slice(0, 5);
+        closeModal(); renderProfileTab(); showToast('✅ Visita facial registrada');
+      } else { alert('Error: ' + (result?.message || 'desconocido')); }
+    } catch(e) { alert('Error de conexión'); }
+    btn.disabled = false; btn.textContent = '💾 Guardar visita';
+  }
+  function openRegistrarVisitaPestanas() {
+    const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    ['rvpServicio','rvpPrecio','rvpTallas','rvpObs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['rvpModelo','rvpDiseno'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+    document.getElementById('registrarVisitaPestanasModal').classList.add('active');
+  }
+  async function guardarVisitaPestanas() {
+    const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    const servicio = document.getElementById('rvpServicio').value.trim();
+    const modelo = document.getElementById('rvpModelo').value;
+    const diseno = document.getElementById('rvpDiseno').value;
+    const tallas = document.getElementById('rvpTallas').value.trim();
+    const obs = document.getElementById('rvpObs').value.trim();
+    const precio = Number(document.getElementById('rvpPrecio').value) || 0;
+    if (!servicio && !modelo) { alert('Indicá el servicio o seleccioná el modelo'); return; }
+    const btn = document.getElementById('rvpGuardarBtn');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try {
+      const user = window.currentUser;
+      const servicioFinal = servicio || (modelo + (diseno ? ' · ' + diseno : ''));
+      const result = await apiPost('addFichaPestanas', { codigo: c.code, nombre: c.name, modelo, diseno, tallas, obs });
+      if (result && result.success) {
+        if (!c.pestanas) c.pestanas = { fichas: [], history: [] };
+        if (!c.pestanas.history) c.pestanas.history = [];
+        const today = new Date();
+        const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
+        c.pestanas.history.unshift({ service: servicioFinal, price: precio, date: fecha, by: user?.name||'', modelo, diseno, tallas });
+        if (c.pestanas.history.length > 5) c.pestanas.history = c.pestanas.history.slice(0, 5);
+        if (!c.pestanas.fichas) c.pestanas.fichas = [];
+        c.pestanas.fichas.forEach(f => f.activa = false);
+        c.pestanas.fichas.unshift({ modelo, diseno: diseno||'—', tallas: tallas||'—', obs, fecha, activa: true });
+        if (c.pestanas.fichas.length > 5) c.pestanas.fichas.pop();
+        closeModal(); renderProfileTab(); showToast('✅ Visita de pestañas registrada');
+      } else { alert('Error: ' + (result?.message || 'desconocido')); }
+    } catch(e) { alert('Error de conexión'); }
+    btn.disabled = false; btn.textContent = '💾 Guardar visita';
+  }
+  window.openRegistrarVisitaFacial = openRegistrarVisitaFacial;
+  window.guardarVisitaFacial = guardarVisitaFacial;
+  window.openRegistrarVisitaPestanas = openRegistrarVisitaPestanas;
+  window.guardarVisitaPestanas = guardarVisitaPestanas;
+
   async function completarYTomarSiguiente() {
     const slot = window._finishingSlot || 1;
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
     try {
-      const r = await apiPost('completarYTomarSiguienteAreaTM', {
-        idEspera,
-        chicaNombre: user?.name || '',
-        chicaArea: user?.area || ''
-      });
-      if (r.success) {
-        showToast(r.todasCompletadas ? '🎯 Todas las áreas completadas.' : '✅ Área completada. Siguiente área tomada: ' + (r.siguienteArea || ''));
-        await new Promise(res => setTimeout(res, 300));
-        loadStaffHome();
-        show('staffHome');
-      } else {
-        alert('Error: ' + r.message);
-      }
+      const r = await apiPost('completarYTomarSiguienteAreaTM', { idEspera, chicaNombre: user?.name||'', chicaArea: user?.area||'' });
+      if (r.success) { showToast(r.todasCompletadas ? '🎯 Completado.' : '✅ Área completada. Tomando: ' + (r.siguienteArea||'')); await new Promise(res => setTimeout(res,300)); loadStaffHome(); show('staffHome'); }
+      else { alert('Error: ' + r.message); }
     } catch(e) { alert('Error de conexión'); }
   }
-
   window.completarAreaMulti      = completarAreaMulti;
   window.completarAreaMultiFinal = completarAreaMultiFinal;
   window.completarYTomarSiguiente = completarYTomarSiguiente;
