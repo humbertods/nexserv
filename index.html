@@ -1150,104 +1150,152 @@ if ('caches' in window) {
       </div>
 
       <!-- TOP detectado -->
-      <div id="arrTopBanner" style="display: none; background: linear-gradient(135deg, var(--top-purple) 0%, #5b21b6 100%); color: white; padding: 14px 16px; border-radius: var(--radius-sm); margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+      <div id="arrTopBanner" style="display: none; background: linear-gradient(135deg, var(--top-purple) 0%, #5b21b6 100%); color: white; padding: 14px 16px; border-radius: var(--radius-sm); margin-bottom: 14px; align-items: center; gap: 10px;">
         <span style="font-size: 22px;">⭐</span>
         <div style="font-size: 13px; font-weight: 600;" id="arrTopText"></div>
       </div>
 
-      <div class="input-group">
-        <label>Área</label>
-        <select id="arrArea" onchange="loadServicesForArea();">
-          <option>Cejas</option>
-          <option>Depilación</option>
-          <option>Pestañas</option>
-          <option>Lifting / Retiro</option>
-          <option>Facial</option>
-        </select>
-      </div>
-      <div class="input-group">
-        <label>Servicio tentativo</label>
-        <select id="arrService" onchange="onArrServiceChange()">
-          <option value="">Primero seleccioná el área</option>
-        </select>
-        <div id="arrServicePriceDisplay" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--accent);"></div>
-      </div>
-
-      <!-- SERVICIOS ADICIONALES -->
-      <div id="serviciosAdicionalesContainer"></div>
-
-      <button id="btnServicioAdicional" onclick="agregarServicioAdicional()" style="
-        width: 100%; padding: 13px; margin-top: 10px; margin-bottom: 4px;
-        background: var(--bg); border: 2px dashed var(--line);
-        border-radius: var(--radius-sm); font-family: inherit;
-        font-size: 13px; font-weight: 700; color: var(--ink-soft);
-        cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-      ">
-        ➕ Servicio adicional
-      </button>
-
-      <div class="section-title" style="margin-top: 16px;">Prioridad</div>
-      <div class="priority-picker">
-        <div class="priority-option especial" onclick="pickPriority(this)">
-          <div class="icon">🔴</div>
-          <div class="name">Especial</div>
-        </div>
-        <div class="priority-option tiempo" onclick="pickPriority(this)">
-          <div class="icon">🟡</div>
-          <div class="name">Con tiempo</div>
-        </div>
-        <div class="priority-option normal selected" onclick="pickPriority(this)">
-          <div class="icon">🟢</div>
-          <div class="name">Normal</div>
+      <!-- ══ PASO 1: SELECTOR DE TIPO ══ -->
+      <div id="arrTipoSelector" style="background: var(--bg-card); border-radius: 22px; padding: 20px; box-shadow: var(--shadow-card);">
+        <div style="font-size: 15px; font-weight: 800; color: var(--ink); text-align: center; margin-bottom: 16px;">Selecciona el tipo de clienta</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button onclick="seleccionarTipoArrival('multi')" style="padding: 16px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;">🎯</span> Clienta multi-servicios
+          </button>
+          <button onclick="seleccionarTipoArrival('normal')" style="padding: 16px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;">🛠</span> Clienta servicio normal
+          </button>
+          <button onclick="seleccionarTipoArrival('promo')" style="padding: 16px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;">🎁</span> Clienta promo normal
+          </button>
         </div>
       </div>
 
-      <div class="input-group" style="margin-top: 16px;">
-        <label>Observaciones de la visita</label>
-        <textarea id="arrObs" placeholder="Notas especiales de esta visita..."></textarea>
+      <!-- ══ FORMULARIO: SERVICIO NORMAL ══ -->
+      <div id="arrFormNormal" style="display:none;">
+        <div style="font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 16px; color: var(--ink);">🛠 Clienta servicio normal</div>
+        <div class="input-group">
+          <label>Área</label>
+          <select id="arrArea" onchange="loadServicesForArea();">
+            <option>Cejas</option><option>Depilación</option><option>Pestañas</option><option>Lifting / Retiro</option><option>Facial</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Servicio tentativo</label>
+          <select id="arrService" onchange="onArrServiceChange()">
+            <option value="">Primero seleccioná el área</option>
+          </select>
+          <div id="arrServicePriceDisplay" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--accent);"></div>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">Prioridad</div>
+        <div class="priority-picker">
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+        </div>
+        <div class="input-group" style="margin-top: 16px;">
+          <label>Observaciones de la visita</label>
+          <textarea id="arrObs" placeholder="Notas especiales de esta visita..."></textarea>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+        </div>
       </div>
 
-      <!-- ORDEN DE ATENCIÓN -->
-      <div style="margin-top: 20px;">
-        <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
-        <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas. Toca + para agregar un área a la secuencia.</div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
-          <button onclick="addAreaSecuencia('cejas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Cejas</button>
-          <button onclick="addAreaSecuencia('depilacion')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Depilación</button>
-          <button onclick="addAreaSecuencia('pestanas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Pestañas</button>
-          <button onclick="addAreaSecuencia('facial')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Facial</button>
+      <!-- ══ FORMULARIO: PROMO NORMAL ══ -->
+      <div id="arrFormPromo" style="display:none;">
+        <div style="font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 16px; color: var(--ink);">🎁 Clienta promo normal</div>
+        <div style="margin-top: 4px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--ink);">Promos asignadas</div>
+            <button id="addPromoBtn" onclick="addPromoSlot()" style="padding: 6px 14px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">+ Promo</button>
+          </div>
+          <div id="arrPromoSlots"></div>
+          <div style="background: var(--warning-bg); border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #7a5a1c; text-align: center; margin-top: 8px;">
+            Promos solo validas con efectivo o transferencia
+          </div>
         </div>
-        <div id="secuenciaList" style="margin-bottom: 8px;"></div>
-        <div id="secuenciaEmpty" style="font-size: 12px; color: var(--ink-faint); text-align: center; padding: 6px 0; display:block;">Sin orden definido — el staff tomará según disponibilidad</div>
+        <div style="margin-top: 20px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
+          <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas. Toca + para agregar un área a la secuencia.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <button onclick="addAreaSecuencia('cejas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Cejas</button>
+            <button onclick="addAreaSecuencia('depilacion')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Depilación</button>
+            <button onclick="addAreaSecuencia('pestanas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Pestañas</button>
+            <button onclick="addAreaSecuencia('facial')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Facial</button>
+          </div>
+          <div id="secuenciaList" style="margin-bottom: 8px;"></div>
+          <div id="secuenciaEmpty" style="font-size: 12px; color: var(--ink-faint); text-align: center; padding: 6px 0; display:block;">Sin orden definido — el staff tomará según disponibilidad</div>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">Prioridad</div>
+        <div class="priority-picker">
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+        </div>
+        <div class="input-group" style="margin-top: 16px;">
+          <label>Observaciones de la visita</label>
+          <textarea id="arrObsPromo" placeholder="Notas especiales de esta visita..."></textarea>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+        </div>
       </div>
 
-      <!-- PROMOS (hasta 3) -->
-      <div style="margin-top: 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <div style="font-size: 13px; font-weight: 700; color: var(--ink);">Promos asignadas</div>
-          <button id="addPromoBtn" onclick="addPromoSlot()" style="padding: 6px 14px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">+ Promo</button>
+      <!-- ══ FORMULARIO: MULTI-SERVICIOS ══ -->
+      <div id="arrFormMulti" style="display:none;">
+        <div style="font-size: 16px; font-weight: 800; text-align: center; margin-bottom: 16px; color: var(--ink);">🎯 Clienta multi-servicios</div>
+        <div class="input-group">
+          <label>Área</label>
+          <select id="arrAreaMulti" onchange="loadServicesForAreaMulti();">
+            <option>Cejas</option><option>Depilación</option><option>Pestañas</option><option>Lifting / Retiro</option><option>Facial</option>
+          </select>
         </div>
-        <div id="arrPromoSlots">
-          <!-- Hasta 3 slots de promo -->
+        <div class="input-group">
+          <label>Servicio tentativo</label>
+          <select id="arrServiceMulti" onchange="onArrServiceChangeMulti()">
+            <option value="">Primero seleccioná el área</option>
+          </select>
+          <div id="arrServicePriceDisplayMulti" style="display: none; margin-top: 8px; padding: 10px; background: var(--bg); border-radius: 10px; font-size: 13px; font-weight: 700; color: var(--accent);"></div>
         </div>
-        <div style="background: var(--warning-bg); border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #7a5a1c; text-align: center; margin-top: 8px;">
-          Promos solo validas con efectivo o transferencia
+        <!-- SERVICIOS ADICIONALES -->
+        <div id="serviciosAdicionalesContainer"></div>
+        <button id="btnServicioAdicional" onclick="agregarServicioAdicional()" style="width: 100%; padding: 13px; margin-top: 10px; margin-bottom: 4px; background: var(--bg); border: 2px dashed var(--line); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-soft); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          ➕ Servicio adicional
+        </button>
+        <div style="margin-top: 20px;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
+          <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <button onclick="addAreaSecuencia('cejas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Cejas</button>
+            <button onclick="addAreaSecuencia('depilacion')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Depilación</button>
+            <button onclick="addAreaSecuencia('pestanas')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Pestañas</button>
+            <button onclick="addAreaSecuencia('facial')" style="padding: 8px 14px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">+ Facial</button>
+          </div>
+          <div id="secuenciaListMulti" style="margin-bottom: 8px;"></div>
+          <div id="secuenciaEmptyMulti" style="font-size: 12px; color: var(--ink-faint); text-align: center; padding: 6px 0; display:block;">Sin orden definido</div>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">Prioridad</div>
+        <div class="priority-picker">
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+        </div>
+        <div class="input-group" style="margin-top: 16px;">
+          <label>Observaciones de la visita</label>
+          <textarea id="arrObsMulti" placeholder="Notas especiales de esta visita..."></textarea>
+        </div>
+        <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
         </div>
       </div>
 
-      <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-        <div class="action-btn primary" onclick="goToList()">
-          <span class="icon">📋</span>
-          <span class="label">Mandar a lista</span>
-          <span class="sub">la toma quien se desocupe</span>
-        </div>
-        <div class="action-btn" onclick="show('assignDirect')">
-          <span class="icon">👩</span>
-          <span class="label">Asignar directo</span>
-          <span class="sub">elegí la chica ahora</span>
-        </div>
-      </div>
       
       <!-- Botón para asignar servicio normal -->
     </div>
@@ -7386,7 +7434,14 @@ if ('caches' in window) {
     document.getElementById('arrivalClientList').style.display = 'none';
     document.getElementById('arrivalSearch').style.display = 'none';
     document.getElementById('arrivalForm').style.display = 'block';
-    
+
+    // Mostrar selector de tipo, ocultar sub-formularios
+    document.getElementById('arrTipoSelector').style.display = 'block';
+    document.getElementById('arrFormNormal').style.display = 'none';
+    document.getElementById('arrFormPromo').style.display = 'none';
+    document.getElementById('arrFormMulti').style.display = 'none';
+    window._arrTipo = 'normal';
+
     // Resetear servicios adicionales
     document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
     _numServiciosAdicionales = 0;
@@ -7477,7 +7532,49 @@ if ('caches' in window) {
     }
   }
 
-  // ── SERVICIOS ADICIONALES ──────────────────────────────────
+  // ── SELECTOR DE TIPO DE CLIENTA ─────────────────────────
+  window._arrTipo = 'normal'; // 'normal' | 'promo' | 'multi'
+
+  function seleccionarTipoArrival(tipo) {
+    window._arrTipo = tipo;
+    document.getElementById('arrTipoSelector').style.display = 'none';
+    document.getElementById('arrFormNormal').style.display = tipo === 'normal' ? 'block' : 'none';
+    document.getElementById('arrFormPromo').style.display  = tipo === 'promo'  ? 'block' : 'none';
+    document.getElementById('arrFormMulti').style.display  = tipo === 'multi'  ? 'block' : 'none';
+    if (tipo === 'normal') loadServicesForArea();
+    if (tipo === 'multi')  loadServicesForAreaMulti();
+    if (tipo === 'promo')  { resetArrivalExtras(); }
+  }
+  window.seleccionarTipoArrival = seleccionarTipoArrival;
+
+  function loadServicesForAreaMulti() {
+    const area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+    const areaMap = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
+    const catKey = areaMap[area] || 'cejas';
+    const sel = document.getElementById('arrServiceMulti');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
+    (CATALOGO[catKey] || []).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ nombre: s.name, precio: s.price, area: catKey });
+      opt.textContent = s.name + ' — $' + s.price;
+      sel.appendChild(opt);
+    });
+  }
+
+  function onArrServiceChangeMulti() {
+    const sel = document.getElementById('arrServiceMulti');
+    const priceDiv = document.getElementById('arrServicePriceDisplayMulti');
+    if (sel && sel.value) {
+      const d = JSON.parse(sel.value);
+      priceDiv.textContent = '💵 Precio: $' + d.precio;
+      priceDiv.style.display = 'block';
+    } else if (priceDiv) {
+      priceDiv.style.display = 'none';
+    }
+  }
+  window.loadServicesForAreaMulti  = loadServicesForAreaMulti;
+  window.onArrServiceChangeMulti   = onArrServiceChangeMulti;
   let _numServiciosAdicionales = 0;
 
   function agregarServicioAdicional() {
@@ -10098,15 +10195,22 @@ if ('caches' in window) {
   }
 
   async function goToList() {
-    // Obtener datos del formulario de llegada
+    const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
-    const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const servicioRaw = document.getElementById('arrService')?.value || '';
-    const obs = document.getElementById('arrObs')?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
+
+    // Leer área/servicio/obs según el tipo activo
+    const areaEl    = tipo === 'multi' ? document.getElementById('arrAreaMulti')    : document.getElementById('arrArea');
+    const servicioEl = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
+    const obsEl     = tipo === 'promo' ? document.getElementById('arrObsPromo') :
+                      tipo === 'multi' ? document.getElementById('arrObsMulti')  : document.getElementById('arrObs');
+
+    const area = areaEl?.value || 'Cejas';
+    const servicioRaw = servicioEl?.value || '';
+    const obs = obsEl?.value || '';
     const promo = window._arrPromo || null;
-    
+
     // Extraer nombre y precio del servicio del JSON
     let servicio = '';
     let precio = 0;
@@ -10116,7 +10220,7 @@ if ('caches' in window) {
         servicio = data.nombre;
         precio = data.precio || 0;
       } catch (e) {
-        servicio = servicioRaw; // Fallback por si no es JSON
+        servicio = servicioRaw;
         precio = 0;
       }
     }
@@ -10130,7 +10234,7 @@ if ('caches' in window) {
     const prioridad = priEl ? priEl.querySelector('.name').textContent : 'Normal';
 
     const postData = {
-      codigo: codigo, 
+      codigo: codigo,
       nombre: nombre, 
       servicio: servicio,
       area: areaKey, 
@@ -10324,14 +10428,17 @@ if ('caches' in window) {
   }
 
   async function goAssign(chica) {
-    // Obtener datos del formulario de llegada
+    const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
-    const area = document.getElementById('arrArea')?.value || 'Cejas';
-    const _svcRawGA = document.getElementById('arrService')?.value || '';
+    const areaEl = tipo === 'multi' ? document.getElementById('arrAreaMulti') : document.getElementById('arrArea');
+    const svcEl  = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
+    const obsEl  = tipo === 'promo' ? document.getElementById('arrObsPromo') : tipo === 'multi' ? document.getElementById('arrObsMulti') : document.getElementById('arrObs');
+    const area = areaEl?.value || 'Cejas';
+    const _svcRawGA = svcEl?.value || '';
     let servicioGA = _svcRawGA, precioGA = 0;
     try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
-    const obs = document.getElementById('arrObs')?.value || '';
+    const obs = obsEl?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     const promo = window._arrPromo || null;
 
