@@ -577,39 +577,54 @@ function handleGetListaEspera() {
     }
   } catch(e) {}
 
-  // Merge con TicketMulti (tickets TM- esperando — primera área sin tomar)
+  // Merge con TicketMulti (tickets TM- — solo la PRÓXIMA área según secuencia)
   try {
     const tmR = handleGetTicketMulti({});
     if (tmR.success && tmR.activos) {
       tmR.activos.forEach(function(tm) {
-        // Solo agregar áreas que están en estado "Esperando"
-        (tm.areas || []).forEach(function(a) {
-          if (String(a.estado || '').toLowerCase() !== 'esperando') return;
-          lista.push({
-            id          : tm.idEspera,
-            fecha       : '',
-            horaLlegada : '',
-            codigo      : tm.codigo,
-            nombre      : tm.nombre,
-            servicio    : a.tentativo || '',
-            area        : a.area || 'multi',
-            prioridad   : tm.prioridad || 'Normal',
-            estado      : 'Esperando',
-            tomadaPor   : '',
-            horaToma    : '',
-            observaciones: tm.observaciones || '',
-            total       : a.precio || 0,
-            promoNombre : '',
-            precioPromo : '',
-            precioRegular: '',
-            tipo        : 'TM',
-            secuencia   : [],
-            promasExtra : [],
-            esTop       : 'No',
-            asignadaA   : '',
-            fuente      : 'TicketMulti',
-            areaIdx     : a.idx
-          });
+        var areasEsperando = (tm.areas || []).filter(function(a) {
+          return String(a.estado || '').toLowerCase() === 'esperando';
+        });
+        if (areasEsperando.length === 0) return;
+
+        // Determinar cuál área va primero según la secuencia de Mikaela
+        var proximaArea = null;
+        if (tm.secuencia && tm.secuencia.length > 0) {
+          for (var si = 0; si < tm.secuencia.length; si++) {
+            var seqArea = String(tm.secuencia[si]).toLowerCase();
+            var match = areasEsperando.filter(function(a) {
+              return String(a.area || '').toLowerCase() === seqArea;
+            })[0];
+            if (match) { proximaArea = match; break; }
+          }
+        }
+        // Si no hay secuencia o no hubo match, usar la primera en espera
+        if (!proximaArea) proximaArea = areasEsperando[0];
+
+        lista.push({
+          id          : tm.idEspera,
+          fecha       : '',
+          horaLlegada : '',
+          codigo      : tm.codigo,
+          nombre      : tm.nombre,
+          servicio    : proximaArea.tentativo || '',
+          area        : proximaArea.area || 'multi',
+          prioridad   : tm.prioridad || 'Normal',
+          estado      : 'Esperando',
+          tomadaPor   : '',
+          horaToma    : '',
+          observaciones: tm.observaciones || '',
+          total       : proximaArea.precio || 0,
+          promoNombre : '',
+          precioPromo : '',
+          precioRegular: '',
+          tipo        : 'TM',
+          secuencia   : tm.secuencia || [],
+          promasExtra : [],
+          esTop       : 'No',
+          asignadaA   : '',
+          fuente      : 'TicketMulti',
+          areaIdx     : proximaArea.idx
         });
       });
     }
