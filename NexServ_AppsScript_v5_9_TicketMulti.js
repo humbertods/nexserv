@@ -110,6 +110,7 @@ function doPost(e) {
       case 'addVisitaFacial':    result = handleAddVisitaFacial(data);    break;
       case 'getHistorialFacial': result = handleGetHistorialFacial(e.parameter); break;
       case 'getPerfilFichas':    result = handleGetPerfilFichas(e.parameter); break;
+      case 'completarYTomarSiguienteAreaTM': result = handleCompletarYTomarSiguienteAreaTM(data); break;
       case 'updateFichaFacial':  result = handleUpdateFichaFacial(data);  break;
       case 'addFichaCejasPigmento': result = handleAddFichaCejasPigmento(data); break;
       case 'cierreSemanal': result = handleCierreSemanal(data); break;
@@ -580,39 +581,50 @@ function handleGetListaEspera() {
     }
   } catch(e) {}
 
-  // Merge con TicketMulti (tickets TM- esperando — primera área sin tomar)
+  // Merge con TicketMulti — solo la PRÓXIMA área según secuencia (una tarjeta por TM)
   try {
     const tmR = handleGetTicketMulti({});
     if (tmR.success && tmR.activos) {
       tmR.activos.forEach(function(tm) {
-        // Solo agregar áreas que están en estado "Esperando"
-        (tm.areas || []).forEach(function(a) {
-          if (String(a.estado || '').toLowerCase() !== 'esperando') return;
-          lista.push({
-            id          : tm.idEspera,
-            fecha       : '',
-            horaLlegada : '',
-            codigo      : tm.codigo,
-            nombre      : tm.nombre,
-            servicio    : a.tentativo || '',
-            area        : a.area || 'multi',
-            prioridad   : tm.prioridad || 'Normal',
-            estado      : 'Esperando',
-            tomadaPor   : '',
-            horaToma    : '',
-            observaciones: tm.observaciones || '',
-            total       : a.precio || 0,
-            promoNombre : '',
-            precioPromo : '',
-            precioRegular: '',
-            tipo        : 'TM',
-            secuencia   : [],
-            promasExtra : [],
-            esTop       : 'No',
-            asignadaA   : '',
-            fuente      : 'TicketMulti',
-            areaIdx     : a.idx
-          });
+        var areasEsperando = (tm.areas || []).filter(function(a) {
+          return String(a.estado || '').toLowerCase() === 'esperando';
+        });
+        if (areasEsperando.length === 0) return;
+        var proximaArea = null;
+        if (tm.secuencia && tm.secuencia.length > 0) {
+          for (var si = 0; si < tm.secuencia.length; si++) {
+            var seqArea = String(tm.secuencia[si]).toLowerCase();
+            var match = areasEsperando.filter(function(a) {
+              return String(a.area || '').toLowerCase() === seqArea;
+            })[0];
+            if (match) { proximaArea = match; break; }
+          }
+        }
+        if (!proximaArea) proximaArea = areasEsperando[0];
+        lista.push({
+          id          : tm.idEspera,
+          fecha       : '',
+          horaLlegada : '',
+          codigo      : tm.codigo,
+          nombre      : tm.nombre,
+          servicio    : proximaArea.tentativo || '',
+          area        : proximaArea.area || 'multi',
+          prioridad   : tm.prioridad || 'Normal',
+          estado      : 'Esperando',
+          tomadaPor   : '',
+          horaToma    : '',
+          observaciones: tm.observaciones || '',
+          total       : proximaArea.precio || 0,
+          promoNombre : '',
+          precioPromo : '',
+          precioRegular: '',
+          tipo        : 'TM',
+          secuencia   : tm.secuencia || [],
+          promasExtra : [],
+          esTop       : 'No',
+          asignadaA   : '',
+          fuente      : 'TicketMulti',
+          areaIdx     : proximaArea.idx
         });
       });
     }
@@ -964,36 +976,42 @@ function handleGetListaCompleta() {
         });
         // Si algún área está en servicio, mostrar en enServicio
         if (tieneEnServicio) {
+          var resumenAreas = (tm.areas || []).map(function(a) {
+            var est = String(a.estado||'').toLowerCase();
+            if (est === 'completado') return (a.tentativo||a.area) + ' ✅ ' + (a.staff||'');
+            if (est === 'en servicio') return (a.tentativo||a.area) + ' 🔄 ' + (a.staff||'');
+            return (a.tentativo||a.area) + ' ⏳';
+          }).join(' | ');
           enServicio.push({
-            idEspera:  tm.idEspera,
-            codigo:    tm.codigo,
-            nombre:    tm.nombre,
-            servicio:  'Multi (' + tm.areas.length + ' servicios)',
-            area:      'multi',
-            tomadaPor: (tm.areas || []).filter(function(a){return a.staff;}).map(function(a){return a.staff;}).join(', ') || '—',
-            total:     tm.precioPromo,
-            estado:    tm.estado,
-            horaToma:  (tm.areas[0] && tm.areas[0].hora) ? tm.areas[0].hora : '',
-            areas:     tm.areas,
-            fuente:    'TicketMulti'
+            idEspera:  tm.idEspera, codigo: tm.codigo, nombre: tm.nombre,
+            servicio:  resumenAreas, area: 'multi',
+            tomadaPor: (tm.areas||[]).filter(function(a){ return a.staff && String(a.estado||'').toLowerCase()==='en servicio'; }).map(function(a){return a.staff;}).join(', ') || '—',
+            total: tm.precioPromo, estado: tm.estado,
+            horaToma: (tm.areas[0] && tm.areas[0].hora) ? tm.areas[0].hora : '',
+            areas: tm.areas, secuencia: tm.secuencia || [],
+            fuente: 'TicketMulti'
           });
         } else {
-          // Todo en espera
-          (tm.areas || []).forEach(function(a) {
-            if (String(a.estado || '').toLowerCase() !== 'esperando') return;
+          // Todo en espera — solo la próxima según secuencia
+          var areasEsp = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() === 'esperando'; });
+          if (areasEsp.length > 0) {
+            var proxA = null;
+            if (tm.secuencia && tm.secuencia.length > 0) {
+              for (var si2 = 0; si2 < tm.secuencia.length; si2++) {
+                var sa = String(tm.secuencia[si2]).toLowerCase();
+                var ma = areasEsp.filter(function(a){ return String(a.area||'').toLowerCase() === sa; })[0];
+                if (ma) { proxA = ma; break; }
+              }
+            }
+            if (!proxA) proxA = areasEsp[0];
             esperando.push({
-              idEspera:  tm.idEspera,
-              codigo:    tm.codigo,
-              nombre:    tm.nombre,
-              servicio:  a.tentativo || 'Multi-servicio',
-              area:      a.area || 'multi',
-              tomadaPor: '',
-              total:     a.precio || 0,
-              estado:    'Esperando',
-              fuente:    'TicketMulti',
-              areaIdx:   a.idx
+              idEspera:  tm.idEspera, codigo: tm.codigo, nombre: tm.nombre,
+              servicio:  proxA.tentativo || 'Multi-servicio', area: proxA.area || 'multi',
+              tomadaPor: '', total: proxA.precio || 0, estado: 'Esperando',
+              fuente: 'TicketMulti', areaIdx: proxA.idx,
+              areas: tm.areas, secuencia: tm.secuencia || []
             });
-          });
+          }
         }
       });
       // Por cobrar
@@ -2271,65 +2289,6 @@ function handleUpdateFichaFacial(data) {
   return { success: true, created: true };
 }
 
-
-// ============================================
-// HISTORIAL FACIAL (una fila por visita, máx 5)
-// Columnas HistorialFacial: A=Código | B=Nombre | C=Fecha | D=Servicio | E=Precio | F=Staff | G=Procedimiento | H=ProductosUsados | I=Obs
-// ============================================
-function handleAddVisitaFacial(data) {
-  try {
-    var ws;
-    try { ws = getSheet('HistorialFacial'); } catch(e) {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      ws = ss.insertSheet('HistorialFacial');
-      ws.appendRow(['Código','Nombre','Fecha','Servicio','Precio','Staff','Procedimiento','ProductosUsados','Observaciones']);
-    }
-    var allData = ws.getDataRange().getValues();
-    var codigo = String(data.codigo || '').trim();
-    var existentes = [];
-    for (var i = 1; i < allData.length; i++) {
-      if (String(allData[i][0]).trim() === codigo) existentes.push(i + 1);
-    }
-    if (existentes.length >= 5) ws.deleteRow(existentes[0]);
-    var today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-    ws.appendRow([codigo, data.nombre||'', today, data.servicio||'', data.precio||0, data.staff||'', data.procedimiento||'', data.productosUsados||'', data.obs||'']);
-    return { success: true };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
-function handleGetHistorialFacial(params) {
-  try {
-    var ws;
-    try { ws = getSheet('HistorialFacial'); } catch(e) { return { success: true, historial: [] }; }
-    var data = ws.getDataRange().getValues();
-    var codigo = String(params.codigo || '').trim();
-    var historial = [];
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === codigo) {
-        historial.push({ fecha: String(data[i][2]||''), servicio: String(data[i][3]||''), precio: Number(data[i][4]||0), staff: String(data[i][5]||''), procedimiento: String(data[i][6]||''), productosUsados: String(data[i][7]||''), obs: String(data[i][8]||'') });
-      }
-    }
-    return { success: true, historial: historial.slice(-5).reverse() };
-  } catch(e) { return { success: true, historial: [] }; }
-}
-
-function handleGetPerfilFichas(params) {
-  try {
-    var codigo = String(params.codigo || '').trim();
-    var pestResult = handleGetFichaPestanas({ codigo: codigo });
-    var facResult  = handleGetFichaFacial({ codigo: codigo });
-    var facHist    = handleGetHistorialFacial({ codigo: codigo });
-    var pigResult  = handleGetFichaCejasPigmento({ codigo: codigo });
-    return {
-      success: true,
-      fichasPestanas:  pestResult.fichas || [],
-      fichaFacial:     facResult.ficha   || null,
-      historialFacial: facHist.historial || [],
-      fichasPigmento:  pigResult.fichas  || []
-    };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
 // ============================================
 // FICHA CEJAS EFECTO POLVO (PIGMENTACIÓN)
 // Columnas: A=# | B=Código | C=Fecha | D=Color | E=Aguja | F=TipoSesion | G=Observaciones | H=Responsable | I=ProxRetoque
@@ -2399,16 +2358,12 @@ function handleAddFichaCejasPigmento(data) {
       proxRetoque = Utilities.formatDate(fechaActual, 'America/Guayaquil', 'dd/MM/yyyy');
     }
     
-    // Máximo 5 sesiones por clienta: eliminar la más antigua si se supera
+    // Máximo 5 sesiones: eliminar la más antigua si se supera
     var sesionesCliente = [];
     for (var i = 5; i < allData.length; i++) {
-      if (String(allData[i][1] || '').trim() === String(data.codigo || '').trim()) {
-        sesionesCliente.push(i + 1); // 1-based row number
-      }
+      if (String(allData[i][1]||'').trim() === String(data.codigo||'').trim()) sesionesCliente.push(i+1);
     }
-    if (sesionesCliente.length >= 5) {
-      ws.deleteRow(sesionesCliente[0]); // elimina la más antigua (primera encontrada)
-    }
+    if (sesionesCliente.length >= 5) ws.deleteRow(sesionesCliente[0]);
 
     // Agregar fila
     ws.appendRow([
