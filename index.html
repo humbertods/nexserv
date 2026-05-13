@@ -10716,17 +10716,18 @@ if ('caches' in window) {
       }
     }
 
-    // Mapear área a clave interna — si es promo sin área (arrArea vacío), deducir del tipo
+    // Mapear área a clave interna
     let areaKey = '';
-    if (tipo === 'promo' && (!area || area === 'Cejas')) {
-      // Intentar deducir del promo seleccionado
+    if (tipo === 'promo') {
+      // Para promo: SIEMPRE deducir del área de la primera división de la promo
+      // NO usar arrArea que pertenece al formulario Normal
       const promoForArea = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p=>p));
       if (promoForArea && promoForArea.division && promoForArea.division.length > 0) {
         const ds = String(promoForArea.division[0].area||'').toLowerCase();
-        areaKey = ds.includes('pest')||ds.includes('lifting') ? 'pestanas'
+        areaKey = ds.includes('pest')||ds.includes('lifting')||ds.includes('retiro') ? 'pestanas'
           : ds.includes('ceja') ? 'cejas'
           : ds.includes('depil')||ds.includes('bikini') ? 'depilacion'
-          : ds.includes('facial') ? 'facial' : 'cejas';
+          : ds.includes('facial')||ds.includes('hidra')||ds.includes('limpieza') ? 'facial' : 'cejas';
       }
     }
     if (!areaKey) {
@@ -10973,10 +10974,10 @@ if ('caches' in window) {
       if (promoGA && promoGA.division && promoGA.division.length > 0) {
         // division.area puede tener emojis: '👁 Pestañas', '💅 Cejas', etc.
         const divStr = String(promoGA.division[0].area || '').toLowerCase();
-        const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') ? 'pestanas'
+        const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') || divStr.includes('retiro') ? 'pestanas'
           : divStr.includes('ceja') ? 'cejas'
           : divStr.includes('depil') || divStr.includes('bikini') ? 'depilacion'
-          : divStr.includes('facial') ? 'facial' : 'cejas';
+          : divStr.includes('facial') || divStr.includes('hidra') ? 'facial' : 'cejas';
         const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
         area = areaMapGA[areaKeyGA] || 'Cejas';
       }
