@@ -133,6 +133,7 @@ function doPost(e) {
       case 'crearTicketMulti':       result = handleCrearTicketMulti(data);       break;
       case 'tomarAreaTicketMulti':   result = handleTomarAreaTicketMulti(data);   break;
       case 'completarAreaTicketMulti': result = handleCompletarAreaTicketMulti(data); break;
+      case 'completarYTomarSiguienteAreaTM': result = handleCompletarYTomarSiguienteAreaTM(data); break;
       case 'confirmarCobroMulti':    result = handleConfirmarCobroMulti(data);    break;
       case 'confirmarServicioMulti': result = handleConfirmarServicioMulti(data); break;
       default: result = { error: 'Acción no reconocida' };
@@ -577,54 +578,39 @@ function handleGetListaEspera() {
     }
   } catch(e) {}
 
-  // Merge con TicketMulti (tickets TM- — solo la PRÓXIMA área según secuencia)
+  // Merge con TicketMulti (tickets TM- esperando — primera área sin tomar)
   try {
     const tmR = handleGetTicketMulti({});
     if (tmR.success && tmR.activos) {
       tmR.activos.forEach(function(tm) {
-        var areasEsperando = (tm.areas || []).filter(function(a) {
-          return String(a.estado || '').toLowerCase() === 'esperando';
-        });
-        if (areasEsperando.length === 0) return;
-
-        // Determinar cuál área va primero según la secuencia de Mikaela
-        var proximaArea = null;
-        if (tm.secuencia && tm.secuencia.length > 0) {
-          for (var si = 0; si < tm.secuencia.length; si++) {
-            var seqArea = String(tm.secuencia[si]).toLowerCase();
-            var match = areasEsperando.filter(function(a) {
-              return String(a.area || '').toLowerCase() === seqArea;
-            })[0];
-            if (match) { proximaArea = match; break; }
-          }
-        }
-        // Si no hay secuencia o no hubo match, usar la primera en espera
-        if (!proximaArea) proximaArea = areasEsperando[0];
-
-        lista.push({
-          id          : tm.idEspera,
-          fecha       : '',
-          horaLlegada : '',
-          codigo      : tm.codigo,
-          nombre      : tm.nombre,
-          servicio    : proximaArea.tentativo || '',
-          area        : proximaArea.area || 'multi',
-          prioridad   : tm.prioridad || 'Normal',
-          estado      : 'Esperando',
-          tomadaPor   : '',
-          horaToma    : '',
-          observaciones: tm.observaciones || '',
-          total       : proximaArea.precio || 0,
-          promoNombre : '',
-          precioPromo : '',
-          precioRegular: '',
-          tipo        : 'TM',
-          secuencia   : tm.secuencia || [],
-          promasExtra : [],
-          esTop       : 'No',
-          asignadaA   : '',
-          fuente      : 'TicketMulti',
-          areaIdx     : proximaArea.idx
+        // Solo agregar áreas que están en estado "Esperando"
+        (tm.areas || []).forEach(function(a) {
+          if (String(a.estado || '').toLowerCase() !== 'esperando') return;
+          lista.push({
+            id          : tm.idEspera,
+            fecha       : '',
+            horaLlegada : '',
+            codigo      : tm.codigo,
+            nombre      : tm.nombre,
+            servicio    : a.tentativo || '',
+            area        : a.area || 'multi',
+            prioridad   : tm.prioridad || 'Normal',
+            estado      : 'Esperando',
+            tomadaPor   : '',
+            horaToma    : '',
+            observaciones: tm.observaciones || '',
+            total       : a.precio || 0,
+            promoNombre : '',
+            precioPromo : '',
+            precioRegular: '',
+            tipo        : 'TM',
+            secuencia   : [],
+            promasExtra : [],
+            esTop       : 'No',
+            asignadaA   : '',
+            fuente      : 'TicketMulti',
+            areaIdx     : a.idx
+          });
         });
       });
     }
@@ -4285,6 +4271,91 @@ function handleCompletarAreaTicketMulti(data) {
         todasCompletadas: todasListas,
         siguienteArea: siguienteArea ? siguienteArea.key : null,
         areasPendientes: areasPendientes.length
+      };
+    }
+    return { success: false, message: 'Ticket no encontrado' };
+  } catch(e) { return { success: false, message: String(e) }; }
+}
+
+
+// ── COMPLETAR ÁREA Y TOMAR LA SIGUIENTE (misma staff hace ambas áreas) ──
+function handleCompletarYTomarSiguienteAreaTM(data) {
+  try {
+    var ws = getTMSheet();
+    var rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
+    var tz = 'America/Guayaquil';
+    var hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() !== data.idEspera) continue;
+      var rowNum = i + 3;
+
+      // Parsear secuencia
+      var obsRaw = String(rows[i][7] || '');
+      var secuencia = [];
+      if (obsRaw.startsWith('SEQ:')) {
+        secuencia = obsRaw.substring(4).split('|')[0].split(',').filter(Boolean);
+      }
+
+      // 1) Marcar área actual de esta staff como Completada
+      var areaCompletadaKey = '';
+      var areaCompletadaIdx = -1;
+      for (var a = 0; a < 4; a++) {
+        var base = TM_AREA_COL[a];
+        if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
+        if (String(rows[i][base + 3] || '').trim().toLowerCase() !== 'en servicio') continue;
+        ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
+        areaCompletadaIdx = a;
+        var rawTent = String(rows[i][base] || '');
+        areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
+        try { updateComision(data.chicaNombre, Number(rows[i][TM_PRECIO_COL[a]] || 0)); } catch(e2) {}
+        break;
+      }
+
+      // Re-leer fila actualizada
+      rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
+
+      // 2) Encontrar la siguiente área en Esperando según secuencia
+      var areasConDatos = [];
+      for (var a2 = 0; a2 < 4; a2++) {
+        var base2 = TM_AREA_COL[a2];
+        var tent2 = String(rows[i][base2] || '').trim();
+        if (!tent2) continue;
+        var est2 = String(rows[i][base2 + 3] || '').trim().toLowerCase();
+        var aKey2 = tent2.indexOf('||') !== -1 ? tent2.split('||')[0] : '';
+        areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2, tentativo: tent2.indexOf('||') !== -1 ? tent2.split('||')[1] : tent2 });
+      }
+
+      var areasEsperando = areasConDatos.filter(function(a) { return a.estado === 'esperando'; });
+
+      if (areasEsperando.length === 0) {
+        // No hay más — marcar como "Por cobrar"
+        ws.getRange(rowNum, 6).setValue('Por cobrar');
+        return { success: true, todasCompletadas: true };
+      }
+
+      // Siguiente según secuencia
+      var siguiente = null;
+      if (secuencia.length > 0) {
+        var posActual = secuencia.indexOf(areaCompletadaKey);
+        for (var s = posActual + 1; s < secuencia.length; s++) {
+          var cand = areasEsperando.filter(function(ap) { return ap.key === secuencia[s]; })[0];
+          if (cand) { siguiente = cand; break; }
+        }
+      }
+      if (!siguiente) siguiente = areasEsperando[0];
+
+      // 3) Asignar la siguiente área a esta misma staff (estado → En servicio)
+      var base3 = TM_AREA_COL[siguiente.idx];
+      ws.getRange(rowNum, base3 + 2 + 1).setValue(data.chicaNombre);  // col staff
+      ws.getRange(rowNum, base3 + 3 + 1).setValue('En servicio');      // col estado
+      ws.getRange(rowNum, base3 + 4 + 1).setValue(hora);               // col hora
+
+      return {
+        success: true,
+        todasCompletadas: false,
+        siguienteArea: siguiente.key,
+        confirmacionRequerida: false
       };
     }
     return { success: false, message: 'Ticket no encontrado' };
