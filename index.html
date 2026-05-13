@@ -6327,9 +6327,22 @@ if ('caches' in window) {
   }
 
   function renderSecuencia() {
-    // Soporta normal y multi
-    const list = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
-    const empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
+    // Usar el contenedor del formulario ACTIVO (promo o multi)
+    const tipoActivo = window._arrTipo || 'normal';
+    let list, empty;
+    if (tipoActivo === 'multi') {
+      list  = document.getElementById('secuenciaListMulti');
+      empty = document.getElementById('secuenciaEmptyMulti');
+    } else {
+      // Promo normal o normal — usar secuenciaList
+      list  = document.getElementById('secuenciaList');
+      empty = document.getElementById('secuenciaEmpty');
+    }
+    if (!list) {
+      // Fallback: cualquier visible
+      list  = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
+      empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
+    }
     if (!list) return;
     if (_secuencia.length === 0) {
       list.innerHTML = '';
