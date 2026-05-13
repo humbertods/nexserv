@@ -1169,6 +1169,8 @@ if ('caches' in window) {
             <span style="font-size: 18px;">🎁</span> Clienta promo normal
           </button>
         </div>
+        <!-- Confirmación de tipo seleccionado -->
+        <div id="arrTipoConfirm" style="display:none; margin-top:14px; padding:12px 16px; border-radius:14px; font-size:13px; font-weight:700; text-align:center;"></div>
       </div>
 
       <!-- ══ FORMULARIO: SERVICIO NORMAL ══ -->
@@ -7557,14 +7559,33 @@ if ('caches' in window) {
   window._arrTipo = 'normal'; // 'normal' | 'promo' | 'multi'
 
   function seleccionarTipoArrival(tipo) {
-    window._arrTipo = tipo;
-    document.getElementById('arrTipoSelector').style.display = 'none';
-    document.getElementById('arrFormNormal').style.display = tipo === 'normal' ? 'block' : 'none';
-    document.getElementById('arrFormPromo').style.display  = tipo === 'promo'  ? 'block' : 'none';
-    document.getElementById('arrFormMulti').style.display  = tipo === 'multi'  ? 'block' : 'none';
-    if (tipo === 'normal') loadServicesForArea();
-    if (tipo === 'multi')  loadServicesForAreaMulti();
-    if (tipo === 'promo')  { resetArrivalExtras(); }
+    const labels = {
+      multi:  { icon: '🎯', text: 'Multi-servicios', color: 'var(--ink)', bg: 'rgba(0,0,0,0.08)' },
+      normal: { icon: '🛠', text: 'Servicio normal', color: 'var(--accent)', bg: 'var(--accent-bg, #ede9fe)' },
+      promo:  { icon: '🎁', text: 'Promo normal',    color: '#b45309',      bg: 'var(--warning-bg)' }
+    };
+    const l = labels[tipo];
+
+    // Mostrar confirmación animada
+    const confirm = document.getElementById('arrTipoConfirm');
+    if (confirm) {
+      confirm.style.display = 'block';
+      confirm.style.background = l.bg;
+      confirm.style.color = l.color;
+      confirm.textContent = '✓ ' + l.icon + ' ' + l.text + ' seleccionado';
+    }
+
+    // Esperar 600ms para que la staff vea la confirmación, luego abrir formulario
+    setTimeout(() => {
+      window._arrTipo = tipo;
+      document.getElementById('arrTipoSelector').style.display = 'none';
+      document.getElementById('arrFormNormal').style.display = tipo === 'normal' ? 'block' : 'none';
+      document.getElementById('arrFormPromo').style.display  = tipo === 'promo'  ? 'block' : 'none';
+      document.getElementById('arrFormMulti').style.display  = tipo === 'multi'  ? 'block' : 'none';
+      if (tipo === 'normal') loadServicesForArea();
+      if (tipo === 'multi')  loadServicesForAreaMulti();
+      if (tipo === 'promo')  resetArrivalExtras();
+    }, 600);
   }
   window.seleccionarTipoArrival = seleccionarTipoArrival;
 
