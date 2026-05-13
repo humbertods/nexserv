@@ -3117,7 +3117,9 @@ if ('caches' in window) {
     // IMPORTANTE: cejas puede hacer lifting de pestañas, retiro, bigote, depilaciones
     const AREA_FILTER_MAP = {
       'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
-                   'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas', 'retiro_lifting'],
+                   'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas', 'retiro_lifting',
+                   'pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen',
+                   'pelo a pelo', 'clasicas', 'clásicas', 'efecto'],
       'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen',
                    'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura'],
       'facial':   ['facial', 'hidra', 'limpieza']
@@ -4041,7 +4043,10 @@ if ('caches' in window) {
               
               // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
               const myArea = user?.area || 'cejas';
-              const myPrice = getMyPromoPrice(promoFull, myArea);
+              // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
+              // Para promo normal: usar getMyPromoPrice
+              const precioMiAreaSP = Number(a.precioMiArea || 0);
+              const myPrice = precioMiAreaSP > 0 ? precioMiAreaSP : getMyPromoPrice(promoFull, myArea);
               
               slotServices[1].push({
                 name: promoFull.name,
@@ -4466,17 +4471,21 @@ if ('caches' in window) {
     const clientKey = normalizeClientKey(clientName);
     const promoData = activePromos[clientKey] || window._finishPromoData;
 
-    // Para "hago toda la promo": usar el precio total de la promo, no solo el servicio actual
-    if (promoData && promoData.promo) {
-      const precioTotal = promoData.promo.price;
-      // Reemplazar slotServices con la promo completa al precio total
-      slotServices[slot] = [{ name: promoData.promo.name, price: precioTotal, area: user?.area || 'cejas' }];
+    // Para "hago toda la promo": usar lo que hay en slotServices (precio real de esta área)
+    // Si completedAreas tiene áreas previas, no repetir el precio total — ya fue cobrado antes
+    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const totalEnSlot = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+
+    // Si no hay servicios en slot pero hay promo, cargar precio de esta área
+    if (svcsAprobados.length === 0 && promoData && promoData.promo) {
+      const myAreaAll = user?.area || 'cejas';
+      const precioMiAreaAll = getMyPromoPrice(promoData.promo, myAreaAll);
+      slotServices[slot] = [{ name: promoData.promo.name, price: precioMiAreaAll, area: myAreaAll }];
     }
 
-    // Calcular totales frescos
-    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
-    const totalFinal = promoData ? Number(promoData.promo.price) : svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const svcNames = promoData ? promoData.promo.name : (svcsAprobados.map(s => s.name).join(' + ') || 'Servicio');
+    const svcsAprobados2 = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const totalFinal = svcsAprobados2.reduce((sum, s) => sum + Number(s.price || 0), 0) || (promoData ? Number(promoData.promo.price) : 0);
+    const svcNames = promoData ? promoData.promo.name : (svcsAprobados2.map(s => s.name).join(' + ') || 'Servicio');
     const precioRegularFinal = promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalFinal);
 
     // Llenar _finishingData y _finishingSlot para que finishAndSend tenga todo
