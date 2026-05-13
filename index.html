@@ -5895,41 +5895,74 @@ if ('caches' in window) {
     document.getElementById('newPestFichaModal').classList.add('active');
   }
 
-  function saveNewPestFicha() {
+  async function saveNewPestFicha() {
     const clientKey = window._newPestClient;
     const slot = window._newPestSlot;
     const modelo = document.getElementById('npfModelo').value;
     const diseno = document.getElementById('npfDiseno').value;
     const tallas = document.getElementById('npfTallas').value.trim();
-    
+    const obs = document.getElementById('npfObs').value.trim();
+
     if (!modelo) { alert('Seleccioná el modelo'); return; }
-    
+
+    // Obtener código/nombre — del perfil en memoria o del slot activo como fallback
+    let clientCodigo = '', clientNombre = '';
     const client = CLIENT_PROFILES[clientKey];
-    if (!client.pestanas) client.pestanas = { fichas: [], history: [] };
-    if (!client.pestanas.fichas) client.pestanas.fichas = [];
-    
-    // Desactivar todas las anteriores
-    client.pestanas.fichas.forEach(f => f.activa = false);
-    
-    // Máximo 5 fichas
-    if (client.pestanas.fichas.length >= 5) {
-      client.pestanas.fichas.pop(); // quitar la más vieja
+    if (client) {
+      clientCodigo = client.code || '';
+      clientNombre = client.name || '';
+    } else {
+      const slotNum = slot || 1;
+      clientCodigo = (document.getElementById('as' + slotNum + 'Code')?.textContent || '').trim();
+      clientNombre = (document.getElementById('as' + slotNum + 'Name')?.textContent || '').replace(' ⭐','').trim();
+      if (clientCodigo) {
+        CLIENT_PROFILES[clientKey] = {
+          name: clientNombre, code: clientCodigo,
+          pestanas: { fichas: [], history: [] },
+          cejas: { history: [] }, depilacion: { history: [] }, facial: { history: [] }
+        };
+      }
     }
-    
-    // Agregar nueva al inicio como activa
-    const today = new Date();
-    client.pestanas.fichas.unshift({
-      modelo: modelo,
-      diseno: diseno || '—',
-      tallas: tallas || '—',
-      obs: document.getElementById('npfObs').value.trim(),
-      fecha: today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear(),
-      activa: true
-    });
-    
+
+    // Guardar en Google Sheets
+    try {
+      const btn = document.querySelector('#newPestFichaModal .btn-primary');
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+      const result = await apiPost('addFichaPestanas', {
+        codigo: clientCodigo, nombre: clientNombre,
+        modelo, diseno: diseno || '—', tallas: tallas || '—', obs
+      });
+
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar nueva ficha'; }
+
+      if (!result || !result.success) {
+        alert('Error al guardar ficha: ' + (result?.message || 'Error desconocido'));
+        return;
+      }
+    } catch(e) {
+      alert('Error de conexión al guardar ficha');
+      return;
+    }
+
+    // Actualizar memoria local
+    const clientLocal = CLIENT_PROFILES[clientKey];
+    if (clientLocal) {
+      if (!clientLocal.pestanas) clientLocal.pestanas = { fichas: [], history: [] };
+      if (!clientLocal.pestanas.fichas) clientLocal.pestanas.fichas = [];
+      clientLocal.pestanas.fichas.forEach(f => f.activa = false);
+      if (clientLocal.pestanas.fichas.length >= 5) clientLocal.pestanas.fichas.pop();
+      const today = new Date();
+      clientLocal.pestanas.fichas.unshift({
+        modelo, diseno: diseno || '—', tallas: tallas || '—', obs,
+        fecha: today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear(),
+        activa: true
+      });
+    }
+
     closeModal();
-    loadPestFichaQuick(clientKey, slot);
-    alert('✅ Nueva ficha creada: ' + modelo + ' · ' + diseno);
+    if (slot) loadPestFichaQuick(clientKey, slot);
+    showToast('✅ Ficha guardada: ' + modelo + (diseno ? ' · ' + diseno : ''));
   }
 
   // === CEJAS EFECTO POLVO ===
