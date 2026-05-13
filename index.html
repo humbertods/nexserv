@@ -3711,36 +3711,58 @@ if ('caches' in window) {
     }
     document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${_svcDisplay4}</strong>.<br>Se registrará la hora automáticamente.`;
 
-    // Detectar si es servicio de depilación corporal con múltiples ítems
-    const esDepi = w.area === 'depilacion' || String(w.service || '').toLowerCase().includes('depi') || String(w.service || '').toLowerCase().includes('bikini') || String(w.service || '').toLowerCase().includes('pierna') || String(w.service || '').toLowerCase().includes('axila');
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
 
+    // ── ENGANCHE: servicio contiene historial de áreas previas (✅) ──
+    // Formato: "[✅Lesly: Cejas $12] | Limpieza profunda"
+    const servicioStr0 = String(w.service || '');
+    const tieneHistorial = servicioStr0.includes('✅');
+
+    if (tieneHistorial) {
+      // Separar partes: completadas (entre []) vs pendiente (lo que sigue después)
+      const partesCompletas = [];
+      const regexCompleta = /\[✅([^\]]+)\]/g;
+      let m;
+      while ((m = regexCompleta.exec(servicioStr0)) !== null) {
+        partesCompletas.push(m[1].trim()); // ej: "Lesly: Cejas $12"
+      }
+      // La parte pendiente es lo que viene después del último "]"
+      const lastBracket = servicioStr0.lastIndexOf(']');
+      const pendiente = lastBracket >= 0 ? servicioStr0.substring(lastBracket + 1).replace(/^\s*[|\-]\s*/, '').trim() : servicioStr0;
+      // Área del ticket
+      const areaLabel = String(w.area || 'Servicio');
+      const areaLabels2 = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', facial:'Facial', retiro_lifting:'Lifting/Retiro' };
+
+      // Mostrar en el split: partes completadas (readonly) + pendiente (seleccionable)
+      const items = [];
+      partesCompletas.forEach(p => items.push({ nombre: p, precio: 0, checked: false, readonly: true, completado: true }));
+      items.push({ nombre: areaLabels2[areaLabel] || pendiente || areaLabel, precio: Number(w.total) || 0, checked: true, readonly: false, completado: false });
+
+      window._depiItems = items;
+      splitEl.style.display = 'block';
+      normalEl.style.display = 'none';
+      renderDepiItems();
+      document.getElementById('takeModal').classList.add('active');
+      return;
+    }
+
+    // ── DEPILACIÓN CORPORAL: múltiples ítems ──
+    const esDepi = w.area === 'depilacion' || servicioStr0.toLowerCase().includes('depi') || servicioStr0.toLowerCase().includes('bikini') || servicioStr0.toLowerCase().includes('pierna') || servicioStr0.toLowerCase().includes('axila');
+
     if (esDepi) {
-      // Parsear servicios individuales del ticket
-      // El servicio puede venir como "Bikini completo + Medias piernas + Axilas" o similar
-      let servicioRaw3 = String(w.service || '');
+      let servicioRaw3 = servicioStr0;
       if (servicioRaw3.trim().startsWith('{')) {
         try { servicioRaw3 = JSON.parse(servicioRaw3).nombre || servicioRaw3; }
         catch(e) { const m3 = servicioRaw3.match(/"nombre"\s*:\s*"([^"]+)"/); if (m3) servicioRaw3 = m3[1]; }
       }
-      const servicioStr = servicioRaw3;
-      const partes = servicioStr.split(/\s*[\+\,]\s*/).map(s => s.trim()).filter(s => s && !s.includes('continuac') && !s.includes('completado'));
-      
-      // Intentar obtener precios del catálogo para cada parte
+      const partes = servicioRaw3.split(/\s*[\+\,]\s*/).map(s => s.trim()).filter(s => s && !s.includes('continuac') && !s.includes('completado'));
       const items = partes.map(nombre => {
-        // Buscar precio en catálogo
         const catalogoDepi = CATALOGO.depilacion || [];
         const match = catalogoDepi.find(c => c.name.toLowerCase().includes(nombre.toLowerCase()) || nombre.toLowerCase().includes(c.name.toLowerCase()));
-        return {
-          nombre: nombre,
-          precio: match ? Number(match.price) : 0,
-          checked: true
-        };
+        return { nombre, precio: match ? Number(match.price) : 0, checked: true };
       });
-
       window._depiItems = items;
-
       if (items.length > 1) {
         splitEl.style.display = 'block';
         normalEl.style.display = 'none';
@@ -3761,17 +3783,28 @@ if ('caches' in window) {
     const items = window._depiItems || [];
     const el = document.getElementById('takeDepiItems');
     if (!el) return;
-    el.innerHTML = items.map((item, i) => `
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0dfa0;cursor:pointer;">
+    el.innerHTML = items.map((item, i) => {
+      if (item.readonly || item.completado) {
+        // Área ya completada — solo lectura, no desmarcable
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;opacity:0.9;">
+          <span style="font-size:18px;flex-shrink:0;">✅</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--success);">${item.nombre}</div>
+            <div style="font-size:11px;color:var(--success);font-weight:600;">Ya realizado</div>
+          </div>
+        </div>`;
+      }
+      // Área pendiente — seleccionable
+      return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;cursor:pointer;border:2px solid var(--info);">
         <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleDepiItem(${i}, this.checked)"
-          style="width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;">
+          style="width:18px;height:18px;accent-color:var(--info);flex-shrink:0;">
         <div style="flex:1;">
-          <div style="font-size:13px;font-weight:700;">${item.nombre}</div>
-          ${item.precio > 0 ? `<div style="font-size:11px;color:var(--ink-faint);">$${item.precio}</div>` : ''}
+          <div style="font-size:13px;font-weight:800;color:var(--info);">👇 Tu servicio: ${item.nombre}</div>
+          ${item.precio > 0 ? `<div style="font-size:11px;color:var(--info);font-weight:600;">$${item.precio} — Confirmá o cambiá al tomar</div>` : '<div style="font-size:11px;color:var(--info);">Confirmá el servicio al tomar</div>'}
         </div>
         ${item.checked ? '<span style="font-size:16px;">✅</span>' : '<span style="font-size:16px;opacity:0.3;">⬜</span>'}
-      </label>
-    `).join('');
+      </label>`;
+    }).join('');
     updateDepiTotal();
   }
 
@@ -3784,21 +3817,27 @@ if ('caches' in window) {
 
   function updateDepiTotal() {
     const items = window._depiItems || [];
-    const total = items.filter(i => i.checked).reduce((sum, i) => sum + Number(i.precio || 0), 0);
+    // Only sum non-readonly (pending) items
+    const total = items.filter(i => i.checked && !i.readonly && !i.completado).reduce((sum, i) => sum + Number(i.precio || 0), 0);
     const el = document.getElementById('takeDepiTotal');
     if (el) el.textContent = '$' + total;
   }
 
   async function confirmTakeDepiAll() {
-    // La staff hace todo el servicio — flujo normal
-    window._depiItems = (window._depiItems || []).map(i => ({...i, checked: true}));
+    // La staff hace todo el servicio pendiente — flujo normal
+    window._depiItems = (window._depiItems || []).map(i => ({
+      ...i,
+      checked: i.readonly || i.completado ? false : true  // no marcar los ya completados
+    }));
     await confirmTake();
   }
 
   async function confirmTakeDepi() {
     const items = window._depiItems || [];
-    const misItems = items.filter(i => i.checked);
-    const restItems = items.filter(i => !i.checked);
+    // Ignorar items readonly (ya completados) — solo procesar los pendientes
+    const itemsPendientes = items.filter(i => !i.readonly && !i.completado);
+    const misItems = itemsPendientes.filter(i => i.checked);
+    const restItems = itemsPendientes.filter(i => !i.checked);
 
     if (misItems.length === 0) {
       alert('Seleccioná al menos un servicio para hacer vos.');
@@ -3806,7 +3845,7 @@ if ('caches' in window) {
     }
 
     if (restItems.length === 0) {
-      // Todas marcadas — flujo normal
+      // Todo lo pendiente lo hace esta staff — flujo normal
       await confirmTake();
       return;
     }
@@ -4083,8 +4122,34 @@ if ('caches' in window) {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
 
-          // Mostrar modal de confirmación de servicio (enganche)
-          setTimeout(() => showConfirmServiceModal(1), 400);
+          // Si es TM: cargar areas completas para mostrar desglose
+          if (window._as1IdEspera && window._as1IdEspera.startsWith('TM-')) {
+            apiGet('getTicketMulti').then(function(tmData) {
+              if (tmData.success) {
+                var tm = (tmData.activos || []).find(function(t) { return t.idEspera === window._as1IdEspera; });
+                if (tm) {
+                  window._tmAreasActuales = tm.areas || [];
+                  // Cargar en slotServices el servicio de esta staff (área en servicio)
+                  var user2 = window.currentUser;
+                  var miArea = (tm.areas || []).find(function(ar) {
+                    return ar.staff === (user2 && user2.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
+                  });
+                  if (miArea && slotServices[1].length === 0) {
+                    slotServices[1] = [{ name: miArea.tentativo || miArea.confirmado || '', price: miArea.precio || 0, area: miArea.area }];
+                    renderServicesForSlot(1);
+                    document.getElementById('as1Total').textContent = '$' + (miArea.precio || 0);
+                    document.getElementById('as1SvcCount').textContent = '1';
+                  }
+                }
+              }
+              setTimeout(() => showConfirmServiceModal(1), 200);
+            }).catch(function() {
+              setTimeout(() => showConfirmServiceModal(1), 400);
+            });
+          } else {
+            // Mostrar modal de confirmación de servicio (enganche)
+            setTimeout(() => showConfirmServiceModal(1), 400);
+          }
         } else {
           window._as2Client = a.codigo;
           const initials2b = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
@@ -4156,8 +4221,29 @@ if ('caches' in window) {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
           }
 
-          // Mostrar modal de confirmación de servicio (enganche)
-          setTimeout(() => showConfirmServiceModal(2), 400);
+          // Si es TM: cargar areas completas para slot 2
+          if (window._as2IdEspera && window._as2IdEspera.startsWith('TM-')) {
+            apiGet('getTicketMulti').then(function(tmData2) {
+              if (tmData2.success) {
+                var tm2 = (tmData2.activos || []).find(function(t) { return t.idEspera === window._as2IdEspera; });
+                if (tm2) {
+                  window._tmAreasActuales2 = tm2.areas || [];
+                  var user2b = window.currentUser;
+                  var miArea2 = (tm2.areas || []).find(function(ar) {
+                    return ar.staff === (user2b && user2b.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
+                  });
+                  if (miArea2 && slotServices[2].length === 0) {
+                    slotServices[2] = [{ name: miArea2.tentativo || miArea2.confirmado || '', price: miArea2.precio || 0, area: miArea2.area }];
+                    renderServicesForSlot(2);
+                    document.getElementById('as2Total').textContent = '$' + (miArea2.precio || 0);
+                  }
+                }
+              }
+              setTimeout(() => showConfirmServiceModal(2), 200);
+            }).catch(function() { setTimeout(() => showConfirmServiceModal(2), 400); });
+          } else {
+            setTimeout(() => showConfirmServiceModal(2), 400);
+          }
         }
         
         if (user && user.maxClients === 2) {
@@ -4417,17 +4503,52 @@ if ('caches' in window) {
     const svcs = slotServices[slot] || [];
     const svcName = svcs.length > 0 ? svcs.map(s => s.name).join(' + ') : '—';
     const svcPrice = svcs.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const esTM = idEspera.startsWith('TM-');
 
     document.getElementById('confirmSvcClientName').textContent = clientName;
-    document.getElementById('confirmSvcName').textContent = svcName;
-    document.getElementById('confirmSvcPrice').textContent = svcPrice > 0 ? '$' + svcPrice : '—';
-
-    // Título diferente si es enganche
-    const esEnganche = window._esEnganche || false;
-    document.getElementById('confirmSvcTitle').textContent = esEnganche
-      ? '🔄 Servicio de enganche' : '📋 Servicio asignado';
-
     window._confirmSvcSlot = slot;
+
+    if (esTM && window._tmAreasActuales) {
+      // ── TICKET MULTI: mostrar historial completo + área actual ──
+      const areas = window._tmAreasActuales;
+      const areaIcons = { cejas: '💅', depilacion: '🪒', depilación: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
+      const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+      let timelineHTML = '';
+      areas.forEach(ar => {
+        const aKey = String(ar.area||'').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, s=>s==='é'?'e':'n');
+        const icon = areaIcons[aKey] || '🔄';
+        const label = areaLabels[aKey] || ar.area || 'Servicio';
+        const est = String(ar.estado||'').toLowerCase();
+        if (est === 'completado') {
+          timelineHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">
+            <div style="font-size:18px;">${icon}</div>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'}</div>
+            <div style="font-size:12px;color:var(--ink-soft);">${ar.confirmado||ar.tentativo||''}</div></div>
+            <div style="font-size:13px;font-weight:800;color:var(--success);">$${ar.precio||0}</div>
+            <div style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:3px 8px;border-radius:100px;">✅ LISTO</div>
+          </div>`;
+        } else if (est === 'en servicio') {
+          timelineHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);">
+            <div style="font-size:18px;">${icon}</div>
+            <div style="flex:1;"><div style="font-size:13px;font-weight:800;color:var(--info);">👇 TU SERVICIO · ${label}</div>
+            <div style="font-size:12px;color:var(--ink-soft);">${ar.tentativo||'Confirmar servicio'}</div></div>
+            <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
+          </div>`;
+        }
+      });
+      document.getElementById('confirmSvcName').innerHTML = timelineHTML ||
+        `<div style="font-size:14px;font-weight:700;">${svcName}</div>`;
+      document.getElementById('confirmSvcPrice').textContent = '';
+      document.getElementById('confirmSvcTitle').textContent = '🎯 Ticket multi-servicio';
+    } else {
+      document.getElementById('confirmSvcName').textContent = svcName;
+      document.getElementById('confirmSvcPrice').textContent = svcPrice > 0 ? '$' + svcPrice : '—';
+      const esEnganche = window._esEnganche || false;
+      document.getElementById('confirmSvcTitle').textContent = esEnganche
+        ? '🔄 Servicio de enganche' : '📋 Servicio asignado';
+    }
+
     document.getElementById('confirmServiceModal').classList.add('active');
   }
 
@@ -4525,7 +4646,13 @@ if ('caches' in window) {
     // ── PASO 3: Calcular totales ───────────────────────────────────────────────
     const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
     const totalSoloEstaStaff = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const totalFresh = String(totalSoloEstaStaff || Number(data.total) || 0);
+    // Para enganche: sumar también partes previas del sheet para el total final
+    let totalPrevioSheet = 0;
+    if (esTicketSP && miTicketSheet?.serviciosDetalle?.length > 0) {
+      totalPrevioSheet = miTicketSheet.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
+    }
+    const totalCombinadoEnganche = totalPrevioSheet + totalSoloEstaStaff;
+    const totalFresh = String(totalCombinadoEnganche > 0 ? totalCombinadoEnganche : (Number(data.total) || 0));
     const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
     const precioRegularFresh = promoDataFresh
       ? String(Number(promoDataFresh.promo.regular || promoDataFresh.promo.price))
@@ -4539,11 +4666,25 @@ if ('caches' in window) {
       monto: Number(s.price || 0)
     }));
 
-    let desgloseDelSheet = window._desgloseAcumulado || [];
-    if (esTicketSP && desgloseDelSheet.length === 0 && miTicketSheet?.serviciosDetalle?.length > 0) {
-      desgloseDelSheet = miTicketSheet.serviciosDetalle;
+    // Base: desglose del sheet (partes de staffs anteriores) + lo que hay en memoria
+    // SIEMPRE combinar: el sheet guarda partes previas (ej: Lesly), la memoria tiene la actual (Laura)
+    const desgloseAcumulado = [];
+
+    // 1) Agregar partes del sheet primero (staffs anteriores guardados en SP ticket)
+    if (esTicketSP && miTicketSheet?.serviciosDetalle?.length > 0) {
+      miTicketSheet.serviciosDetalle.forEach(d => {
+        const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
+        if (!yaExiste) desgloseAcumulado.push(d);
+      });
     }
-    const desgloseAcumulado = [...desgloseDelSheet];
+
+    // 2) Agregar desglose acumulado en memoria (partes de enganche anteriores parseadas de obs)
+    (window._desgloseAcumulado || []).forEach(d => {
+      const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
+      if (!yaExiste) desgloseAcumulado.push(d);
+    });
+
+    // 3) Agregar el servicio actual de esta staff
     desgloseActual.forEach(nuevo => {
       const yaExiste = desgloseAcumulado.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
       if (!yaExiste) desgloseAcumulado.push(nuevo);
@@ -11272,8 +11413,8 @@ if ('caches' in window) {
       <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:10px;"></div>
       <div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid var(--line);">
         <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servicio asignado</div>
-        <div id="confirmSvcName" style="font-size:18px;font-weight:800;color:var(--ink);margin-bottom:4px;"></div>
-        <div id="confirmSvcPrice" style="font-size:24px;font-weight:900;color:var(--accent-deep);"></div>
+        <div id="confirmSvcName" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;"></div>
+        <div id="confirmSvcPrice" style="font-size:22px;font-weight:900;color:var(--accent-deep);"></div>
       </div>
       <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">Asesorá a la clienta y confirmá o cambiá el servicio.</div>
     </div>
