@@ -1782,8 +1782,8 @@ if ('caches' in window) {
           <label>Observaciones</label>
           <textarea id="rvfObs" placeholder="Estado de la piel, reacciones, recomendaciones..." style="min-height:70px;resize:vertical;"></textarea>
         </div>
-        <button id="rvfGuardarBtn" class="btn-primary" onclick="guardarVisitaFacial()" style="background:linear-gradient(135deg,var(--success),#2d5a3a);margin-top:18px;">💾 Guardar visita</button>
-        <button class="btn-secondary" onclick="closeModal()" style="margin-top:10px;">Cancelar</button>
+        <button id="rvfGuardarBtn" class="btn-primary" onclick="guardarVisitaFacial()" style="background:linear-gradient(135deg,var(--success),#2d5a3a);margin-top:18px;">💾 Guardar visita facial</button>
+        <button class="btn-secondary" onclick="window._currentFacialClientKey=null;window._currentFacialClientNombre=null;window._currentFacialClientCodigo=null;closeModal();" style="margin-top:10px;color:var(--ink-faint);">Saltar por ahora</button>
       </div>
     </div>
 
@@ -4563,6 +4563,45 @@ if ('caches' in window) {
       }
     } catch(e) {}
     showToast('✅ Servicio confirmado');
+
+    // ── Si es facial: abrir modal de ficha facial para registrar la visita ──
+    const user = window.currentUser;
+    if (user?.area === 'facial' || user?.role === 'owner') {
+      const slot2 = window._confirmSvcSlot || 1;
+      const clientNombre = document.getElementById('as' + slot2 + 'Name')?.textContent?.replace(' ⭐','') || '';
+      const clientCodigo = document.getElementById('as' + slot2 + 'Code')?.textContent?.split(' ')[0] || '';
+      const clientKey = clientCodigo.toLowerCase().replace(/-/g,'');
+      // Pre-llenar datos de la clienta en el modal de visita facial
+      setTimeout(() => {
+        // Asegurar que CLIENT_PROFILES tenga la entrada
+        if (clientCodigo && !CLIENT_PROFILES[clientKey]) {
+          CLIENT_PROFILES[clientKey] = {
+            name: clientNombre, code: clientCodigo,
+            facial: { history: [] }, pestanas: { fichas: [], history: [] },
+            cejas: { history: [] }, depilacion: { history: [] }
+          };
+        }
+        // Pre-llenar servicio con lo que está en slotServices
+        const svcs = slotServices[slot2] || [];
+        const svcName = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+        const svcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
+        const rvfServicio = document.getElementById('rvfServicio');
+        const rvfPrecio = document.getElementById('rvfPrecio');
+        const rvfProcedimiento = document.getElementById('rvfProcedimiento');
+        const rvfProductos = document.getElementById('rvfProductos');
+        const rvfObs = document.getElementById('rvfObs');
+        if (rvfServicio) rvfServicio.value = svcName;
+        if (rvfPrecio) rvfPrecio.value = svcPrice || '';
+        if (rvfProcedimiento) rvfProcedimiento.value = '';
+        if (rvfProductos) rvfProductos.value = '';
+        if (rvfObs) rvfObs.value = '';
+        // Guardar clientKey para guardarVisitaFacial
+        window._currentFacialClientKey = clientKey;
+        window._currentFacialClientNombre = clientNombre;
+        window._currentFacialClientCodigo = clientCodigo;
+        document.getElementById('registrarVisitaFacialModal').classList.add('active');
+      }, 400);
+    }
   }
 
   function changeServiceFromModal() {
@@ -11326,15 +11365,21 @@ if ('caches' in window) {
     document.getElementById('registrarVisitaFacialModal').classList.add('active');
   }
   async function guardarVisitaFacial() {
-    const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    // Puede venir del perfil (currentProfileClient) o del panel de Laura (window._currentFacialClientKey)
+    const clientKey = window._currentFacialClientKey || currentProfileClient;
+    const c = CLIENT_PROFILES[clientKey];
     const servicio = document.getElementById('rvfServicio').value.trim();
     if (!servicio) { alert('Indicá el servicio realizado'); return; }
+    // Obtener código/nombre: del perfil o del override
+    const clientCodigo = c?.code || window._currentFacialClientCodigo || '';
+    const clientNombre = c?.name || window._currentFacialClientNombre || '';
+    if (!clientCodigo) { alert('Error: no se encontró la clienta'); return; }
     const btn = document.getElementById('rvfGuardarBtn');
     btn.disabled = true; btn.textContent = 'Guardando...';
     try {
       const user = window.currentUser;
       const result = await apiPost('addVisitaFacial', {
-        codigo: c.code, nombre: c.name, servicio,
+        codigo: clientCodigo, nombre: clientNombre, servicio,
         precio: Number(document.getElementById('rvfPrecio').value) || 0,
         staff: user?.name || '',
         procedimiento: document.getElementById('rvfProcedimiento').value.trim(),
@@ -11342,13 +11387,21 @@ if ('caches' in window) {
         obs: document.getElementById('rvfObs').value.trim()
       });
       if (result && result.success) {
-        if (!c.facial) c.facial = { history: [] };
-        if (!c.facial.history) c.facial.history = [];
-        const today = new Date();
-        const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
-        c.facial.history.unshift({ service: servicio, price: Number(document.getElementById('rvfPrecio').value)||0, date: fecha, by: user?.name||'', procedimiento: document.getElementById('rvfProcedimiento').value.trim(), productosUsados: document.getElementById('rvfProductos').value.trim(), obs: document.getElementById('rvfObs').value.trim() });
-        if (c.facial.history.length > 5) c.facial.history = c.facial.history.slice(0, 5);
-        closeModal(); renderProfileTab(); showToast('✅ Visita facial registrada');
+        const cLocal = CLIENT_PROFILES[clientKey];
+        if (cLocal) {
+          if (!cLocal.facial) cLocal.facial = { history: [] };
+          if (!cLocal.facial.history) cLocal.facial.history = [];
+          const today = new Date();
+          const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
+          cLocal.facial.history.unshift({ service: servicio, price: Number(document.getElementById('rvfPrecio').value)||0, date: fecha, by: user?.name||'', procedimiento: document.getElementById('rvfProcedimiento').value.trim(), productosUsados: document.getElementById('rvfProductos').value.trim(), obs: document.getElementById('rvfObs').value.trim() });
+          if (cLocal.facial.history.length > 5) cLocal.facial.history = cLocal.facial.history.slice(0, 5);
+        }
+        window._currentFacialClientKey = null;
+        window._currentFacialClientNombre = null;
+        window._currentFacialClientCodigo = null;
+        closeModal();
+        if (clientKey === currentProfileClient) renderProfileTab();
+        showToast('✅ Visita facial registrada');
       } else { alert('Error: ' + (result?.message || 'desconocido')); }
     } catch(e) { alert('Error de conexión'); }
     btn.disabled = false; btn.textContent = '💾 Guardar visita';
