@@ -10611,9 +10611,23 @@ if ('caches' in window) {
       }
     }
 
-    // Mapear área a clave interna
-    const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    const areaKey = areaMap[area] || 'cejas';
+    // Mapear área a clave interna — si es promo sin área (arrArea vacío), deducir del tipo
+    let areaKey = '';
+    if (tipo === 'promo' && (!area || area === 'Cejas')) {
+      // Intentar deducir del promo seleccionado
+      const promoForArea = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p=>p));
+      if (promoForArea && promoForArea.division && promoForArea.division.length > 0) {
+        const ds = String(promoForArea.division[0].area||'').toLowerCase();
+        areaKey = ds.includes('pest')||ds.includes('lifting') ? 'pestanas'
+          : ds.includes('ceja') ? 'cejas'
+          : ds.includes('depil')||ds.includes('bikini') ? 'depilacion'
+          : ds.includes('facial') ? 'facial' : 'cejas';
+      }
+    }
+    if (!areaKey) {
+      const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
+      areaKey = areaMap[area] || 'cejas';
+    }
 
     // Obtener prioridad seleccionada
     const priEl = document.querySelector('.priority-option.selected');
@@ -10744,10 +10758,13 @@ if ('caches' in window) {
         // Para promo: usar el área de la primera promo seleccionada
         const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
         if (promo && promo.division && promo.division.length > 0) {
-          const firstDiv = promo.division[0];
-          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
-          const divArea = String(firstDiv.area || '').toLowerCase();
-          area = areaMapRD[divArea] || 'Cejas';
+          const divStr2 = String(promo.division[0].area || '').toLowerCase();
+          const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
+            : divStr2.includes('ceja') ? 'cejas'
+            : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
+            : divStr2.includes('facial') ? 'facial' : 'cejas';
+          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
+          area = areaMapRD[areaKeyRD] || 'Cejas';
         }
       } else {
         area = document.getElementById('arrArea')?.value || 'Cejas';
@@ -10785,7 +10802,7 @@ if ('caches' in window) {
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
         if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
-        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[String(p2.division[0].area||'').toLowerCase()]||'Cejas'; } }
+        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const ds2=String(p2.division[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('ceja')?'cejas':ds2.includes('depil')?'depilacion':ds2.includes('facial')?'facial':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
@@ -10849,9 +10866,14 @@ if ('caches' in window) {
       // Para promo: área de la primera promo asignada
       const promoGA = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p => p));
       if (promoGA && promoGA.division && promoGA.division.length > 0) {
-        const divAreaGA = String(promoGA.division[0].area || '').toLowerCase();
-        const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
-        area = areaMapGA[divAreaGA] || 'Cejas';
+        // division.area puede tener emojis: '👁 Pestañas', '💅 Cejas', etc.
+        const divStr = String(promoGA.division[0].area || '').toLowerCase();
+        const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') ? 'pestanas'
+          : divStr.includes('ceja') ? 'cejas'
+          : divStr.includes('depil') || divStr.includes('bikini') ? 'depilacion'
+          : divStr.includes('facial') ? 'facial' : 'cejas';
+        const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
+        area = areaMapGA[areaKeyGA] || 'Cejas';
       }
     } else {
       area = document.getElementById('arrArea')?.value || 'Cejas';
