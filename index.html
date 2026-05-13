@@ -4592,19 +4592,15 @@ if ('caches' in window) {
     const slot = window._finishingSlot || 1;
 
     // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
-    // Prioridad: _finishingData.idEspera > _as1IdEspera > buscar en backend
     let idEsperaActual = data.idEspera || window._as1IdEspera || '';
     let miTicketSheet = null;
 
-    // Solo buscar en ServicioPromo si parece SP- o si no tenemos idEspera
+    // Buscar en ServicioPromo si es SP- o vacío
     if (!idEsperaActual || idEsperaActual.startsWith('SP-')) {
       try {
         const spData = await apiGet('getServicioPromo');
         if (spData.success) {
-          const todosLosTickets = [
-            ...(spData.enServicio || []),
-            ...(spData.porCobrar  || [])
-          ];
+          const todosLosTickets = [...(spData.enServicio || []), ...(spData.porCobrar || [])];
           miTicketSheet = todosLosTickets.find(t =>
             t.tomadaPor === user?.name &&
             (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
@@ -4612,6 +4608,26 @@ if ('caches' in window) {
           if (miTicketSheet) {
             idEsperaActual = miTicketSheet.idEspera;
             window._as1IdEspera = idEsperaActual;
+          }
+        }
+      } catch(e) {}
+    }
+
+    // ── ENGANCHE: si es SN- pero hay desglose acumulado en memoria, buscar también en SP ──
+    // Cuando Laura toma enganche de Lesly (SN-), el ticket del enganche es SP-
+    // El SN- original no tiene serviciosDetalle de Lesly — está en el SP- creado por continuarPromoALista
+    if (idEsperaActual.startsWith('SN-') && !miTicketSheet) {
+      try {
+        const spData2 = await apiGet('getServicioPromo');
+        if (spData2.success) {
+          const allSP = [...(spData2.enServicio || []), ...(spData2.porCobrar || [])];
+          // Buscar SP ticket para esta clienta (puede tener desglose de la staff previa)
+          const linkedSP = allSP.find(t =>
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
+          );
+          if (linkedSP && linkedSP.serviciosDetalle && linkedSP.serviciosDetalle.length > 0) {
+            miTicketSheet = linkedSP;
+            // No cambiar idEsperaActual — solo usamos miTicketSheet para el desglose
           }
         }
       } catch(e) {}
@@ -4646,9 +4662,10 @@ if ('caches' in window) {
     // ── PASO 3: Calcular totales ───────────────────────────────────────────────
     const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
     const totalSoloEstaStaff = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    // Para enganche: sumar también partes previas del sheet para el total final
+    // Para enganche: sumar partes previas del sheet (Lesly) + esta staff (Laura)
     let totalPrevioSheet = 0;
-    if (esTicketSP && miTicketSheet?.serviciosDetalle?.length > 0) {
+    // Incluir desglose del sheet tanto si es SP como si es SN con SP vinculado
+    if (miTicketSheet?.serviciosDetalle?.length > 0) {
       totalPrevioSheet = miTicketSheet.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
     }
     const totalCombinadoEnganche = totalPrevioSheet + totalSoloEstaStaff;
@@ -4670,8 +4687,8 @@ if ('caches' in window) {
     // SIEMPRE combinar: el sheet guarda partes previas (ej: Lesly), la memoria tiene la actual (Laura)
     const desgloseAcumulado = [];
 
-    // 1) Agregar partes del sheet primero (staffs anteriores guardados en SP ticket)
-    if (esTicketSP && miTicketSheet?.serviciosDetalle?.length > 0) {
+    // 1) Agregar partes del sheet primero (staffs anteriores — funciona para SP y SN-enganche)
+    if (miTicketSheet?.serviciosDetalle?.length > 0) {
       miTicketSheet.serviciosDetalle.forEach(d => {
         const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
         if (!yaExiste) desgloseAcumulado.push(d);
@@ -4691,10 +4708,13 @@ if ('caches' in window) {
     });
 
     // ── PASO 5: Llamar al backend ──────────────────────────────────────────────
+    // Para enganche SN-→SP: usar el SP ticket del desglose si existe, no el SN original
+    const esEngancheSN = !esTicketSP && miTicketSheet && miTicketSheet.idEspera && miTicketSheet.idEspera.startsWith('SP-');
     try {
-      if (esTicketSP) {
+      if (esTicketSP || esEngancheSN) {
+        const idParaFinalizar = esEngancheSN ? miTicketSheet.idEspera : idEsperaActual;
         await apiPost('finalizarServicioPromo', {
-          idEspera: idEsperaActual,
+          idEspera: idParaFinalizar,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
           servicio: svcNamesFresh,
