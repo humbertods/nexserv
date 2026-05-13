@@ -11714,14 +11714,14 @@ if ('caches' in window) {
         + '<div style="font-size:10px;opacity:.7;">' + (hayVisitas ? client.facial.history.length + ' visita(s) registrada(s)' : 'Primera visita') + '</div>'
         + '</div>'
         + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--success),#2d5a3a);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✅ Registrar visita de hoy</button>'
-        + '<button onclick="openNuevaFichaFacialFromPanel('' + clientKey + '',' + slot + ')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">✏️ Actualizar ficha</button>';
+        + '<button onclick="openNuevaFichaFacialFromPanel(\'' + clientKey + '\',' + slot + ')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">✏️ Actualizar ficha</button>';
     } else {
       // Sin ficha — mostrar botón crear ficha
       el.innerHTML = '<div style="background:var(--bg-card);border:2px dashed #2d6a4f;border-radius:20px;padding:18px;text-align:center;margin-bottom:10px;">'
         + '<div style="font-size:24px;margin-bottom:6px;">🌿</div>'
         + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#2d6a4f;">Sin ficha facial</div>'
         + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Creá la ficha base de la clienta para llevar su historial</div>'
-        + '<button onclick="openNuevaFichaFacialFromPanel('' + clientKey + '',' + slot + ')" style="padding:14px 24px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha facial</button>'
+        + '<button onclick="openNuevaFichaFacialFromPanel(\'' + clientKey + '\',' + slot + ')" style="padding:14px 24px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha facial</button>'
         + '</div>'
         + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">Saltar ficha — solo registrar visita</button>';
     }
