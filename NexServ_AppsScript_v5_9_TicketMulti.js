@@ -3997,7 +3997,9 @@ function handleCrearTicketMulti(data) {
     row[4]  = data.nombre   || '';
     row[5]  = 'Activo';
     row[6]  = data.prioridad || 'Normal';
-    row[7]  = data.observaciones || '';
+    row[7]  = (data.secuencia && data.secuencia.length > 0)
+              ? 'SEQ:' + data.secuencia.join(',') + (data.observaciones ? '|' + data.observaciones : '')
+              : (data.observaciones || '');
     row[8]  = '';
     row[9]  = '';
 
@@ -4072,13 +4074,29 @@ function handleGetTicketMulti(params) {
         });
       });
 
+      const obsRaw = String(row[7] || '');
+      var secuencia = [];
+      var observaciones = obsRaw;
+      if (obsRaw.startsWith('SEQ:')) {
+        var seqPart = obsRaw.substring(4);
+        var pipeIdx = seqPart.indexOf('|');
+        if (pipeIdx !== -1) {
+          secuencia = seqPart.substring(0, pipeIdx).split(',').filter(Boolean);
+          observaciones = seqPart.substring(pipeIdx + 1);
+        } else {
+          secuencia = seqPart.split(',').filter(Boolean);
+          observaciones = '';
+        }
+      }
+
       const item = {
         idEspera:         id,
         codigo:           String(row[3] || ''),
         nombre:           String(row[4] || ''),
         estado:           String(row[5] || ''),
         prioridad:        String(row[6] || ''),
-        observaciones:    String(row[7] || ''),
+        observaciones:    observaciones,
+        secuencia:        secuencia,
         metodoPago:       String(row[8] || ''),
         horaCobro:        String(row[9] || ''),
         areas,
@@ -4169,52 +4187,90 @@ function handleCompletarAreaTicketMulti(data) {
     const rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
     const tz = 'America/Guayaquil';
 
-    for (let i = 0; i < rows.length; i++) {
+    for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() !== data.idEspera) continue;
-      const rowNum = i + 3;
+      var rowNum = i + 3;
 
-      // Marcar área de esta staff como Completado
-      for (let a = 0; a < 4; a++) {
-        const base = TM_AREA_COL[a];
+      // Parsear secuencia desde observaciones
+      var obsRaw = String(rows[i][7] || '');
+      var secuencia = [];
+      if (obsRaw.startsWith('SEQ:')) {
+        var seqStr = obsRaw.substring(4).split('|')[0];
+        secuencia = seqStr.split(',').filter(Boolean);
+      }
+
+      // Encontrar el área de esta staff y marcarla completada
+      var areaCompletadaIdx = -1;
+      var areaCompletadaKey = '';
+      for (var a = 0; a < 4; a++) {
+        var base = TM_AREA_COL[a];
         if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
         ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
-        // Registrar comisión parcial
-        try { updateComision(data.chicaNombre, Number(rows[i][TM_PRECIO_COL[a]] || 0)); } catch(e) {}
+        areaCompletadaIdx = a;
+        // Extraer área key del tentativo (formato "cejas||servicio")
+        var rawTent = String(rows[i][base] || '');
+        areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
+        try { updateComision(data.chicaNombre, Number(rows[i][TM_PRECIO_COL[a]] || 0)); } catch(e2) {}
         break;
       }
 
-      // Verificar si todas las áreas con datos están completadas
-      let todasListas = true;
-      for (let a = 0; a < 4; a++) {
-        const base = TM_AREA_COL[a];
-        const tent   = String(rows[i][base]     || '').trim();
-        const estado = String(rows[i][base + 3] || '').trim();
-        if (tent && estado !== 'Completado') { todasListas = false; break; }
+      // Determinar siguiente área usando la secuencia
+      // Áreas pendientes (con datos y no completadas, excluyendo la que acaba de completar)
+      var areasConDatos = [];
+      for (var a2 = 0; a2 < 4; a2++) {
+        var base2 = TM_AREA_COL[a2];
+        var tent2  = String(rows[i][base2] || '').trim();
+        if (!tent2) continue;
+        var est2   = String(rows[i][base2 + 3] || '').trim();
+        var aKey2  = tent2.indexOf('||') !== -1 ? tent2.split('||')[0] : '';
+        areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2 });
+      }
+
+      // Áreas que aún no están completadas (excluyendo la que acaba de terminar)
+      var areasPendientes = areasConDatos.filter(function(a) {
+        return a.estado !== 'Completado';
+      });
+
+      var todasListas = areasPendientes.length === 0;
+
+      // Determinar si hay siguiente área según secuencia
+      var siguienteArea = null;
+      if (!todasListas && secuencia.length > 0) {
+        // Buscar en la secuencia cuál es la siguiente después de la completada
+        var posActual = secuencia.indexOf(areaCompletadaKey);
+        for (var s = posActual + 1; s < secuencia.length; s++) {
+          var candidata = areasPendientes.find(function(ap) { return ap.key === secuencia[s]; });
+          if (candidata) { siguienteArea = candidata; break; }
+        }
+        // Si no encontró por secuencia, tomar la primera pendiente
+        if (!siguienteArea) siguienteArea = areasPendientes[0];
+      } else if (!todasListas) {
+        siguienteArea = areasPendientes[0];
       }
 
       if (todasListas) {
         ws.getRange(rowNum, 6).setValue('Por cobrar');
-        // Escribir en HistorialOwner para visibilidad owner
         try {
-          const wsHist = getSheet('HistorialOwner');
-          const totalPromo = Number(rows[i][35] || 0);
+          var wsHist = getSheet('HistorialOwner');
           wsHist.appendRow([
-            rows[i][1], // Fecha
+            rows[i][1],
             Utilities.formatDate(new Date(), tz, 'HH:mm'),
-            rows[i][3], // Código
-            rows[i][4], // Nombre
-            '',
+            rows[i][3], rows[i][4], '',
             'Ticket Multi (' + String(rows[i][0]) + ')',
-            'multi',
-            'Varios',
-            totalPromo,
+            'multi', 'Varios',
+            Number(rows[i][35] || 0),
             Number(rows[i][34] || 0),
             'Pendiente cobro'
           ]);
-        } catch(e) {}
+        } catch(eH) {}
       }
 
-      return { success: true, todasCompletadas: todasListas };
+      return {
+        success: true,
+        todasCompletadas: todasListas,
+        siguienteArea: siguienteArea ? siguienteArea.key : null,
+        areasPendientes: areasPendientes.length
+      };
     }
     return { success: false, message: 'Ticket no encontrado' };
   } catch(e) { return { success: false, message: String(e) }; }

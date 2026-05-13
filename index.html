@@ -3068,15 +3068,36 @@ if ('caches' in window) {
     const myArea = user?.area || 'cejas';
 
     // ── TICKET MULTI ─────────────────────────────────────────
-    const idEsperaActual = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
     if (idEsperaActual.startsWith('TM-')) {
-      btnContainer.innerHTML = `
-        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
-          ✅ Completado — siguiente servicio
-        </button>
-        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMultiFinal()">
-          🎯 Completado multi-servicio — mandar a cobrar
-        </button>`;
+      // Verificar si hay más áreas pendientes para este ticket
+      apiGet('getTicketMulti').then(function(tmData) {
+        if (!tmData.success) return;
+        var tm = (tmData.activos || []).find(function(t) { return t.idEspera === idEsperaActual; });
+        if (!tm) return;
+        var areasPendientes = (tm.areas || []).filter(function(a) {
+          return a.estado !== 'Completado' && a.staff !== (user && user.name ? user.name : '');
+        });
+        var esUltima = areasPendientes.length === 0;
+        btnContainer.innerHTML = esUltima
+          ? `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+              🎯 Completado multi-servicio — mandar a cobrar
+             </button>`
+          : `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+              ✅ Completado — siguiente área
+             </button>
+             <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+              🎯 Completado multi-servicio — mandar a cobrar
+             </button>`;
+      }).catch(function() {
+        // Fallback: mostrar ambos botones
+        btnContainer.innerHTML = `
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+            ✅ Completado — siguiente área
+          </button>
+          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; completarAreaMulti()">
+            🎯 Completado multi-servicio — mandar a cobrar
+          </button>`;
+      });
       return;
     }
     // ── FIN TICKET MULTI ─────────────────────────────────────
@@ -10301,7 +10322,8 @@ if ('caches' in window) {
         nombre:       nombre,
         prioridad:    prioridad,
         observaciones: obs,
-        areas:        areasMulti
+        areas:        areasMulti,
+        secuencia:    _secuencia.map(s => s.area) // ['pestanas','cejas'] etc
       };
 
       try {
@@ -10493,7 +10515,8 @@ if ('caches' in window) {
           nombre:       nombre,
           prioridad:    'Normal',
           observaciones: obs,
-          areas:        areasMultiGA
+          areas:        areasMultiGA,
+          secuencia:    _secuencia.map(s => s.area)
         });
         if (tmResult && tmResult.success) {
           window._arrPromo = null;
@@ -10923,6 +10946,7 @@ if ('caches' in window) {
         chicaNombre: user?.name || ''
       });
       if (r.success) {
+        // Limpiar slot
         slotServices[slot] = [];
         window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
         if (user && activeClients[user.name]) {
@@ -10930,9 +10954,13 @@ if ('caches' in window) {
           updateCapacityUI(user.name);
         }
         show('staffHome');
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
-        alert('✅ Tu parte completada. El sistema continúa con el siguiente servicio.');
+        if (r.todasCompletadas) {
+          alert('🎯 Todos los servicios completados. Clienta enviada a cobrar con Mikaela.');
+        } else {
+          alert('✅ Tu parte completada. Sigue el área: ' + (r.siguienteArea || 'siguiente') + '. La clienta está en lista de espera.');
+        }
       } else {
         alert('Error: ' + r.message);
       }
