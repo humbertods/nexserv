@@ -10057,31 +10057,63 @@ if ('caches' in window) {
     // Renderizar lista de promos activas
     const list = document.getElementById('promoSelectList');
     const active = PROMOS.filter(p => p.active);
+    const _user_pm = window.currentUser;
+    const _myArea_pm = _user_pm?.area || 'cejas';
+
     list.innerHTML = active.map((p, i) => {
       // Verificar si esta es la promo asignada por Mikaela
       const isAssigned = assignedPromo && p.name === assignedPromo.name;
       const borderStyle = isAssigned ? 'border: 3px solid #ff6b9d;' : '';
       const bgStyle = isAssigned ? 'background: linear-gradient(135deg, #fff5f7 0%, #ffe8ef 100%);' : 'background: var(--bg-card);';
       const assignedBadge = isAssigned ? '<div style="background: #ff6b9d; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px; display: inline-block; margin-bottom: 6px;">💝 ASIGNADA POR MIKAELA</div>' : '';
-      
-      return `
-      <div style="${bgStyle} ${borderStyle} border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(${i})">
-        ${assignedBadge}
+
+      // ── DETECCIÓN "PROMO COMPLETA MÁS BARATA" ──
+      // Precio normal del servicio de esta área en el catálogo
+      const _myCatArea = CATALOGO[_myArea_pm === 'pestanas' ? 'pestanas' : _myArea_pm === 'facial' ? 'facial' : 'cejas'] || [];
+      // Precio del servicio en mi área dentro de esta promo
+      const _myDivPM = p.division.find(d => {
+        const da = String(d.area||'').toLowerCase();
+        return _myArea_pm === 'pestanas' ? (da.includes('pest') || da.includes('lifting') || da.includes('retiro'))
+          : _myArea_pm === 'facial' ? da.includes('facial')
+          : (da.includes('ceja') || da.includes('depil'));
+      });
+      // Solo mostrar botón si: promo tiene mi área, precio promo < precio regular del servicio solo
+      const _promoEsMasBarata = _myDivPM && (Number(p.price) < Number(p.regular)) &&
+        p.division.length > 1 && // promo multi-área (no mono-servicio)
+        (Number(p.price) < Number(p.regular)); // promo tiene descuento vs regular
+
+      const _btnPromoCompleta = _promoEsMasBarata ? `
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);" onclick="event.stopPropagation()">
+          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">💡 La clienta solo quiere tu servicio, pero la promo es más barata que el precio normal</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="event.stopPropagation(); applyPromo(${i})" style="flex:1;padding:8px 12px;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);">
+              Solo mi parte · $${_myDivPM ? _myDivPM.monto : '?'}
+            </button>
+            <button onclick="event.stopPropagation(); applyPromoCompleta(${i})" style="flex:1;padding:8px 12px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:white;">
+              🎯 Tomar promo completa · $${p.price}
+            </button>
+          </div>
+        </div>` : '';
+
+      return \`
+      <div style="\${bgStyle} \${borderStyle} border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(\${i})">
+        \${assignedBadge}
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div style="flex: 1;">
-            <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">${p.name}</div>
-            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 6px;">${p.services}</div>
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">\${p.name}</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 6px;">\${p.services}</div>
             <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-              ${p.division.map(d => '<span style="background: var(--bg); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-pill); color: var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>').join('')}
+              \${p.division.map(d => '<span style="background: var(--bg); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-pill); color: var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>').join('')}
             </div>
           </div>
           <div style="text-align: right; flex-shrink: 0; margin-left: 10px;">
-            <div style="font-size: 22px; font-weight: 800; color: ${isAssigned ? '#c44569' : 'var(--accent-deep)'};">$${p.price}</div>
-            <div style="font-size: 11px; color: var(--ink-faint); text-decoration: line-through;">$${p.regular}</div>
+            <div style="font-size: 22px; font-weight: 800; color: \${isAssigned ? '#c44569' : 'var(--accent-deep)'};">\$\${p.price}</div>
+            <div style="font-size: 11px; color: var(--ink-faint); text-decoration: line-through;">\$\${p.regular}</div>
           </div>
         </div>
+        \${_btnPromoCompleta}
       </div>
-    `;
+    \`;
     }).join('');
     
     document.getElementById('promoSelectModal').classList.add('active');
@@ -10136,6 +10168,58 @@ if ('caches' in window) {
     
     closeModal();
     alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
+  }
+
+  // Tomar promo completa: la staff cobra el precio total aunque solo haga su parte
+  // Útil cuando precio promo < precio normal del servicio individual
+  function applyPromoCompleta(promoIdx) {
+    const promo = PROMOS[promoIdx];
+    const slot = window._promoSlot;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
+    const user = window.currentUser;
+    const myArea = user?.area || 'cejas';
+
+    // Precio TOTAL de la promo (no solo la parte del área)
+    const precioTotal = Number(promo.price);
+
+    // Reemplazar slotServices con la promo al precio total
+    if (!slotServices[slot]) slotServices[slot] = [];
+    // Limpiar servicios previos de esta promo si existen
+    slotServices[slot] = slotServices[slot].filter(s => s.name !== promo.name);
+    slotServices[slot].push({
+      name: promo.name,
+      area: myArea,
+      price: precioTotal,
+      _promoCompleta: true  // flag para saber que es precio de promo completa
+    });
+
+    // Actualizar UI
+    renderServicesForSlot(slot);
+    const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+
+    // Registrar promo activa — marcar como completa (no continuar a otras áreas)
+    const promoClientKey = normalizeClientKey(clientName);
+    activePromos[promoClientKey] = {
+      promo: promo,
+      startedBy: myArea,
+      completedAreas: promo.division.map(d => d.area), // marcar todas como "hechas"
+      _promoCompleta: true
+    };
+    saveActivePromos();
+
+    // Cambiar botón
+    const promoBtn = document.getElementById('promoBtn' + slot);
+    if (promoBtn) {
+      promoBtn.textContent = '✓ Promo completa aplicada';
+      promoBtn.style.background = 'var(--success)';
+    }
+
+    closeModal();
+    // Actualizar botones de finalización — debe mostrar "Finalizar servicio" directo
+    setTimeout(() => updateFinishButtons(slot), 200);
+    showToast('🎯 Promo completa aplicada · $' + precioTotal + ' — Se cobra el total de la promo');
   }
 
   function continuePromo() {
