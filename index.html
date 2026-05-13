@@ -5999,8 +5999,9 @@ if ('caches' in window) {
   }
 
   function renderSecuencia() {
-    const list = document.getElementById('secuenciaList');
-    const empty = document.getElementById('secuenciaEmpty');
+    // Soporta ambos formularios: normal (secuenciaList) y multi (secuenciaListMulti)
+    const list = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
+    const empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
     if (!list) return;
     if (_secuencia.length === 0) {
       list.innerHTML = '';
@@ -6032,6 +6033,10 @@ if ('caches' in window) {
     if (btn) btn.style.display = 'inline-block';
     const empty = document.getElementById('secuenciaEmpty');
     if (empty) empty.style.display = 'block';
+    const emptyMulti = document.getElementById('secuenciaEmptyMulti');
+    if (emptyMulti) emptyMulti.style.display = 'block';
+    const listMulti = document.getElementById('secuenciaListMulti');
+    if (listMulti) listMulti.innerHTML = '';
   }
 
   async function openResumenSemana() {
