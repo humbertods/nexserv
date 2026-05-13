@@ -3075,34 +3075,22 @@ if ('caches' in window) {
         if (!tmData.success) return;
         var tm = (tmData.activos || []).find(function(t) { return t.idEspera === idEsperaActual; });
         if (!tm) return;
-
-        // Áreas que otros todavía deben hacer (excluye la mía actual y las completadas)
         var miNombre = user && user.name ? user.name : '';
-        var areasMiasEnCurso = (tm.areas || []).filter(function(a) {
-          return a.staff === miNombre && String(a.estado||'').toLowerCase() === 'en servicio';
-        });
-        // Áreas pendientes que NO son mías (otra staff las tiene que hacer)
         var areasDeOtros = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        // ¿Puedo tomar yo misma la siguiente? (si mi área y la siguiente son del mismo tipo que manejo)
         var siguienteEsperando = areasDeOtros.length > 0 ? areasDeOtros[0] : null;
-        // Solo hay más si quedan áreas sin completar que no son las mías en curso
         var hayMasAreasSinCompletar = (tm.areas || []).filter(function(a) {
           var est = String(a.estado||'').toLowerCase();
           return est !== 'completado' && a.staff !== miNombre;
         }).length > 0;
-
         var slotN = slot1 ? 1 : 2;
-
         if (!hayMasAreasSinCompletar) {
-          // Solo queda mi área — finalizar todo
           btnContainer.innerHTML = `
             <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">
               🎯 Completado — mandar a cobrar
             </button>`;
         } else {
-          // Hay más áreas. Ofrecer 3 opciones:
           var labelSiguiente = siguienteEsperando ? (siguienteEsperando.tentativo || siguienteEsperando.area || 'siguiente área') : 'siguiente área';
           btnContainer.innerHTML = `
             <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">
@@ -6027,8 +6015,9 @@ if ('caches' in window) {
   }
 
   function renderSecuencia() {
-    const list = document.getElementById('secuenciaList');
-    const empty = document.getElementById('secuenciaEmpty');
+    // Soporta formulario normal (secuenciaList) y multi (secuenciaListMulti)
+    const list = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
+    const empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
     if (!list) return;
     if (_secuencia.length === 0) {
       list.innerHTML = '';
@@ -6060,6 +6049,10 @@ if ('caches' in window) {
     if (btn) btn.style.display = 'inline-block';
     const empty = document.getElementById('secuenciaEmpty');
     if (empty) empty.style.display = 'block';
+    const emptyMulti = document.getElementById('secuenciaEmptyMulti');
+    if (emptyMulti) emptyMulti.style.display = 'block';
+    const listMulti = document.getElementById('secuenciaListMulti');
+    if (listMulti) listMulti.innerHTML = '';
   }
 
   async function openResumenSemana() {
@@ -6323,7 +6316,7 @@ if ('caches' in window) {
         } else {
           atenList.innerHTML = enServicio.map(a => {
             const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-            const areaIcons = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿', depilación: '🪒', pestañas: '👁' };
+            const areaIcons = { cejas: '💅', depilacion: '🪒', depilación: '🪒', pestanas: '👁', pestañas: '👁', retiro_lifting: '✨', facial: '🌿' };
             const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', depilación: 'Depilación', pestanas: 'Pestañas', pestañas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
 
             let timelineHTML = '';
@@ -6332,141 +6325,141 @@ if ('caches' in window) {
             if (esTM) {
               // ── TICKET MULTI: desglose real por área ──
               (a.areas || []).forEach((ar, arIdx) => {
-                const aKey = String(ar.area || '').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                const aKey = String(ar.area || '').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, s => s === 'é' ? 'e' : 'n');
                 const icon = areaIcons[aKey] || areaIcons[ar.area] || '🔄';
                 const label = areaLabels[aKey] || areaLabels[ar.area] || ar.area || 'Servicio';
                 const serv = ar.tentativo || ar.confirmado || '';
                 const precio = ar.precio || 0;
                 const est = String(ar.estado || '').toLowerCase();
-                const isLast = arIdx < (a.areas.length - 1);
-
+                const notLast = arIdx < (a.areas.length - 1);
                 if (est === 'completado') {
-                  timelineHTML += `
-                    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;${isLast ? 'border-bottom:1px solid var(--line);' : ''}">
-                      <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                      <div style="flex:1;">
-                        <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff || '—'} · <strong>$${precio}</strong></div>
-                        <div style="font-size:11px;color:var(--ink-soft);">${serv}</div>
-                        <div style="font-size:10px;color:var(--ink-faint);">✅ Completado${ar.hora ? ' · ' + ar.hora : ''}</div>
-                      </div>
-                      <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div>
-                    </div>`;
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div></div>`;
                 } else if (est === 'en servicio') {
-                  timelineHTML += `
-                    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;${isLast ? 'border-bottom:1px solid var(--line);' : ''}">
-                      <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
-                      <div style="flex:1;">
-                        <div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff || '—'} · <strong>$${precio}</strong></div>
-                        <div style="font-size:11px;color:var(--ink-soft);">${serv}</div>
-                        <div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora ? ' desde ' + ar.hora : ''}</div>
-                      </div>
-                      <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div>
-                    </div>`;
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
                 } else {
-                  // Esperando
-                  timelineHTML += `
-                    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${isLast ? 'border-bottom:1px solid var(--line);' : ''}">
-                      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                      <div style="flex:1;">
-                        <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div>
-                        <div style="font-size:11px;color:var(--ink-faint);">${serv}</div>
-                        <div style="font-size:10px;color:var(--ink-faint);">⏳ Pendiente</div>
-                      </div>
-                      <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div>
-                    </div>`;
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv}</div><div style="font-size:10px;color:var(--ink-faint);">⏳ Pendiente</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
                 }
               });
             } else {
-              // ── TICKET NORMAL / PROMO: timeline existente ──
-              const obs = String(a.observaciones || '');
-              const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
+            // ── TICKET NORMAL / PROMO: timeline original ──
 
-              partesPrevias.forEach(parte => {
-                const matchArea = parte.match(/✅\s*([\w\/áéíóúñ]+)\s+completad[ao] por\s+([^·]+)/i);
-                if (matchArea) {
-                  const areaComp = matchArea[1].trim().toLowerCase();
-                  const staffComp = matchArea[2].trim();
-                  const icon = areaIcons[areaComp] || '✅';
-                  const label = areaLabels[areaComp] || areaComp;
-                  let montoStr = '';
-                  if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
-                    const entrada = a.serviciosDetalle.find(d =>
-                      String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
-                      String(d.area||'').toLowerCase().includes(areaComp)
-                    );
-                    if (entrada && Number(entrada.monto) > 0) montoStr = ' · <strong>$' + Number(entrada.monto).toFixed(2) + '</strong>';
+            // Parsear historial de áreas completadas desde observaciones
+            // Formato: "✅ cejas completado por María · Sigue: Pestañas | ✅ ..."
+            const obs = String(a.observaciones || '');
+            const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
+
+            // Construir timeline: partes completadas + parte actual
+
+            // Partes ya completadas (de otras áreas)
+            partesPrevias.forEach(parte => {
+              // "✅ cejas completado por María · Sigue: Pestañas"
+              const matchArea = parte.match(/✅\s*([\w\/áéíóúñ]+)\s+completad[ao] por\s+([^·]+)/i);
+              if (matchArea) {
+                const areaComp = matchArea[1].trim().toLowerCase();
+                const staffComp = matchArea[2].trim();
+                const icon = areaIcons[areaComp] || '✅';
+                const label = areaLabels[areaComp] || areaComp;
+                // Intentar extraer monto desde el desglose del ticket si está disponible
+                let montoStr = '';
+                if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+                  const entrada = a.serviciosDetalle.find(d =>
+                    String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
+                    String(d.area||'').toLowerCase().includes(areaComp)
+                  );
+                  if (entrada && Number(entrada.monto) > 0) {
+                    montoStr = ' · <strong>$' + Number(entrada.monto).toFixed(2) + '</strong>';
                   }
-                  timelineHTML += `
-                    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">
-                      <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                      <div style="flex:1;">
-                        <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${staffComp}${montoStr}</div>
-                        <div style="font-size:10px;color:var(--ink-faint);font-weight:500;">✅ Completado</div>
-                      </div>
-                      <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div>
-                    </div>`;
                 }
-              });
+                timelineHTML += `
+                  <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;">
+                      <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${staffComp}${montoStr}</div>
+                      <div style="font-size:10px;color:var(--ink-faint);font-weight:500;">✅ Completado</div>
+                    </div>
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div>
+                  </div>`;
+              }
+            });
 
-              const areaActualKey = String(a.area || '').toLowerCase().replace('ó','o').replace('ñ','n');
-              const iconActual = areaIcons[areaActualKey] || '🔄';
-              const labelActual = areaLabels[areaActualKey] || a.area || 'Servicio';
-              const servicioLimpio = String(a.servicio || '').replace('(continuación promo)', '').replace('(continuacion promo)', '').trim();
-              const esPendConf = a.pendienteConfirmacion === true;
-              const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
-              const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
-              const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
-              timelineHTML += `
-                <div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
-                  <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
-                  <div style="flex:1;">
-                    <div style="font-size:12px;font-weight:800;color:${badgeColor};">${labelActual} · ${a.tomadaPor}</div>
-                    <div style="font-size:11px;color:var(--ink-soft);font-weight:500;">${servicioLimpio}</div>
-                    <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf ? ' · Esperando que la staff confirme' : ''}</div>
-                  </div>
-                  <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div>
-                </div>`;
+            // Parte actual — en atención AHORA
+            const areaActualKey = String(a.area || '').toLowerCase().replace('ó','o').replace('ñ','n');
+            const iconActual = areaIcons[areaActualKey] || '🔄';
+            const labelActual = areaLabels[areaActualKey] || a.area || 'Servicio';
+            // Servicio actual: limpiar "(continuación promo)" si viene de enganche
+            const servicioLimpio = String(a.servicio || '').replace('(continuación promo)', '').replace('(continuacion promo)', '').trim();
+            const esPendConf = a.pendienteConfirmacion === true;
+            const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
+            const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
+            const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
+            timelineHTML += `
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
+                <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
+                <div style="flex:1;">
+                  <div style="font-size:12px;font-weight:800;color:${badgeColor};">${labelActual} · ${a.tomadaPor}</div>
+                  <div style="font-size:11px;color:var(--ink-soft);font-weight:500;">${servicioLimpio}</div>
+                  <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf ? ' · Esperando que la staff confirme' : ''}</div>
+                </div>
+                <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div>
+              </div>`;
 
-              if (a.promoNombre) {
-                const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
-                if (promoFull && promoFull.division) {
-                  const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
-                  const areasYa = new Set();
-                  partesPrevias.forEach(p => {
-                    const m = p.match(/✅\s*([\w\/]+)\s+completad/i);
-                    if (m) areasYa.add(m[1].trim().toLowerCase());
-                  });
-                  areasYa.add(areaActualNorm);
-                  if (areaActualNorm === 'pestanas') areasYa.add('pestañas');
-                  if (areaActualNorm === 'cejas') areasYa.add('cejas');
-                  promoFull.division.forEach(d => {
-                    const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas').replace('pestaña','pestanas');
-                    const matched = [...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea));
-                    if (!matched) {
-                      const icon = areaIcons[dArea] || '⏳';
-                      const label = areaLabels[dArea] || d.area;
-                      timelineHTML += `
-                        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
-                          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
-                          <div style="flex:1;">
-                            <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · $${d.monto}</div>
-                            <div style="font-size:10px;color:var(--ink-faint);">Pendiente</div>
-                          </div>
-                          <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div>
-                        </div>`;
-                    }
-                  });
-                }
+            // Áreas pendientes (las que faltan de la promo)
+            if (a.promoNombre) {
+              const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
+              if (promoFull && promoFull.division) {
+                const areaActualNorm = String(a.area||'').toLowerCase()
+                  .replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                // Áreas ya procesadas: completadas + actual
+                const areasYa = new Set();
+                partesPrevias.forEach(p => {
+                  const m = p.match(/✅\s*([\w\/]+)\s+completad/i);
+                  if (m) areasYa.add(m[1].trim().toLowerCase());
+                });
+                // Agregar área actual con normalización
+                areasYa.add(areaActualNorm);
+                if (areaActualNorm === 'pestanas') areasYa.add('pestañas');
+                if (areaActualNorm === 'cejas') areasYa.add('cejas');
+
+                promoFull.division.forEach(d => {
+                  const dArea = String(d.area||'').toLowerCase()
+                    .replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n')
+                    .replace('pestañas','pestanas').replace('pestaña','pestanas');
+                  const matched = [...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea));
+                  if (!matched) {
+                    const icon = areaIcons[dArea] || '⏳';
+                    const label = areaLabels[dArea] || d.area;
+                    timelineHTML += `
+                      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
+                        <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                        <div style="flex:1;">
+                          <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · $${d.monto}</div>
+                          <div style="font-size:10px;color:var(--ink-faint);">Pendiente</div>
+                        </div>
+                        <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div>
+                      </div>`;
+                  }
+                });
               }
             }
 
-            // Total visible
+            } // fin else ticket normal/promo
+
+            // Total visible (si ya hay monto)
             const totalStr = a.total && Number(a.total) > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${Number(a.total).toFixed(2)}</span></div>` : '';
+            const tmBadge = esTM ? ` <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>` : '';
             const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
-            const tmBadge = esTM ? `<span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;margin-left:6px;">MULTI</span>` : '';
 
             return `
-            <div style="background:var(--bg-card);border-radius:var(--radius-card);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow-card);border-left:4px solid ${esTM ? 'var(--accent)' : 'var(--info)'};">
+            <div style="background:var(--bg-card);border-radius:var(--radius-card);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow-card);border-left:4px solid ${esTM?'var(--accent)':'var(--info)'};">
               <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
                 <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink:0;">${initials}</div>
                 <div style="flex:1;">
@@ -11087,19 +11080,10 @@ if ('caches' in window) {
         chicaArea: user?.area || ''
       });
       if (r.success) {
-        if (r.confirmacionRequerida) {
-          // La siguiente área necesita que la staff confirme el servicio
-          showToast('✅ Área completada. La siguiente área te fue asignada — confirma el servicio.');
-          // Recargar el slot para que aparezca el nuevo servicio a confirmar
-          await new Promise(res => setTimeout(res, 500));
-          loadStaffHome();
-          show('staffHome');
-        } else {
-          showToast('✅ Área completada y siguiente área tomada: ' + (r.siguienteArea || ''));
-          await new Promise(res => setTimeout(res, 300));
-          loadStaffHome();
-          show('staffHome');
-        }
+        showToast(r.todasCompletadas ? '🎯 Todas las áreas completadas.' : '✅ Área completada. Siguiente área tomada: ' + (r.siguienteArea || ''));
+        await new Promise(res => setTimeout(res, 300));
+        loadStaffHome();
+        show('staffHome');
       } else {
         alert('Error: ' + r.message);
       }
