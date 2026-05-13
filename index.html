@@ -1577,6 +1577,9 @@ if ('caches' in window) {
     <!-- Ficha rápida pestañas (visible solo para staff de pestañas) -->
     <div id="pestFichaQuick1" style="display: none; margin-bottom: 14px;"></div>
 
+    <!-- Ficha rápida facial (visible solo para staff de facial) -->
+    <div id="facialFichaQuick1" style="display: none; margin-bottom: 14px;"></div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 20px;" id="as1ActionBtns">
       <button onclick="openAddService(1)" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft); transition: all .15s;">+ Agregar servicio</button>
       <button onclick="openPromoSelect(1)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s;" id="promoBtn1">🏷 Aplicar promo</button>
@@ -1752,6 +1755,62 @@ if ('caches' in window) {
         </div>
         <button class="btn-primary" onclick="saveNewPestFicha()" style="background: var(--top-purple);">Guardar nueva ficha</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal: Nueva Ficha Facial (datos base de la clienta) -->
+    <div class="modal-bg" id="nuevaFichaFacialModal">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-title">🌿 Ficha facial — datos de la clienta</div>
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px;text-align:center;">Se guarda una vez y se actualiza con cada visita</div>
+        <div class="input-group">
+          <label>Biotipo de piel</label>
+          <select id="nffBiotipo">
+            <option value="">Seleccionar...</option>
+            <option>Alípica (seca)</option>
+            <option>Hiperlípica (grasa)</option>
+            <option>Normolípica (mixta)</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Tipo de piel</label>
+          <select id="nffTipoPiel">
+            <option value="">Seleccionar...</option>
+            <option>Seca</option>
+            <option>Grasa</option>
+            <option>Mixta</option>
+            <option>Normal</option>
+            <option>Sensible</option>
+            <option>Deshidratada</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Fototipo (tono de piel)</label>
+          <select id="nffFototipo">
+            <option value="">Seleccionar...</option>
+            <option>I — Muy claro, siempre se quema</option>
+            <option>II — Claro, se quema fácil</option>
+            <option>III — Intermedio, se broncea</option>
+            <option>IV — Moreno claro</option>
+            <option>V — Moreno oscuro</option>
+            <option>VI — Muy oscuro</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Alergias / Sensibilidades</label>
+          <input type="text" id="nffAlergias" placeholder="Ej: Sin alergias conocidas">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Medicamentos actuales</label>
+          <input type="text" id="nffMedicamentos" placeholder="Ej: Ninguno">
+        </div>
+        <div class="input-group" style="margin-top:12px;">
+          <label>Observaciones de salud</label>
+          <textarea id="nffObs" placeholder="Enfermedades, cirugías estéticas previas, antecedentes relevantes..." style="min-height:60px;resize:vertical;"></textarea>
+        </div>
+        <button id="nffGuardarBtn" class="btn-primary" onclick="guardarNuevaFichaFacial()" style="background:linear-gradient(135deg,#2d6a4f,#1a4a32);margin-top:18px;">💾 Guardar ficha y continuar</button>
+        <button class="btn-secondary" onclick="closeModal(); openRegistrarVisitaFacialFromPanel();" style="margin-top:10px;color:var(--ink-faint);">Saltar ficha — solo registrar visita</button>
       </div>
     </div>
 
@@ -4593,25 +4652,16 @@ if ('caches' in window) {
             cejas: { history: [] }, depilacion: { history: [] }
           };
         }
-        // Pre-llenar servicio con lo que está en slotServices
-        const svcs = slotServices[slot2] || [];
-        const svcName = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
-        const svcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
-        const rvfServicio = document.getElementById('rvfServicio');
-        const rvfPrecio = document.getElementById('rvfPrecio');
-        const rvfProcedimiento = document.getElementById('rvfProcedimiento');
-        const rvfProductos = document.getElementById('rvfProductos');
-        const rvfObs = document.getElementById('rvfObs');
-        if (rvfServicio) rvfServicio.value = svcName;
-        if (rvfPrecio) rvfPrecio.value = svcPrice || '';
-        if (rvfProcedimiento) rvfProcedimiento.value = '';
-        if (rvfProductos) rvfProductos.value = '';
-        if (rvfObs) rvfObs.value = '';
-        // Guardar clientKey para guardarVisitaFacial
+        // Guardar datos de la clienta para la ficha/visita
         window._currentFacialClientKey = clientKey;
         window._currentFacialClientNombre = clientNombre;
         window._currentFacialClientCodigo = clientCodigo;
-        document.getElementById('registrarVisitaFacialModal').classList.add('active');
+        // Pre-calcular servicio y precio para la visita
+        const svcs = slotServices[slot2] || [];
+        window._currentFacialSvcName = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+        window._currentFacialSvcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
+        // Mostrar ficha rápida en el panel (no abrir modal de visita directo)
+        loadFacialFichaQuick(clientKey, slot2);
       }, 400);
     }
   }
@@ -11544,46 +11594,64 @@ if ('caches' in window) {
     document.getElementById('registrarVisitaFacialModal').classList.add('active');
   }
   async function guardarVisitaFacial() {
-    // Puede venir del perfil (currentProfileClient) o del panel de Laura (window._currentFacialClientKey)
-    const clientKey = window._currentFacialClientKey || currentProfileClient;
-    const c = CLIENT_PROFILES[clientKey];
-    const servicio = document.getElementById('rvfServicio').value.trim();
-    if (!servicio) { alert('Indicá el servicio realizado'); return; }
-    // Obtener código/nombre: del perfil o del override
-    const clientCodigo = c?.code || window._currentFacialClientCodigo || '';
-    const clientNombre = c?.name || window._currentFacialClientNombre || '';
-    if (!clientCodigo) { alert('Error: no se encontró la clienta'); return; }
     const btn = document.getElementById('rvfGuardarBtn');
-    btn.disabled = true; btn.textContent = 'Guardando...';
     try {
+      // Puede venir del perfil (currentProfileClient) o del panel de Laura (_currentFacialClientKey)
+      const clientKey    = window._currentFacialClientKey    || currentProfileClient || '';
+      const clientCodigo = window._currentFacialClientCodigo || CLIENT_PROFILES[clientKey]?.code || '';
+      const clientNombre = window._currentFacialClientNombre || CLIENT_PROFILES[clientKey]?.name || '';
+
+      const servicio = document.getElementById('rvfServicio').value.trim();
+      const precio   = Number(document.getElementById('rvfPrecio').value) || 0;
+      const proc     = document.getElementById('rvfProcedimiento').value.trim();
+      const prods    = document.getElementById('rvfProductos').value.trim();
+      const obs      = document.getElementById('rvfObs').value.trim();
+
+      if (!servicio) { alert('Indicá el servicio realizado'); return; }
+      if (!clientCodigo) { alert('Error: no se encontró el código de la clienta. Cerrá y volvé a abrir el modal.'); return; }
+
+      btn.disabled = true; btn.textContent = 'Guardando...';
+
       const user = window.currentUser;
       const result = await apiPost('addVisitaFacial', {
-        codigo: clientCodigo, nombre: clientNombre, servicio,
-        precio: Number(document.getElementById('rvfPrecio').value) || 0,
+        codigo: clientCodigo, nombre: clientNombre, servicio, precio,
         staff: user?.name || '',
-        procedimiento: document.getElementById('rvfProcedimiento').value.trim(),
-        productosUsados: document.getElementById('rvfProductos').value.trim(),
-        obs: document.getElementById('rvfObs').value.trim()
+        procedimiento: proc,
+        productosUsados: prods,
+        obs
       });
+
       if (result && result.success) {
-        const cLocal = CLIENT_PROFILES[clientKey];
-        if (cLocal) {
+        // Actualizar perfil local
+        if (clientKey) {
+          if (!CLIENT_PROFILES[clientKey]) {
+            CLIENT_PROFILES[clientKey] = { name: clientNombre, code: clientCodigo, facial: { history: [] } };
+          }
+          const cLocal = CLIENT_PROFILES[clientKey];
           if (!cLocal.facial) cLocal.facial = { history: [] };
           if (!cLocal.facial.history) cLocal.facial.history = [];
           const today = new Date();
           const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
-          cLocal.facial.history.unshift({ service: servicio, price: Number(document.getElementById('rvfPrecio').value)||0, date: fecha, by: user?.name||'', procedimiento: document.getElementById('rvfProcedimiento').value.trim(), productosUsados: document.getElementById('rvfProductos').value.trim(), obs: document.getElementById('rvfObs').value.trim() });
+          cLocal.facial.history.unshift({ service: servicio, price: precio, date: fecha, by: user?.name||'', procedimiento: proc, productosUsados: prods, obs });
           if (cLocal.facial.history.length > 5) cLocal.facial.history = cLocal.facial.history.slice(0, 5);
         }
-        window._currentFacialClientKey = null;
+        // Limpiar overrides
+        window._currentFacialClientKey    = null;
         window._currentFacialClientNombre = null;
         window._currentFacialClientCodigo = null;
         closeModal();
-        if (clientKey === currentProfileClient) renderProfileTab();
+        if (clientKey && clientKey === currentProfileClient) renderProfileTab();
         showToast('✅ Visita facial registrada');
-      } else { alert('Error: ' + (result?.message || 'desconocido')); }
-    } catch(e) { alert('Error de conexión'); }
-    btn.disabled = false; btn.textContent = '💾 Guardar visita';
+      } else {
+        alert('Error al guardar: ' + (result?.message || 'respuesta inválida del servidor'));
+      }
+    } catch(e) {
+      console.error('guardarVisitaFacial error:', e);
+      alert('Error de conexión al guardar la visita. Intentá de nuevo.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Guardar visita facial';
+    }
   }
   function openRegistrarVisitaPestanas() {
     const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
@@ -11622,8 +11690,119 @@ if ('caches' in window) {
     } catch(e) { alert('Error de conexión'); }
     btn.disabled = false; btn.textContent = '💾 Guardar visita';
   }
+
+  // ── FICHA FACIAL RÁPIDA (panel de staff) ──────────────────────
+
+  function loadFacialFichaQuick(clientKey, slot) {
+    const el = document.getElementById('facialFichaQuick' + slot);
+    if (!el) return;
+    const client = CLIENT_PROFILES[clientKey];
+    const ficha  = client?.facial?.ficha; // datos base guardados
+    const hayVisitas = client?.facial?.history && client.facial.history.length > 0;
+
+    el.style.display = 'block';
+
+    if (ficha && ficha.tipoPiel) {
+      // Tiene ficha — mostrar resumen + botón registrar visita
+      el.innerHTML = '<div style="background:linear-gradient(135deg,#1a4a32,#2d6a4f);color:white;border-radius:20px;padding:16px;margin-bottom:10px;">'
+        + '<div style="font-size:11px;font-weight:600;opacity:.8;margin-bottom:8px;">🌿 Ficha facial · ' + (client.name || '') + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+        + '<div style="background:rgba(255,255,255,.15);border-radius:12px;padding:8px;text-align:center;"><div style="font-size:9px;opacity:.7;font-weight:600;">Tipo de piel</div><div style="font-size:12px;font-weight:800;margin-top:2px;">' + (ficha.tipoPiel||'—') + '</div></div>'
+        + '<div style="background:rgba(255,255,255,.15);border-radius:12px;padding:8px;text-align:center;"><div style="font-size:9px;opacity:.7;font-weight:600;">Biotipo</div><div style="font-size:12px;font-weight:800;margin-top:2px;">' + (ficha.biotipo||'—') + '</div></div>'
+        + '</div>'
+        + (ficha.alergias ? '<div style="font-size:11px;opacity:.9;margin-bottom:8px;">⚠️ Alergias: ' + ficha.alergias + '</div>' : '')
+        + '<div style="font-size:10px;opacity:.7;">' + (hayVisitas ? client.facial.history.length + ' visita(s) registrada(s)' : 'Primera visita') + '</div>'
+        + '</div>'
+        + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--success),#2d5a3a);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✅ Registrar visita de hoy</button>'
+        + '<button onclick="openNuevaFichaFacialFromPanel('' + clientKey + '',' + slot + ')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">✏️ Actualizar ficha</button>';
+    } else {
+      // Sin ficha — mostrar botón crear ficha
+      el.innerHTML = '<div style="background:var(--bg-card);border:2px dashed #2d6a4f;border-radius:20px;padding:18px;text-align:center;margin-bottom:10px;">'
+        + '<div style="font-size:24px;margin-bottom:6px;">🌿</div>'
+        + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#2d6a4f;">Sin ficha facial</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Creá la ficha base de la clienta para llevar su historial</div>'
+        + '<button onclick="openNuevaFichaFacialFromPanel('' + clientKey + '',' + slot + ')" style="padding:14px 24px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha facial</button>'
+        + '</div>'
+        + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">Saltar ficha — solo registrar visita</button>';
+    }
+  }
+
+  function openNuevaFichaFacialFromPanel(clientKey, slot) {
+    window._currentFacialClientKey = clientKey || window._currentFacialClientKey;
+    // Pre-cargar datos existentes si los hay
+    const ficha = CLIENT_PROFILES[clientKey]?.facial?.ficha;
+    const ids = ['nffBiotipo','nffTipoPiel','nffFototipo','nffAlergias','nffMedicamentos','nffObs'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    if (ficha) {
+      if (document.getElementById('nffBiotipo')) document.getElementById('nffBiotipo').value = ficha.biotipo || '';
+      if (document.getElementById('nffTipoPiel')) document.getElementById('nffTipoPiel').value = ficha.tipoPiel || '';
+      if (document.getElementById('nffFototipo')) document.getElementById('nffFototipo').value = ficha.fototipo || '';
+      if (document.getElementById('nffAlergias')) document.getElementById('nffAlergias').value = ficha.alergias || '';
+      if (document.getElementById('nffMedicamentos')) document.getElementById('nffMedicamentos').value = ficha.medicamentos || '';
+      if (document.getElementById('nffObs')) document.getElementById('nffObs').value = ficha.obs || '';
+    }
+    document.getElementById('nuevaFichaFacialModal').classList.add('active');
+  }
+
+  async function guardarNuevaFichaFacial() {
+    const btn = document.getElementById('nffGuardarBtn');
+    try {
+      const clientKey    = window._currentFacialClientKey || '';
+      const clientCodigo = window._currentFacialClientCodigo || CLIENT_PROFILES[clientKey]?.code || '';
+      const clientNombre = window._currentFacialClientNombre || CLIENT_PROFILES[clientKey]?.name || '';
+      if (!clientCodigo) { alert('Error: no se encontró el código de la clienta'); return; }
+
+      const fichaData = {
+        biotipo:      document.getElementById('nffBiotipo').value,
+        tipoPiel:     document.getElementById('nffTipoPiel').value,
+        fototipo:     document.getElementById('nffFototipo').value,
+        alergias:     document.getElementById('nffAlergias').value.trim(),
+        medicamentos: document.getElementById('nffMedicamentos').value.trim(),
+        obs:          document.getElementById('nffObs').value.trim()
+      };
+
+      btn.disabled = true; btn.textContent = 'Guardando...';
+      const result = await apiPost('updateFichaFacial', { codigo: clientCodigo, nombre: clientNombre, ...fichaData });
+
+      if (result && result.success) {
+        // Actualizar perfil local
+        if (!CLIENT_PROFILES[clientKey]) CLIENT_PROFILES[clientKey] = { name: clientNombre, code: clientCodigo, facial: {} };
+        if (!CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial = {};
+        CLIENT_PROFILES[clientKey].facial.ficha = fichaData;
+        closeModal();
+        // Actualizar el panel con la ficha nueva y abrir modal de visita
+        loadFacialFichaQuick(clientKey, window._facialFichaSlot || 1);
+        setTimeout(() => openRegistrarVisitaFacialFromPanel(), 300);
+        showToast('✅ Ficha facial guardada');
+      } else {
+        alert('Error al guardar la ficha: ' + (result?.message || 'desconocido'));
+      }
+    } catch(e) {
+      alert('Error de conexión al guardar la ficha');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Guardar ficha y continuar';
+    }
+  }
+
+  function openRegistrarVisitaFacialFromPanel() {
+    // Pre-llenar el modal de visita con servicio y precio actuales
+    const rvfServicio = document.getElementById('rvfServicio');
+    const rvfPrecio   = document.getElementById('rvfPrecio');
+    if (rvfServicio) rvfServicio.value = window._currentFacialSvcName || '';
+    if (rvfPrecio)   rvfPrecio.value   = window._currentFacialSvcPrice || '';
+    ['rvfProcedimiento','rvfProductos','rvfObs'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('registrarVisitaFacialModal').classList.add('active');
+  }
+
   window.openRegistrarVisitaFacial = openRegistrarVisitaFacial;
   window.guardarVisitaFacial = guardarVisitaFacial;
+  window.loadFacialFichaQuick = loadFacialFichaQuick;
+  window.openNuevaFichaFacialFromPanel = openNuevaFichaFacialFromPanel;
+  window.guardarNuevaFichaFacial = guardarNuevaFichaFacial;
+  window.openRegistrarVisitaFacialFromPanel = openRegistrarVisitaFacialFromPanel;
   window.openRegistrarVisitaPestanas = openRegistrarVisitaPestanas;
   window.guardarVisitaPestanas = guardarVisitaPestanas;
 
