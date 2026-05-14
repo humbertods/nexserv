@@ -3313,6 +3313,76 @@ if ('caches' in window) {
     btnContainer.innerHTML = html;
   }
 
+  // Cuando la staff hizo su parte (1er servicio) y el resto va a otra staff
+  async function finishAndSendPartial() {
+    closeModal();
+    const slot = window._finishingSlot || 1;
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const svcs = slotServices[slot] || [];
+    const svcsAprobados = svcs.filter(s => s.status !== 'rechazado');
+
+    if (svcsAprobados.length < 2) {
+      // Solo 1 servicio — finalizar normal
+      await finishAndSend();
+      return;
+    }
+
+    // Mi servicio = el primero
+    const miServicio = svcsAprobados[0];
+    // Servicios restantes = los demás
+    const serviciosRestantes = svcsAprobados.slice(1);
+
+    try {
+      // 1. Finalizar mi parte (primer servicio)
+      const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const miTotal = Number(miServicio.price || 0);
+      const desgloseMio = [{ staff: user?.name || '', servicio: miServicio.name, area: miServicio.area || user?.area || '', monto: miTotal }];
+
+      await apiPost('finalizarAtencion', {
+        idEspera,
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        clienteCodigo: window['_as' + slot + 'Client'] || '',
+        servicio: miServicio.name,
+        total: String(miTotal),
+        serviciosDetalle: desgloseMio
+      });
+
+      // 2. Crear nuevo ticket SN para los servicios restantes
+      const clientCodigo = window['_as' + slot + 'Client'] || '';
+      const nombresRest = serviciosRestantes.map(s => s.name).join(' + ');
+      const precioRest = serviciosRestantes.reduce((s, v) => s + Number(v.price || 0), 0);
+      const areaRest = serviciosRestantes[0].area || user?.area || 'cejas';
+
+      await apiPost('addServicioNormal', {
+        codigo: clientCodigo,
+        nombre: data.clientName,
+        servicio: nombresRest,
+        area: areaRest,
+        precio: precioRest,
+        prioridad: 'Normal',
+        observaciones: 'Continuación de ticket — ' + (user?.name || '') + ' terminó su parte'
+      });
+
+      // 3. Limpiar slot
+      slotServices[slot] = [];
+      window['_as' + slot + 'IdEspera'] = '';
+      delete activePromos[normalizeClientKey(data.clientName)];
+      if (user && activeClients[user?.name]) {
+        activeClients[user.name].splice(slot - 1, 1);
+        updateCapacityUI(user.name);
+      }
+
+      show('staffHome');
+      await new Promise(r => setTimeout(r, 300));
+      loadStaffHome();
+      showToast('✅ Tu parte registrada · ' + nombresRest + ' vuelve a lista de espera');
+    } catch(e) {
+      alert('Error: ' + e.message);
+    }
+  }
+
   async function finishAndContinueSameStaff() {
     // La misma staff continúa con el siguiente servicio del combo
     // Solo registra que terminó esa parte y actualiza el total
@@ -5579,6 +5649,10 @@ if ('caches' in window) {
     
     const hayAreasExtras = areasExtras.length > 0;
 
+    // También detectar si hay múltiples servicios aprobados (aunque sean del mismo área)
+    // Ej: "Depilación de cejas $8" + "Depilación de bigote $4" → la staff puede hacer ambos o solo uno
+    const hayMultiplesServicios = svcsAprobados.length > 1 && !promoData;
+
     // Promos extra pendientes (2a, 3a promo del ticket)
     const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
 
@@ -5658,7 +5732,7 @@ if ('caches' in window) {
           return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
         });
 
-      const tieneSecuencia = promoData || hayAreasExtras || promasExtraPendientes.length > 0;
+      const tieneSecuencia = promoData || hayAreasExtras || promasExtraPendientes.length > 0 || hayMultiplesServicios;
 
       const esUltimaArea = promoData && promoData.completedAreas && promoData.promo.division &&
         (promoData.completedAreas.length >= promoData.promo.division.length - 1);
@@ -5667,7 +5741,38 @@ if ('caches' in window) {
       const b1 = document.getElementById('finishDoAllBtn');
       if (b1) b1.style.display = (puedeTodo && promoData) ? 'block' : 'none';
 
-      // BTN 2: Finalizar servicio
+      // ── CASO: Múltiples servicios en el slot (sin promo, mismo área) ──
+      // Ej: Depilación cejas $8 + Depilación bigote $4 → mostrar 2 botones específicos
+      if (hayMultiplesServicios && !promoData) {
+        const serviciosRestantes = svcsAprobados.slice(1); // el 2do, 3ro...
+        const nombresRestantes = serviciosRestantes.map(s => s.name).join(' + ');
+
+        // BTN A: "Termino yo el siguiente servicio"
+        const b2 = document.getElementById('finishSendBtn');
+        if (b2) {
+          b2.style.display = 'block';
+          b2.textContent = '✅ Ya terminé ambos servicios — cobrar';
+          b2.onclick = function() { closeModal(); finishAndSend(); };
+        }
+
+        // BTN 4: "Terminé mi parte — enviar a siguiente staff"
+        const b4 = document.getElementById('finishContinueBtn');
+        if (b4) {
+          b4.style.display = 'block';
+          b4.textContent = '➡️ Terminé mi parte — enviar a siguiente staff: ' + nombresRestantes;
+          b4.onclick = function() { closeModal(); finishAndSendPartial(); };
+        }
+
+        // Ocultar otros botones
+        const b3 = document.getElementById('finishPromoCompleteBtn');
+        if (b3) b3.style.display = 'none';
+
+        const modal = document.getElementById('finishOptionsModal');
+        if (modal) { modal.querySelectorAll('.finish-extra-btn').forEach(b => b.remove()); modal.classList.add('active'); }
+        return; // salir del setTimeout
+      }
+
+      // BTN 2: Finalizar servicio (flujo normal / promo)
       const b2 = document.getElementById('finishSendBtn');
       if (b2) {
         if (promoData && tieneSecuencia && !esUltimaArea && !puedeTodo) {
@@ -5675,6 +5780,7 @@ if ('caches' in window) {
         } else {
           b2.style.display = 'block';
           b2.textContent = promoData ? '💰 Finalizar servicio (solo mi parte)' : '💰 Finalizar servicio';
+          b2.onclick = function() { closeModal(); finishAndSend(); };
         }
       }
 
@@ -5682,7 +5788,7 @@ if ('caches' in window) {
       const b3 = document.getElementById('finishPromoCompleteBtn');
       if (b3) b3.style.display = (promoData && esUltimaArea && !puedeTodo) ? 'block' : 'none';
 
-      // BTN 4: Continuar siguiente área
+      // BTN 4: Continuar siguiente área / promo
       const b4 = document.getElementById('finishContinueBtn');
       if (b4) {
         if (tieneSecuencia && !esUltimaArea && !puedeTodo) {
@@ -5691,6 +5797,7 @@ if ('caches' in window) {
             ? areasExtras.map(a => areaDisplayMap[a] || a).join(', ')
             : promasExtraPendientes.length > 0 ? promasExtraPendientes[0].nombre : 'siguiente área';
           b4.textContent = '➡️ Continuar siguiente área: ' + areasLabel;
+          b4.onclick = function() { finishAndContinue(); };
         } else {
           b4.style.display = 'none';
         }
