@@ -3319,6 +3319,87 @@ if ('caches' in window) {
     btnContainer.innerHTML = html;
   }
 
+  // Staff hizo su parte de la promo y el siguiente servicio va a otra staff
+  // Congela lo realizado, manda el siguiente área a lista de espera
+  async function compartirSiguienteServicio() {
+    const slot = window._finishingSlot || 1;
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const clientKey = data?.clientKey || '';
+    const promoData = activePromos[clientKey];
+
+    if (!promoData) {
+      // Sin promo activa — usar finishAndContinue normal
+      await finishAndContinue();
+      return;
+    }
+
+    try {
+      // Determinar siguiente área y precio
+      const division = promoData.promo.division || [];
+      const completadas = promoData.completedAreas || [];
+      const siguienteDivision = division.find(d => {
+        const da = String(d.area||'').toLowerCase().replace(/[^\w\s]/gi,' ').trim();
+        return !completadas.some(c => da.includes(String(c).toLowerCase()) || String(c).toLowerCase().includes(da));
+      });
+
+      const sigArea = siguienteDivision
+        ? (String(siguienteDivision.area||'').toLowerCase().replace(/[^\w\s]/gi,' ').trim().includes('pest') ? 'pestanas'
+          : String(siguienteDivision.area||'').toLowerCase().includes('facial') ? 'facial'
+          : String(siguienteDivision.area||'').toLowerCase().includes('depil') ? 'depilacion'
+          : 'cejas')
+        : (data.areasExtras && data.areasExtras[0]) || 'cejas';
+      const sigPrecio = siguienteDivision ? Number(siguienteDivision.monto || 0) : 0;
+      const sigNombre = siguienteDivision
+        ? String(siguienteDivision.area||'').replace(/[^\w\sáéíóúñü]/gi,'').trim()
+        : sigArea;
+
+      // Llamar continuarPromoALista — mismo flujo que "Siguiente servicio del combo"
+      const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const clientCodigo = window['_as' + slot + 'Client'] || '';
+      const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado');
+      const miTotal = svcs.reduce((s,v) => s + Number(v.price||0), 0);
+      const miSvcNames = svcs.map(s => s.name).join(' + ') || data.svcNames || '';
+
+      const result = await apiPost('continuarPromoALista', {
+        idEspera,
+        chicaNombre: user?.name || '',
+        areaCompletada: user?.area || 'cejas',
+        montoChica: miTotal,
+        clienteCodigo: clientCodigo,
+        clienteNombre: data.clientName,
+        siguienteArea: sigArea,
+        montoSiguiente: sigPrecio,
+        promoNombre: promoData.promo.name,
+        serviciosDetalle: JSON.stringify([{
+          staff: user?.name || '',
+          servicio: miSvcNames,
+          area: user?.area || 'cejas',
+          monto: miTotal
+        }])
+      });
+
+      if (result && result.success) {
+        // Limpiar slot
+        delete activePromos[clientKey];
+        slotServices[slot] = [];
+        window['_as' + slot + 'IdEspera'] = '';
+        if (user && activeClients[user?.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        show('staffHome');
+        await new Promise(r => setTimeout(r, 300));
+        loadStaffHome();
+        showToast('✅ Tu parte ($' + miTotal + ') registrada · ' + sigNombre + ' vuelve a lista de espera');
+      } else {
+        alert('Error: ' + (result?.message || 'desconocido'));
+      }
+    } catch(e) {
+      alert('Error de conexión: ' + e.message);
+    }
+  }
+
   // Cuando la staff hizo su parte (1er servicio) y el resto va a otra staff
   async function finishAndSendPartial() {
     closeModal();
@@ -3828,7 +3909,19 @@ if ('caches' in window) {
         </div>
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
-        ${w.obs ? `<div class="waitlist-obs">📝 ${w.obs}</div>` : ''}
+        ${(function() {
+          var obs = w.obs || '';
+          var parts = obs.split('|');
+          var compPart = parts.find(function(p){ return p.indexOf('✅') >= 0; });
+          if (compPart) {
+            var clean = compPart.replace(/_completedAreas:[^|]*/,'').trim();
+            return '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding:5px 10px;background:var(--success-bg);border-radius:8px;">'
+              + '<span style="font-size:12px;">✅</span>'
+              + '<span style="font-size:11px;color:var(--success);font-weight:700;">' + clean + '</span>'
+              + '</div>';
+          }
+          return obs ? '<div class="waitlist-obs">📝 ' + obs + '</div>' : '';
+        })()}
         <div class="waitlist-actions">
           <button class="btn-take" onclick='openTake(${idx})'>Tomar clienta</button>
         </div>
@@ -4193,6 +4286,24 @@ if ('caches' in window) {
               renderServicesForSlot(1);
               document.getElementById('as1Total').textContent = '$' + myPrice;
               document.getElementById('as1SvcCount').textContent = '1';
+
+              // Fix 2: partes previas (promo compartida) — mostrar como historial readonly
+              if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+                window._desgloseAcumulado = a.serviciosDetalle;
+                const svcListEl = document.getElementById('as1SvcList');
+                if (svcListEl) {
+                  const histHtml = a.serviciosDetalle.map(function(d) {
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                      + '<span style="font-size:16px;">&#x2705;</span>'
+                      + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                      + (d.servicio || d.area || 'Servicio previo') + ' &middot; ' + (d.staff || '&mdash;')
+                      + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                      + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (d.monto || 0) + '</div>'
+                      + '</div>';
+                  }).join('');
+                  svcListEl.insertAdjacentHTML('afterbegin', histHtml);
+                }
+              }
               
               // Registrar promo activa con key normalizada
               const clientKey = normalizeClientKey(a.nombre);
@@ -5791,6 +5902,42 @@ if ('caches' in window) {
         return; // salir del setTimeout
       }
 
+      // Detectar si la promo tiene siguiente área (para botón compartir)
+      const promoTieneMultiArea = promoData && promoData.promo && promoData.promo.division && promoData.promo.division.length > 1;
+      const siguienteAreaPromo = promoTieneMultiArea
+        ? (promoData.promo.division.find(d => {
+            const da = String(d.area||'').toLowerCase();
+            const comp = (promoData.completedAreas || []).map(a => String(a).toLowerCase());
+            return !comp.some(c => da.includes(c) || c.includes(da));
+          }) || null)
+        : null;
+      const nombreSiguienteArea = siguienteAreaPromo
+        ? (String(siguienteAreaPromo.area||'').replace(/[^\w\s]/g,'').trim() || 'siguiente área')
+        : (areasExtras.length > 0 ? areasExtras.map(a => areaDisplayMap[a]||a).join(', ') : 'siguiente área');
+
+      // BTN "Compartir siguiente servicio" — visible cuando:
+      // 1. Hay promo multi-área con área pendiente
+      // 2. La staff PUEDE hacer el siguiente servicio (lifting/pest incluido para cejas)
+      //    pero QUIERE compartirlo con otra staff
+      // Nota: lifting de pestañas lo puede hacer todo el staff de cejas Y pestañas
+      const bCompartir = document.getElementById('finishShareNextBtn');
+      if (bCompartir) {
+        // Verificar si la staff puede hacer el siguiente servicio
+        const sigAreaStr = String(siguienteAreaPromo ? siguienteAreaPromo.area : '').toLowerCase();
+        const puedeSiguiente = myCaps.some(cap => sigAreaStr.replace(/[^\w\s]/gi,' ').includes(cap));
+        // Mostrar si hay promo multi-área, hay área pendiente, Y la staff puede hacerla
+        // (si no puede hacerla, la siguiente staff distinta lo toma automáticamente)
+        const mostrarCompartir = promoData && (promoTieneMultiArea || hayAreasExtras) && !esUltimaArea
+          && (puedeTodo || puedeSiguiente);
+        if (mostrarCompartir) {
+          bCompartir.style.display = 'block';
+          bCompartir.textContent = '🤝 Compartir siguiente servicio con otra staff: ' + nombreSiguienteArea;
+          bCompartir.onclick = function() { closeModal(); compartirSiguienteServicio(); };
+        } else {
+          bCompartir.style.display = 'none';
+        }
+      }
+
       // BTN 2: Finalizar servicio (flujo normal / promo)
       const b2 = document.getElementById('finishSendBtn');
       if (b2) {
@@ -5805,7 +5952,17 @@ if ('caches' in window) {
 
       // BTN 3: Promo completada (última área)
       const b3 = document.getElementById('finishPromoCompleteBtn');
-      if (b3) b3.style.display = (promoData && esUltimaArea && !puedeTodo) ? 'block' : 'none';
+      const esPromoCompartida = promoData && (promoData.completedAreas || []).length > 0;
+      if (b3) {
+        b3.style.display = (promoData && esUltimaArea && !puedeTodo) ? 'block' : 'none';
+        if (esPromoCompartida && esUltimaArea) {
+          b3.textContent = '&#x2705; Promo compartida completada &mdash; mandar a cobrar';
+          b3.style.background = 'linear-gradient(135deg,#2d6a4f,#1a4a32)';
+        } else {
+          b3.textContent = '&#x1F3AF; Promo completada &mdash; cobrar';
+          b3.style.background = '';
+        }
+      }
 
       // BTN 4: Continuar siguiente área / promo
       const b4 = document.getElementById('finishContinueBtn');
@@ -11994,6 +12151,7 @@ if ('caches' in window) {
   window.finishAndRetire       = finishAndRetire;
   window.finishAndReturn       = finishAndReturn;
   window.confirmServiceAndClose = confirmServiceAndClose;
+  window.compartirSiguienteServicio = compartirSiguienteServicio;
   window.finishSlot1           = finishSlot1;
   window.finishSlot2           = finishSlot2;
 
@@ -12045,6 +12203,11 @@ if ('caches' in window) {
     <!-- BTN 1: Yo hago toda la promo (solo visible si staff puede hacer todas las áreas) -->
     <button id="finishDoAllBtn" class="btn-primary" style="margin-bottom:10px; background:#2d6a4f; display:none;" onclick="finishAndSendAll()">
       ✅ Yo hago toda la promo — cobrar total
+    </button>
+
+    <!-- BTN 1b: Compartir siguiente servicio con otra staff -->
+    <button id="finishShareNextBtn" class="btn-primary outline" style="margin-bottom:10px; display:none;">
+      🤝 Compartir siguiente servicio con otra staff
     </button>
 
     <!-- BTN 2: Finalizar servicio (servicio normal o promo de 1 área) -->
