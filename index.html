@@ -4268,29 +4268,35 @@ if ('caches' in window) {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
 
-          // Si es TM: cargar areas completas para mostrar desglose
+          // Si es TM: cargar areas completas y mostrar botones correctos desde el inicio
           if (window._as1IdEspera && window._as1IdEspera.startsWith('TM-')) {
             apiGet('getTicketMulti').then(function(tmData) {
               if (tmData.success) {
                 var tm = (tmData.activos || []).find(function(t) { return t.idEspera === window._as1IdEspera; });
                 if (tm) {
                   window._tmAreasActuales = tm.areas || [];
-                  // Cargar en slotServices el servicio de esta staff (área en servicio)
                   var user2 = window.currentUser;
-                  var miArea = (tm.areas || []).find(function(ar) {
+                  // Cargar TODOS los servicios de esta staff que están en servicio
+                  var misAreas = (tm.areas || []).filter(function(ar) {
                     return ar.staff === (user2 && user2.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
                   });
-                  if (miArea && slotServices[1].length === 0) {
-                    slotServices[1] = [{ name: miArea.tentativo || miArea.confirmado || '', price: miArea.precio || 0, area: miArea.area }];
+                  if (misAreas.length > 0) {
+                    // Reemplazar slotServices con los servicios de esta staff en el TM
+                    slotServices[1] = misAreas.map(function(ar) {
+                      return { name: ar.tentativo || ar.confirmado || '', price: ar.precio || 0, area: ar.area };
+                    });
                     renderServicesForSlot(1);
-                    document.getElementById('as1Total').textContent = '$' + (miArea.precio || 0);
-                    document.getElementById('as1SvcCount').textContent = '1';
+                    var totalTM = slotServices[1].reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+                    document.getElementById('as1Total').textContent = '$' + totalTM;
+                    document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
                   }
+                  // Mostrar botones TM correctos en el panel desde el inicio
+                  setTimeout(function() { updateFinishButtons(1); }, 300);
                 }
               }
-              setTimeout(() => showConfirmServiceModal(1), 200);
+              // No abrir confirmServiceModal para TM — los botones ya están en el panel
             }).catch(function() {
-              setTimeout(() => showConfirmServiceModal(1), 400);
+              setTimeout(function() { updateFinishButtons(1); }, 400);
             });
           } else {
             // Mostrar modal de confirmación de servicio (enganche)
