@@ -3220,25 +3220,31 @@ if ('caches' in window) {
         var tm = (tmData.activos || []).find(function(t) { return t.idEspera === _idEsperaSlot; });
         if (!tm) return;
         var miNombre = user && user.name ? user.name : '';
-        var areasDeOtros = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() === 'esperando'; });
-        var sig = areasDeOtros.length > 0 ? areasDeOtros[0] : null;
-        var hayMas = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() !== 'completado' && a.staff !== miNombre; }).length > 0;
         var slotN = slot1 ? 1 : 2;
+
+        // Áreas pendientes (no completadas, no en servicio por esta staff)
+        var areasEsperando = (tm.areas || []).filter(function(a) {
+          return String(a.estado||'').toLowerCase() === 'esperando';
+        });
+        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
+        var hayMas = areasEsperando.length > 0;
+
+        var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
+
         if (!hayMas) {
-          btnContainer.innerHTML = `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🎯 Completado — mandar a cobrar</button>`;
+          // No hay más áreas pendientes → solo "Finalizar servicio"
+          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
         } else {
-          var lbl = sig ? (sig.tentativo || sig.area || 'siguiente área') : 'siguiente área';
-          btnContainer.innerHTML = `
-            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">🔁 Yo hago también: ${lbl}</button>
-            <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">✅ Completé mi parte — pasa a compañera</button>
-            <button class="btn-primary" style="margin-bottom:10px;background:var(--danger);color:white;" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🛑 Retirar clienta — cobrar solo lo realizado</button>`;
+          // Hay servicios pendientes → 3 botones (repetibles infinitamente)
+          // "Continuar siguiente servicio" puede tocarse N veces (cejas → bigote → labio → entrecejo...)
+          btnContainer.innerHTML = ''
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Continuar siguiente servicio</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
+            + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
         }
       }).catch(function() {
         var slotN = slot1 ? 1 : 2;
-        btnContainer.innerHTML = `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#4a7c59,#2e5e3e);" onclick="window._finishingSlot=${slotN}; completarYTomarSiguiente()">🔁 Yo hago la siguiente área también</button>
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotN}; completarAreaMulti()">✅ Completé mi parte — pasa a compañera</button>
-          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotN}; completarAreaMultiFinal()">🎯 Completado — mandar a cobrar</button>`;
+        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal()">Finalizar servicio</button>';
       });
       return;
     }
@@ -5693,7 +5699,14 @@ if ('caches' in window) {
       areasExtras: areasExtras,
       promasExtraPendientes: promasExtraPendientes
     };
-    
+
+    // ── TM: botones ya inline en panel — updateFinishButtons los renderiza ──
+    const _idEsp1 = window._as1IdEspera || '';
+    if (_idEsp1.startsWith('TM-')) {
+      updateFinishButtons(1);
+      return; // los botones cambian inline, no abrir modal
+    }
+
     // Cerrar cualquier modal abierto primero
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
@@ -11929,9 +11942,38 @@ if ('caches' in window) {
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
     try {
-      const r = await apiPost('completarYTomarSiguienteAreaTM', { idEspera, chicaNombre: user?.name||'', chicaArea: user?.area||'' });
-      if (r.success) { showToast(r.todasCompletadas ? '🎯 Completado.' : '✅ Área completada. Tomando: ' + (r.siguienteArea||'')); await new Promise(res => setTimeout(res,300)); loadStaffHome(); show('staffHome'); }
-      else { alert('Error: ' + r.message); }
+      const r = await apiPost('completarYTomarSiguienteAreaTM', {
+        idEspera, chicaNombre: user?.name||'', chicaArea: user?.area||''
+      });
+      if (r.success) {
+        if (r.todasCompletadas) {
+          showToast('🎯 Todo completado — finalizá el servicio');
+          // Actualizar botones: solo mostrar "Finalizar servicio"
+          updateFinishButtons(slot);
+        } else {
+          // Cargar el siguiente servicio en el panel (sin salir de la clienta)
+          const sigNombre = r.siguienteArea || '';
+          const sigPrecio = r.siguientePrecio || 0;
+          // Agregar a slotServices
+          if (sigNombre) {
+            slotServices[slot] = slotServices[slot] || [];
+            const yaExiste = slotServices[slot].find(s => s.name === sigNombre);
+            if (!yaExiste) {
+              slotServices[slot].push({ name: sigNombre, price: sigPrecio, area: user?.area || '' });
+              renderServicesForSlot(slot);
+              // Actualizar total
+              const nuevoTotal = slotServices[slot].reduce((s,v) => s + Number(v.price||0), 0);
+              document.getElementById('as' + slot + 'Total').textContent = '$' + nuevoTotal;
+              document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+            }
+          }
+          showToast('✅ Siguiente servicio cargado: ' + sigNombre);
+          // Volver a consultar el TM — si hay más áreas pendientes, mostrar botones de nuevo
+          updateFinishButtons(slot);
+        }
+      } else {
+        alert('Error: ' + r.message);
+      }
     } catch(e) { alert('Error de conexión'); }
   }
   window.completarAreaMulti      = completarAreaMulti;
