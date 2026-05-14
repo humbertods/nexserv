@@ -3169,11 +3169,9 @@ if ('caches' in window) {
   // Si el staff puede hacer TODAS las partes de la promo, recibe el total completo
   // Si solo puede hacer algunas partes, recibe la suma de esas partes
   // ============================================
-  function getMyPromoPrice(promo, myArea) {
+  function getMyPromoPrice(promo, myArea, completedAreas) {
     if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
 
-    // Áreas que puede hacer este staff
-    // IMPORTANTE: cejas puede hacer lifting de pestañas, retiro, bigote, depilaciones
     const AREA_FILTER_MAP = {
       'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
                    'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas', 'retiro_lifting',
@@ -3185,18 +3183,40 @@ if ('caches' in window) {
     };
     const myCapabilities = AREA_FILTER_MAP[myArea] || [myArea];
 
-    // Ver cuáles divisiones puede hacer este staff
-    const misPartes = promo.division.filter(d => {
+    // Excluir divisiones ya completadas por otra staff (promo compartida)
+    const areasCompletadasNorm = (completedAreas || []).map(a =>
+      String(a).toLowerCase().replace(/[^a-z0-9]/g, '')
+    );
+
+    const divisionesDisponibles = promo.division.filter(d => {
+      const areaDNorm = String(d.area || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Si esta área ya fue completada → excluirla
+      return !areasCompletadasNorm.some(comp =>
+        areaDNorm.includes(comp) || comp.includes(areaDNorm) ||
+        (comp.includes('pest') && (areaDNorm.includes('pest') || areaDNorm.includes('lifting'))) ||
+        (comp.includes('ceja') && areaDNorm.includes('ceja'))
+      );
+    });
+
+    // De las disponibles, las que puede hacer esta staff
+    const misPartes = divisionesDisponibles.filter(d => {
       const areaD = String(d.area || '').toLowerCase();
       return myCapabilities.some(cap => areaD.includes(cap.toLowerCase()));
     });
 
-    if (misPartes.length === 0) return promo.price; // fallback al precio total
-    
-    // Si puede hacer TODAS las partes → precio total de la promo
-    if (misPartes.length === promo.division.length) return promo.price;
+    if (misPartes.length === 0) {
+      // Todas sus partes ya fueron completadas — precio residual o 0
+      return divisionesDisponibles.length > 0
+        ? divisionesDisponibles.reduce((s,d) => s + Number(d.monto||0), 0)
+        : 0;
+    }
 
-    // Si puede hacer ALGUNAS → suma de sus partes
+    // Si puede hacer TODAS las disponibles → precio de esas divisiones (no el total)
+    if (misPartes.length === divisionesDisponibles.length && divisionesDisponibles.length === promo.division.length) {
+      return promo.price; // nadie completó nada → precio total
+    }
+
+    // Suma de sus partes disponibles
     return misPartes.reduce((s, d) => s + Number(d.monto || 0), 0);
   }
 
@@ -4274,7 +4294,9 @@ if ('caches' in window) {
               // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
               // Para promo normal: usar getMyPromoPrice
               const precioMiAreaSP = Number(a.precioMiArea || 0);
-              const myPrice = precioMiAreaSP > 0 ? precioMiAreaSP : getMyPromoPrice(promoFull, myArea);
+              // Pasar completedAreas para que la 2da staff solo vea su parte
+              const _compAreas = restoredCompletedAreas || [];
+              const myPrice = precioMiAreaSP > 0 ? precioMiAreaSP : getMyPromoPrice(promoFull, myArea, _compAreas);
               
               slotServices[1].push({
                 name: promoFull.name,
@@ -4731,7 +4753,7 @@ if ('caches' in window) {
     // Si no hay servicios en slot pero hay promo, cargar precio de esta área
     if (svcsAprobados.length === 0 && promoData && promoData.promo) {
       const myAreaAll = user?.area || 'cejas';
-      const precioMiAreaAll = getMyPromoPrice(promoData.promo, myAreaAll);
+      const precioMiAreaAll = getMyPromoPrice(promoData.promo, myAreaAll, promoData.completedAreas || []);
       slotServices[slot] = [{ name: promoData.promo.name, price: precioMiAreaAll, area: myAreaAll }];
     }
 
@@ -5788,7 +5810,7 @@ if ('caches' in window) {
       const extrasAprobados = svcsAprobados.filter(s => s.name !== promoData.promo.name);
       const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
       // Usar el precio de la parte de ESTA staff (no el total de la promo)
-      miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea);
+      miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea, promoData.completedAreas || []);
       totalFinal = String(miPrecioPromo + totalExtras);
     } else {
       totalFinal = String(total);
