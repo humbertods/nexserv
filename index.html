@@ -10823,10 +10823,19 @@ if ('caches' in window) {
       );
       postData.precioMiArea = firstDiv ? Number(firstDiv.monto || firstDiv.price || promo.price) : Number(promo.price);
     }
-    // Promos adicionales (2 y 3)
+    // Promos adicionales (2 y 3) — incluir área deducida de cada promo
     const promasExtra = _arrPromos.filter(p => p !== null).slice(1);
     if (promasExtra.length > 0) {
-      postData.promasExtra = promasExtra.map(p => ({ nombre: p.name, precio: p.price, regular: p.regular }));
+      postData.promasExtra = promasExtra.map(function(p) {
+        // Deducir área de la división de mayor monto
+        const divOrd = [...(p.division||[])].sort(function(a,b){ return Number(b.monto||0) - Number(a.monto||0); });
+        const ds = String((divOrd[0] && divOrd[0].area) || '').toLowerCase();
+        const _area = ds.includes('pest') || ds.includes('lifting') ? 'pestanas'
+          : ds.includes('facial') || ds.includes('hidra') ? 'facial'
+          : ds.includes('depil') || ds.includes('bikini') ? 'depilacion'
+          : ds.includes('ceja') ? 'cejas' : 'cejas';
+        return { nombre: p.name, precio: p.price, regular: p.regular, _area: _area };
+      });
     }
     // Secuencia de servicios
     if (_secuencia.length > 0) {
@@ -10834,7 +10843,8 @@ if ('caches' in window) {
     }
 
     // ── DETECCIÓN TICKET MULTI ──────────────────────────────
-    // TM si: tipo === 'multi' O si hay servicios adicionales agregados
+    // TM SOLO si: tipo === 'multi' O hay servicios adicionales (híbrido promo+normal)
+    // Múltiples promos del mismo flujo SP NO son TM — se manejan como promos encadenadas
     const adicionales = getServiciosAdicionalesData();
     const esMulti = tipo === 'multi' || adicionales.length > 0;
 
@@ -11082,6 +11092,7 @@ if ('caches' in window) {
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
     // ── DETECCIÓN TICKET MULTI en asignación directa ─────────
+    // TM SOLO si hay servicios adicionales (híbrido). Múltiples promos = flujo SP encadenado.
     const adicionalesGA = getServiciosAdicionalesData();
     if (adicionalesGA.length > 0) {
       const areasMultiGA = [];

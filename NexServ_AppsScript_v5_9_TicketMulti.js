@@ -800,9 +800,9 @@ function handleFinalizarAtencion(data) {
         ws.getRange(row, 14).setValue(data.siguientePromo);  // N: PromoNombre
         ws.getRange(row, 15).setValue(data.siguientePromoPrecio || '0'); // O: PrecioPromo
         ws.getRange(row, 16).setValue(data.siguientePromoRegular || data.siguientePromoPrecio || '0'); // P: Regular
-        // R: Actualizar promasExtra restantes (sin la que se acaba de activar)
+        // V: Actualizar promasExtra restantes (sin la que se acaba de activar) — col 22
         const promasRestantes = data.promasExtraRestantes ? JSON.stringify(data.promasExtraRestantes) : '';
-        ws.getRange(row, 18).setValue(promasRestantes);
+        ws.getRange(row, 22).setValue(promasRestantes);
       } else {
         // Mandar a cobrar: estado Por cobrar en ListaEspera
         ws.getRange(row, 9).setValue('Por cobrar');
@@ -2214,6 +2214,75 @@ function handleAddFichaPestanas(data) {
 // ============================================
 // FICHA FACIAL
 // ============================================
+// ── HISTORIAL DE VISITAS FACIALES ────────────────────────────
+
+function handleAddVisitaFacial(data) {
+  try {
+    const ws = getOrCreateSheet('HistorialFacial', [
+      'Código','Nombre','Fecha','Hora','Servicio','Precio','Staff','Procedimiento','Productos','Observaciones'
+    ]);
+    const tz  = 'America/Guayaquil';
+    const now = new Date();
+    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
+
+    ws.appendRow([
+      data.codigo        || '',
+      data.nombre        || '',
+      fecha,
+      hora,
+      data.servicio      || '',
+      Number(data.precio || 0),
+      data.staff         || '',
+      data.procedimiento || '',
+      data.productosUsados || '',
+      data.obs           || ''
+    ]);
+
+    // Actualizar comisión de Laura (facial = 40%)
+    try {
+      if (data.staff && Number(data.precio) > 0) {
+        updateComision(data.staff, Number(data.precio));
+      }
+    } catch(ec) {}
+
+    return { success: true };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
+function handleGetHistorialFacial(params) {
+  try {
+    const ws = getOrCreateSheet('HistorialFacial', [
+      'Código','Nombre','Fecha','Hora','Servicio','Precio','Staff','Procedimiento','Productos','Observaciones'
+    ]);
+    const data   = ws.getDataRange().getValues();
+    const codigo = String(params.codigo || '').trim();
+    if (!codigo) return { success: false, message: 'Falta código' };
+
+    const historial = [];
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() !== codigo) continue;
+      historial.push({
+        fecha:          data[i][2],
+        hora:           data[i][3],
+        servicio:       data[i][4],
+        precio:         Number(data[i][5] || 0),
+        staff:          data[i][6],
+        procedimiento:  data[i][7],
+        productosUsados:data[i][8],
+        obs:            data[i][9]
+      });
+    }
+    // Más reciente primero, máx 10
+    historial.reverse();
+    return { success: true, historial: historial.slice(0, 10) };
+  } catch(e) {
+    return { success: false, message: String(e) };
+  }
+}
+
 function handleGetFichaFacial(params) {
   const ws = getSheet('FichaFacial');
   const data = ws.getDataRange().getValues();
@@ -3300,7 +3369,7 @@ var COLS_PROMO = [
   'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área actual','Prioridad',
   'Estado','Tomada por','Hora tomada','Observaciones','Total acumulado',
   'Promo nombre','Precio promo','Precio regular','Área completada','Desglose staff (JSON)',
-  'Tipo','Precio Normal','Precio Promo'
+  'Tipo','Precio Normal','Precio Promo','Promos Extra (JSON)'
 ];
 
 function getOrCreateSheet(nombre, columnas) {
@@ -3358,6 +3427,9 @@ function handleAddServicioPromo(data) {
     // precioMiArea = precio de la primera área que va a atender
     const precioMiArea  = Number(data.precioMiArea  || precioPromo);
 
+    const promasExtraJSON = data.promasExtra && data.promasExtra.length > 0
+      ? JSON.stringify(data.promasExtra) : '';
+
     ws.appendRow([
       id,                          // A: ID
       fecha,                       // B: Fecha
@@ -3379,7 +3451,8 @@ function handleAddServicioPromo(data) {
       '',                          // R: Desglose staff JSON
       'SP',                        // S: Tipo
       precioRegular,               // T: Precio Normal total
-      precioPromo                  // U: Precio Promo total
+      precioPromo,                 // U: Precio Promo total
+      promasExtraJSON              // V: Promos Extra pendientes (JSON)
     ]);
 
     return { success: true, id: id, message: 'Clienta agregada a ServicioPromo' };
@@ -3487,7 +3560,8 @@ function handleGetServicioPromo(params) {
         precioPromo : String(precioPromo),
         precioRegular: String(precioNormal),
         precioMiArea: String(Number(row[12] || 0)),  // col M = monto de esta área
-        serviciosDetalle: (function(){ try { return row[17] ? JSON.parse(row[17]) : null; } catch(e) { return null; } })(), // col R = desglose staff JSON
+        serviciosDetalle: (function(){ try { return row[17] ? JSON.parse(row[17]) : null; } catch(e) { return null; } })(), // col R
+        promasExtra: (function(){ try { return row[21] ? JSON.parse(row[21]) : []; } catch(e) { return []; } })(), // col V
         fuente      : 'ServicioPromo'
       };
 
