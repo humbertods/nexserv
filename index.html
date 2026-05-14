@@ -4291,12 +4291,22 @@ if ('caches' in window) {
               
               // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
               const myArea = user?.area || 'cejas';
+
+              // Restaurar completedAreas PRIMERO — necesario para calcular precio correcto
+              const clientKeyTemp = normalizeClientKey(a.nombre);
+              let restoredCompletedAreas = [];
+              try {
+                const obsText = a.observaciones || a.obs || a.obsGeneral || '';
+                const match = obsText.match(/_completedAreas:(\[.*?\])/);
+                if (match) restoredCompletedAreas = JSON.parse(match[1]);
+              } catch(e) {}
+
               // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
-              // Para promo normal: usar getMyPromoPrice
+              // Para promo compartida: excluir completedAreas → la 2da staff ve solo su parte
               const precioMiAreaSP = Number(a.precioMiArea || 0);
-              // Pasar completedAreas para que la 2da staff solo vea su parte
-              const _compAreas = restoredCompletedAreas || [];
-              const myPrice = precioMiAreaSP > 0 ? precioMiAreaSP : getMyPromoPrice(promoFull, myArea, _compAreas);
+              const myPrice = precioMiAreaSP > 0
+                ? precioMiAreaSP
+                : getMyPromoPrice(promoFull, myArea, restoredCompletedAreas);
               
               slotServices[1].push({
                 name: promoFull.name,
@@ -4329,14 +4339,8 @@ if ('caches' in window) {
               
               // Registrar promo activa con key normalizada
               const clientKey = normalizeClientKey(a.nombre);
-              // Restaurar completedAreas desde observaciones del ticket si existe
-              let restoredCompletedAreas = [];
-              try {
-                const obsText = a.observaciones || a.obs || a.obsGeneral || '';
-                const match = obsText.match(/_completedAreas:(\[.*?\])/);
-                if (match) restoredCompletedAreas = JSON.parse(match[1]);
-                console.log('🔍 obsText:', obsText, '| completedAreas restored:', restoredCompletedAreas);
-              } catch(e) { console.warn('completedAreas parse error:', e); }
+              // (restoredCompletedAreas ya fue calculado arriba)
+              console.log('🔍 completedAreas restored:', restoredCompletedAreas);
               activePromos[clientKey] = {
                 promo: promoFull,
                 startedBy: myArea,
