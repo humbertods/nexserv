@@ -4293,13 +4293,13 @@ if ('caches' in window) {
               const myArea = user?.area || 'cejas';
 
               // Restaurar completedAreas PRIMERO — necesario para calcular precio correcto
-              const clientKeyTemp = normalizeClientKey(a.nombre);
-              let restoredCompletedAreas = [];
+              var restoredCompletedAreas = [];
               try {
-                const obsText = a.observaciones || a.obs || a.obsGeneral || '';
-                const match = obsText.match(/_completedAreas:(\[.*?\])/);
-                if (match) restoredCompletedAreas = JSON.parse(match[1]);
-              } catch(e) {}
+                var _obsAllFields = String(a.observaciones || a.obs || a.obsGeneral || a.obsText || '');
+                var _matchComp = _obsAllFields.match(/_completedAreas:(\[[^\]]*\])/);
+                if (_matchComp) restoredCompletedAreas = JSON.parse(_matchComp[1]);
+                console.log('completedAreas parse:', _obsAllFields.substring(0, 100), '->', restoredCompletedAreas);
+              } catch(eComp) { console.warn('completedAreas parse error:', eComp); }
 
               // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
               // Para promo compartida: excluir completedAreas → la 2da staff ve solo su parte
@@ -4799,6 +4799,15 @@ if ('caches' in window) {
     document.getElementById('confirmSvcClientName').textContent = clientName;
     window._confirmSvcSlot = slot;
 
+    // Si hay desglose previo (promo compartida), mostrarlo en el modal
+    const desgloseHtml = (window._desgloseAcumulado || []).map(function(d) {
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--success-bg);border-radius:10px;margin-bottom:6px;">'
+        + '<span style="font-size:14px;">&#x2705;</span>'
+        + '<div style="flex:1;font-size:11px;font-weight:700;color:var(--success);">' + (d.servicio||d.area||'Servicio previo') + ' &middot; ' + (d.staff||'') + '</div>'
+        + '<div style="font-size:12px;font-weight:800;color:var(--success);">$' + (d.monto||0) + '</div>'
+        + '</div>';
+    }).join('');
+
     if (esTM && window._tmAreasActuales) {
       // ── TICKET MULTI: mostrar historial completo + área actual ──
       const areas = window._tmAreasActuales;
@@ -4832,11 +4841,22 @@ if ('caches' in window) {
       document.getElementById('confirmSvcPrice').textContent = '';
       document.getElementById('confirmSvcTitle').textContent = '🎯 Ticket multi-servicio';
     } else {
-      document.getElementById('confirmSvcName').textContent = svcName;
-      document.getElementById('confirmSvcPrice').textContent = svcPrice > 0 ? '$' + svcPrice : '—';
-      const esEnganche = window._esEnganche || false;
-      document.getElementById('confirmSvcTitle').textContent = esEnganche
-        ? '🔄 Servicio de enganche' : '📋 Servicio asignado';
+      const esCompartida = window._desgloseAcumulado && window._desgloseAcumulado.length > 0;
+      if (esCompartida && desgloseHtml) {
+        document.getElementById('confirmSvcName').innerHTML = desgloseHtml
+          + '<div style="padding:8px 10px;border:2px solid var(--info);border-radius:10px;margin-top:4px;">'
+          + '<div style="font-size:10px;font-weight:700;color:var(--info);text-transform:uppercase;margin-bottom:2px;">Tu servicio</div>'
+          + '<div style="font-size:13px;font-weight:800;">' + svcName + ' &middot; $' + svcPrice + '</div>'
+          + '</div>';
+        document.getElementById('confirmSvcPrice').textContent = '';
+        document.getElementById('confirmSvcTitle').textContent = '🤝 Promo compartida';
+      } else {
+        document.getElementById('confirmSvcName').textContent = svcName;
+        document.getElementById('confirmSvcPrice').textContent = svcPrice > 0 ? '$' + svcPrice : '—';
+        const esEnganche = window._esEnganche || false;
+        document.getElementById('confirmSvcTitle').textContent = esEnganche
+          ? '🔄 Servicio de enganche' : '📋 Servicio asignado';
+      }
     }
 
     document.getElementById('confirmServiceModal').classList.add('active');
