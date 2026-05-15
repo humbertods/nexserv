@@ -6748,11 +6748,15 @@ if ('caches' in window) {
           renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
         }
         
-        let msg = '✅ Sesión registrada: ' + tipoSesion;
-        if (result.proxRetoque) {
-          msg += '\n📅 Próximo retoque: ' + result.proxRetoque;
+        // Refrescar panel cejasQuick
+        if (window._currentCejasClientCodigo === codigo) {
+          var _ck = codigo.toLowerCase().replace(/-/g,'');
+          var _cs = window._currentCejasSlot || 1;
+          var _ce = document.getElementById('cejasQuick' + _cs);
+          if (_ce) { _ce.innerHTML = ''; _ce.style.display = 'none'; }
+          setTimeout(function(){ loadCejasQuick(_ck, _cs, codigo, nombre); }, 300);
         }
-        alert(msg);
+        showToast('✅ Sesión registrada: ' + tipoSesion + (result.proxRetoque ? ' · Próx. retoque: ' + result.proxRetoque : ''));
       } else {
         alert('❌ Error al guardar: ' + (result.error || 'Desconocido'));
       }
@@ -12328,25 +12332,35 @@ if ('caches' in window) {
   }
 
   function openNuevaSesionCejas() {
-    // Pre-llenar el modal de nueva sesión cejas pigmento
-    const slot = window._currentCejasSlot || 1;
-    const svcs = slotServices[slot] || [];
-    const svcAprobado = svcs.find(s => s.status !== 'rechazado' && s.status !== 'pendiente' && esSrvPigmento(s.name));
-    const precio = svcAprobado ? Number(svcAprobado.price || 0) : 0;
+    const clientCodigo = window._currentCejasClientCodigo || '';
+    const clientNombre = window._currentCejasClientNombre || '';
 
-    // Pre-llenar campos del modal existente de cejas pigmento
-    const npTipo = document.getElementById('npTipoSesion') || document.getElementById('npfTipoSesion');
-    const npPrecio = document.getElementById('npPrecio') || document.getElementById('npfPrecio');
-    if (npTipo) npTipo.value = '';
-    if (npPrecio) npPrecio.value = precio || '';
+    if (!clientCodigo) {
+      showToast('⚠ Error: no se encontró la clienta');
+      return;
+    }
 
-    // Abrir el modal existente de nueva sesión cejas pigmento
-    const modalEl = document.getElementById('nuevaSesionCejasPigmentoModal') || document.getElementById('npModal');
+    // Establecer contexto para saveCejasPigmentoFicha
+    window._cpCodigo = clientCodigo;
+    window._cpNombre = clientNombre;
+
+    // Limpiar campos del modal
+    const cpColor = document.getElementById('cpColor');
+    const cpAguja = document.getElementById('cpAguja');
+    const cpTipoSesion = document.getElementById('cpTipoSesion');
+    const cpObs = document.getElementById('cpObs');
+    if (cpColor) cpColor.value = '';
+    if (cpAguja) cpAguja.value = '';
+    if (cpTipoSesion) cpTipoSesion.value = '';
+    if (cpObs) cpObs.value = '';
+
+    // Abrir el modal real
+    const modalEl = document.getElementById('newCejasPigmentoModal');
     if (modalEl) {
       modalEl.classList.add('active');
     } else {
-      // Fallback: abrir directo el tab de pigmento del perfil
-      openClientProfile(window._currentCejasClientCodigo, window._currentCejasClientNombre);
+      // Fallback
+      openClientProfile(clientCodigo, clientNombre);
     }
   }
 
