@@ -12315,7 +12315,7 @@ if ('caches' in window) {
           + '<div style="font-size:11px;opacity:.9;margin-bottom:4px;">Aguja: ' + (ultimaSesion.aguja || '—') + ' · Última: ' + (ultimaSesion.fecha || '—') + '</div>'
           + (ultimaSesion.proxRetoque ? '<div style="font-size:11px;opacity:.9;">📅 Próx. retoque: ' + ultimaSesion.proxRetoque + '</div>' : '')
           + '</div>'
-          + '<button onclick="openNuevaSesionCejas()" style="width:100%;padding:14px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✅ Registrar sesión de hoy</button>'
+          + '<button onclick="abrirModalPigmento()" style="width:100%;padding:14px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✅ Registrar sesión de hoy</button>'
           + '<button onclick="loadCejasQuick(\'' + clientKey + '\',' + slot + ',\'' + clientCodigo + '\',\'' + clientNombre + '\')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">&#x1F504; Actualizar</button>';
       } else {
         // Sin historial → crear nueva ficha
@@ -12323,7 +12323,7 @@ if ('caches' in window) {
           + '<div style="font-size:24px;margin-bottom:6px;">💉</div>'
           + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#92400e;">Sin ficha de efecto polvo</div>'
           + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Primera sesión de esta clienta</div>'
-          + '<button onclick="openNuevaSesionCejas()" style="padding:14px 24px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Registrar primera sesión</button>'
+          + '<button onclick="abrirModalPigmento()" style="padding:14px 24px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Registrar primera sesión</button>'
           + '</div>';
       }
     } catch(e) {
@@ -12367,6 +12367,7 @@ if ('caches' in window) {
   window.loadFacialFichaQuick = loadFacialFichaQuick;
   window.loadCejasQuick = loadCejasQuick;
   window.openNuevaSesionCejas = openNuevaSesionCejas;
+  window.abrirModalPigmento = function() { var m = document.getElementById('newCejasPigmentoModal'); if(m) m.classList.add('active'); };
   window.esSrvPigmento = esSrvPigmento;
   window.openNuevaFichaFacialFromPanel = openNuevaFichaFacialFromPanel;
   window.guardarNuevaFichaFacial = guardarNuevaFichaFacial;
