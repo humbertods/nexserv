@@ -2370,7 +2370,13 @@ function handleGetFichaCejasPigmento(params) {
   const data = ws.getDataRange().getValues();
   const fichas = [];
 
-  for (let i = 4; i < data.length; i++) { // Fila 5+ (4 filas de header en la hoja)
+  // Detectar dónde empiezan los datos: buscar primera fila con código de cliente (C-XXXX)
+  var dataStartIdx = 1;
+  for (var di = 0; di < Math.min(data.length, 8); di++) {
+    if (String(data[di][1] || '').match(/^C-\d+$/)) { dataStartIdx = di; break; }
+    if (di >= 4 && String(data[di][1] || '').trim() !== '' && !String(data[di][1] || '').includes('#')) { dataStartIdx = di; break; }
+  }
+  for (let i = dataStartIdx; i < data.length; i++) {
     const row = data[i];
     if (!row[1]) continue; // Saltar filas vacías
     if (String(row[1]).trim() === String(params.codigo || '').trim()) {
@@ -2407,8 +2413,13 @@ function handleAddFichaCejasPigmento(data) {
     const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
     
     // Buscar último ID (empezar desde fila 6, índice 5 - filas 1-4=headers, fila 5=encabezados columnas)
+    // Detectar inicio de datos dinámicamente
+    var addStartIdx = 1;
+    for (var dj = 0; dj < Math.min(allData.length, 8); dj++) {
+      if (String(allData[dj][1] || '').match(/^C-\d+$/)) { addStartIdx = dj; break; }
+    }
     let maxNum = 0;
-    for (let i = 4; i < allData.length; i++) {
+    for (let i = addStartIdx; i < allData.length; i++) {
       const id = String(allData[i][0] || '').trim();
       if (id) {
         const num = parseInt(id);
@@ -2428,7 +2439,7 @@ function handleAddFichaCejasPigmento(data) {
     
     // Máximo 5 sesiones: eliminar la más antigua si se supera
     var sesionesCliente = [];
-    for (var i = 4; i < allData.length; i++) {
+    for (var i = addStartIdx; i < allData.length; i++) {
       if (String(allData[i][1]||'').trim() === String(data.codigo||'').trim()) sesionesCliente.push(i+1);
     }
     if (sesionesCliente.length >= 5) ws.deleteRow(sesionesCliente[0]);
