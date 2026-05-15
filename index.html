@@ -12163,20 +12163,19 @@ if ('caches' in window) {
         desgloseCompleto: desgloseCompleto
       });
       if (r.success) {
+        // Guardar copia ANTES de limpiar para calcular comisión
+        const svcsParaComision = [...(slotServices[slot] || [])].filter(function(s){ return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'; });
         slotServices[slot] = [];
         window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
         if (user && activeClients[user.name]) {
           activeClients[user.name].splice(slot - 1, 1);
           updateCapacityUI(user.name);
         }
-        // Calcular comisión de la última staff
-        const svcsFinales = (slotServices[slot] || []).filter(s =>
-          s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
-        );
-        const totalFinal2 = svcsFinales.reduce((s,v) => s + Number(v.price||0), 0);
-        const pctFinal = (user?.area === 'facial') ? 0.4 : 0.3;
+        // Calcular comisión de la última staff (usando copia guardada antes de limpiar)
+        const totalFinal2 = svcsParaComision.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+        const pctFinal = (user && user.area === 'facial') ? 0.4 : 0.3;
         const comisionFinal = Math.round(totalFinal2 * pctFinal * 100) / 100;
-        const svcFinalNombre = svcsFinales.map(s => s.name).join(' + ') || 'Servicio';
+        const svcFinalNombre = svcsParaComision.map(function(s){ return s.name; }).join(' + ') || 'Servicio';
 
         show('staffHome');
         await new Promise(res => setTimeout(res, 300));
