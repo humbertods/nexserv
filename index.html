@@ -4436,6 +4436,26 @@ if ('caches' in window) {
                   var misAreas = (tm.areas || []).filter(function(ar) {
                     return ar.staff === (user2 && user2.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
                   });
+                  // Mostrar áreas completadas previamente como historial readonly
+                  var areasCompletadasTM = (tm.areas || []).filter(function(ar) {
+                    return String(ar.estado||'').toLowerCase() === 'completado';
+                  });
+                  if (areasCompletadasTM.length > 0) {
+                    var svcListEl = document.getElementById('as1SvcList');
+                    if (svcListEl) {
+                      var histHtmlTM = areasCompletadasTM.map(function(ar) {
+                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                          + '<span style="font-size:16px;">&#x2705;</span>'
+                          + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                          + (ar.tentativo || ar.area || 'Servicio previo') + ' &middot; ' + (ar.staff || '&mdash;')
+                          + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                          + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
+                          + '</div>';
+                      }).join('');
+                      svcListEl.insertAdjacentHTML('afterbegin', histHtmlTM);
+                    }
+                  }
+
                   if (misAreas.length > 0) {
                     // Reemplazar slotServices con los servicios de esta staff en el TM
                     slotServices[1] = misAreas.map(function(ar) {

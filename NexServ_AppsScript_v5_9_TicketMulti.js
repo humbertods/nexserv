@@ -4387,6 +4387,15 @@ function handleCompletarAreaTicketMulti(data) {
             'Pendiente cobro'
           ]);
         } catch(eH) {}
+      } else if (siguienteArea !== null) {
+        // Hay siguiente área — marcarla como "Esperando" para que aparezca en lista
+        // y limpiar el staff anterior de esa área (queda libre para tomar)
+        var nextBase = TM_AREA_COL[siguienteArea.idx];
+        ws.getRange(rowNum, nextBase + 3 + 1).setValue('Esperando'); // estado = Esperando
+        ws.getRange(rowNum, nextBase + 2 + 1).setValue('');           // limpiar staff asignada
+        ws.getRange(rowNum, nextBase + 4 + 1).setValue('');           // limpiar hora tomada
+        // Estado global del TM = "En espera" (para que Mikaela lo vea)
+        ws.getRange(rowNum, 6).setValue('En espera parcial');
       }
 
       return {
