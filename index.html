@@ -12073,12 +12073,23 @@ if ('caches' in window) {
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
     try {
+      // Guardar copia de servicios ANTES de limpiar el slot
+      window['_slotServicesBefore' + slot] = [...(slotServices[slot] || [])];
+
       const r = await apiPost('completarAreaTicketMulti', {
         idEspera,
         chicaNombre: user?.name || ''
       });
       if (r.success) {
-        // Limpiar slot
+        // Calcular comisión de esta staff
+        const svcsHechosMu = (window['_slotServicesBefore' + slot] || slotServices[slot] || []).filter(function(s) {
+          return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
+        });
+        const totalHechoMu = svcsHechosMu.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+        const pctMu = (user && user.area === 'facial') ? 0.4 : 0.3;
+        const comisionMu = Math.round(totalHechoMu * pctMu * 100) / 100;
+        const svcNombreMu = svcsHechosMu.map(function(s){ return s.name; }).join(' + ') || 'Servicio';
+
         slotServices[slot] = [];
         window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
         if (user && activeClients[user.name]) {
@@ -12089,9 +12100,9 @@ if ('caches' in window) {
         await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
         if (r.todasCompletadas) {
-          alert('🎯 Todos los servicios completados. Clienta enviada a cobrar con Mikaela.');
+          showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Comisión: $' + comisionMu + ' · Enviada a cobrar');
         } else {
-          alert('✅ Tu parte completada. Sigue el área: ' + (r.siguienteArea || 'siguiente') + '. La clienta está en lista de espera.');
+          showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Tu comisión: $' + comisionMu + ' · Siguiente: ' + (r.siguienteArea || 'siguiente área'));
         }
       } else {
         alert('Error: ' + r.message);
@@ -12151,10 +12162,19 @@ if ('caches' in window) {
           activeClients[user.name].splice(slot - 1, 1);
           updateCapacityUI(user.name);
         }
+        // Calcular comisión de la última staff
+        const svcsFinales = (slotServices[slot] || []).filter(s =>
+          s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
+        );
+        const totalFinal2 = svcsFinales.reduce((s,v) => s + Number(v.price||0), 0);
+        const pctFinal = (user?.area === 'facial') ? 0.4 : 0.3;
+        const comisionFinal = Math.round(totalFinal2 * pctFinal * 100) / 100;
+        const svcFinalNombre = svcsFinales.map(s => s.name).join(' + ') || 'Servicio';
+
         show('staffHome');
         await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
-        showToast('✅ Clienta múltiple enviada a cobrar con Mikaela');
+        showToast('✅ ' + svcFinalNombre + ' $' + totalFinal2 + ' · Comisión: $' + comisionFinal + ' · Enviada a cobrar');
       } else {
         alert('Error: ' + r.message);
       }
