@@ -3245,23 +3245,27 @@ if ('caches' in window) {
         var miNombre = user && user.name ? user.name : '';
         var slotN = slot1 ? 1 : 2;
 
-        // Áreas pendientes (no completadas, no en servicio por esta staff)
+        // Áreas en estado "Esperando" = servicios del TM aún no tomados por nadie
         var areasEsperando = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
+        var sig    = areasEsperando.length > 0 ? areasEsperando[0] : null;
         var hayMas = areasEsperando.length > 0;
 
-        var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
+        // Label con el nombre real del siguiente servicio a desbloquear
+        var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : '';
 
         if (!hayMas) {
-          // No hay más áreas pendientes → botón de cierre multi-staff
-          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé servicio — clienta múltiple</button>';
-        } else {
-          // Hay servicios pendientes → 3 botones (repetibles infinitamente)
-          // "Continuar siguiente servicio" puede tocarse N veces (cejas → bigote → labio → entrecejo...)
+          // No quedan servicios en "Esperando" — todos están activos o hechos por esta staff
+          // → sin siguiente que desbloquear: mostrar solo "Terminé" y "Finalizar"
           btnContainer.innerHTML = ''
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Continuar siguiente servicio</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
+            + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
+        } else {
+          // Quedan servicios en "Esperando" → mostrar "Continuar siguiente servicio" con nombre real
+          // + opción de ceder el resto a otra staff + finalizar
+          btnContainer.innerHTML = ''
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">➡️ Continuar siguiente: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
             + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
         }
