@@ -1580,6 +1580,9 @@ if ('caches' in window) {
     <!-- Ficha rápida facial (visible solo para staff de facial) -->
     <div id="facialFichaQuick1" style="display: none; margin-bottom: 14px;"></div>
 
+    <!-- Ficha rápida cejas pigmento (visible para servicios de efecto polvo/permanente) -->
+    <div id="cejasQuick1" style="display: none; margin-bottom: 14px;"></div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 20px;" id="as1ActionBtns">
       <button onclick="openAddService(1)" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft); transition: all .15s;">+ Agregar servicio</button>
       <button onclick="openPromoSelect(1)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s;" id="promoBtn1">🏷 Aplicar promo</button>
@@ -4407,6 +4410,17 @@ if ('caches' in window) {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
 
+          // Precargar ficha cejas pigmento si el servicio es de efecto polvo/permanente
+          if (user.area === 'cejas' || user.role === 'owner') {
+            const svcNameForPig = slotServices[1].find(function(s){ return esSrvPigmento(s.name); });
+            if (svcNameForPig) {
+              const cKey1 = (a.codigo || '').toLowerCase().replace(/-/g, '');
+              setTimeout(function() {
+                loadCejasQuick(cKey1, 1, a.codigo, a.nombre);
+              }, 500);
+            }
+          }
+
           // Si es TM: cargar areas completas y mostrar botones correctos desde el inicio
           if (window._as1IdEspera && window._as1IdEspera.startsWith('TM-')) {
             apiGet('getTicketMulti').then(function(tmData) {
@@ -4883,8 +4897,22 @@ if ('caches' in window) {
     } catch(e) {}
     showToast('✅ Servicio confirmado');
 
-    // ── Si es facial: abrir modal de ficha facial para registrar la visita ──
     const user = window.currentUser;
+
+    // ── Si es cejas pigmento: mostrar ficha rápida de efecto polvo ──
+    const slot_cs = window._confirmSvcSlot || 1;
+    const svcs_cs = slotServices[slot_cs] || [];
+    const tienePigmento = svcs_cs.some(s => esSrvPigmento(s.name));
+    if (tienePigmento && (user?.area === 'cejas' || user?.role === 'owner')) {
+      const clientNombre_cs = document.getElementById('as' + slot_cs + 'Name')?.textContent?.replace(' ⭐','') || '';
+      const clientCodigo_cs = (window['_as' + slot_cs + 'Client'] || '').toUpperCase().replace('C','C');
+      const clientKey_cs = (window['_as' + slot_cs + 'Client'] || clientCodigo_cs).toLowerCase().replace(/-/g,'');
+      setTimeout(function() {
+        loadCejasQuick(clientKey_cs, slot_cs, window['_as' + slot_cs + 'Client'] || clientCodigo_cs, clientNombre_cs);
+      }, 400);
+    }
+
+    // ── Si es facial: abrir modal de ficha facial para registrar la visita ──
     if (user?.area === 'facial' || user?.role === 'owner') {
       const slot2 = window._confirmSvcSlot || 1;
       const clientNombre = document.getElementById('as' + slot2 + 'Name')?.textContent?.replace(' ⭐','') || '';
@@ -12192,7 +12220,85 @@ if ('caches' in window) {
 
   window.openRegistrarVisitaFacial = openRegistrarVisitaFacial;
   window.guardarVisitaFacial = guardarVisitaFacial;
+  // ── FICHA RÁPIDA CEJAS PIGMENTO (efecto polvo / permanente) ──────────────
+
+  // Detectar si el servicio requiere ficha de pigmento
+  function esSrvPigmento(svcName) {
+    const n = String(svcName || '').toLowerCase();
+    return n.includes('polvo') || n.includes('pigment') || n.includes('permanen') || n.includes('micropigment');
+  }
+
+  async function loadCejasQuick(clientKey, slot, clientCodigo, clientNombre) {
+    const el = document.getElementById('cejasQuick' + slot);
+    if (!el) return;
+    el.style.display = 'block';
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">⏳ Cargando ficha...</div>';
+
+    try {
+      const result = await apiGet('getFichaCejasPigmento', { codigo: clientCodigo });
+      const fichas = result.success ? (result.fichas || []) : [];
+      const ultimaSesion = fichas.length > 0 ? fichas[fichas.length - 1] : null;
+
+      // Guardar para modal
+      window._currentCejasClientKey = clientKey;
+      window._currentCejasClientCodigo = clientCodigo;
+      window._currentCejasClientNombre = clientNombre;
+      window._currentCejasSlot = slot;
+
+      if (ultimaSesion) {
+        // Tiene historial → mostrar última sesión + botón nueva visita
+        el.innerHTML = '<div style="background:linear-gradient(135deg,#92400e,#b45309);color:white;border-radius:20px;padding:16px;margin-bottom:10px;">'
+          + '<div style="font-size:11px;font-weight:600;opacity:.8;margin-bottom:8px;">💉 Cejas efecto polvo · ' + clientNombre + ' · ' + fichas.length + ' sesión(es)</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">'
+          + '<div style="background:rgba(255,255,255,.15);border-radius:12px;padding:8px;text-align:center;"><div style="font-size:9px;opacity:.7;font-weight:600;">Tipo sesión</div><div style="font-size:12px;font-weight:800;margin-top:2px;">' + (ultimaSesion.tipoSesion || '—') + '</div></div>'
+          + '<div style="background:rgba(255,255,255,.15);border-radius:12px;padding:8px;text-align:center;"><div style="font-size:9px;opacity:.7;font-weight:600;">Color</div><div style="font-size:12px;font-weight:800;margin-top:2px;">' + (ultimaSesion.color || '—') + '</div></div>'
+          + '</div>'
+          + '<div style="font-size:11px;opacity:.9;margin-bottom:4px;">Aguja: ' + (ultimaSesion.aguja || '—') + ' · Última: ' + (ultimaSesion.fecha || '—') + '</div>'
+          + (ultimaSesion.proxRetoque ? '<div style="font-size:11px;opacity:.9;">📅 Próx. retoque: ' + ultimaSesion.proxRetoque + '</div>' : '')
+          + '</div>'
+          + '<button onclick="openNuevaSesionCejas()" style="width:100%;padding:14px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px;">✅ Registrar sesión de hoy</button>'
+          + '<button onclick="loadCejasQuick(\'' + clientKey + '\',' + slot + ',\'' + clientCodigo + '\',\'' + clientNombre + '\')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">&#x1F504; Actualizar</button>';
+      } else {
+        // Sin historial → crear nueva ficha
+        el.innerHTML = '<div style="background:var(--bg-card);border:2px dashed #92400e;border-radius:20px;padding:18px;text-align:center;margin-bottom:10px;">'
+          + '<div style="font-size:24px;margin-bottom:6px;">💉</div>'
+          + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#92400e;">Sin ficha de efecto polvo</div>'
+          + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Primera sesión de esta clienta</div>'
+          + '<button onclick="openNuevaSesionCejas()" style="padding:14px 24px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Registrar primera sesión</button>'
+          + '</div>';
+      }
+    } catch(e) {
+      el.innerHTML = '<div style="font-size:12px;color:var(--ink-faint);text-align:center;padding:10px;">Error cargando ficha</div>';
+    }
+  }
+
+  function openNuevaSesionCejas() {
+    // Pre-llenar el modal de nueva sesión cejas pigmento
+    const slot = window._currentCejasSlot || 1;
+    const svcs = slotServices[slot] || [];
+    const svcAprobado = svcs.find(s => s.status !== 'rechazado' && s.status !== 'pendiente' && esSrvPigmento(s.name));
+    const precio = svcAprobado ? Number(svcAprobado.price || 0) : 0;
+
+    // Pre-llenar campos del modal existente de cejas pigmento
+    const npTipo = document.getElementById('npTipoSesion') || document.getElementById('npfTipoSesion');
+    const npPrecio = document.getElementById('npPrecio') || document.getElementById('npfPrecio');
+    if (npTipo) npTipo.value = '';
+    if (npPrecio) npPrecio.value = precio || '';
+
+    // Abrir el modal existente de nueva sesión cejas pigmento
+    const modalEl = document.getElementById('nuevaSesionCejasPigmentoModal') || document.getElementById('npModal');
+    if (modalEl) {
+      modalEl.classList.add('active');
+    } else {
+      // Fallback: abrir directo el tab de pigmento del perfil
+      openClientProfile(window._currentCejasClientCodigo, window._currentCejasClientNombre);
+    }
+  }
+
   window.loadFacialFichaQuick = loadFacialFichaQuick;
+  window.loadCejasQuick = loadCejasQuick;
+  window.openNuevaSesionCejas = openNuevaSesionCejas;
+  window.esSrvPigmento = esSrvPigmento;
   window.openNuevaFichaFacialFromPanel = openNuevaFichaFacialFromPanel;
   window.guardarNuevaFichaFacial = guardarNuevaFichaFacial;
   window.openRegistrarVisitaFacialFromPanel = openRegistrarVisitaFacialFromPanel;
