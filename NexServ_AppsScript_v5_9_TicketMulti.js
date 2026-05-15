@@ -4482,25 +4482,73 @@ function handleConfirmarCobroMulti(data) {
       ws.getRange(rowNum, 10).setValue(hora);
       ws.getRange(rowNum, 37).setValue(totalCobrado);
 
-      // Registrar en CierresPagos
-      try {
-        const wsCierre = getSheet('CierresPagos');
-        // Una fila por área completada
-        for (let a = 0; a < 4; a++) {
-          const base    = TM_AREA_COL[a];
-          const tent    = String(rows[i][base] || '').trim();
-          if (!tent) continue;
-          const staff   = String(rows[i][base + 2] || '').trim();
-          const confirm = String(rows[i][base + 1] || tent).trim();
-          const precio  = Number(rows[i][TM_PRECIO_COL[a]] || 0);
-          const precioReal = esTargeta ? Number(rows[i][34] || 0) / 4 : precio; // proporcional si tarjeta
+      // Calcular total promo para distribuir proporcionalmente si es tarjeta
+      const totalPromoAreas = [0,1,2,3].reduce(function(s,a){ return s + Number(rows[i][TM_PRECIO_COL[a]]||0); }, 0);
+
+      // Registrar por área en CierresPagos Y HistorialOwner
+      const wsCierre = getSheet('CierresPagos');
+      const wsHist   = getSheet('HistorialOwner');
+      const wsComis  = getSheet('Comisiones');
+      const comisData = wsComis ? wsComis.getDataRange().getValues() : [];
+      const fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
+
+      for (let a = 0; a < 4; a++) {
+        const base   = TM_AREA_COL[a];
+        const tent   = String(rows[i][base] || '').trim();
+        if (!tent) continue;
+        const staff  = String(rows[i][base + 2] || '').trim();
+        if (!staff) continue; // área sin staff asignada
+        const confirm = String(rows[i][base + 1] || tent).replace(/.*\|\|/, '').trim() || tent.replace(/.*\|\|/, '').trim();
+        const areaKey = tent.replace(/\|\|.*/, '').trim();
+        const precioPromoArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
+
+        // Si tarjeta: precio proporcional al total normal
+        let precioReal = precioPromoArea;
+        if (esTargeta && totalPromoAreas > 0) {
+          const proporcion = precioPromoArea / totalPromoAreas;
+          precioReal = Math.round(totalCobrado * proporcion * 100) / 100;
+        }
+
+        // Determinar % comisión de esta staff
+        let pct = 0.3;
+        for (let ci = 4; ci < comisData.length; ci++) {
+          if (String(comisData[ci][0]||'').trim() === staff) {
+            const areaStr = String(comisData[ci][1]||'').toLowerCase();
+            const pctStr  = String(comisData[ci][4]||'');
+            if (areaStr.includes('facial') || pctStr.includes('40')) pct = 0.4;
+            break;
+          }
+        }
+        const comision = Math.round(precioReal * pct * 100) / 100;
+
+        // CierresPagos
+        try {
           wsCierre.appendRow([
             rows[i][1], rows[i][2], rows[i][3], rows[i][4], staff,
             confirm, precioReal, metodoPago, hora,
             String(rows[i][0]) + '-A' + (a + 1)
           ]);
-        }
-      } catch(e) {}
+        } catch(eCierre) {}
+
+        // HistorialOwner — para que aparezca en "Servicios de hoy" de cada staff
+        try {
+          wsHist.appendRow([
+            fecha, hora,
+            String(rows[i][3] || ''), // código cliente
+            String(rows[i][4] || ''), // nombre cliente
+            '',
+            confirm || 'Servicio multi',
+            areaKey || 'multi',
+            staff,
+            precioReal,
+            comision,
+            metodoPago
+          ]);
+        } catch(eHist) {}
+
+        // Actualizar comisión acumulada en hoja Comisiones
+        try { updateComision(staff, precioReal); } catch(eC) {}
+      }
 
       return { success: true, totalCobrado };
     }
