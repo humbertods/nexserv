@@ -127,6 +127,7 @@ function doPost(e) {
       case 'bloquearUsuario': result = handleBloquearUsuario(data); break;
       case 'asignarServicioNormal': result = handleAsignarServicioNormal(data); break;
       case 'confirmarServicioStaff': result = handleConfirmarServicioStaff(data); break;
+      case 'actualizarServicioSP': result = handleActualizarServicioSP(data); break;
       case 'asignarPromo': result = handleAsignarPromo(data); break;
       case 'solicitarAutorizacion': result = handleSolicitarAutorizacion(data); break;
       case 'aprobarAutorizacion': result = handleAprobarAutorizacion(data); break;
@@ -1204,7 +1205,7 @@ function handleContinuarPromoALista(data) {
         montoSiguiente,                      // Total
         data.promoNombre || allData[i][13] || '', // Promo nombre
         precioPromo, precioNormal, '',       // Precio promo, Precio regular, Área completada
-        JSON.stringify([{ area: data.areaCompletada, monto: montoChica, staff: data.chicaNombre }]), // Desglose
+        JSON.stringify([{ area: data.areaCompletada, servicio: data.servicioNombre || data.areaCompletada, monto: montoChica, staff: data.chicaNombre }]), // Desglose
         'SP', precioNormal, precioPromo      // Tipo, Precio Normal, Precio Promo
       ]);
 
@@ -2820,6 +2821,25 @@ function handleAsignarServicioNormal(data) {
 }
 
 // La staff confirmó el servicio asignado por Mikaela → volver estado a "En servicio"
+function handleActualizarServicioSP(data) {
+  // Actualiza el servicio y total en un SP ticket cuando la staff cambia el servicio de enganche
+  try {
+    const ws = getSheet('ServicioPromo');
+    const rows = ws.getDataRange().getValues();
+    const idEspera = String(data.idEspera || '').trim();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0] || '').trim() !== idEspera) continue;
+      // Actualizar servicio (col F=6) y total/precio de esta área (col M=13)
+      if (data.nuevoServicio) ws.getRange(i+1, 6).setValue(data.nuevoServicio);
+      if (data.nuevoPrecio !== undefined) ws.getRange(i+1, 13).setValue(Number(data.nuevoPrecio));
+      // Actualizar desglose si se proporciona
+      if (data.desgloseActualizado) ws.getRange(i+1, 18).setValue(JSON.stringify(data.desgloseActualizado));
+      return { success: true };
+    }
+    return { success: false, message: 'SP ticket no encontrado: ' + idEspera };
+  } catch(e) { return { success: false, message: String(e) }; }
+}
+
 function handleConfirmarServicioStaff(data) {
   const idEspera = String(data.idEspera || '').trim();
   if (!idEspera) return { success: false, message: 'idEspera requerido' };
@@ -4370,7 +4390,8 @@ function handleCompletarAreaTicketMulti(data) {
       return {
         success: true,
         todasCompletadas: todasListas,
-        siguienteArea: siguienteArea ? siguienteArea.key : null,
+        siguienteArea: siguienteArea ? (siguienteArea.tentativo || siguienteArea.key) : null,
+        siguientePrecio: siguienteArea ? Number(siguienteArea.precio || 0) : 0,
         areasPendientes: areasPendientes.length
       };
     }

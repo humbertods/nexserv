@@ -3384,10 +3384,13 @@ if ('caches' in window) {
       const miTotal = svcs.reduce((s,v) => s + Number(v.price||0), 0);
       const miSvcNames = svcs.map(s => s.name).join(' + ') || data.svcNames || '';
 
+      // Obtener nombre del servicio realizado para guardarlo en serviciosDetalle
+      const svcNombreFinal = svcs.map(s => s.name).join(' + ') || miSvcNames || (user?.area || 'Servicio');
       const result = await apiPost('continuarPromoALista', {
         idEspera,
         chicaNombre: user?.name || '',
         areaCompletada: user?.area || 'cejas',
+        servicioNombre: svcNombreFinal,
         montoChica: miTotal,
         clienteCodigo: clientCodigo,
         clienteNombre: data.clientName,
@@ -4893,6 +4896,22 @@ if ('caches' in window) {
       const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
       if (idEspera) {
         await apiPost('confirmarServicioStaff', { idEspera });
+
+        // Si es SP ticket (promo compartida/enganche): actualizar servicio en el sheet
+        if (idEspera.startsWith('SP-')) {
+          const svcsConf = (slotServices[slot] || []).filter(s =>
+            s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
+          );
+          const svcNuevo = svcsConf.map(s => s.name).join(' + ');
+          const precioNuevo = svcsConf.reduce((s,v) => s + Number(v.price||0), 0);
+          if (svcNuevo) {
+            await apiPost('actualizarServicioSP', {
+              idEspera,
+              nuevoServicio: svcNuevo,
+              nuevoPrecio: precioNuevo
+            });
+          }
+        }
       }
     } catch(e) {}
     showToast('✅ Servicio confirmado');
@@ -5048,9 +5067,15 @@ if ('caches' in window) {
     const totalCombinadoEnganche = totalPrevioSheet + totalSoloEstaStaff;
     const totalFresh = String(totalCombinadoEnganche > 0 ? totalCombinadoEnganche : (Number(data.total) || 0));
     const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
-    const precioRegularFresh = promoDataFresh
-      ? String(Number(promoDataFresh.promo.regular || promoDataFresh.promo.price))
-      : totalFresh;
+    // precioRegular: para tarjeta = precio normal total (promo compartida usa precios del sheet)
+    let precioRegularFresh = totalFresh;
+    if (promoDataFresh) {
+      precioRegularFresh = String(Number(promoDataFresh.promo.regular || promoDataFresh.promo.price));
+    } else if (miTicketSheet && totalPrevioSheet > 0) {
+      // Promo compartida sin activePromos: usar precioRegular del sheet + precio regular de esta staff
+      const precioRegSheetTotal = Number(miTicketSheet.precioRegular || miTicketSheet.precioNormal || 0);
+      precioRegularFresh = String(precioRegSheetTotal > 0 ? precioRegSheetTotal : totalCombinadoEnganche);
+    }
 
     // ── PASO 4: Construir desglose ─────────────────────────────────────────────
     const desgloseActual = svcsAprobados.map(s => ({
@@ -5067,6 +5092,8 @@ if ('caches' in window) {
     // 1) Agregar partes del sheet primero (staffs anteriores — funciona para SP y SN-enganche)
     if (miTicketSheet?.serviciosDetalle?.length > 0) {
       miTicketSheet.serviciosDetalle.forEach(d => {
+        // Fix: servicio puede ser undefined si fue guardado antes del fix
+        if (!d.servicio) d.servicio = d.area || miTicketSheet.promoNombre || 'Servicio';
         const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
         if (!yaExiste) desgloseAcumulado.push(d);
       });
