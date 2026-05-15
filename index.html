@@ -8053,7 +8053,9 @@ if ('caches' in window) {
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
     window._cobrarTotalRegular = Number(precioRegular) || Number(total) || 0;
-    window._cobrarTienePromo = promoNombre && promoNombre !== '' && promoNombre !== 'undefined';
+    // Para TM: si precioRegular > total, hay descuento promo que tarjeta no aplica
+    const _tienePrecioDistinto = Number(precioRegular) > 0 && Number(precioRegular) !== Number(total);
+    window._cobrarTienePromo = (promoNombre && promoNombre !== '' && promoNombre !== 'undefined') || _tienePrecioDistinto;
     window._cobrarDesglose = null;
 
     document.getElementById('cobrarClientName').textContent = nombre;
@@ -8183,9 +8185,11 @@ if ('caches' in window) {
     if (metodo === 'Tarjeta' && tienePromo) {
       // LEY SUPREMA: tarjeta invalida la promo → precio regular
       aviso.style.display = 'block';
-      document.getElementById('cobrarPrecioPromo').textContent    = '$' + totalPromo;
-      document.getElementById('cobrarPrecioRegular').textContent  = '$' + totalRegular;
-      totalEl.textContent   = '$' + totalRegular;
+      const precioPromoDisplay = typeof totalPromo === 'number' ? totalPromo.toFixed(2) : totalPromo;
+      const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
+      document.getElementById('cobrarPrecioPromo').textContent    = '$' + precioPromoDisplay;
+      document.getElementById('cobrarPrecioRegular').textContent  = '$' + precioRegularDisplay;
+      totalEl.textContent   = '$' + precioRegularDisplay;
       totalEl.style.color   = 'var(--danger)';
       promoBanner.style.display = 'none';
       if (subtotalEl) { subtotalEl.textContent = '$' + totalRegular; subtotalEl.style.color = 'var(--danger)'; }
