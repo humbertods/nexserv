@@ -4635,6 +4635,24 @@ if ('caches' in window) {
   }
   
   function renderServicesForSlot(slot) {
+    // Después de renderizar, verificar si hay servicio pigmento y mostrar ficha quick
+    setTimeout(function() {
+      try {
+        if (slot === 1) {
+          const user2 = window.currentUser;
+          if (user2 && (user2.area === 'cejas' || user2.role === 'owner')) {
+            const hasPig = (slotServices[1] || []).some(function(s) { return esSrvPigmento(s.name); });
+            const el = document.getElementById('cejasQuick1');
+            if (hasPig && el && el.style.display === 'none' && el.innerHTML.trim() === '') {
+              const cod = window._as1Client || '';
+              const nom = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
+              const cKey = cod.toLowerCase().replace(/-/g,'');
+              if (cod) loadCejasQuick(cKey, 1, cod, nom);
+            }
+          }
+        }
+      } catch(ePig) {}
+    }, 300);
     const services = slotServices[slot] || [];
     const listEl = document.getElementById('as' + slot + 'ServicesList');
     if (!listEl) return;
@@ -4921,13 +4939,16 @@ if ('caches' in window) {
     // ── Si es cejas pigmento: mostrar ficha rápida de efecto polvo ──
     const slot_cs = window._confirmSvcSlot || 1;
     const svcs_cs = slotServices[slot_cs] || [];
-    const tienePigmento = svcs_cs.some(s => esSrvPigmento(s.name));
+    const tienePigmento = svcs_cs.some(function(s) { return esSrvPigmento(s.name); });
     if (tienePigmento && (user?.area === 'cejas' || user?.role === 'owner')) {
+      const clientCodigo_cs = slot_cs === 1 ? (window._as1Client || '') : (window._as2Client || '');
       const clientNombre_cs = document.getElementById('as' + slot_cs + 'Name')?.textContent?.replace(' ⭐','') || '';
-      const clientCodigo_cs = (window['_as' + slot_cs + 'Client'] || '').toUpperCase().replace('C','C');
-      const clientKey_cs = (window['_as' + slot_cs + 'Client'] || clientCodigo_cs).toLowerCase().replace(/-/g,'');
+      const clientKey_cs = clientCodigo_cs.toLowerCase().replace(/-/g,'');
+      const el_cs = document.getElementById('cejasQuick' + slot_cs);
+      if (el_cs) el_cs.innerHTML = ''; // forzar recarga
+      if (el_cs) el_cs.style.display = 'none';
       setTimeout(function() {
-        loadCejasQuick(clientKey_cs, slot_cs, window['_as' + slot_cs + 'Client'] || clientCodigo_cs, clientNombre_cs);
+        if (clientCodigo_cs) loadCejasQuick(clientKey_cs, slot_cs, clientCodigo_cs, clientNombre_cs);
       }, 400);
     }
 
