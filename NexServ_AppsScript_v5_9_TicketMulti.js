@@ -2370,10 +2370,10 @@ function handleGetFichaCejasPigmento(params) {
   const data = ws.getDataRange().getValues();
   const fichas = [];
 
-  for (let i = 4; i < data.length; i++) {
+  for (let i = 1; i < data.length; i++) { // Empezar desde fila 2 (índice 1), saltando headers
     const row = data[i];
     if (!row[1]) continue; // Saltar filas vacías
-    if (row[1] === params.codigo) {
+    if (String(row[1]).trim() === String(params.codigo || '').trim()) {
       fichas.push({
         id: row[0],
         codigo: row[1],
@@ -2393,16 +2393,14 @@ function handleGetFichaCejasPigmento(params) {
 
 function handleAddFichaCejasPigmento(data) {
   try {
-    const ws = getSheet('FichaCejasPigmento');
+    var ws = getSheet('FichaCejasPigmento');
     if (!ws) {
-      // Intentar con posibles variaciones del nombre
-      const ss = SpreadsheetApp.openById(SHEET_ID);
-      const allSheets = ss.getSheets();
-      const sheetNames = allSheets.map(s => s.getName());
-      return { 
-        success: false,
-        error: 'Sheet FichaCejasPigmento no encontrado. Sheets disponibles: ' + sheetNames.join(', ') 
-      };
+      // Auto-crear la hoja si no existe
+      var ss = SpreadsheetApp.openById(SHEET_ID);
+      ws = ss.insertSheet('FichaCejasPigmento');
+      // Encabezados: ID | Código | Fecha | Color | Aguja | TipoSesión | Obs | Responsable | PróxRetoque
+      ws.getRange(1, 1, 1, 9).setValues([['ID','Código','Fecha','Color','Aguja','Tipo Sesión','Observaciones','Responsable','Próx. Retoque']]);
+      ws.getRange(1,1,1,9).setFontWeight('bold');
     }
     
     const allData = ws.getDataRange().getValues();
@@ -2410,7 +2408,7 @@ function handleAddFichaCejasPigmento(data) {
     
     // Buscar último ID (empezar desde fila 6, índice 5 - filas 1-4=headers, fila 5=encabezados columnas)
     let maxNum = 0;
-    for (let i = 5; i < allData.length; i++) {
+    for (let i = 1; i < allData.length; i++) {
       const id = String(allData[i][0] || '').trim();
       if (id) {
         const num = parseInt(id);
@@ -2430,7 +2428,7 @@ function handleAddFichaCejasPigmento(data) {
     
     // Máximo 5 sesiones: eliminar la más antigua si se supera
     var sesionesCliente = [];
-    for (var i = 5; i < allData.length; i++) {
+    for (var i = 1; i < allData.length; i++) {
       if (String(allData[i][1]||'').trim() === String(data.codigo||'').trim()) sesionesCliente.push(i+1);
     }
     if (sesionesCliente.length >= 5) ws.deleteRow(sesionesCliente[0]);
@@ -4334,7 +4332,28 @@ function handleCompletarAreaTicketMulti(data) {
         // Extraer área key del tentativo (formato "cejas||servicio")
         var rawTent = String(rows[i][base] || '');
         areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
-        try { updateComision(data.chicaNombre, Number(rows[i][TM_PRECIO_COL[a]] || 0)); } catch(e2) {}
+        var precioArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
+        try { updateComision(data.chicaNombre, precioArea); } catch(e2) {}
+        // Registrar en HistorialOwner para que aparezca en "Servicios de hoy" de la staff
+        try {
+          var wsHO = getSheet('HistorialOwner');
+          var servicioArea = String(rows[i][base + 1] || rows[i][base] || '').replace(/.*\|\|/, '');
+          var horaAhora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+          var areaStr2 = String(rows[i][base] || '').replace(/\|\|.*/, '') || 'multi';
+          wsHO.appendRow([
+            Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy'),
+            horaAhora,
+            String(rows[i][3] || ''), // código cliente
+            String(rows[i][4] || ''), // nombre cliente
+            '',
+            servicioArea || 'Servicio multi',
+            areaStr2,
+            data.chicaNombre,
+            precioArea,
+            Math.round(precioArea * 0.3 * 100) / 100,
+            'Pendiente cobro'
+          ]);
+        } catch(eHO) {}
         break;
       }
 
