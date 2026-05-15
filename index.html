@@ -7716,6 +7716,19 @@ if ('caches' in window) {
     { nombre: 'Lápiz Chocolate',                 precio: 15, min: 3  },
     { nombre: 'Lápiz Gray',                      precio: 15, min: 3  },
     { nombre: 'Lápiz Blonde',                    precio: 15, min: 2  },
+    // ── PAQUETES ──────────────────────────────────────────────────────────────
+    { nombre: 'Pack Brochas Rostro',    precio: 10, min: 1, tipo: 'paquete',
+      descripcion: 'Brocha Rubor + Brocha de Contorno',
+      items: ['Brocha Rubor', 'Brocha de Contorno'] },
+    { nombre: 'Pack Pomada + Brocha',    precio: 15, min: 1, tipo: 'paquete',
+      descripcion: 'Pomada cejas (cualquier tono) + Brocha de Cejas',
+      items: ['Pomada dark Brown', 'Brocha de Cejas'] },
+    { nombre: 'Kit Brochas Completo',    precio: 35, min: 1, tipo: 'paquete',
+      descripcion: 'Brocha de Cejas + Brocha difuminar + Brocha de Contorno (cejas) + Brocha de Contorno + Brocha Rubor',
+      items: ['Brocha de Cejas', 'Brocha difuminar', 'Brocha de Contorno (cejas)', 'Brocha de Contorno', 'Brocha Rubor'] },
+    { nombre: 'Kit Brocha de Cejas',     precio: 20, min: 1, tipo: 'paquete',
+      descripcion: 'Brocha de Cejas + Brocha difuminar + Brocha de Contorno (cejas)',
+      items: ['Brocha de Cejas', 'Brocha difuminar', 'Brocha de Contorno (cejas)'] },
   ];
 
   // Stock inicial (si no hay guardado)
@@ -7757,9 +7770,26 @@ if ('caches' in window) {
     }));
   }
 
+  // Expandir paquetes a sus items individuales para descuento de stock
+  function expandirPaquetes(productos) {
+    const expanded = [];
+    productos.forEach(function(p) {
+      const base = PRODUCTOS_MARCA_BASE.find(function(b){ return b.nombre === p.nombre; });
+      if (base && base.tipo === 'paquete' && base.items) {
+        base.items.forEach(function(itemNombre) {
+          expanded.push({ nombre: itemNombre, cantidad: p.cantidad || 1 });
+        });
+      } else {
+        expanded.push(p);
+      }
+    });
+    return expanded;
+  }
+
   function descontarStockVenta(productos) {
     const stock = getStockData();
-    productos.forEach(p => {
+    const productosExpandidos = expandirPaquetes(productos);
+    productosExpandidos.forEach(p => {
       if (stock[p.nombre] !== undefined) {
         stock[p.nombre] = Math.max(0, stock[p.nombre] - Number(p.cantidad || 1));
       }
@@ -7882,7 +7912,7 @@ if ('caches' in window) {
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg-card);border-radius:12px;margin-bottom:6px;${agotado ? 'opacity:0.5;' : ''}">
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:700;">${p.nombre}</div>
-          <div style="font-size:11px;color:var(--ink-faint);">Stock: <strong>${p.stock}</strong>${agotado ? ' · SIN STOCK' : ''}</div>
+          <div style="font-size:11px;color:var(--ink-faint);">${p.tipo === 'paquete' ? '<span style="font-size:9px;font-weight:800;background:linear-gradient(135deg,#92400e,#b45309);color:white;padding:2px 6px;border-radius:10px;margin-right:4px;">PACK</span>' + (p.descripcion || '') : 'Stock: <strong>' + p.stock + '</strong>' + (agotado ? ' &middot; SIN STOCK' : '')}</div>
         </div>
         <input type="number" value="${p.precio}" min="0" step="0.5" id="ap-precio-${i}"
           style="width:60px;padding:6px;border:1.5px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;font-weight:700;text-align:center;background:var(--bg);"
