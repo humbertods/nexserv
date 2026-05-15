@@ -1699,6 +1699,59 @@ function handleGetServiciosHoy(params) {
     }
   } catch(e) {}
 
+  // ── Merge con HistorialOwner — tickets TM completados hoy ──────────────
+  // handleConfirmarCobroMulti escribe aquí; las otras fuentes (LE/SN/SP)
+  // ya tienen su propia sección arriba, así que se filtran para evitar duplicados.
+  try {
+    const wsH  = getSheet('HistorialOwner');
+    const dataH = wsH.getDataRange().getValues();
+    // Col: A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
+    for (let i = 2; i < dataH.length; i++) {
+      const rowH = dataH[i];
+      if (!rowH[0]) continue;
+
+      // Filtrar por fecha de hoy
+      let fechaHStr = '';
+      if (rowH[0] instanceof Date) {
+        fechaHStr = Utilities.formatDate(rowH[0], 'America/Guayaquil', 'dd/MM/yyyy');
+      } else {
+        fechaHStr = String(rowH[0] || '');
+      }
+      if (fechaHStr !== hoy) continue;
+
+      // Filtrar por staff si se indicó
+      const staffH = String(rowH[7] || '').trim();
+      if (params.chica && staffH !== params.chica) continue;
+
+      // Evitar duplicados: filas de LE/SN/SP tienen su prefijo en col E (Top/idOrigen)
+      const colE = String(rowH[4] || '').trim();
+      if (colE.startsWith('LE-') || colE.startsWith('SN-') || colE.startsWith('SP-')) continue;
+
+      const valorH    = Number(rowH[8] || 0);
+      const comisionH = Number(rowH[9] || 0);
+      const horaH     = rowH[1] instanceof Date
+        ? Utilities.formatDate(rowH[1], 'America/Guayaquil', 'HH:mm')
+        : String(rowH[1] || '');
+
+      servicios.push({
+        nombre      : String(rowH[3] || ''),
+        servicio    : String(rowH[5] || ''),
+        area        : String(rowH[6] || ''),
+        horaToma    : horaH,
+        total       : valorH,
+        metodoPago  : String(rowH[10] || 'Efectivo'),
+        tomadaPor   : staffH,
+        fecha       : fechaHStr,
+        promoNombre : '',
+        precioRegular: '',
+        observaciones: '',
+        horaCobro   : horaH,
+        comision    : comisionH
+      });
+    }
+  } catch(eTM) {}
+  // ── Fin merge HistorialOwner (TM) ─────────────────────────────────────
+
   return { success: true, servicios: servicios };
 }
 
