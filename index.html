@@ -4285,6 +4285,7 @@ if ('caches' in window) {
             const promoFull = PROMOS.find(p => p.name === promoBasic.name);
             
             if (promoFull) {
+              try { // Wrap promo loading to prevent crashes stopping confirmServiceModal
               // Guardar promo completa
               if (!window._assignedPromo) window._assignedPromo = {};
               window._assignedPromo[1] = promoFull;
@@ -4398,6 +4399,7 @@ if ('caches' in window) {
                   promasExtraActuales.map(function(p,i){ return '<div style="color:#5a4a00;font-weight:600;">' + (i+1) + '. ' + p.nombre + ' ($' + p.precio + ')</div>'; }).join('');
                 if (actionBtns) actionBtns.parentNode.insertBefore(extraDiv, actionBtns);
               }
+              } catch(ePromo) { console.error('Error cargando promo:', ePromo); }
             }
           }
           
@@ -4436,8 +4438,15 @@ if ('caches' in window) {
               setTimeout(function() { updateFinishButtons(1); }, 400);
             });
           } else {
-            // Mostrar modal de confirmación de servicio (enganche)
-            setTimeout(() => showConfirmServiceModal(1), 400);
+            // SP / promo compartida / enganche → siempre mostrar modal de confirmación
+            setTimeout(function() {
+              try {
+                showConfirmServiceModal(1);
+              } catch(eSvc) {
+                console.error('showConfirmServiceModal error:', eSvc);
+                // Fallback: abrir pantalla de servicio directo
+              }
+            }, 400);
           }
         } else {
           window._as2Client = a.codigo;
