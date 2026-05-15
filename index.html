@@ -3255,8 +3255,8 @@ if ('caches' in window) {
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
         if (!hayMas) {
-          // No hay más áreas pendientes → solo "Finalizar servicio"
-          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
+          // No hay más áreas pendientes → botón de cierre multi-staff
+          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé servicio — clienta múltiple</button>';
         } else {
           // Hay servicios pendientes → 3 botones (repetibles infinitamente)
           // "Continuar siguiente servicio" puede tocarse N veces (cejas → bigote → labio → entrecejo...)
@@ -3267,7 +3267,7 @@ if ('caches' in window) {
         }
       }).catch(function() {
         var slotN = slot1 ? 1 : 2;
-        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal()">Finalizar servicio</button>';
+        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal()">✅ Terminé servicio — clienta múltiple</button>';
       });
       return;
     }
@@ -12073,11 +12073,46 @@ if ('caches' in window) {
     const slot = window._finishingSlot || 1;
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+
+    // Construir desglose completo: áreas previas (del TM) + área actual
+    let desgloseCompleto = [];
+    try {
+      const tmData = await apiGet('getTicketMulti');
+      if (tmData.success) {
+        const tm = (tmData.activos || []).find(t => t.idEspera === idEspera);
+        if (tm && tm.areas) {
+          // Incluir todas las áreas con datos (ya completadas + la actual)
+          tm.areas.forEach(ar => {
+            if (ar.tentativo || ar.confirmado) {
+              desgloseCompleto.push({
+                staff: ar.staff || user?.name || '',
+                servicio: ar.confirmado || ar.tentativo || ar.area || '',
+                area: ar.area || '',
+                monto: Number(ar.precio || 0)
+              });
+            }
+          });
+        }
+      }
+    } catch(e) {}
+
+    // Si no hay desglose del TM, usar lo que hay en slotServices
+    if (desgloseCompleto.length === 0) {
+      const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+      desgloseCompleto = svcs.map(s => ({
+        staff: user?.name || '',
+        servicio: s.name,
+        area: s.area || user?.area || '',
+        monto: Number(s.price || 0)
+      }));
+    }
+
     try {
       const r = await apiPost('completarAreaTicketMulti', {
         idEspera,
         chicaNombre: user?.name || '',
-        esUltima: true
+        esUltima: true,
+        desgloseCompleto: desgloseCompleto
       });
       if (r.success) {
         slotServices[slot] = [];
@@ -12087,9 +12122,9 @@ if ('caches' in window) {
           updateCapacityUI(user.name);
         }
         show('staffHome');
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
-        alert('🎯 Multi-servicio completado. Clienta enviada a cobrar con Mikaela.');
+        showToast('✅ Clienta múltiple enviada a cobrar con Mikaela');
       } else {
         alert('Error: ' + r.message);
       }

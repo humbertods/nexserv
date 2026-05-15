@@ -4350,8 +4350,11 @@ function handleCompletarAreaTicketMulti(data) {
         areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2 });
       }
 
-      // Áreas que aún no están completadas (excluyendo la que acaba de terminar)
+      // Áreas que aún no están completadas
+      // IMPORTANTE: el área recién completada (areaCompletadaIdx) ya fue marcada arriba
+      // pero rows[i] tiene el valor antiguo — excluirla manualmente
       var areasPendientes = areasConDatos.filter(function(a) {
+        if (a.idx === areaCompletadaIdx) return false; // recién completada
         return a.estado !== 'Completado';
       });
 
@@ -4374,6 +4377,10 @@ function handleCompletarAreaTicketMulti(data) {
 
       if (todasListas) {
         ws.getRange(rowNum, 6).setValue('Por cobrar');
+        // Guardar desglose completo en col 37 (AK) para que Mikaela lo vea al cobrar
+        if (data.desgloseCompleto) {
+          try { ws.getRange(rowNum, 37).setValue(JSON.stringify(data.desgloseCompleto)); } catch(eD) {}
+        }
         try {
           var wsHist = getSheet('HistorialOwner');
           wsHist.appendRow([
