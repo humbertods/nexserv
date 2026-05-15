@@ -4447,12 +4447,20 @@ if ('caches' in window) {
                     document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
                   }
                   // Mostrar botones TM correctos en el panel desde el inicio
-                  setTimeout(function() { updateFinishButtons(1); }, 300);
+                  setTimeout(function() { updateFinishButtons(1); }, 600);
                 }
               }
-              // No abrir confirmServiceModal para TM — los botones ya están en el panel
+              // TM: mostrar modal de confirmación igual que otros tipos
+              // La staff debe confirmar/cambiar su servicio tentativo
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); }
+                catch(e) { console.error('confirmServiceModal TM error:', e); }
+              }, 300);
             }).catch(function() {
-              setTimeout(function() { updateFinishButtons(1); }, 400);
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); } catch(e) {}
+                updateFinishButtons(1);
+              }, 400);
             });
           } else {
             // SP / promo compartida / enganche → siempre mostrar modal de confirmación
