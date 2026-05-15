@@ -8179,6 +8179,7 @@ if ('caches' in window) {
     const totalFinal = totalServicios + totalProductos;
 
     try {
+      if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
         metodoPago: window._cobrarPago,
@@ -8186,7 +8187,13 @@ if ('caches' in window) {
         totalServicios: totalServicios,
         totalProductos: totalProductos
       });
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error('confirmarCobro error:', err);
+      btn.disabled = false;
+      btn.textContent = '✓ Confirmar cobro';
+      showToast('⚠ Error al confirmar: ' + (err.message || 'intenta de nuevo'));
+      return; // No continuar si falló
+    }
 
     // Si hay productos, registrarlos en el historial
     const productosTicket = (window._cobrarId && window._apProductosEnTicket && window._apProductosEnTicket[window._cobrarId]) ? window._apProductosEnTicket[window._cobrarId] : [];

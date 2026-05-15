@@ -3741,7 +3741,9 @@ function handleConfirmarCobroPromo(data) {
       const id = String(rows[i][0] || '').trim();
       if (id !== String(data.idEspera).trim()) continue;
       const estado = String(rows[i][8] || '').toLowerCase();
-      if (estado !== 'por cobrar') continue;
+      // Aceptar cualquier estado cobrable (por cobrar, completada-parcial, completada pendiente)
+      const estadosCobrable = ['por cobrar', 'completada-parcial', 'completada', 'pendiente cobro final'];
+      if (!estadosCobrable.some(function(e){ return estado.includes(e.split(' ')[0]); }) && !estado.includes('cobrar') && !estado.includes('completad')) continue;
 
       const metodoPago   = data.metodoPago || 'Efectivo';
       const tipo         = String(rows[i][18] || 'SP').trim();
