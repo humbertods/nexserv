@@ -12423,6 +12423,9 @@ if ('caches' in window) {
       window._currentCejasClientCodigo = clientCodigo;
       window._currentCejasClientNombre = clientNombre;
       window._currentCejasSlot = slot;
+      // Setear _cpCodigo/_cpNombre para que saveCejasPigmentoFicha los encuentre
+      window._cpCodigo = clientCodigo;
+      window._cpNombre = clientNombre;
 
       if (ultimaSesion) {
         // Tiene historial → mostrar última sesión + botón nueva visita
