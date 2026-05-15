@@ -4712,7 +4712,7 @@ if ('caches' in window) {
     const user = window.currentUser;
     if (!user) return;
     const svcs = slotServices[slot] || [];
-    const activeNames = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente').map(s => s.name).join(' + ');
+    const activeNames = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado').map(s => s.name).join(' + ');
     if (!activeNames) return;
     const clientName = slot === 1
       ? (document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '')
@@ -4751,7 +4751,7 @@ if ('caches' in window) {
 
     // Para "hago toda la promo": usar lo que hay en slotServices (precio real de esta área)
     // Si completedAreas tiene áreas previas, no repetir el precio total — ya fue cobrado antes
-    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const totalEnSlot = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
 
     // Si no hay servicios en slot pero hay promo, cargar precio de esta área
@@ -4761,7 +4761,7 @@ if ('caches' in window) {
       slotServices[slot] = [{ name: promoData.promo.name, price: precioMiAreaAll, area: myAreaAll }];
     }
 
-    const svcsAprobados2 = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const svcsAprobados2 = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const totalFinal = svcsAprobados2.reduce((sum, s) => sum + Number(s.price || 0), 0) || (promoData ? Number(promoData.promo.price) : 0);
     const svcNames = promoData ? promoData.promo.name : (svcsAprobados2.map(s => s.name).join(' + ') || 'Servicio');
     const precioRegularFinal = promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalFinal);
@@ -4976,7 +4976,7 @@ if ('caches' in window) {
     const esTicketSP = idEsperaActual.startsWith('SP-');
 
     // ── PASO 2: Obtener servicios aprobados ────────────────────────────────────
-    let svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    let svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
 
     // Si memoria está vacía, reconstruir desde el ticket del sheet
     if (svcsAprobados.length === 0 && miTicketSheet) {
@@ -5132,9 +5132,9 @@ if ('caches' in window) {
     const clientKey  = normalizeClientKey(clientName);
     const promoData  = activePromos[clientKey];
     const svcs       = slotServices[slot] || [];
-    const total      = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+    const total      = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado')
                           .reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const svcNames   = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente')
+    const svcNames   = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado')
                           .map(s => s.name).join(' + ');
 
     window._finishingData = {
@@ -5190,7 +5190,7 @@ if ('caches' in window) {
         const allSvcs = slotServices[slot] || [];
         // Servicios completados (no rechazados ni pendientes)
         const svcsRealizados = allSvcs.filter(function(s) {
-          return s.status !== 'rechazado' && s.status !== 'pendiente';
+          return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
         });
         // Servicios de la siguiente area (aprobados, area diferente)
         const svcsExtras = allSvcs.filter(function(s) {
@@ -5313,7 +5313,7 @@ if ('caches' in window) {
       // Llamar al backend para devolver a lista de espera
       // totalAcumulado = lo que ya cobró esta área (promo + extras) + lo que cobrará la siguiente
       const svcsActuales = slotServices[slot] || [];
-      const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+      const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
       
       // montoYaHecho = solo la parte de esta staff (no el total de la promo)
       // Para promos multi-área usamos la memoria (slotServices) que tiene el precio de su área
@@ -5438,7 +5438,7 @@ if ('caches' in window) {
     const slot = window._finishingSlot || 1;
 
     // Solo los servicios aprobados del slot actual
-    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente');
+    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const totalRealizado = svcs.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const nombresRealizados = svcs.map(s => s.name).join(' + ') || data.svcNames;
 
@@ -5611,26 +5611,70 @@ if ('caches' in window) {
       if (!slotServices[slotNum]) slotServices[slotNum] = [];
 
       let changed = false;
+      const AREA_CAPS_AUTH = {
+        'cejas':    ['cejas','depilacion','bigote','depil','ceja','pigment','brow','pest','lifting','retiro'],
+        'pestanas': ['pestanas','pest','lifting','retiro','volumen','pelo','clasica','efecto','aura'],
+        'facial':   ['facial','hidra','limpieza'],
+        'depilacion': ['depilacion','depil','bikini','pierna','axila','ingles']
+      };
+      const staffArea = user.area || 'cejas';
+      const staffCaps = AREA_CAPS_AUTH[staffArea] || [staffArea];
+
       for (const auth of myAuths) {
-        // Buscar por authId primero, luego por nombre (por si authId aun no estaba asignado)
+        // ── DETECTAR si el servicio es de otra área ──
+        const svcAreaNorm = String(auth.servicioArea || auth.servicioNombre || '').toLowerCase()
+          .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
+          .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
+        const esDeOtraArea = !staffCaps.some(cap => svcAreaNorm.includes(cap));
+
+        if (auth.estado === 'aprobado' && esDeOtraArea) {
+          // ── Servicio aprobado de otra área → crear ticket SN para esa área ──
+          // Solo si no fue procesado ya (no existe en slotServices como 'enganche-enviado')
+          const yaEnviado = slotServices[slotNum].find(s => s.authId === auth.id && s.status === 'enganche-enviado');
+          if (!yaEnviado) {
+            // Marcar como enviado para no procesar dos veces
+            const existingEng = slotServices[slotNum].find(s => s.authId === auth.id);
+            if (existingEng) {
+              existingEng.status = 'enganche-enviado';
+            } else {
+              slotServices[slotNum].push({
+                name: auth.servicioNombre, price: Number(auth.servicioPrecio||0),
+                area: auth.servicioArea||'', status: 'enganche-enviado', authId: auth.id
+              });
+            }
+            // Crear ticket SN para la otra área
+            const clientCodeEng = slot === 1 ? window._as1Client : window._as2Client;
+            const clientNameEng = slot === 1
+              ? document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || ''
+              : document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
+            apiPost('addServicioNormal', {
+              codigo: clientCodeEng || auth.clienteCodigo,
+              nombre: clientNameEng || auth.clienteNombre,
+              servicio: auth.servicioNombre,
+              area: auth.servicioArea || 'cejas',
+              precio: Number(auth.servicioPrecio || 0),
+              prioridad: 'Normal',
+              observaciones: 'Servicio adicional solicitado por ' + staffName + ' durante atención'
+            }).then(function(r) {
+              if (r && r.success) {
+                showToast('✅ ' + auth.servicioNombre + ' enviado a lista de espera');
+              }
+            }).catch(function(){});
+            changed = true;
+          }
+          continue; // No agregar a slotServices de esta staff
+        }
+
+        // ── Servicio de la misma área → agregar/actualizar en slotServices ──
         let existing = slotServices[slotNum].find(s => s.authId === auth.id);
         if (!existing) {
           existing = slotServices[slotNum].find(s => s.name === auth.servicioNombre && !s.authId);
         }
 
         if (existing) {
-          // Siempre asignar authId si faltaba
-          if (!existing.authId) {
-            existing.authId = auth.id;
-            changed = true;
-          }
-          // Actualizar status si cambio
-          if (existing.status !== auth.estado) {
-            existing.status = auth.estado;
-            changed = true;
-          }
+          if (!existing.authId) { existing.authId = auth.id; changed = true; }
+          if (existing.status !== auth.estado) { existing.status = auth.estado; changed = true; }
         } else if (!slotServices[slotNum].find(s => s.name === auth.servicioNombre)) {
-          // Agregar si no existe de ninguna forma
           slotServices[slotNum].push({
             name: auth.servicioNombre,
             price: Number(auth.servicioPrecio || 0),
@@ -5646,7 +5690,7 @@ if ('caches' in window) {
 
       if (changed) {
         const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
-          if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+          if (s.status === 'pendiente' || s.status === 'rechazado' || s.status === 'enganche-enviado') return sum;
           return sum + Number(s.price || 0);
         }, 0);
         renderServicesForSlot(slotNum);
