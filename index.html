@@ -6776,13 +6776,20 @@ if ('caches' in window) {
           renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
         }
         
-        // Refrescar panel cejasQuick
-        if (window._currentCejasClientCodigo === codigo) {
-          var _ck = codigo.toLowerCase().replace(/-/g,'');
-          var _cs = window._currentCejasSlot || 1;
-          var _ce = document.getElementById('cejasQuick' + _cs);
-          if (_ce) { _ce.innerHTML = ''; _ce.style.display = 'none'; }
-          setTimeout(function(){ loadCejasQuick(_ck, _cs, codigo, nombre); }, 300);
+        // Refrescar panel cejasQuick (siempre que estemos en panel de staff con cejas)
+        var _cs2 = window._currentCejasSlot || 1;
+        var _ce2 = document.getElementById('cejasQuick' + _cs2);
+        var _cod2 = codigo || window._currentCejasClientCodigo || window._cpCodigo || '';
+        var _nom2 = nombre || window._currentCejasClientNombre || window._cpNombre || '';
+        var _ck2 = _cod2.toLowerCase().replace(/-/g,'');
+        if (_ce2 && _cod2) {
+          _ce2.innerHTML = '';
+          _ce2.style.display = 'none';
+          setTimeout(function(){ loadCejasQuick(_ck2, _cs2, _cod2, _nom2); }, 400);
+        }
+        // Refrescar tab de perfil si está abierto
+        if (currentProfileClient && currentProfileTab === 'pigmento') {
+          renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
         }
         showToast('✅ Sesión registrada: ' + tipoSesion + (result.proxRetoque ? ' · Próx. retoque: ' + result.proxRetoque : ''));
       } else {
