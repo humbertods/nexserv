@@ -7310,7 +7310,9 @@ if ('caches' in window) {
             let desgloseData = p.serviciosDetalle;
             if (!desgloseData && esTM && p.areas) {
               desgloseData = p.areas.map(a => ({
-                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area, monto: a.precio
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
+                monto: a.precio,
+                montoNormal: a.precioNormal || a.precio
               }));
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
@@ -8185,19 +8187,51 @@ if ('caches' in window) {
     if (metodo === 'Tarjeta' && tienePromo) {
       // LEY SUPREMA: tarjeta invalida la promo → precio regular
       aviso.style.display = 'block';
-      const precioPromoDisplay = typeof totalPromo === 'number' ? totalPromo.toFixed(2) : totalPromo;
+      const precioPromoDisplay   = typeof totalPromo   === 'number' ? totalPromo.toFixed(2)   : totalPromo;
       const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
-      document.getElementById('cobrarPrecioPromo').textContent    = '$' + precioPromoDisplay;
-      document.getElementById('cobrarPrecioRegular').textContent  = '$' + precioRegularDisplay;
-      totalEl.textContent   = '$' + precioRegularDisplay;
-      totalEl.style.color   = 'var(--danger)';
+      document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
+      document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
+      totalEl.textContent  = '$' + precioRegularDisplay;
+      totalEl.style.color  = 'var(--danger)';
       promoBanner.style.display = 'none';
-      if (subtotalEl) { subtotalEl.textContent = '$' + totalRegular; subtotalEl.style.color = 'var(--danger)'; }
+      if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
+      // Actualizar cada línea del desglose TM con precio normal por área
+      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
+        if (itemsEl2) {
+          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
+            const montoReal = Number(d.montoNormal || d.monto || 0);
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);">
+              <div>
+                <div style="font-size:13px;font-weight:700;">${d.servicio}</div>
+                <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area||''}</div>
+              </div>
+              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${montoReal.toFixed(2)}</div>
+            </div>`;
+          }).join('');
+        }
+      }
     } else {
       aviso.style.display = 'none';
-      totalEl.textContent   = '$' + totalPromo;
-      totalEl.style.color   = 'var(--accent-deep)';
+      totalEl.textContent  = '$' + totalPromo;
+      totalEl.style.color  = 'var(--accent-deep)';
       if (tienePromo) promoBanner.style.display = 'block';
+      // Restaurar líneas del desglose TM con precio promo
+      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
+        if (itemsEl2) {
+          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
+            const montoPromo = Number(d.monto || 0);
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);">
+              <div>
+                <div style="font-size:13px;font-weight:700;">${d.servicio}</div>
+                <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area||''}</div>
+              </div>
+              <div style="font-size:15px;font-weight:800;color:var(--accent-deep);margin-left:12px;">$${montoPromo.toFixed(2)}</div>
+            </div>`;
+          }).join('');
+        }
+      }
       if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
     }
   }

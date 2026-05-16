@@ -4294,15 +4294,23 @@ function handleGetTicketMulti(params) {
           areaVal = parts[0];
           tentativoVal = parts[1] || rawTentativo;
         }
+        const precioPromoArea  = Number(row[TM_PRECIO_COL[i]] || 0);
+        const totalPromoTM     = Number(row[35] || 0);
+        const totalNormalTM    = Number(row[34] || 0);
+        // precioNormal por área: proporción del total normal
+        const precioNormalArea = (totalPromoTM > 0)
+          ? Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100
+          : precioPromoArea;
         areas.push({
           idx: i + 1,
-          area:      areaVal,
-          tentativo: tentativoVal,
-          confirmado: String(row[base + 1] || '').trim(),
-          staff:      String(row[base + 2] || '').trim(),
-          estado:     String(row[base + 3] || 'Esperando').trim(),
-          hora:       String(row[base + 4] || '').trim(),
-          precio:     Number(row[TM_PRECIO_COL[i]] || 0)
+          area:         areaVal,
+          tentativo:    tentativoVal,
+          confirmado:   String(row[base + 1] || '').trim(),
+          staff:        String(row[base + 2] || '').trim(),
+          estado:       String(row[base + 3] || 'Esperando').trim(),
+          hora:         String(row[base + 4] || '').trim(),
+          precio:       precioPromoArea,
+          precioNormal: precioNormalArea
         });
       });
 
