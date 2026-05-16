@@ -1504,8 +1504,10 @@ function handleConfirmarCobro(data) {
           if (colSHist) { try { desgloseParaHist = JSON.parse(colSHist); } catch(eJ) {} }
         }
 
+        // Col E = idEspera del ticket para que getServiciosHoy no duplique
+        // (el merge filtra colE.startsWith('LE-'|'SN-'|'SP-'))
+        const idEsperaHist = String(data.idEspera || '');
         if (desgloseParaHist && desgloseParaHist.length > 0) {
-          // Registrar cada parte por su staff
           desgloseParaHist.forEach(function(parte) {
             const pStaff = String(parte.staff || chicaNombre);
             const pServicio = String(parte.servicio || servicio);
@@ -1515,12 +1517,11 @@ function handleConfirmarCobro(data) {
               : Number(parte.monto || 0);
             const pPct    = pArea.toLowerCase().includes('facial') ? 0.4 : 0.3;
             const pComision = Math.round(pMonto * pPct * 100) / 100;
-            wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, topStr,
+            wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, idEsperaHist,
               pServicio, pArea, pStaff, pMonto, pComision, data.metodoPago || 'Efectivo']);
           });
         } else {
-          // Sin desglose: entrada simple
-          wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, topStr,
+          wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, idEsperaHist,
             servicio, area, chicaNombre, totalCobrado, comision, data.metodoPago || 'Efectivo']);
         }
       } catch(e) { /* Si falla el historial, no bloquear el cobro */ }
@@ -4011,6 +4012,7 @@ function handleConfirmarCobroPromo(data) {
         const desgloseJSON = String(rows[i][17] || '');
         let desgloseArr = [];
         if (desgloseJSON) { try { desgloseArr = JSON.parse(desgloseJSON); } catch(eJ) {} }
+        const idEsperaSP = String(rows[i][0] || ''); // SP-XXXX para evitar duplicados
         if (desgloseArr && desgloseArr.length > 0) {
           desgloseArr.forEach(function(parte) {
             const partStaff = String(parte.staff || chicaNombre);
@@ -4018,12 +4020,12 @@ function handleConfirmarCobroPromo(data) {
               ? Number(parte.montoNormal || parte.monto || 0) : Number(parte.monto || 0);
             const partArea  = String(parte.area || area);
             const partPct   = partArea.toLowerCase().includes('facial') ? 0.4 : 0.3;
-            wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
+            wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, idEsperaSP,
               String(parte.servicio || parte.area || servicio), partArea, partStaff,
               partMonto, Math.round(partMonto * partPct * 100) / 100, metodoPago]);
           });
         } else {
-          wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
+          wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, idEsperaSP,
             servicio + ' (promo ' + (String(rows[i][13]||'')) + ')', area,
             chicaNombre, montoComision, comision, metodoPago]);
         }
@@ -4791,7 +4793,7 @@ function handleConfirmarCobroMulti(data) {
             fecha, hora,
             String(rows[i][3] || ''), // código cliente
             String(rows[i][4] || ''), // nombre cliente
-            '',
+            String(rows[i][0] || ''), // col E = TM-XXXX para evitar duplicados en getServiciosHoy
             confirm || 'Servicio multi',
             areaKey || 'multi',
             staff,
