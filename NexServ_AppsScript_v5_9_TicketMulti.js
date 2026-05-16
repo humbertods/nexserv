@@ -4443,8 +4443,10 @@ function handleCompletarAreaTicketMulti(data) {
         var tent2  = String(rows[i][base2] || '').trim();
         if (!tent2) continue;
         var est2   = String(rows[i][base2 + 3] || '').trim();
+        var tent2Label = tent2.indexOf("||") !== -1 ? tent2.split("||")[1] : tent2;
+        var precio2    = Number(rows[i][TM_PRECIO_COL[a2]] || 0);
         var aKey2  = tent2.indexOf('||') !== -1 ? tent2.split('||')[0] : '';
-        areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2 });
+        areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2, tentativo: tent2Label, precio: precio2 });
       }
 
       // Áreas que aún no están completadas
@@ -4514,6 +4516,61 @@ function handleCompletarAreaTicketMulti(data) {
   } catch(e) { return { success: false, message: String(e) }; }
 }
 
+
+// ─── handleCompletarYTomarSiguienteAreaTM ────────────────────────────────────
+// La staff completa su área actual Y toma la siguiente del mismo TM sin salir.
+// Es un alias enriquecido de handleCompletarAreaTicketMulti que además
+// actualiza el estado del área siguiente a "En servicio" y la asigna a la misma staff.
+function handleCompletarYTomarSiguienteAreaTM(data) {
+  // 1. Completar el área actual (marca Completado, escribe HistorialOwner, etc.)
+  var resultCompletar = handleCompletarAreaTicketMulti(data);
+  if (!resultCompletar.success) return resultCompletar;
+  if (resultCompletar.todasCompletadas) return resultCompletar;
+
+  // 2. Tomar la siguiente área: asignar a la misma staff y cambiar estado a "En servicio"
+  try {
+    var ws   = getTMSheet();
+    var rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
+    var tz   = 'America/Guayaquil';
+    var hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() !== data.idEspera) continue;
+      var rowNum = i + 3;
+
+      // Buscar la primera área en estado "Esperando" (la que acaba de liberarse)
+      for (var a = 0; a < 4; a++) {
+        var base = TM_AREA_COL[a];
+        var tent = String(rows[i][base] || '').trim();
+        if (!tent) continue;
+        var est  = String(rows[i][base + 3] || '').trim();
+        if (est !== 'Esperando') continue;
+
+        // Asignar esta staff al área y ponerla "En servicio"
+        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre || ''); // staff
+        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');          // estado
+        ws.getRange(rowNum, base + 4 + 1).setValue(hora);                       // hora tomada
+        ws.getRange(rowNum, 6).setValue('En servicio');                      // estado global TM
+
+        var tentLabel = tent.indexOf('||') !== -1 ? tent.split('||')[1] : tent;
+        var precio    = Number(rows[i][TM_PRECIO_COL[a]] || 0);
+
+        return {
+          success         : true,
+          todasCompletadas: false,
+          siguienteArea   : tentLabel,
+          siguientePrecio : precio,
+          areasPendientes : resultCompletar.areasPendientes
+        };
+      }
+      break;
+    }
+  } catch(eT) {}
+
+  // Si no se pudo asignar, devolver igual el resultado de completar
+  return resultCompletar;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 function handleConfirmarCobroMulti(data) {
   try {
     const ws = getTMSheet();
