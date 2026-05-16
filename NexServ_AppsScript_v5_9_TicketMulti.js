@@ -1794,7 +1794,8 @@ function handleGetServiciosHoy(params) {
       if (params.chica && staffH !== params.chica) continue;
       var colE = String(rowH[4] || '').trim();
       if (colE.startsWith('LE-') || colE.startsWith('SN-') || colE.startsWith('SP-')) continue;
-      // Excluir registros intermedios SP (pendiente cobro) — se duplicarían al cobrar
+      // Excluir solo registros intermedios SP (pendiente cobro promo compartida)
+      // 'Pendiente cobro TM' SÍ se incluye — es el servicio real de la staff TM
       var metodoPagoH = String(rowH[10] || '').trim();
       if (metodoPagoH === 'Pendiente cobro final' || metodoPagoH === 'Pendiente cobro') continue;
       var horaH = rowH[1] instanceof Date
@@ -4609,7 +4610,7 @@ function handleCompletarAreaTicketMulti(data) {
             data.chicaNombre,
             precioArea,
             Math.round(precioArea * pctStaff * 100) / 100,
-            'Pendiente cobro'
+            'Pendiente cobro TM'  // TM: no filtrar en getServiciosHoy
           ]);
         } catch(eHO) {}
         if (!esUltima) break;
