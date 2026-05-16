@@ -3305,32 +3305,22 @@ if ('caches' in window) {
         return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
       });
 
-    let html = '';
-    // slotActual: en finishSlot1 siempre es 1, en updateFinishButtons viene de slot1?1:2
+    // promasExtraPendientes: 2da, 3ra promo del ticket (si las hay)
+    const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
+    // slotActual: slot1 existe en updateFinishButtons, no en finishSlot1
     const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
 
+    let html = '';
     if (puedeTodo) {
       // Puede hacer todo el combo sola
       if (promasExtraPendientes.length > 0) {
-        // Hay otra promo pendiente — mostrar botón de siguiente promo en vez de cobrar directo
-        const siguienteNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
-        html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">
-            🏁 Promo terminada — enviar siguiente: ${siguienteNombre}
-          </button>`;
-        html += `
-          <button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">
-            💰 Cobrar todo ahora (sin pasar a cejas)
-          </button>`;
+        // Hay otra promo pendiente — enviar a siguiente área primero
+        const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Promo terminada — enviar siguiente: ${sigNombre}</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora</button>`;
       } else {
-        // No hay promasExtra — flujo normal
-        html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">
-            ✅ Terminé todo el combo — mandar a cobrar
-          </button>
-          <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">
-            ➡️ Siguiente servicio del combo
-          </button>`;
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Terminé todo el combo — mandar a cobrar</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">➡️ Siguiente servicio del combo</button>`;
       }
     } else {
       // Verificar si es la última área
@@ -3339,30 +3329,14 @@ if ('caches' in window) {
       const esUltimaArea = completedAreas.length >= totalAreas - 1;
 
       if (esUltimaArea) {
-        // Última área — promo completada
-        html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
-            🏁 Promo completada — cobrar total
-          </button>`;
+        // Última área — promo completada, mandar a cobrar
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">🏁 Promo completada — cobrar total</button>`;
       } else {
-        // Necesita otra staff para completar
-        html += `
-          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">
-            ➡️ Continuar siguiente área
-          </button>`;
+        // Todavía falta otra área
+        html += `<button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">➡️ Continuar siguiente área</button>`;
       }
-      html += `
-        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
-          💰 Mandar a cobrar (solo mi parte)
-        </button>`;
-    }
-    // Si hay promasExtraPendientes Y el botón de promo completa aparece, agregar también siguiente promo
-    if (promasExtraPendientes.length > 0 && !html.includes('finishAndNextPromo')) {
-      const sigNombreExtra = promasExtraPendientes[0].nombre || 'siguiente servicio';
-      html += `
-        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);border:none;" onclick="window._finishingSlot=${slot1?1:2}; finishAndNextPromo()">
-          🏁 Promo terminada — enviar siguiente: ${sigNombreExtra}
-        </button>`;
+      html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
+      html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">💰 Mandar a cobrar (solo mi parte)</button>`;
     }
     btnContainer.innerHTML = html;
   }
@@ -5546,33 +5520,9 @@ if ('caches' in window) {
   async function finishAndNextPromo() {
     // Finalizar la parte actual y activar la siguiente promo del ticket
     const user = window.currentUser;
-    const slot = window._finishingSlot || 1;
-
-    // Si _finishingData no está seteado (llamada desde puedeTodo), construirlo ahora
-    if (!window._finishingData || !window._finishingData.clientName) {
-      const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-      const clientKey  = normalizeClientKey(clientName);
-      const promoData  = activePromos[clientKey] || window._finishPromoData;
-      const svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
-      const totalSlot  = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      const promasExtraActuales = window._takingPromasExtra || [];
-      window._finishingData = {
-        clientKey,
-        clientName,
-        svcNames     : promoData ? promoData.promo.name : (svcsAprobados.map(s => s.name).join(' + ') || 'Servicio'),
-        total        : String(totalSlot || (promoData ? promoData.promo.price : 0)),
-        promoNombre  : promoData ? promoData.promo.name : '',
-        precioRegular: promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalSlot),
-        idEspera     : slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || ''),
-        clienteCodigo: slot === 1 ? (window._as1Client   || '') : (window._as2Client   || ''),
-        areasExtras  : [],
-        promasExtraPendientes: promasExtraActuales
-      };
-    }
-
     const data = window._finishingData;
-    const siguientePromo = (data.promasExtraPendientes && data.promasExtraPendientes[0])
-      || (window._takingPromasExtra && window._takingPromasExtra[0]);
+    const slot = window._finishingSlot || 1;
+    const siguientePromo = data.promasExtraPendientes && data.promasExtraPendientes[0];
 
     if (!siguientePromo) { alert('No hay siguiente promo'); return; }
 
