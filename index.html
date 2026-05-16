@@ -3305,20 +3305,20 @@ if ('caches' in window) {
         return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
       });
 
-    // promasExtraPendientes: 2da, 3ra promo del ticket (si las hay)
+    // promasExtraPendientes: 2da/3ra promo independiente del ticket (si las hay)
     const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
-    // slotActual: slot1 existe en updateFinishButtons, no en finishSlot1
+    // slotActual: funciona tanto en updateFinishButtons (donde slot1 existe) como en finishSlot1
     const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
 
     let html = '';
     if (puedeTodo) {
-      // Puede hacer todo el combo sola
       if (promasExtraPendientes.length > 0) {
-        // Hay otra promo pendiente — enviar a siguiente área primero
+        // Hay otra promo independiente pendiente (ej: promo 2 pestañas+cejas)
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
-        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Promo terminada — enviar siguiente: ${sigNombre}</button>`;
-        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora</button>`;
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente promo)</button>`;
       } else {
+        // No hay promasExtra — promo de una sola área o ya es la última
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Terminé todo el combo — mandar a cobrar</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">➡️ Siguiente servicio del combo</button>`;
       }
@@ -3329,10 +3329,13 @@ if ('caches' in window) {
       const esUltimaArea = completedAreas.length >= totalAreas - 1;
 
       if (esUltimaArea) {
-        // Última área — promo completada, mandar a cobrar
-        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">🏁 Promo completada — cobrar total</button>`;
+        // Última área — promo completada
+        html += `
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
+            🏁 Promo completada — cobrar total
+          </button>`;
       } else {
-        // Todavía falta otra área
+        // Todavía falta otra área del combo
         html += `<button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">➡️ Continuar siguiente área</button>`;
       }
       html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
