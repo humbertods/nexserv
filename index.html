@@ -3145,13 +3145,13 @@ if ('caches' in window) {
     const msg = `¿Eliminar este registro?\n\n• Cliente: ${sv.cliente}\n• Servicio: ${sv.servicio}\n• Monto: $${sv.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
     if (!confirm(msg)) return;
     eliminarServicio({
-      nombre:   sv.cliente || sv.nombre || '',
-      servicio: sv.servicio || '',
-      chica:    sv.staff || sv.chica || '',
-      precio:   Number(sv.precio || 0),
-      comision: Number(sv.comision || 0),
-      fecha:    sv.fecha || '',
-      hora:     sv.hora || ''
+      nombre: sv.cliente,
+      servicio: sv.servicio,
+      chica: sv.staff || sv.chica || '',
+      precio: sv.precio || 0,
+      comision: sv.comision || 0,
+      fecha: sv.fecha || '',
+      hora: sv.hora || ''
     });
   }
 
@@ -4790,22 +4790,46 @@ if ('caches' in window) {
       ? (document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '')
       : (document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '');
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+
+    // ── CRÍTICO: sumar partes ya completadas por otras staffs (ej: Diana en SP compartido) ──
+    // Leer el desglose del sheet para no perder lo que ya estaba registrado
+    let totalPrevioOtrasStaffs = 0;
+    let desgloseCongelado = []; // partes de otras staffs — no modificables
+    try {
+      const idEsperaCurrent = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+      if (idEsperaCurrent && idEsperaCurrent.startsWith('SP-')) {
+        const spData = await apiGet('getPorCobrar');
+        if (spData && spData.success) {
+          // Buscar en enServicio también (puede estar En servicio aún)
+          const allTickets = [...(spData.enServicio || []), ...(spData.porCobrar || [])];
+          const miSP = allTickets.find(t => t.idEspera === idEsperaCurrent);
+          if (miSP && miSP.serviciosDetalle && miSP.serviciosDetalle.length > 0) {
+            // Solo contar las partes de OTRAS staffs (no la actual)
+            const otrasPartes = miSP.serviciosDetalle.filter(d => d.staff !== user.name);
+            totalPrevioOtrasStaffs = otrasPartes.reduce((s, d) => s + Number(d.monto || 0), 0);
+            desgloseCongelado = otrasPartes;
+          }
+        }
+      }
+    } catch(eSP) {}
+
+    // Total real = lo de esta staff + lo ya congelado de otras staffs
+    const totalReal = Number(total || 0) + totalPrevioOtrasStaffs;
+
     try {
       const payload = {
         chicaNombre   : user.name,
         clienteNombre : clientName,
         clienteCodigo : clientCode || '',
         servicios     : activeNames,
-        total         : String(total || 0),
+        total         : String(totalReal),
         tipo          : 'SN'
       };
-      // Si viene con datos de promo, incluirlos para actualizar ServicioNormal
       if (promoData) {
         payload.promoNombre    = promoData.promoNombre;
         payload.precioPromo    = promoData.precioPromo;
         payload.precioRegular  = promoData.precioRegular;
       }
-      // Incluir idEspera para actualización precisa en el Sheet
       const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
       if (idEspera) payload.idEspera = idEspera;
 
@@ -7308,11 +7332,19 @@ if ('caches' in window) {
           cobrarList.innerHTML = porCobrar.map(p => {
             const esTM = p.fuente === 'TicketMulti';
             let desgloseData = p.serviciosDetalle;
+            // Para SP: marcar partes ya completadas (staffs distintas a la última) como congeladas
+            if (desgloseData && desgloseData.length > 0 && !esTM) {
+              // La última staff en el desglose es la actual — las anteriores están congeladas
+              const staffsEnDesglose = [...new Set(desgloseData.map(d => d.staff))];
+              const ultimaStaff = staffsEnDesglose[staffsEnDesglose.length - 1];
+              desgloseData = desgloseData.map(d => ({
+                ...d,
+                congelado: d.staff !== ultimaStaff
+              }));
+            }
             if (!desgloseData && esTM && p.areas) {
               desgloseData = p.areas.map(a => ({
-                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
-                monto: a.precio,
-                montoNormal: a.precioNormal || a.precio
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area, monto: a.precio
               }));
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
@@ -8082,12 +8114,12 @@ if ('caches' in window) {
       desgloseEl.style.display = 'block';
       simpleEl.style.display = 'none';
       itemsEl.innerHTML = desglose.map(d => `
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--line); ${d.congelado ? 'background:var(--success-bg);border-radius:8px;padding:8px 10px;margin-bottom:2px;' : ''}">
           <div>
-            <div style="font-size: 13px; font-weight: 700;">${d.servicio}</div>
+            <div style="font-size: 13px; font-weight: 700;">${d.servicio}${d.congelado ? ' <span style="font-size:9px;background:var(--success);color:white;padding:2px 5px;border-radius:6px;font-weight:700;margin-left:4px;">✅ LISTO</span>' : ''}</div>
             <div style="font-size: 11px; color: var(--ink-soft); margin-top: 1px;">por ${d.staff} · ${d.area || ''}</div>
           </div>
-          <div style="font-size: 15px; font-weight: 800; color: var(--accent-deep); margin-left: 12px;">$${Number(d.monto).toFixed(2)}</div>
+          <div style="font-size: 15px; font-weight: 800; color: ${d.congelado ? 'var(--success)' : 'var(--accent-deep)'}; margin-left: 12px;">$${Number(d.monto).toFixed(2)}</div>
         </div>
       `).join('');
       const subtotalNum = desglose.reduce((s, d) => s + Number(d.monto || 0), 0);
@@ -8187,51 +8219,19 @@ if ('caches' in window) {
     if (metodo === 'Tarjeta' && tienePromo) {
       // LEY SUPREMA: tarjeta invalida la promo → precio regular
       aviso.style.display = 'block';
-      const precioPromoDisplay   = typeof totalPromo   === 'number' ? totalPromo.toFixed(2)   : totalPromo;
+      const precioPromoDisplay = typeof totalPromo === 'number' ? totalPromo.toFixed(2) : totalPromo;
       const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
-      document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
-      document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
-      totalEl.textContent  = '$' + precioRegularDisplay;
-      totalEl.style.color  = 'var(--danger)';
+      document.getElementById('cobrarPrecioPromo').textContent    = '$' + precioPromoDisplay;
+      document.getElementById('cobrarPrecioRegular').textContent  = '$' + precioRegularDisplay;
+      totalEl.textContent   = '$' + precioRegularDisplay;
+      totalEl.style.color   = 'var(--danger)';
       promoBanner.style.display = 'none';
-      if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
-      // Actualizar cada línea del desglose TM con precio normal por área
-      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
-        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
-        if (itemsEl2) {
-          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
-            const montoReal = Number(d.montoNormal || d.monto || 0);
-            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);">
-              <div>
-                <div style="font-size:13px;font-weight:700;">${d.servicio}</div>
-                <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area||''}</div>
-              </div>
-              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${montoReal.toFixed(2)}</div>
-            </div>`;
-          }).join('');
-        }
-      }
+      if (subtotalEl) { subtotalEl.textContent = '$' + totalRegular; subtotalEl.style.color = 'var(--danger)'; }
     } else {
       aviso.style.display = 'none';
-      totalEl.textContent  = '$' + totalPromo;
-      totalEl.style.color  = 'var(--accent-deep)';
+      totalEl.textContent   = '$' + totalPromo;
+      totalEl.style.color   = 'var(--accent-deep)';
       if (tienePromo) promoBanner.style.display = 'block';
-      // Restaurar líneas del desglose TM con precio promo
-      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
-        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
-        if (itemsEl2) {
-          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
-            const montoPromo = Number(d.monto || 0);
-            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);">
-              <div>
-                <div style="font-size:13px;font-weight:700;">${d.servicio}</div>
-                <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area||''}</div>
-              </div>
-              <div style="font-size:15px;font-weight:800;color:var(--accent-deep);margin-left:12px;">$${montoPromo.toFixed(2)}</div>
-            </div>`;
-          }).join('');
-        }
-      }
       if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
     }
   }
@@ -12440,8 +12440,16 @@ if ('caches' in window) {
 
   // Detectar si el servicio requiere ficha de pigmento
   function esSrvPigmento(svcName) {
-    const n = String(svcName || '').toLowerCase();
-    return n.includes('polvo') || n.includes('pigment') || n.includes('permanen') || n.includes('micropigment');
+    const n = String(svcName || '').toLowerCase()
+      .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
+      .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
+    // Solo activar ficha para: "cejas efecto polvo permanentes" o "retoque de efecto polvo"
+    // NO activar para combo 9 (solo pigmento), solo depilacion+pigmento, etc.
+    const esCejasPolvo  = (n.includes('cejas') || n.includes('ceja')) && n.includes('polvo');
+    const esRetoque     = n.includes('retoque') && (n.includes('polvo') || n.includes('efecto'));
+    const esEfectoPolvo = n.includes('efecto') && n.includes('polvo') && !n.includes('solo') && !n.includes('combo');
+    const esMicropig    = n.includes('micropigment');
+    return esCejasPolvo || esRetoque || esEfectoPolvo || esMicropig;
   }
 
   async function loadCejasQuick(clientKey, slot, clientCodigo, clientNombre) {
