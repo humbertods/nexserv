@@ -2728,6 +2728,9 @@ function handleGetHistorial(params) {
       servicio: h.servicio,
       precio: h.precio,
       hora: h.hora,
+      fecha: h.fecha,
+      comision: h.comision,
+      staff: h.chica,
       metodoPago: h.metodoPago
     });
     porStaff[chica].totalFacturado += h.precio;
