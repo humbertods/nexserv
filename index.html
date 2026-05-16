@@ -3328,14 +3328,11 @@ if ('caches' in window) {
             🏁 Promo completada — cobrar total
           </button>`;
       } else {
-        // Necesita otra staff para completar
         html += `
           <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
             ➡️ Continuar siguiente área
           </button>`;
       }
-      // Botón "Cobrar promo completa": la clienta paga el precio de la promo aunque
-      // no haga todos los servicios. TODO el valor se asigna a esta staff.
       html += `
         <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);border:none;" onclick="cobrarPromoCompleta(${slot1?1:2})">
           🎁 Cobrar promo completa ($${Number(promo.price || 0)})
@@ -4863,9 +4860,6 @@ if ('caches' in window) {
     await finishAndSend();
   }
 
-  // ── cobrarPromoCompleta ────────────────────────────────────────────────────
-  // La clienta paga el precio de la promo completa aunque no haga todos los servicios.
-  // Todo el valor de la promo se asigna a esta staff y se manda a cobro directo.
   async function cobrarPromoCompleta(slot) {
     slot = slot || window._finishingSlot || 1;
     const user = window.currentUser;
@@ -4873,59 +4867,26 @@ if ('caches' in window) {
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey  = normalizeClientKey(clientName);
     const promoData  = activePromos[clientKey] || window._finishPromoData;
-
-    if (!promoData || !promoData.promo) {
-      alert('No hay datos de promo para esta clienta.');
-      return;
-    }
-
-    const promo          = promoData.promo;
-    const precioPromo    = Number(promo.price   || 0); // precio con descuento promo
-    const precioRegular  = Number(promo.regular || promo.price || 0); // precio sin promo
-    const promoNombre    = promo.name || 'Promo';
-    const idEspera       = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-    const clienteCodigo  = slot === 1 ? (window._as1Client   || '') : (window._as2Client   || '');
-
-    // Confirmar con la staff
-    const msg = `¿Cobrar promo completa "${promoNombre}" a nombre de ${user.name}?\n\n` +
-      `• Precio promo: $${precioPromo}\n` +
-      `• Todo el valor se asigna a ${user.name}\n` +
-      `• La clienta va directamente a cobro`;
+    if (!promoData || !promoData.promo) { alert('No hay datos de promo para esta clienta.'); return; }
+    const promo         = promoData.promo;
+    const precioPromo   = Number(promo.price   || 0);
+    const precioRegular = Number(promo.regular || promo.price || 0);
+    const promoNombre   = promo.name || 'Promo';
+    const idEspera      = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clienteCodigo = slot === 1 ? (window._as1Client   || '') : (window._as2Client   || '');
+    const msg = `¿Cobrar promo completa "${promoNombre}" a nombre de ${user.name}?\n\n• Precio promo: $${precioPromo}\n• Todo el valor se asigna a ${user.name}\n• La clienta va directamente a cobro`;
     if (!confirm(msg)) return;
-
-    // Reemplazar slotServices con el precio completo de la promo para esta staff
-    slotServices[slot] = [{
-      name   : promoNombre,
-      price  : precioPromo,
-      area   : user.area || '',
-      status : 'aprobado'
-    }];
-
-    // Construir _finishingData con precio total de promo
+    slotServices[slot] = [{ name: promoNombre, price: precioPromo, area: user.area || '', status: 'aprobado' }];
     window._finishingSlot = slot;
     window._finishingData = {
-      clientKey      : clientKey,
-      clientName     : clientName,
-      svcNames       : promoNombre,
-      total          : String(precioPromo),
-      promoNombre    : promoNombre,
-      precioRegular  : String(precioRegular),
-      idEspera       : idEspera,
-      clienteCodigo  : clienteCodigo,
-      areasExtras    : [],
-      promasExtraPendientes: [],
-      _promoCompleta : true  // flag para distinguir este flujo
+      clientKey, clientName, svcNames: promoNombre,
+      total: String(precioPromo), promoNombre, precioRegular: String(precioRegular),
+      idEspera, clienteCodigo, areasExtras: [], promasExtraPendientes: [], _promoCompleta: true
     };
     window._finishFullPromo = true;
-
     showToast('⏳ Enviando a cobro...');
-    try {
-      await finishAndSend();
-    } catch(e) {
-      alert('Error al enviar a cobro: ' + e.message);
-    }
+    try { await finishAndSend(); } catch(e) { alert('Error al enviar a cobro: ' + e.message); }
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
   function showConfirmServiceModal(slot) {
     const slotStr = String(slot);
@@ -5793,19 +5754,26 @@ if ('caches' in window) {
 
       let changed = false;
       const AREA_CAPS_AUTH = {
-        'cejas':    ['cejas','depilacion','bigote','depil','ceja','pigment','brow','pest','lifting','retiro'],
-        'pestanas': ['pestanas','pest','lifting','retiro','volumen','pelo','clasica','efecto','aura'],
-        'facial':   ['facial','hidra','limpieza'],
-        'depilacion': ['depilacion','depil','bikini','pierna','axila','ingles']
+        'cejas':         ['cejas','depilacion','bigote','depil','ceja','pigment','brow','pest','lifting','retiro'],
+        'pestanas':      ['pestanas','pest','lifting','retiro','volumen','pelo','clasica','efecto','aura'],
+        'retiro_lifting':['pestanas','pest','lifting','retiro','volumen','pelo','clasica','efecto','aura'],
+        'facial':        ['facial','hidra','limpieza'],
+        'depilacion':    ['depilacion','depil','bikini','pierna','axila','ingles']
       };
       const staffArea = user.area || 'cejas';
       const staffCaps = AREA_CAPS_AUTH[staffArea] || [staffArea];
 
       for (const auth of myAuths) {
         // ── DETECTAR si el servicio es de otra área ──
-        const svcAreaNorm = String(auth.servicioArea || auth.servicioNombre || '').toLowerCase()
+        // Normalizar área del servicio (retiro_lifting se trata igual que pestanas)
+        let svcAreaRaw = String(auth.servicioArea || auth.servicioNombre || '').toLowerCase()
           .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
           .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
+        // Mapear retiro/lifting → pestanas para la detección
+        if (svcAreaRaw.includes('retiro') || svcAreaRaw.includes('lifting')) {
+          svcAreaRaw = svcAreaRaw + ' pestanas pest';
+        }
+        const svcAreaNorm = svcAreaRaw;
         const esDeOtraArea = !staffCaps.some(cap => svcAreaNorm.includes(cap));
 
         if (auth.estado === 'aprobado' && esDeOtraArea) {
