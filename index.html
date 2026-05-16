@@ -7347,8 +7347,13 @@ if ('caches' in window) {
                   const label = areaLabels[areaComp] || areaComp;
                   let montoStr = '';
                   if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
-                    const entrada = a.serviciosDetalle.find(d => String(d.staff||'').toLowerCase() === staffComp.toLowerCase() || String(d.area||'').toLowerCase().includes(areaComp));
-                    if (entrada && Number(entrada.monto) > 0) montoStr = ' · <strong>$' + Number(entrada.monto).toFixed(2) + '</strong>';
+                    // Sumar TODAS las entradas de esa staff (promo + adicionales)
+                    const entradasStaff = a.serviciosDetalle.filter(d =>
+                      String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
+                      String(d.area||'').toLowerCase().includes(areaComp)
+                    );
+                    const montoTotal = entradasStaff.reduce((s, d) => s + Number(d.monto || 0), 0);
+                    if (montoTotal > 0) montoStr = ' · <strong>$' + montoTotal.toFixed(2) + '</strong>';
                   }
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
@@ -7389,7 +7394,18 @@ if ('caches' in window) {
               }
             } // fin else normal/promo
 
-            const totalStr = a.total && Number(a.total) > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${Number(a.total).toFixed(2)}</span></div>` : '';
+            // TOTAL ACUMULADO = serviciosDetalle (partes ya hechas) + a.total (área actual en curso)
+            let totalAcumDisplay = Number(a.total) || 0;
+            if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+              const totalDetalle = a.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
+              // Si hay desglose, el total real = desglose + precio área en curso
+              if (totalDetalle > 0) {
+                // a.total ya puede incluir el desglose (cuando viene de col M acumulado)
+                // usar el mayor para evitar contar doble
+                totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
+              }
+            }
+            const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
             const tmBadge = esTM ? ' <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>' : '';
             const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
 

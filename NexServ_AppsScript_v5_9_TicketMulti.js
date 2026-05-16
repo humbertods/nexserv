@@ -1315,14 +1315,13 @@ function handleContinuarPromoALista(data) {
       const obsActual = String(allData[i][11] || '');
       const nuevaObs = (obsActual ? obsActual + ' | ' : '') + '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre + ' · Falta: ' + data.areasFaltantes;
       
-      // Total del nuevo ticket = lo que cobró esta área (del Sheet, incluye extras) + siguiente área
-      // Leer total real de col M del ticket actual (solo para calcular comisión de esta chica)
-      const totalEstaAreaSheet = Number(allData[i][12] || 0); // col M = índice 12
+      // Col M del nuevo ticket = total ACUMULADO real (lo ya hecho + la siguiente área)
+      // Esto es lo que Mikaela ve como "TOTAL ACUMULADO" en el panel
+      const totalEstaAreaSheet = Number(allData[i][12] || 0); // col M actual
       const montoSiguiente = Number(data.montoSiguienteArea || 0);
-      
-      // El nuevo ticket solo debe tener el precio de la SIGUIENTE área (no el acumulado total)
-      // El acumulado completo se calcula al cobrar sumando el desglose de cada staff
-      const totalNuevoTicket = String(montoSiguiente || '0');
+      const montoYaHechoReal = Number(data.montoChica || 0) || Number(data.totalAcumulado || 0) || totalEstaAreaSheet;
+      // totalAcumulado = lo que hizo esta staff (incluyendo extras) + lo que hará la siguiente
+      const totalNuevoTicket = String((montoYaHechoReal > 0 ? montoYaHechoReal : 0) + montoSiguiente);
       
       // Guardar también el monto real de esta área (para comisiones correctas)
       const montoChicaReal = Number(data.montoChica || 0) || (totalEstaAreaSheet > 0 ? totalEstaAreaSheet : 0);
@@ -3132,6 +3131,13 @@ function handleAprobarAutorizacion(data) {
       ws.getRange(i + 1, 11).setValue('aprobado');
       ws.getRange(i + 1, 12).setValue('Aprobado por Mikaela el ' + fechaAprobacion + ' ' + horaAprobacion);
 
+      const authStaff      = String(rows[i][5] || '');
+      const authCliente    = String(rows[i][4] || '');
+      const authCodigo     = String(rows[i][3] || '');
+      const authPrecio     = Number(rows[i][8] || 0);
+      const authServicio   = String(rows[i][6] || '');
+      const authArea       = String(rows[i][7] || '');
+
       // ── Registrar en ServiciosExtras ──
       try {
         let wsExt = getSheet('ServiciosExtras');
@@ -3147,26 +3153,63 @@ function handleAprobarAutorizacion(data) {
           wsExt.setFrozenRows(1);
         }
         wsExt.appendRow([
-          fechaAprobacion,                                              // A: Fecha
-          Utilities.formatDate(rows[i][1], 'America/Guayaquil', 'HH:mm'), // B: Hora solicitud
-          horaAprobacion,                                               // C: Hora aprobación
-          String(rows[i][5] || ''),                                     // D: Staff
-          String(rows[i][4] || ''),                                     // E: Cliente
-          String(rows[i][3] || ''),                                     // F: Código
-          String(rows[i][6] || ''),                                     // G: Servicio extra
-          String(rows[i][7] || ''),                                     // H: Área
-          Number(rows[i][8] || 0),                                      // I: Precio
-          'Aprobado',                                                   // J: Estado
-          ''                                                            // K: ID Ticket (se llena al cobrar)
+          fechaAprobacion,
+          Utilities.formatDate(rows[i][1], 'America/Guayaquil', 'HH:mm'),
+          horaAprobacion,
+          authStaff, authCliente, authCodigo, authServicio, authArea,
+          authPrecio, 'Aprobado', ''
         ]);
       } catch(eExt) { Logger.log('Error escribiendo ServiciosExtras: ' + eExt); }
-      
+
+      // ── Si la clienta tiene un TM activo, sumar el extra al precio del área ──
+      // Esto asegura que Mikaela vea el precio correcto en el panel y que el cobro sea exacto
+      if (authPrecio > 0 && authStaff && authCliente) {
+        try {
+          const wsTM = getTMSheet();
+          const tmRows = wsTM.getDataRange().getValues();
+          for (let t = 2; t < tmRows.length; t++) {
+            const tmId     = String(tmRows[t][0] || '').trim();
+            if (!tmId.startsWith('TM-')) continue;
+            const tmEstado = String(tmRows[t][5] || '').toLowerCase();
+            if (tmEstado === 'completado') continue;
+            const tmNombre = String(tmRows[t][4] || '').trim().toLowerCase();
+            if (tmNombre !== authCliente.toLowerCase()) continue;
+
+            // Encontrar el área de esta staff en el TM
+            for (let a = 0; a < 4; a++) {
+              const base      = TM_AREA_COL[a];
+              const areaStaff = String(tmRows[t][base + 2] || '').trim();
+              if (areaStaff !== authStaff) continue;
+              const estadoArea = String(tmRows[t][base + 3] || '').trim().toLowerCase();
+              if (estadoArea === 'completado') continue; // área ya cerrada, no sumar
+
+              // Sumar el precio del extra al TM_PRECIO_COL del área
+              const precioActual = Number(tmRows[t][TM_PRECIO_COL[a]] || 0);
+              const nuevoPrecio  = precioActual + authPrecio;
+              const tmRowNum     = t + 3;
+              wsTM.getRange(tmRowNum, TM_PRECIO_COL[a] + 1).setValue(nuevoPrecio);
+
+              // Recalcular total promo del TM (col 36 = AJ, idx 35)
+              const nuevosPrecios = TM_PRECIO_COL.map(function(c, idx) {
+                return idx === a ? nuevoPrecio : Number(tmRows[t][c] || 0);
+              });
+              const nuevoTotalPromo = nuevosPrecios.reduce(function(s, v) { return s + v; }, 0);
+              wsTM.getRange(tmRowNum, 36).setValue(nuevoTotalPromo); // col AJ = precioPromoTotal
+
+              Logger.log('TM ' + tmId + ': área ' + a + ' precio actualizado ' + precioActual + ' → ' + nuevoPrecio + ' (extra: ' + authServicio + ')');
+              break;
+            }
+            break; // solo el primer TM activo de esta clienta
+          }
+        } catch(eTM) { Logger.log('Error actualizando TM con extra: ' + eTM); }
+      }
+
       return { 
         success: true, 
         message: 'Servicio aprobado',
-        clienteCodigo: rows[i][3],
-        clienteNombre: rows[i][4],
-        staffNombre: rows[i][5]
+        clienteCodigo: authCodigo,
+        clienteNombre: authCliente,
+        staffNombre: authStaff
       };
     }
   }
