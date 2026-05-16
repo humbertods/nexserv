@@ -1337,8 +1337,10 @@ function handleContinuarPromoALista(data) {
         servicioLimpio = servicioLimpio.replace(/\[.*?\]/g, '').trim();
       }
 
+      // Usar hora actual como hora de llegada (allData[i][2] puede ser Date vacía → 1899)
+      const horaLlegadaNueva = horaStr;
       ws.appendRow([
-        newId, fechaStr, allData[i][2], allData[i][3], nombre,
+        newId, fechaStr, horaLlegadaNueva, allData[i][3], nombre,
         servicioLimpio + ' (continuación promo)',
         data.nuevaArea || allData[i][6],
         allData[i][7] || 'Normal',
