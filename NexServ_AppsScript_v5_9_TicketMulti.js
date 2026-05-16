@@ -2850,14 +2850,15 @@ function addHistorialOwner(atencion, data) {
   const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
   const hora = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
 
-  // Columnas HistorialOwner: A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-  const topFlag = ''; // Se podria calcular si la clienta es TOP
+  // Col E = ID del ticket (LE-XXXX, SN-XXXX) para que getServiciosHoy no duplique
+  // El merge filtra colE.startsWith('LE-'|'SN-'|'SP-'), evitando duplicados con ListaEspera
+  const idTicket = String(atencion[0] || ''); // col A = ID del ticket
   ws.appendRow([
     fecha,                                    // A: Fecha
     hora,                                     // B: Hora
     atencion[3],                              // C: Codigo clienta
     atencion[4],                              // D: Nombre clienta
-    topFlag,                                  // E: Top flag
+    idTicket,                                 // E: ID ticket (LE/SN/SP) para dedup merge
     data.servicio || atencion[5] || '',       // F: Servicio
     atencion[6] || data.area || '',           // G: Area
     atencion[9] || data.chicaNombre || '',    // H: Staff nombre
