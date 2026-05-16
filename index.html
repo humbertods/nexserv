@@ -3306,23 +3306,26 @@ if ('caches' in window) {
       });
 
     let html = '';
+    // slotActual: en finishSlot1 siempre es 1, en updateFinishButtons viene de slot1?1:2
+    const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
+
     if (puedeTodo) {
       // Puede hacer todo el combo sola
       if (promasExtraPendientes.length > 0) {
         // Hay otra promo pendiente — mostrar botón de siguiente promo en vez de cobrar directo
         const siguienteNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
         html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slot1?1:2}; finishAndNextPromo()">
+          <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">
             🏁 Promo terminada — enviar siguiente: ${siguienteNombre}
           </button>`;
         html += `
-          <button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
+          <button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">
             💰 Cobrar todo ahora (sin pasar a cejas)
           </button>`;
       } else {
         // No hay promasExtra — flujo normal
         html += `
-          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slot1?1:2}; finishAndSendAll()">
+          <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">
             ✅ Terminé todo el combo — mandar a cobrar
           </button>
           <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">
@@ -3342,15 +3345,12 @@ if ('caches' in window) {
             🏁 Promo completada — cobrar total
           </button>`;
       } else {
+        // Necesita otra staff para completar
         html += `
-          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
+          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">
             ➡️ Continuar siguiente área
           </button>`;
       }
-      html += `
-        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);border:none;" onclick="cobrarPromoCompleta(${slot1?1:2})">
-          🎁 Cobrar promo completa ($${Number(promo.price || 0)})
-        </button>`;
       html += `
         <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
           💰 Mandar a cobrar (solo mi parte)
@@ -3915,7 +3915,6 @@ if ('caches' in window) {
     const allowed = AREA_FILTER[user.area] || [];
     
     // Filtrar por área Y por asignación directa
-    // Cachear para recuperación de promasExtra en finishAndSend
     window._listaEsperaCache = lista;
 
     const myList = lista.filter(w => {
@@ -4191,7 +4190,6 @@ if ('caches' in window) {
     // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
     window._takingPromasExtra = takingData ? (takingData.promasExtra || []) : [];
-    // Persistir en sessionStorage para sobrevivir navegación sin recarga completa
     try {
       if (window._takingPromasExtra.length > 0) {
         sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
@@ -5612,8 +5610,8 @@ if ('caches' in window) {
         // Quitar la promo que acabamos de activar de las pendientes
         window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
         try {
-          const idEsperaAct = window._as1IdEspera || '';
-          if (idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + idEsperaAct, JSON.stringify(window._takingPromasExtra));
+          const _idEsperaAct = window._as1IdEspera || '';
+          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
         } catch(eS2) {}
         const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
         const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
@@ -6076,20 +6074,18 @@ if ('caches' in window) {
 
     // Promos extra pendientes (2a, 3a promo del ticket)
     // Recuperar desde sessionStorage si _takingPromasExtra está vacío
-    if ((!window._takingPromasExtra || window._takingPromasExtra.length === 0)) {
-      const idEsperaActual = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-      if (idEsperaActual) {
+    if (!window._takingPromasExtra || window._takingPromasExtra.length === 0) {
+      const _idEsperaRec = window._as1IdEspera || '';
+      if (_idEsperaRec) {
         try {
-          const stored = sessionStorage.getItem('nexserv_promasExtra_' + idEsperaActual);
-          if (stored) window._takingPromasExtra = JSON.parse(stored);
+          const _stored = sessionStorage.getItem('nexserv_promasExtra_' + _idEsperaRec);
+          if (_stored) window._takingPromasExtra = JSON.parse(_stored);
         } catch(eR) {}
       }
-      // También intentar desde la listaEspera ya cargada en memoria
       if ((!window._takingPromasExtra || window._takingPromasExtra.length === 0) && window._listaEsperaCache) {
-        const idEsperaActual2 = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-        const ticketEnLista = (window._listaEsperaCache || []).find(w => w.id === idEsperaActual2);
-        if (ticketEnLista && ticketEnLista.promasExtra && ticketEnLista.promasExtra.length > 0) {
-          window._takingPromasExtra = ticketEnLista.promasExtra;
+        const _ticket = (window._listaEsperaCache || []).find(w => w.id === _idEsperaRec);
+        if (_ticket && _ticket.promasExtra && _ticket.promasExtra.length > 0) {
+          window._takingPromasExtra = _ticket.promasExtra;
         }
       }
     }
