@@ -1699,46 +1699,30 @@ function handleGetServiciosHoy(params) {
     }
   } catch(e) {}
 
-  // ── Merge con HistorialOwner — tickets TM completados hoy ──────────────
-  // handleConfirmarCobroMulti escribe aquí; las otras fuentes (LE/SN/SP)
-  // ya tienen su propia sección arriba, así que se filtran para evitar duplicados.
+  // ── Merge HistorialOwner — tickets TM completados hoy ──────────────────
   try {
-    const wsH  = getSheet('HistorialOwner');
-    const dataH = wsH.getDataRange().getValues();
-    // Col: A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-    for (let i = 2; i < dataH.length; i++) {
-      const rowH = dataH[i];
+    var wsH  = getSheet('HistorialOwner');
+    var dataH = wsH.getDataRange().getValues();
+    for (var i = 2; i < dataH.length; i++) {
+      var rowH = dataH[i];
       if (!rowH[0]) continue;
-
-      // Filtrar por fecha de hoy
-      let fechaHStr = '';
-      if (rowH[0] instanceof Date) {
-        fechaHStr = Utilities.formatDate(rowH[0], 'America/Guayaquil', 'dd/MM/yyyy');
-      } else {
-        fechaHStr = String(rowH[0] || '');
-      }
+      var fechaHStr = rowH[0] instanceof Date
+        ? Utilities.formatDate(rowH[0], 'America/Guayaquil', 'dd/MM/yyyy')
+        : String(rowH[0] || '');
       if (fechaHStr !== hoy) continue;
-
-      // Filtrar por staff si se indicó
-      const staffH = String(rowH[7] || '').trim();
+      var staffH = String(rowH[7] || '').trim();
       if (params.chica && staffH !== params.chica) continue;
-
-      // Evitar duplicados: filas de LE/SN/SP tienen su prefijo en col E (Top/idOrigen)
-      const colE = String(rowH[4] || '').trim();
+      var colE = String(rowH[4] || '').trim();
       if (colE.startsWith('LE-') || colE.startsWith('SN-') || colE.startsWith('SP-')) continue;
-
-      const valorH    = Number(rowH[8] || 0);
-      const comisionH = Number(rowH[9] || 0);
-      const horaH     = rowH[1] instanceof Date
+      var horaH = rowH[1] instanceof Date
         ? Utilities.formatDate(rowH[1], 'America/Guayaquil', 'HH:mm')
         : String(rowH[1] || '');
-
       servicios.push({
         nombre      : String(rowH[3] || ''),
         servicio    : String(rowH[5] || ''),
         area        : String(rowH[6] || ''),
         horaToma    : horaH,
-        total       : valorH,
+        total       : Number(rowH[8] || 0),
         metodoPago  : String(rowH[10] || 'Efectivo'),
         tomadaPor   : staffH,
         fecha       : fechaHStr,
@@ -1746,11 +1730,11 @@ function handleGetServiciosHoy(params) {
         precioRegular: '',
         observaciones: '',
         horaCobro   : horaH,
-        comision    : comisionH
+        comision    : Number(rowH[9] || 0)
       });
     }
   } catch(eTM) {}
-  // ── Fin merge HistorialOwner (TM) ─────────────────────────────────────
+  // ── Fin merge HistorialOwner ────────────────────────────────────────────
 
   return { success: true, servicios: servicios };
 }
@@ -3364,71 +3348,130 @@ function handleRegistrarVentaProductos(data) {
 // ============================================
 function handleEliminarServicio(data) {
   try {
-    const fecha   = String(data.fecha || '').trim();
-    const hora    = String(data.hora || '').trim();
+    const fecha   = String(data.fecha   || '').trim();
+    const hora    = String(data.hora    || '').trim();
     const cliente = String(data.cliente || '').trim().toLowerCase();
-    const staff   = String(data.staff || '').trim().toLowerCase();
-    const servicio= String(data.servicio || '').trim().toLowerCase();
-    const precio  = Number(data.precio || 0);
-    const comision= Number(data.comision || 0);
+    const staff   = String(data.staff   || '').trim().toLowerCase();
+    const servicio= String(data.servicio|| '').trim().toLowerCase();
+    const precio  = Number(data.precio  || 0);
+    const comision= Number(data.comision|| 0);
 
-    // 1. Eliminar de HistorialOwner
+    const tz = 'America/Guayaquil';
+
+    // ── Detectar si es un registro TM (staff="varios" o servicio contiene "TM-") ──
+    const esTM = staff === 'varios' || /ticket multi \(tm-/i.test(servicio);
+    // Extraer TM-id si aplica, ej: "Ticket Multi (TM-0002)" → "TM-0002"
+    const tmIdMatch = servicio.match(/tm-\d+/i);
+    const tmId = tmIdMatch ? tmIdMatch[0].toUpperCase() : null;
+
+    let eliminadoHist   = false;
+    let totalComisionRevertir = 0;
+    const staffsAfectados = {}; // { staffNombre: { precio, comision } }
+
+    // ── 1. Eliminar de HistorialOwner ──────────────────────────────────────
     const wsHist = getSheet('HistorialOwner');
     const histData = wsHist.getDataRange().getValues();
-    let eliminadoHist = false;
+
+    // Iterar de abajo a arriba para borrar filas sin afectar índices
     for (let i = histData.length - 1; i >= 3; i--) {
-      const rowFecha   = histData[i][0] instanceof Date
-        ? Utilities.formatDate(histData[i][0], 'America/Guayaquil', 'dd/MM/yyyy')
+      const rowFecha = histData[i][0] instanceof Date
+        ? Utilities.formatDate(histData[i][0], tz, 'dd/MM/yyyy')
         : String(histData[i][0] || '');
-      const rowCliente = String(histData[i][3] || '').trim().toLowerCase();
-      const rowStaff   = String(histData[i][7] || '').trim().toLowerCase();
-      const rowServicio= String(histData[i][5] || '').trim().toLowerCase();
-      const rowHora    = String(histData[i][1] || '');
+      const rowCliente  = String(histData[i][3] || '').trim().toLowerCase();
+      const rowStaff    = String(histData[i][7] || '').trim().toLowerCase();
+      const rowServicio = String(histData[i][5] || '').trim().toLowerCase();
+      const rowPrecio   = Number(histData[i][8] || 0);
+      const rowComision = Number(histData[i][9] || 0);
 
       const matchFecha   = rowFecha === fecha;
       const matchCliente = rowCliente.includes(cliente) || cliente.includes(rowCliente);
-      const matchStaff   = rowStaff.includes(staff) || staff.includes(rowStaff) || staff === '';
-      const matchServicio= rowServicio.includes(servicio.substring(0,10)) || servicio.includes(rowServicio.substring(0,10));
 
-      if (matchFecha && matchCliente && matchStaff && matchServicio) {
+      let debeEliminar = false;
+
+      if (esTM && tmId) {
+        // Para TM: eliminar TODAS las filas de este cliente en esta fecha
+        // que correspondan al TM (servicio contiene el TM-id o staff=Varios)
+        const rowServicioContieneTM = rowServicio.includes(tmId.toLowerCase());
+        const esFilaTM = rowServicioContieneTM ||
+          (matchFecha && matchCliente && (rowStaff === 'varios' || rowServicio.includes('ticket multi')));
+        debeEliminar = matchFecha && matchCliente && esFilaTM;
+      } else {
+        // Servicio normal: match exacto por fecha + cliente + staff + servicio
+        const matchStaff   = staff === '' || rowStaff.includes(staff) || staff.includes(rowStaff);
+        const matchServicio= rowServicio.includes(servicio.substring(0, 15)) ||
+                             servicio.includes(rowServicio.substring(0, 15));
+        debeEliminar = matchFecha && matchCliente && matchStaff && matchServicio;
+      }
+
+      if (debeEliminar) {
+        // Acumular comisión a revertir por staff
+        if (rowStaff && rowStaff !== 'varios' && rowComision > 0) {
+          if (!staffsAfectados[rowStaff]) staffsAfectados[rowStaff] = { precio: 0, comision: 0 };
+          staffsAfectados[rowStaff].precio   += rowPrecio;
+          staffsAfectados[rowStaff].comision += rowComision;
+        }
+        totalComisionRevertir += rowComision;
         wsHist.deleteRow(i + 1);
         eliminadoHist = true;
-        break;
+        if (!esTM) break; // servicio normal: solo borrar una fila
       }
     }
 
-    // 2. Eliminar de CierresPagos
+    // ── 2. Eliminar fila en TicketMulti si es TM ───────────────────────────
+    if (esTM && tmId) {
+      try {
+        const wsTM = getTMSheet();
+        const tmRows = wsTM.getDataRange().getValues();
+        for (let i = tmRows.length - 1; i >= 2; i--) {
+          if (String(tmRows[i][0] || '').trim().toUpperCase() === tmId) {
+            wsTM.deleteRow(i + 1);
+            break;
+          }
+        }
+      } catch(eTM) {}
+    }
+
+    // ── 3. Eliminar de CierresPagos ────────────────────────────────────────
     try {
       const wsPagos = getSheet('CierresPagos');
       const pagosData = wsPagos.getDataRange().getValues();
       for (let i = pagosData.length - 1; i >= 1; i--) {
-        const rowCliente = String(pagosData[i][2] || '').trim().toLowerCase();
-        const rowStaff   = String(pagosData[i][3] || '').trim().toLowerCase();
-        const rowTotal   = Number(pagosData[i][5] || 0);
-        if (rowCliente.includes(cliente) && Math.abs(rowTotal - precio) < 0.5) {
+        const rowCliente2 = String(pagosData[i][2] || '').trim().toLowerCase();
+        const rowTotal2   = Number(pagosData[i][5] || 0);
+        const rowFecha2   = pagosData[i][0] instanceof Date
+          ? Utilities.formatDate(pagosData[i][0], tz, 'dd/MM/yyyy')
+          : String(pagosData[i][0] || '');
+        const matchPago = rowCliente2.includes(cliente) && rowFecha2 === fecha;
+        if (matchPago && (esTM || Math.abs(rowTotal2 - precio) < 0.5)) {
           wsPagos.deleteRow(i + 1);
-          break;
+          if (!esTM) break;
         }
       }
     } catch(e) {}
 
-    // 3. Revertir comisión en hoja Comisiones
-    if (comision > 0 && staff !== '') {
-      try {
-        const wsComm = getSheet('Comisiones');
-        const commData = wsComm.getDataRange().getValues();
+    // ── 4. Revertir comisiones en hoja Comisiones ─────────────────────────
+    try {
+      const wsComm = getSheet('Comisiones');
+      const commData = wsComm.getDataRange().getValues();
+
+      // Para TM: revertir por cada staff afectada individualmente
+      const staffsParaRevertir = esTM && Object.keys(staffsAfectados).length > 0
+        ? staffsAfectados
+        : (staff !== '' ? { [staff]: { precio: precio, comision: comision } } : {});
+
+      for (const [staffNombre, montos] of Object.entries(staffsParaRevertir)) {
         for (let i = commData.length - 1; i >= 3; i--) {
           const rowChica = String(commData[i][0] || '').trim().toLowerCase();
-          if (rowChica.includes(staff) || staff.includes(rowChica)) {
-            const actualComm = Number(commData[i][5] || 0);
+          if (rowChica.includes(staffNombre) || staffNombre.includes(rowChica)) {
             const actualFact = Number(commData[i][3] || 0);
-            wsComm.getRange(i + 1, 4).setValue(Math.max(0, actualFact - precio));
-            wsComm.getRange(i + 1, 6).setValue(Math.max(0, actualComm - comision));
+            const actualComm = Number(commData[i][5] || 0);
+            wsComm.getRange(i + 1, 4).setValue(Math.max(0, actualFact - montos.precio));
+            wsComm.getRange(i + 1, 6).setValue(Math.max(0, actualComm - montos.comision));
             break;
           }
         }
-      } catch(e) {}
-    }
+      }
+    } catch(e) {}
 
     return { success: true, eliminado: eliminadoHist };
   } catch(e) {
@@ -4385,54 +4428,71 @@ function handleCompletarAreaTicketMulti(data) {
         secuencia = seqStr.split(',').filter(Boolean);
       }
 
-      // Encontrar el área de esta staff y marcarla completada
+      // Encontrar el área de esta staff y marcarla completada.
+      // Si esUltima=true (Finalizar servicio), marcar TODAS las áreas de esta staff
+      // porque pudo haber tomado varios servicios con "Continuar siguiente".
       var areaCompletadaIdx = -1;
       var areaCompletadaKey = '';
+      var esUltima = data.esUltima === true;
+
+      // Leer % comisión de esta staff una sola vez
+      var pctStaff = 0.3;
+      try {
+        var wsComStaff = getSheet('Comisiones');
+        var comDataStaff = wsComStaff.getDataRange().getValues();
+        for (var cj = 4; cj < comDataStaff.length; cj++) {
+          if (String(comDataStaff[cj][0]||'').trim() === data.chicaNombre) {
+            if (String(comDataStaff[cj][1]||'').toLowerCase().includes('facial') ||
+                String(comDataStaff[cj][4]||'').includes('40')) pctStaff = 0.4;
+            break;
+          }
+        }
+      } catch(ePct2) {}
+
       for (var a = 0; a < 4; a++) {
         var base = TM_AREA_COL[a];
         if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
+        var estAreaActual = String(rows[i][base + 3] || '').trim();
+
+        // Registrar clave del primer área completada (para la secuencia)
+        if (areaCompletadaIdx === -1) {
+          areaCompletadaIdx = a;
+          var rawTent = String(rows[i][base] || '');
+          areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
+        }
+
+        // Si ya estaba Completado, no volver a escribir en HistorialOwner
+        if (estAreaActual === 'Completado') {
+          if (!esUltima) break;
+          continue;
+        }
+
         ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
-        areaCompletadaIdx = a;
-        // Extraer área key del tentativo (formato "cejas||servicio")
-        var rawTent = String(rows[i][base] || '');
-        areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
         var precioArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
         try { updateComision(data.chicaNombre, precioArea); } catch(e2) {}
-        // Registrar en HistorialOwner para que aparezca en "Servicios de hoy" de la staff
+
+        // Registrar en HistorialOwner (solo si no estaba ya Completado)
         try {
           var wsHO = getSheet('HistorialOwner');
           var servicioArea = String(rows[i][base + 1] || rows[i][base] || '').replace(/.*\|\|/, '');
           var horaAhora = Utilities.formatDate(new Date(), tz, 'HH:mm');
           var areaStr2 = String(rows[i][base] || '').replace(/\|\|.*/, '') || 'multi';
-          // Determinar comisión según área (40% facial, 30% resto)
-          var pctHO = 0.3;
-          try {
-            var wsComHO = getSheet('Comisiones');
-            var comDataHO = wsComHO.getDataRange().getValues();
-            for (var ci = 4; ci < comDataHO.length; ci++) {
-              if (String(comDataHO[ci][0]||'').trim() === data.chicaNombre) {
-                var areaHO = String(comDataHO[ci][1]||'').toLowerCase();
-                var pctStrHO = String(comDataHO[ci][4]||'');
-                if (areaHO.includes('facial') || pctStrHO.includes('40')) pctHO = 0.4;
-                break;
-              }
-            }
-          } catch(ePct) {}
           wsHO.appendRow([
             Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy'),
             horaAhora,
-            String(rows[i][3] || ''), // código cliente
-            String(rows[i][4] || ''), // nombre cliente
+            String(rows[i][3] || ''),
+            String(rows[i][4] || ''),
             '',
             servicioArea || 'Servicio multi',
             areaStr2,
             data.chicaNombre,
             precioArea,
-            Math.round(precioArea * pctHO * 100) / 100,
+            Math.round(precioArea * pctStaff * 100) / 100,
             'Pendiente cobro'
           ]);
         } catch(eHO) {}
-        break;
+
+        if (!esUltima) break; // modo normal: solo la primera área
       }
 
       // Determinar siguiente área usando la secuencia
@@ -4443,9 +4503,9 @@ function handleCompletarAreaTicketMulti(data) {
         var tent2  = String(rows[i][base2] || '').trim();
         if (!tent2) continue;
         var est2   = String(rows[i][base2 + 3] || '').trim();
-        var tent2Label = tent2.indexOf("||") !== -1 ? tent2.split("||")[1] : tent2;
-        var precio2    = Number(rows[i][TM_PRECIO_COL[a2]] || 0);
         var aKey2  = tent2.indexOf('||') !== -1 ? tent2.split('||')[0] : '';
+        var tent2Label = tent2.indexOf('||') !== -1 ? tent2.split('||')[1] : tent2;
+        var precio2    = Number(rows[i][TM_PRECIO_COL[a2]] || 0);
         areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2, tentativo: tent2Label, precio: precio2 });
       }
 
@@ -4480,19 +4540,8 @@ function handleCompletarAreaTicketMulti(data) {
         if (data.desgloseCompleto) {
           try { ws.getRange(rowNum, 37).setValue(JSON.stringify(data.desgloseCompleto)); } catch(eD) {}
         }
-        try {
-          var wsHist = getSheet('HistorialOwner');
-          wsHist.appendRow([
-            rows[i][1],
-            Utilities.formatDate(new Date(), tz, 'HH:mm'),
-            rows[i][3], rows[i][4], '',
-            'Ticket Multi (' + String(rows[i][0]) + ')',
-            'multi', 'Varios',
-            Number(rows[i][35] || 0),
-            Number(rows[i][34] || 0),
-            'Pendiente cobro'
-          ]);
-        } catch(eH) {}
+        // NO escribir en HistorialOwner aquí — cada área ya se registró individualmente
+        // en el loop anterior. Escribir aquí genera duplicados en "Servicios de hoy".
       } else if (siguienteArea !== null) {
         // Hay siguiente área — marcarla como "Esperando" para que aparezca en lista
         // y limpiar el staff anterior de esa área (queda libre para tomar)
@@ -4516,61 +4565,50 @@ function handleCompletarAreaTicketMulti(data) {
   } catch(e) { return { success: false, message: String(e) }; }
 }
 
-
 // ─── handleCompletarYTomarSiguienteAreaTM ────────────────────────────────────
-// La staff completa su área actual Y toma la siguiente del mismo TM sin salir.
-// Es un alias enriquecido de handleCompletarAreaTicketMulti que además
-// actualiza el estado del área siguiente a "En servicio" y la asigna a la misma staff.
+// "Continuar siguiente servicio" — desbloquea el siguiente servicio del TM
+// para que la misma staff lo tome sin salir de la clienta.
 function handleCompletarYTomarSiguienteAreaTM(data) {
-  // 1. Completar el área actual (marca Completado, escribe HistorialOwner, etc.)
   var resultCompletar = handleCompletarAreaTicketMulti(data);
   if (!resultCompletar.success) return resultCompletar;
   if (resultCompletar.todasCompletadas) return resultCompletar;
 
-  // 2. Tomar la siguiente área: asignar a la misma staff y cambiar estado a "En servicio"
   try {
     var ws   = getTMSheet();
     var rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    var tz   = 'America/Guayaquil';
-    var hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+    var hora = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
 
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() !== data.idEspera) continue;
       var rowNum = i + 3;
-
-      // Buscar la primera área en estado "Esperando" (la que acaba de liberarse)
       for (var a = 0; a < 4; a++) {
         var base = TM_AREA_COL[a];
         var tent = String(rows[i][base] || '').trim();
         if (!tent) continue;
-        var est  = String(rows[i][base + 3] || '').trim();
-        if (est !== 'Esperando') continue;
+        if (String(rows[i][base + 3] || '').trim() !== 'Esperando') continue;
 
-        // Asignar esta staff al área y ponerla "En servicio"
-        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre || ''); // staff
-        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');          // estado
-        ws.getRange(rowNum, base + 4 + 1).setValue(hora);                       // hora tomada
-        ws.getRange(rowNum, 6).setValue('En servicio');                      // estado global TM
+        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre || '');
+        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');
+        ws.getRange(rowNum, base + 4 + 1).setValue(hora);
+        ws.getRange(rowNum, 6).setValue('En servicio');
 
         var tentLabel = tent.indexOf('||') !== -1 ? tent.split('||')[1] : tent;
-        var precio    = Number(rows[i][TM_PRECIO_COL[a]] || 0);
-
         return {
-          success         : true,
-          todasCompletadas: false,
-          siguienteArea   : tentLabel,
-          siguientePrecio : precio,
-          areasPendientes : resultCompletar.areasPendientes
+          success          : true,
+          todasCompletadas : false,
+          siguienteArea    : tentLabel,
+          siguientePrecio  : Number(rows[i][TM_PRECIO_COL[a]] || 0),
+          areasPendientes  : resultCompletar.areasPendientes
         };
       }
       break;
     }
   } catch(eT) {}
 
-  // Si no se pudo asignar, devolver igual el resultado de completar
   return resultCompletar;
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
 function handleConfirmarCobroMulti(data) {
   try {
     const ws = getTMSheet();
