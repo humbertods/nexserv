@@ -964,7 +964,7 @@ function handleGetListaCompleta() {
       precioRegular: row[15] || row[14] || row[12] || '0',  // P=precioRegular acum., O=precioPromo, M=total
       secuencia: (function(){ try { return JSON.parse(row[16] || '[]'); } catch(e) { return []; } })(),
       serviciosDetalle: (function(){ try { return row[18] ? JSON.parse(row[18]) : null; } catch(e) { return null; } })(),
-      promasExtra: (function(){ try { return row[21] ? JSON.parse(row[21]) : []; } catch(e) { return []; } })(),
+      promasExtra: (function(){ try { return JSON.parse(row[17] || '[]'); } catch(e) { return []; } })(), // col R = promasExtra (2a y 3a promo)
       esTop: esTop
     };
 

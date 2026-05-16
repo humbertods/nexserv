@@ -4172,6 +4172,11 @@ if ('caches' in window) {
         sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
       }
     } catch(eS) {}
+    try {
+      if (window._takingPromasExtra.length > 0) {
+        sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
+      }
+    } catch(eS) {}
     
     // Cargar clienta normalmente
     await loadClientAfterTake();
@@ -5566,6 +5571,10 @@ if ('caches' in window) {
           const _idEsperaAct = window._as1IdEspera || '';
           if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
         } catch(eS2) {}
+        try {
+          const _idEsperaAct = window._as1IdEspera || '';
+          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
+        } catch(eS2) {}
         const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
         const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
         const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
@@ -6441,6 +6450,11 @@ if ('caches' in window) {
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
               saveActivePromos(); // persistir en sessionStorage
+              // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
+              if (a1.promasExtra && a1.promasExtra.length > 0) {
+                window._takingPromasExtra = a1.promasExtra;
+                try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
+              }
               // Actualizar botones de finalización con opciones de promo
               setTimeout(() => updateFinishButtons(1), 300);
             }
