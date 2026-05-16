@@ -3145,13 +3145,13 @@ if ('caches' in window) {
     const msg = `¿Eliminar este registro?\n\n• Cliente: ${sv.cliente}\n• Servicio: ${sv.servicio}\n• Monto: $${sv.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
     if (!confirm(msg)) return;
     eliminarServicio({
-      nombre: sv.cliente,
-      servicio: sv.servicio,
-      chica: sv.staff || sv.chica || '',
-      precio: sv.precio || 0,
-      comision: sv.comision || 0,
-      fecha: sv.fecha || '',
-      hora: sv.hora || ''
+      nombre:   sv.cliente || sv.nombre || '',
+      servicio: sv.servicio || '',
+      chica:    sv.staff || sv.chica || '',
+      precio:   Number(sv.precio || 0),
+      comision: Number(sv.comision || 0),
+      fecha:    sv.fecha || '',
+      hora:     sv.hora || ''
     });
   }
 
@@ -3334,6 +3334,12 @@ if ('caches' in window) {
             ➡️ Continuar siguiente área
           </button>`;
       }
+      // Botón "Cobrar promo completa": la clienta paga el precio de la promo aunque
+      // no haga todos los servicios. TODO el valor se asigna a esta staff.
+      html += `
+        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);border:none;" onclick="cobrarPromoCompleta(${slot1?1:2})">
+          🎁 Cobrar promo completa ($${Number(promo.price || 0)})
+        </button>`;
       html += `
         <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
           💰 Mandar a cobrar (solo mi parte)
@@ -4791,13 +4797,7 @@ if ('caches' in window) {
       : (document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '');
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
-
-    // ── Para SP compartido: el total guardado en el sheet debe ser SOLO el de esta staff.
-    // Las partes de otras staffs ya están guardadas en serviciosDetalle del SP.
-    // NO sumar el total de Diana aquí — eso duplicaría el valor en col M.
-    // El total acumulado real (para cobro) se calcula en openCobrar desde el desglose.
     const totalEstaStaff = Number(total || 0);
-
     try {
       const payload = {
         chicaNombre   : user.name,
@@ -4862,6 +4862,70 @@ if ('caches' in window) {
     await new Promise(r => setTimeout(r, 100));
     await finishAndSend();
   }
+
+  // ── cobrarPromoCompleta ────────────────────────────────────────────────────
+  // La clienta paga el precio de la promo completa aunque no haga todos los servicios.
+  // Todo el valor de la promo se asigna a esta staff y se manda a cobro directo.
+  async function cobrarPromoCompleta(slot) {
+    slot = slot || window._finishingSlot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const promoData  = activePromos[clientKey] || window._finishPromoData;
+
+    if (!promoData || !promoData.promo) {
+      alert('No hay datos de promo para esta clienta.');
+      return;
+    }
+
+    const promo          = promoData.promo;
+    const precioPromo    = Number(promo.price   || 0); // precio con descuento promo
+    const precioRegular  = Number(promo.regular || promo.price || 0); // precio sin promo
+    const promoNombre    = promo.name || 'Promo';
+    const idEspera       = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clienteCodigo  = slot === 1 ? (window._as1Client   || '') : (window._as2Client   || '');
+
+    // Confirmar con la staff
+    const msg = `¿Cobrar promo completa "${promoNombre}" a nombre de ${user.name}?\n\n` +
+      `• Precio promo: $${precioPromo}\n` +
+      `• Todo el valor se asigna a ${user.name}\n` +
+      `• La clienta va directamente a cobro`;
+    if (!confirm(msg)) return;
+
+    // Reemplazar slotServices con el precio completo de la promo para esta staff
+    slotServices[slot] = [{
+      name   : promoNombre,
+      price  : precioPromo,
+      area   : user.area || '',
+      status : 'aprobado'
+    }];
+
+    // Construir _finishingData con precio total de promo
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey      : clientKey,
+      clientName     : clientName,
+      svcNames       : promoNombre,
+      total          : String(precioPromo),
+      promoNombre    : promoNombre,
+      precioRegular  : String(precioRegular),
+      idEspera       : idEspera,
+      clienteCodigo  : clienteCodigo,
+      areasExtras    : [],
+      promasExtraPendientes: [],
+      _promoCompleta : true  // flag para distinguir este flujo
+    };
+    window._finishFullPromo = true;
+
+    showToast('⏳ Enviando a cobro...');
+    try {
+      await finishAndSend();
+    } catch(e) {
+      alert('Error al enviar a cobro: ' + e.message);
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   function showConfirmServiceModal(slot) {
     const slotStr = String(slot);
@@ -7312,14 +7376,12 @@ if ('caches' in window) {
           cobrarList.innerHTML = porCobrar.map(p => {
             const esTM = p.fuente === 'TicketMulti';
             let desgloseData = p.serviciosDetalle;
-            // Para SP: marcar partes ya completadas (staffs distintas a la última) como congeladas
             if (desgloseData && desgloseData.length > 0 && !esTM) {
               const staffsEnDesglose = [...new Set(desgloseData.map(d => d.staff))];
               const ultimaStaff = staffsEnDesglose[staffsEnDesglose.length - 1];
               desgloseData = desgloseData.map(d => ({
                 ...d,
                 congelado: d.staff !== ultimaStaff,
-                // montoNormal: extras sin promo tienen montoNormal = monto; la promo usa su precio normal
                 montoNormal: d.montoNormal || d.monto
               }));
             }
@@ -8105,13 +8167,9 @@ if ('caches' in window) {
       `).join('');
       const subtotalNum = desglose.reduce((s, d) => s + Number(d.monto || 0), 0);
       subtotalEl.textContent = '$' + subtotalNum.toFixed(2);
-      // _cobrarTotalPromo = subtotal con promo (efectivo/transferencia)
       window._cobrarTotalPromo = subtotalNum;
-      // _cobrarTotalRegular = suma de precios normales por línea
-      // Si una línea tiene montoNormal (parte de promo), usar ese; si no, usar monto (extras sin descuento)
       const subtotalNormal = desglose.reduce((s, d) => s + Number(d.montoNormal || d.monto || 0), 0);
       window._cobrarTotalRegular = subtotalNormal > subtotalNum ? subtotalNormal : (Number(precioRegular) || subtotalNum);
-      // Solo mostrar aviso de tarjeta si hay diferencia real (hay promo con descuento)
       window._cobrarTienePromo = window._cobrarTienePromo || (window._cobrarTotalRegular > window._cobrarTotalPromo);
     } else {
       // Modo simple
@@ -8203,21 +8261,44 @@ if ('caches' in window) {
     const totalRegular= window._cobrarTotalRegular || totalPromo;
 
     if (metodo === 'Tarjeta' && tienePromo) {
-      // LEY SUPREMA: tarjeta invalida la promo → precio regular
       aviso.style.display = 'block';
-      const precioPromoDisplay = typeof totalPromo === 'number' ? totalPromo.toFixed(2) : totalPromo;
+      const precioPromoDisplay   = typeof totalPromo   === 'number' ? totalPromo.toFixed(2)   : totalPromo;
       const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
-      document.getElementById('cobrarPrecioPromo').textContent    = '$' + precioPromoDisplay;
-      document.getElementById('cobrarPrecioRegular').textContent  = '$' + precioRegularDisplay;
-      totalEl.textContent   = '$' + precioRegularDisplay;
-      totalEl.style.color   = 'var(--danger)';
+      document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
+      document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
+      totalEl.textContent  = '$' + precioRegularDisplay;
+      totalEl.style.color  = 'var(--danger)';
       promoBanner.style.display = 'none';
-      if (subtotalEl) { subtotalEl.textContent = '$' + totalRegular; subtotalEl.style.color = 'var(--danger)'; }
+      if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
+      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
+        if (itemsEl2) {
+          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
+            const montoReal = Number(d.montoNormal || d.monto || 0);
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
+              <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
+              <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
+              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${montoReal.toFixed(2)}</div></div>`;
+          }).join('');
+        }
+      }
     } else {
       aviso.style.display = 'none';
-      totalEl.textContent   = '$' + totalPromo;
-      totalEl.style.color   = 'var(--accent-deep)';
+      totalEl.textContent  = '$' + totalPromo;
+      totalEl.style.color  = 'var(--accent-deep)';
       if (tienePromo) promoBanner.style.display = 'block';
+      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
+        if (itemsEl2) {
+          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
+            const montoPromo = Number(d.monto || 0);
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
+              <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
+              <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
+              <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${montoPromo.toFixed(2)}</div></div>`;
+          }).join('');
+        }
+      }
       if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
     }
   }
@@ -12429,8 +12510,6 @@ if ('caches' in window) {
     const n = String(svcName || '').toLowerCase()
       .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
       .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
-    // Solo activar ficha para: "cejas efecto polvo permanentes" o "retoque de efecto polvo"
-    // NO activar para: "solo pigmento", "combo 9", "depilacion + pigmento"
     const esCejasPolvo  = (n.includes('cejas') || n.includes('ceja')) && n.includes('polvo');
     const esRetoque     = n.includes('retoque') && (n.includes('polvo') || n.includes('efecto'));
     const esEfectoPolvo = n.includes('efecto') && n.includes('polvo') && !n.includes('solo') && !n.includes('combo');
@@ -12578,6 +12657,7 @@ if ('caches' in window) {
   window.completarYTomarSiguiente = completarYTomarSiguiente;
   window.finishAndSend         = finishAndSend;
   window.finishAndSendAll      = finishAndSendAll;
+  window.cobrarPromoCompleta   = cobrarPromoCompleta;
   window.finishAndContinue     = finishAndContinue;
   window.finishAndContinueSameStaff = finishAndContinueSameStaff;
   window.finishSlotAndContinue = finishSlotAndContinue;
