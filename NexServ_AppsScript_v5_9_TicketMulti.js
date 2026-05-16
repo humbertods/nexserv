@@ -797,10 +797,43 @@ function handleFinalizarAtencion(data) {
         ws.getRange(row, 10).setValue('');                   // J: Liberar staff
         ws.getRange(row, 7).setValue(sigArea);               // G: Area de la siguiente promo
         ws.getRange(row, 6).setValue(data.siguientePromo);   // F: Servicio = siguiente promo
-        ws.getRange(row, 13).setValue(data.siguientePromoPrecio || '0'); // M: Total
-        ws.getRange(row, 14).setValue(data.siguientePromo);  // N: PromoNombre
-        ws.getRange(row, 15).setValue(data.siguientePromoPrecio || '0'); // O: PrecioPromo
+        ws.getRange(row, 14).setValue(data.siguientePromo);  // N: PromoNombre siguiente
+        ws.getRange(row, 15).setValue(data.siguientePromoPrecio || '0'); // O: PrecioPromo siguiente
         ws.getRange(row, 16).setValue(data.siguientePromoRegular || data.siguientePromoPrecio || '0'); // P: Regular
+
+        // ── ACUMULAR desglose de servicios completados en col S (idx 18) ─────
+        // Esto congela la parte ya realizada para que Mikaela la vea al cobrar
+        if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
+          try {
+            let desgloseExistente = [];
+            const colS = allData[i][18];
+            if (colS) { try { desgloseExistente = JSON.parse(colS); } catch(eJ) {} }
+            const nuevoDesglose = [...desgloseExistente];
+            data.serviciosDetalle.forEach(function(nuevo) {
+              const yaExiste = nuevoDesglose.some(function(ex) {
+                return ex.staff === nuevo.staff && ex.servicio === nuevo.servicio;
+              });
+              if (!yaExiste) nuevoDesglose.push(nuevo);
+            });
+            ws.getRange(row, 19).setValue(JSON.stringify(nuevoDesglose)); // col S = índice 18 = col 19 (1-based)
+
+            // Actualizar col M (total acumulado) = suma de todo el desglose hasta ahora
+            const totalAcumulado = nuevoDesglose.reduce(function(s, d) { return s + Number(d.monto || 0); }, 0);
+            ws.getRange(row, 13).setValue(totalAcumulado); // M: total acumulado real
+          } catch(eD) {}
+        }
+
+        // ── Actualizar col P (precioRegular acumulado) = suma de regulares de todas las promos ──
+        // Se suma el regular de la promo ya hecha + el regular de la siguiente
+        try {
+          const regularAhora    = Number(data.precioRegular || data.total || 0);
+          const regularSiguiente = Number(data.siguientePromoRegular || data.siguientePromoPrecio || 0);
+          // Sumar al regular ya existente en el ticket (de promos anteriores)
+          const regularExistente = Number(allData[i][15] || 0);
+          const totalRegular = regularExistente + regularSiguiente;
+          ws.getRange(row, 16).setValue(totalRegular > 0 ? totalRegular : (regularAhora + regularSiguiente));
+        } catch(eR) {}
+
         // V: Actualizar promasExtra restantes (sin la que se acaba de activar) — col 22
         const promasRestantes = data.promasExtraRestantes ? JSON.stringify(data.promasExtraRestantes) : '';
         ws.getRange(row, 22).setValue(promasRestantes);
@@ -928,9 +961,10 @@ function handleGetListaCompleta() {
       observaciones: row[11] || '',
       total: row[12] || '0',
       promoNombre: row[13] || '',
-      precioRegular: row[15] || row[14] || row[12] || '0',  // P=precioRegular, O=precioPromo, M=total
+      precioRegular: row[15] || row[14] || row[12] || '0',  // P=precioRegular acum., O=precioPromo, M=total
       secuencia: (function(){ try { return JSON.parse(row[16] || '[]'); } catch(e) { return []; } })(),
       serviciosDetalle: (function(){ try { return row[18] ? JSON.parse(row[18]) : null; } catch(e) { return null; } })(),
+      promasExtra: (function(){ try { return row[21] ? JSON.parse(row[21]) : []; } catch(e) { return []; } })(),
       esTop: esTop
     };
 
@@ -1430,19 +1464,64 @@ function handleConfirmarCobro(data) {
       const pct = areaStr.includes('facial') ? 0.4 : 0.3;
       const comision = Math.round(montoParaComision * pct * 100) / 100;
       
-      // Actualizar comisión de la chica que atendió
-      if (chicaNombre && montoParaComision > 0) {
-        updateComision(chicaNombre, montoParaComision);
+      // Actualizar comisiones: si hay desglose multi-staff, distribuir por parte
+      try {
+        let desgloseParaComis = [];
+        if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
+          desgloseParaComis = data.serviciosDetalle;
+        } else {
+          const colSComis = allData[i] ? allData[i][18] : null;
+          if (colSComis) { try { desgloseParaComis = JSON.parse(colSComis); } catch(eJ) {} }
+        }
+        if (desgloseParaComis && desgloseParaComis.length > 0) {
+          desgloseParaComis.forEach(function(parte) {
+            const pStaff = String(parte.staff || '');
+            const pMonto = data.metodoPago === 'Tarjeta'
+              ? Number(parte.montoNormal || parte.monto || 0)
+              : Number(parte.monto || 0);
+            if (pStaff && pMonto > 0) {
+              try { updateComision(pStaff, pMonto); } catch(eCom) {}
+            }
+          });
+        } else if (chicaNombre && montoParaComision > 0) {
+          updateComision(chicaNombre, montoParaComision);
+        }
+      } catch(eComis) {
+        if (chicaNombre && montoParaComision > 0) { try { updateComision(chicaNombre, montoParaComision); } catch(e) {} }
       }
       
       // Escribir en HistorialOwner
-      // Columnas: A=Fecha | B=Hora | C=Código | D=Cliente | E=⭐ | F=Servicio | G=Área | H=Chica | I=Valor | J=Comisión
+      // Si hay desglose multi-staff, registrar cada parte individualmente
       try {
         const wsH = getSheet('HistorialOwner');
-        wsH.appendRow([
-          fechaStr, horaStr, codigoCliente, nombreCliente, topStr,
-          servicio, area, chicaNombre, totalCobrado, comision, data.metodoPago || 'Efectivo'
-        ]);
+        let desgloseParaHist = [];
+        if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
+          desgloseParaHist = data.serviciosDetalle;
+        } else {
+          // Intentar leer del Sheet (col S, índice 18)
+          const colSHist = allData[i] ? allData[i][18] : null;
+          if (colSHist) { try { desgloseParaHist = JSON.parse(colSHist); } catch(eJ) {} }
+        }
+
+        if (desgloseParaHist && desgloseParaHist.length > 0) {
+          // Registrar cada parte por su staff
+          desgloseParaHist.forEach(function(parte) {
+            const pStaff = String(parte.staff || chicaNombre);
+            const pServicio = String(parte.servicio || servicio);
+            const pArea   = String(parte.area || area);
+            const pMonto  = data.metodoPago === 'Tarjeta'
+              ? Number(parte.montoNormal || parte.monto || 0)
+              : Number(parte.monto || 0);
+            const pPct    = pArea.toLowerCase().includes('facial') ? 0.4 : 0.3;
+            const pComision = Math.round(pMonto * pPct * 100) / 100;
+            wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, topStr,
+              pServicio, pArea, pStaff, pMonto, pComision, data.metodoPago || 'Efectivo']);
+          });
+        } else {
+          // Sin desglose: entrada simple
+          wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, topStr,
+            servicio, area, chicaNombre, totalCobrado, comision, data.metodoPago || 'Efectivo']);
+        }
       } catch(e) { /* Si falla el historial, no bloquear el cobro */ }
       
       // Escribir en CierresPagos para el historial de Mikaela
@@ -3864,10 +3943,12 @@ function handleConfirmarCobroPromo(data) {
       const chicaNombre   = String(rows[i][9]||'');
       const pct           = area.toLowerCase().includes('facial') ? 0.4 : 0.3;
 
-      // Comisión y actualización: si hay desglose, se maneja por parte en el HistorialOwner
-      // Aquí solo calcular para el caso simple (sin desglose)
+      // Monto para comisión = solo la parte de esta staff
+      // Si pagó con tarjeta y hay promo → calcular proporción del precio normal
       let montoComision;
       if (tipo === 'SP' && metodoPago === 'Tarjeta' && precioNormal > 0 && precioPromo > 0) {
+        // Proporción: precioMiArea representa X% del precioPromo total
+        // La comisión debe ser sobre esa misma proporción del precioNormal
         const proporcion = precioPromo > 0 ? precioMiArea / precioPromo : 1;
         montoComision = Math.round(precioNormal * proporcion * 100) / 100;
       } else {
@@ -3876,29 +3957,7 @@ function handleConfirmarCobroPromo(data) {
       const comision = Math.round(montoComision * pct * 100) / 100;
 
       try { updateVisitaClienta(codigoCliente); } catch(e) {}
-
-      // Actualizar comisiones de CADA staff según el desglose
-      try {
-        const desgloseForComis = String(rows[i][17] || '');
-        let desgloseComisArr = [];
-        if (desgloseForComis) { try { desgloseComisArr = JSON.parse(desgloseForComis); } catch(eJ2) {} }
-        if (desgloseComisArr && desgloseComisArr.length > 0) {
-          const wsComis2 = getSheet('Comisiones');
-          desgloseComisArr.forEach(function(parte) {
-            const partStaff = String(parte.staff || '');
-            const partMonto = metodoPago === 'Tarjeta'
-              ? Number(parte.montoNormal || parte.monto || 0)
-              : Number(parte.monto || 0);
-            if (partStaff && partMonto > 0) {
-              try { updateComision(partStaff, partMonto); } catch(eCom) {}
-            }
-          });
-        } else {
-          if (chicaNombre && montoComision > 0) updateComision(chicaNombre, montoComision);
-        }
-      } catch(eComis) {
-        if (chicaNombre && montoComision > 0) { try { updateComision(chicaNombre, montoComision); } catch(e) {} }
-      }
+      try { if (chicaNombre && montoComision > 0) updateComision(chicaNombre, montoComision); } catch(e) {}
 
       // HistorialOwner — registrar cada parte del desglose individualmente
       try {
@@ -3906,25 +3965,18 @@ function handleConfirmarCobroPromo(data) {
         const desgloseJSON = String(rows[i][17] || '');
         let desgloseArr = [];
         if (desgloseJSON) { try { desgloseArr = JSON.parse(desgloseJSON); } catch(eJ) {} }
-
         if (desgloseArr && desgloseArr.length > 0) {
-          // Registrar cada parte por su staff correspondiente
           desgloseArr.forEach(function(parte) {
-            const partStaff   = String(parte.staff || chicaNombre);
-            const partMonto   = Number(parte.monto || 0);
-            // Para tarjeta: usar montoNormal si existe, si no usar monto
-            const partMontoFinal = metodoPago === 'Tarjeta'
-              ? Number(parte.montoNormal || parte.monto || 0)
-              : partMonto;
-            const partArea    = String(parte.area || area);
-            const partPct     = partArea.toLowerCase().includes('facial') ? 0.4 : 0.3;
-            const partComision = Math.round(partMontoFinal * partPct * 100) / 100;
-            const partServicio = String(parte.servicio || parte.area || servicio);
+            const partStaff = String(parte.staff || chicaNombre);
+            const partMonto = metodoPago === 'Tarjeta'
+              ? Number(parte.montoNormal || parte.monto || 0) : Number(parte.monto || 0);
+            const partArea  = String(parte.area || area);
+            const partPct   = partArea.toLowerCase().includes('facial') ? 0.4 : 0.3;
             wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
-              partServicio, partArea, partStaff, partMontoFinal, partComision, metodoPago]);
+              String(parte.servicio || parte.area || servicio), partArea, partStaff,
+              partMonto, Math.round(partMonto * partPct * 100) / 100, metodoPago]);
           });
         } else {
-          // Sin desglose: registrar la parte de esta staff
           wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, '',
             servicio + ' (promo ' + (String(rows[i][13]||'')) + ')', area,
             chicaNombre, montoComision, comision, metodoPago]);
@@ -4587,7 +4639,6 @@ function handleCompletarAreaTicketMulti(data) {
 }
 
 // ─── handleCompletarYTomarSiguienteAreaTM ─────────────────────────────────────
-// "Continuar siguiente servicio" — desbloquea el siguiente servicio del TM
 function handleCompletarYTomarSiguienteAreaTM(data) {
   var resultCompletar = handleCompletarAreaTicketMulti(data);
   if (!resultCompletar.success) return resultCompletar;
@@ -4609,19 +4660,15 @@ function handleCompletarYTomarSiguienteAreaTM(data) {
         ws.getRange(rowNum, base + 4 + 1).setValue(hora);
         ws.getRange(rowNum, 6).setValue('En servicio');
         var tentLabel = tent.indexOf('||') !== -1 ? tent.split('||')[1] : tent;
-        return {
-          success: true, todasCompletadas: false,
-          siguienteArea: tentLabel,
-          siguientePrecio: Number(rows[i][TM_PRECIO_COL[a]] || 0),
-          areasPendientes: resultCompletar.areasPendientes
-        };
+        return { success: true, todasCompletadas: false,
+          siguienteArea: tentLabel, siguientePrecio: Number(rows[i][TM_PRECIO_COL[a]] || 0),
+          areasPendientes: resultCompletar.areasPendientes };
       }
       break;
     }
   } catch(eT) {}
   return resultCompletar;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 function handleConfirmarCobroMulti(data) {
   try {

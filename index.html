@@ -3915,6 +3915,9 @@ if ('caches' in window) {
     const allowed = AREA_FILTER[user.area] || [];
     
     // Filtrar por área Y por asignación directa
+    // Cachear para recuperación de promasExtra en finishAndSend
+    window._listaEsperaCache = lista;
+
     const myList = lista.filter(w => {
       // Si tiene asignación directa, solo la ve la chica asignada
       if (w.asignadaA && w.asignadaA.trim() !== '') {
@@ -4188,6 +4191,12 @@ if ('caches' in window) {
     // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
     window._takingPromasExtra = takingData ? (takingData.promasExtra || []) : [];
+    // Persistir en sessionStorage para sobrevivir navegación sin recarga completa
+    try {
+      if (window._takingPromasExtra.length > 0) {
+        sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
+      }
+    } catch(eS) {}
     
     // Cargar clienta normalmente
     await loadClientAfterTake();
@@ -5602,6 +5611,10 @@ if ('caches' in window) {
         }
         // Quitar la promo que acabamos de activar de las pendientes
         window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
+        try {
+          const idEsperaAct = window._as1IdEspera || '';
+          if (idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + idEsperaAct, JSON.stringify(window._takingPromasExtra));
+        } catch(eS2) {}
         const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
         const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
         const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
@@ -6062,6 +6075,24 @@ if ('caches' in window) {
     const hayMultiplesServicios = svcsAprobados.length > 1 && !promoData;
 
     // Promos extra pendientes (2a, 3a promo del ticket)
+    // Recuperar desde sessionStorage si _takingPromasExtra está vacío
+    if ((!window._takingPromasExtra || window._takingPromasExtra.length === 0)) {
+      const idEsperaActual = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      if (idEsperaActual) {
+        try {
+          const stored = sessionStorage.getItem('nexserv_promasExtra_' + idEsperaActual);
+          if (stored) window._takingPromasExtra = JSON.parse(stored);
+        } catch(eR) {}
+      }
+      // También intentar desde la listaEspera ya cargada en memoria
+      if ((!window._takingPromasExtra || window._takingPromasExtra.length === 0) && window._listaEsperaCache) {
+        const idEsperaActual2 = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+        const ticketEnLista = (window._listaEsperaCache || []).find(w => w.id === idEsperaActual2);
+        if (ticketEnLista && ticketEnLista.promasExtra && ticketEnLista.promasExtra.length > 0) {
+          window._takingPromasExtra = ticketEnLista.promasExtra;
+        }
+      }
+    }
     const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
 
     // Guardar datos en variable global para usar en las opciones
