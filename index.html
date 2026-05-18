@@ -5991,6 +5991,20 @@ if ('caches' in window) {
             if (!svc.authId) svc.authId = authInBackend.id;
             if (authInBackend.estado === 'aprobado') {
               svc.status = 'aprobado';
+              // Si es promo extra aprobada, registrar como promo activa sin borrar servicios existentes
+              if (svc.esPromoExtra && svc.promoData) {
+                const clientName2 = slot === 1
+                  ? (document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '')
+                  : (document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '');
+                const clientKey2 = normalizeClientKey(clientName2);
+                activePromos[clientKey2] = {
+                  promo: svc.promoData,
+                  startedBy: user?.area || 'cejas',
+                  completedAreas: [],
+                  _metadata: { displayName: clientName2 }
+                };
+                saveActivePromos();
+              }
             } else if (authInBackend.estado === 'rechazado') {
               svc.status = 'rechazado';
             }
@@ -8193,7 +8207,7 @@ if ('caches' in window) {
 
   function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON) {
     window._cobrarId = idEspera;
-    window._cobrarEsMixto = false; // resetear pago mixto
+    window._cobrarEsMixto = false;
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
     window._cobrarTotalRegular = Number(precioRegular) || Number(total) || 0;
@@ -8478,41 +8492,31 @@ if ('caches' in window) {
     // Determinar método de pago (normal o mixto)
     let metodoPagoFinal;
     let totalServiciosFinal;
-
     if (window._cobrarEsMixto) {
       const mixto = window._cobrarMixto || {};
       const suma  = Number(mixto.suma || 0);
       const total = Number(window._cobrarTotalPromo || 0);
       if (Math.abs(suma - total) > 0.05) {
-        const errEl = document.getElementById('pagoMixtoError');
-        if (errEl) { errEl.style.display = 'block'; errEl.textContent = '⚠️ La suma ($' + suma.toFixed(2) + ') no coincide con el total ($' + total.toFixed(2) + ')'; }
-        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
+        const errEl = document.getElementById("pagoMixtoError");
+        if (errEl) { errEl.style.display = "block"; errEl.textContent = "⚠️ La suma ($" + suma.toFixed(2) + ") no coincide con el total ($" + total.toFixed(2) + ")"; }
+        btn.disabled = false; btn.textContent = "✓ Confirmar cobro";
         return;
       }
-      // Construir string: "Mixto:Efectivo:10.00|Transferencia:8.00"
       const partes = [];
-      if (mixto.efectivo > 0)      partes.push('Efectivo:'      + mixto.efectivo.toFixed(2));
-      if (mixto.tarjeta > 0)       partes.push('Tarjeta:'       + mixto.tarjeta.toFixed(2));
-      if (mixto.transferencia > 0) partes.push('Transferencia:' + mixto.transferencia.toFixed(2));
-      metodoPagoFinal = partes.length === 1 ? partes[0].split(':')[0] : 'Mixto:' + partes.join('|');
-      // Si hay tarjeta en el mix con promo → parte de tarjeta va a precio normal
+      if (mixto.efectivo > 0)      partes.push("Efectivo:"      + mixto.efectivo.toFixed(2));
+      if (mixto.tarjeta > 0)       partes.push("Tarjeta:"       + mixto.tarjeta.toFixed(2));
+      if (mixto.transferencia > 0) partes.push("Transferencia:" + mixto.transferencia.toFixed(2));
+      metodoPagoFinal = partes.length === 1 ? partes[0].split(":")[0] : "Mixto:" + partes.join("|");
       if (mixto.tarjeta > 0 && window._cobrarTienePromo) {
         const totalNormal = window._cobrarTotalRegular || total;
         const ratioTarjeta = mixto.tarjeta / total;
         totalServiciosFinal = Math.round((mixto.efectivo + mixto.transferencia + ratioTarjeta * totalNormal) * 100) / 100;
-      } else {
-        totalServiciosFinal = suma;
-      }
+      } else { totalServiciosFinal = suma; }
     } else {
-      // Pago normal — lógica original
       metodoPagoFinal = window._cobrarPago;
-      if (!metodoPagoFinal) { btn.disabled = false; btn.textContent = '✓ Confirmar cobro'; alert('Seleccioná el método de pago'); return; }
-      totalServiciosFinal = (window._cobrarTienePromo && metodoPagoFinal === 'Tarjeta')
-        ? window._cobrarTotalRegular
-        : window._cobrarTotalPromo;
+      if (!metodoPagoFinal) { btn.disabled = false; btn.textContent = "✓ Confirmar cobro"; alert("Seleccioná el método de pago"); return; }
+      totalServiciosFinal = (window._cobrarTienePromo && metodoPagoFinal === "Tarjeta") ? window._cobrarTotalRegular : window._cobrarTotalPromo;
     }
-
-    // Si tiene promo y paga con tarjeta, cobrar precio regular
     const totalServicios = totalServiciosFinal;
 
     // Sumar productos si hay
@@ -11268,63 +11272,37 @@ if ('caches' in window) {
     `).join('');
   }
 
-  function applyPromoFromAddSvc(promoIdx) {
+  async function applyPromoFromAddSvc(promoIdx) {
     const promoData = (window._addSvcPromosList || PROMOS.filter(p => p.active))[promoIdx];
     if (!promoData) return;
     const slot = window._addServiceSlot || 1;
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-    const clientKey = normalizeClientKey(clientName);
-    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
-
-    // Limpiar servicios anteriores del slot y aplicar la promo
-    slotServices[slot] = [];
-    const myArea = user?.area || 'cejas';
+    const myArea  = user?.area || 'cejas';
     const myPrice = getMyPromoPrice(promoData, myArea);
 
-    slotServices[slot].push({
-      name: promoData.name,
-      area: myArea,
-      price: myPrice,
-      status: undefined
-    });
-
-    // Registrar promo activa usando el clientKey correcto
-    activePromos[clientKey] = {
-      promo: promoData,
-      startedBy: myArea,
-      completedAreas: [],
-      _metadata: { displayName: clientName }
+    // ── Solicitar autorización a Mikaela (igual que servicio extra) ──
+    // NO aplicar directamente — Mikaela debe aprobar la promo adicional
+    // Construir como servicio extra con tipo promo
+    const svcPromo = {
+      name   : promoData.name,
+      area   : myArea,
+      price  : myPrice,
+      note   : 'Promo adicional solicitada por ' + (user?.name || 'Staff'),
+      status : 'pendiente',
+      esPromoExtra: true,
+      promoData: promoData,
+      requestedBy: user?.name || 'Staff',
+      requestedAt: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
     };
-    saveActivePromos();
 
-    renderServicesForSlot(slot);
-    document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
-    document.getElementById('as' + slot + 'SvcCount').textContent = '1';
-
-    // Actualizar Sheet directamente con promoNombre + precioRegular
-    console.log('🔍 applyPromoFromAddSvc — idEspera:', idEspera, '| clientName:', clientName, '| promo:', promoData.name, '| regular:', promoData.regular);
-    if (idEspera) {
-      apiPost('updateServiciosAtencion', {
-        idEspera      : idEspera,
-        chicaNombre   : user.name,
-        clienteNombre : clientName,
-        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
-        servicios     : promoData.name,
-        total         : String(myPrice),
-        promoNombre   : promoData.name,
-        tipo          : 'SP',
-        precioPromo   : String(myPrice),
-        precioRegular : String(promoData.regular || promoData.price || myPrice)
-      }).then(r => {
-        console.log('✅ Promo SP actualizada en Sheet:', r);
-      }).catch(e => {
-        console.warn('⚠ Error actualizando promo en Sheet:', e);
-      });
+    // Agregar al slot como pendiente (NO borrar servicios existentes)
+    if (addServiceToSlot(slot, svcPromo)) {
+      closeModal();
+      await sendAuthorizationRequest(clientName, svcPromo, slot);
+      recargarAutorizacionesStaff(slot);
+      alert('⏳ Solicitud de promo "' + promoData.name + '" enviada a Mikaela para aprobar.');
     }
-
-    closeModal();
-    showToast('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
   }
 
   function openAddService(slot) {
