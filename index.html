@@ -632,11 +632,59 @@ if ('caches' in window) {
         <!-- TOTAL -->
         <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
         
-        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
-          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
-          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
+        <!-- Toggle pago normal / mixto -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button id="pagoNormalTab" onclick="togglePagoMixto(false)" style="flex:1;padding:10px;border-radius:var(--radius-pill);border:2px solid var(--success);background:var(--success);color:white;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">💳 Pago normal</button>
+          <button id="pagoMixtoTab" onclick="togglePagoMixto(true)" style="flex:1;padding:10px;border-radius:var(--radius-pill);border:2px solid var(--line);background:var(--bg-card);color:var(--ink);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🔀 Pago mixto</button>
+        </div>
+
+        <!-- Pago normal (3 botones) -->
+        <div id="pagoNormalSection">
+          <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
+          <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
+            <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
+            <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
+          </div>
+        </div>
+
+        <!-- Pago mixto (oculto por defecto) -->
+        <div id="pagoMixtoSection" style="display:none;margin-bottom:20px;">
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Dividí el total entre los métodos. La suma debe ser igual al total.</div>
+          <div id="pagoMixtoError" style="display:none;background:var(--danger-bg);border:1.5px solid var(--danger);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;color:var(--danger);margin-bottom:10px;text-align:center;"></div>
+          <div style="display:grid;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:20px;">💵</span>
+              <span style="font-size:13px;font-weight:700;width:90px;">Efectivo</span>
+              <div style="flex:1;position:relative;">
+                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--ink-soft);">$</span>
+                <input id="mixtoEfectivo" type="number" min="0" step="0.01" placeholder="0.00" oninput="recalcularMixto()"
+                  style="width:100%;padding:10px 10px 10px 24px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;box-sizing:border-box;">
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:20px;">💳</span>
+              <span style="font-size:13px;font-weight:700;width:90px;">Tarjeta</span>
+              <div style="flex:1;position:relative;">
+                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--ink-soft);">$</span>
+                <input id="mixtoTarjeta" type="number" min="0" step="0.01" placeholder="0.00" oninput="recalcularMixto()"
+                  style="width:100%;padding:10px 10px 10px 24px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;box-sizing:border-box;">
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:20px;">📱</span>
+              <span style="font-size:13px;font-weight:700;width:90px;">Transfer.</span>
+              <div style="flex:1;position:relative;">
+                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--ink-soft);">$</span>
+                <input id="mixtoTransferencia" type="number" min="0" step="0.01" placeholder="0.00" oninput="recalcularMixto()"
+                  style="width:100%;padding:10px 10px 10px 24px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;box-sizing:border-box;">
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:10px 14px;background:var(--bg);border-radius:10px;border:1.5px solid var(--line);">
+            <span style="font-size:13px;font-weight:600;color:var(--ink-soft);">Suma ingresada</span>
+            <span id="mixtoSuma" style="font-size:16px;font-weight:800;color:var(--accent-deep);">$0.00</span>
+          </div>
         </div>
         
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
@@ -3335,11 +3383,19 @@ if ('caches' in window) {
             🏁 Promo completada — cobrar total
           </button>`;
       } else {
-        // Todavía falta otra área del combo
-        html += `<button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">➡️ Continuar siguiente área</button>`;
+        html += `
+          <button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slot1?1:2})">
+            ➡️ Continuar siguiente área
+          </button>`;
       }
-      html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
-      html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">💰 Mandar a cobrar (solo mi parte)</button>`;
+      html += `
+        <button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);border:none;" onclick="cobrarPromoCompleta(${slot1?1:2})">
+          🎁 Cobrar promo completa ($${Number(promo.price || 0)})
+        </button>`;
+      html += `
+        <button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">
+          💰 Mandar a cobrar (solo mi parte)
+        </button>`;
     }
     btnContainer.innerHTML = html;
   }
@@ -4167,11 +4223,6 @@ if ('caches' in window) {
     // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
     window._takingPromasExtra = takingData ? (takingData.promasExtra || []) : [];
-    try {
-      if (window._takingPromasExtra.length > 0) {
-        sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
-      }
-    } catch(eS) {}
     try {
       if (window._takingPromasExtra.length > 0) {
         sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
@@ -5571,10 +5622,6 @@ if ('caches' in window) {
           const _idEsperaAct = window._as1IdEspera || '';
           if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
         } catch(eS2) {}
-        try {
-          const _idEsperaAct = window._as1IdEspera || '';
-          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
-        } catch(eS2) {}
         const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
         const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
         const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
@@ -6450,11 +6497,6 @@ if ('caches' in window) {
                 _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
               };
               saveActivePromos(); // persistir en sessionStorage
-              // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
-              if (a1.promasExtra && a1.promasExtra.length > 0) {
-                window._takingPromasExtra = a1.promasExtra;
-                try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
-              }
               // Actualizar botones de finalización con opciones de promo
               setTimeout(() => updateFinishButtons(1), 300);
             }
@@ -8151,6 +8193,7 @@ if ('caches' in window) {
 
   function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON) {
     window._cobrarId = idEspera;
+    window._cobrarEsMixto = false; // resetear pago mixto
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
     window._cobrarTotalRegular = Number(precioRegular) || Number(total) || 0;
@@ -8265,6 +8308,71 @@ if ('caches' in window) {
     document.getElementById('cobrarModal').classList.add('active');
   }
 
+  // ── Pago Mixto ───────────────────────────────────────────────────────────────
+  function togglePagoMixto(esMixto) {
+    window._cobrarEsMixto = esMixto;
+    const normalTab  = document.getElementById('pagoNormalTab');
+    const mixtoTab   = document.getElementById('pagoMixtoTab');
+    const normalSec  = document.getElementById('pagoNormalSection');
+    const mixtoSec   = document.getElementById('pagoMixtoSection');
+    if (esMixto) {
+      mixtoTab.style.background  = 'var(--accent-deep)';
+      mixtoTab.style.color       = 'white';
+      mixtoTab.style.borderColor = 'var(--accent-deep)';
+      normalTab.style.background = 'var(--bg-card)';
+      normalTab.style.color      = 'var(--ink)';
+      normalTab.style.borderColor= 'var(--line)';
+      normalSec.style.display    = 'none';
+      mixtoSec.style.display     = 'block';
+      // Pre-llenar efectivo con el total
+      const total = window._cobrarTotalPromo || 0;
+      document.getElementById('mixtoEfectivo').value = total > 0 ? total.toFixed(2) : '';
+      document.getElementById('mixtoTarjeta').value  = '';
+      document.getElementById('mixtoTransferencia').value = '';
+      recalcularMixto();
+    } else {
+      normalTab.style.background  = 'var(--success)';
+      normalTab.style.color       = 'white';
+      normalTab.style.borderColor = 'var(--success)';
+      mixtoTab.style.background   = 'var(--bg-card)';
+      mixtoTab.style.color        = 'var(--ink)';
+      mixtoTab.style.borderColor  = 'var(--line)';
+      normalSec.style.display     = 'block';
+      mixtoSec.style.display      = 'none';
+    }
+  }
+
+  function recalcularMixto() {
+    const total  = Number(window._cobrarTotalPromo || 0);
+    const ef     = Number(document.getElementById('mixtoEfectivo')?.value     || 0);
+    const ta     = Number(document.getElementById('mixtoTarjeta')?.value      || 0);
+    const tr     = Number(document.getElementById('mixtoTransferencia')?.value|| 0);
+    const suma   = Math.round((ef + ta + tr) * 100) / 100;
+    const sumaEl = document.getElementById('mixtoSuma');
+    const errEl  = document.getElementById('pagoMixtoError');
+    if (sumaEl) sumaEl.textContent = '$' + suma.toFixed(2);
+
+    // Color feedback
+    const diff = Math.abs(suma - total);
+    if (sumaEl) sumaEl.style.color = diff < 0.01 ? 'var(--success)' : 'var(--danger)';
+
+    // Aviso si tarjeta y hay promo
+    if (ta > 0 && window._cobrarTienePromo) {
+      // La parte de tarjeta usa precio normal proporcional
+      const totalNormal = window._cobrarTotalRegular || total;
+      if (errEl) {
+        errEl.style.display = 'block';
+        errEl.textContent = '⚠️ La parte con tarjeta ($' + ta.toFixed(2) + ') se cobra a precio normal.';
+      }
+    } else {
+      if (errEl) errEl.style.display = 'none';
+    }
+
+    // Guardar desglose mixto
+    window._cobrarMixto = { efectivo: ef, tarjeta: ta, transferencia: tr, suma };
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
+
   function selectPago(metodo, btn) {
     // Unificar ambas variables de pago (cobro individual y grupal usan la misma)
     window._cobrarPago = metodo;
@@ -8367,10 +8475,45 @@ if ('caches' in window) {
       return;
     }
 
+    // Determinar método de pago (normal o mixto)
+    let metodoPagoFinal;
+    let totalServiciosFinal;
+
+    if (window._cobrarEsMixto) {
+      const mixto = window._cobrarMixto || {};
+      const suma  = Number(mixto.suma || 0);
+      const total = Number(window._cobrarTotalPromo || 0);
+      if (Math.abs(suma - total) > 0.05) {
+        const errEl = document.getElementById('pagoMixtoError');
+        if (errEl) { errEl.style.display = 'block'; errEl.textContent = '⚠️ La suma ($' + suma.toFixed(2) + ') no coincide con el total ($' + total.toFixed(2) + ')'; }
+        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
+        return;
+      }
+      // Construir string: "Mixto:Efectivo:10.00|Transferencia:8.00"
+      const partes = [];
+      if (mixto.efectivo > 0)      partes.push('Efectivo:'      + mixto.efectivo.toFixed(2));
+      if (mixto.tarjeta > 0)       partes.push('Tarjeta:'       + mixto.tarjeta.toFixed(2));
+      if (mixto.transferencia > 0) partes.push('Transferencia:' + mixto.transferencia.toFixed(2));
+      metodoPagoFinal = partes.length === 1 ? partes[0].split(':')[0] : 'Mixto:' + partes.join('|');
+      // Si hay tarjeta en el mix con promo → parte de tarjeta va a precio normal
+      if (mixto.tarjeta > 0 && window._cobrarTienePromo) {
+        const totalNormal = window._cobrarTotalRegular || total;
+        const ratioTarjeta = mixto.tarjeta / total;
+        totalServiciosFinal = Math.round((mixto.efectivo + mixto.transferencia + ratioTarjeta * totalNormal) * 100) / 100;
+      } else {
+        totalServiciosFinal = suma;
+      }
+    } else {
+      // Pago normal — lógica original
+      metodoPagoFinal = window._cobrarPago;
+      if (!metodoPagoFinal) { btn.disabled = false; btn.textContent = '✓ Confirmar cobro'; alert('Seleccioná el método de pago'); return; }
+      totalServiciosFinal = (window._cobrarTienePromo && metodoPagoFinal === 'Tarjeta')
+        ? window._cobrarTotalRegular
+        : window._cobrarTotalPromo;
+    }
+
     // Si tiene promo y paga con tarjeta, cobrar precio regular
-    const totalServicios = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
-      ? window._cobrarTotalRegular
-      : window._cobrarTotalPromo;
+    const totalServicios = totalServiciosFinal;
 
     // Sumar productos si hay
     const totalProductos = window._cobrarTotalProductos || 0;
@@ -8380,7 +8523,7 @@ if ('caches' in window) {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
-        metodoPago: window._cobrarPago,
+        metodoPago: metodoPagoFinal,
         totalCobrado: totalFinal,
         totalServicios: totalServicios,
         totalProductos: totalProductos
