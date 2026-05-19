@@ -633,37 +633,12 @@ if ('caches' in window) {
         <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
         
         <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
-          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; min-width: 70px; padding: 12px 8px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
-          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; min-width: 70px; padding: 12px 8px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
-          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; min-width: 70px; padding: 12px 8px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
-          <button onclick="selectPago('Mixto', this)" class="pago-btn" style="flex: 1; min-width: 70px; padding: 12px 8px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;">🔀 Mixto</button>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
+          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
+          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
         </div>
-
-        <!-- Panel pago mixto -->
-        <div id="cobrarMixtoPanel" style="display:none; background: var(--bg); border-radius: 16px; padding: 14px; margin-bottom: 14px; border: 1.5px solid var(--line);">
-          <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 10px; letter-spacing: 0.04em;">DETALLE PAGO MIXTO &mdash; <span id="mixtoTotalRef" style="color:var(--accent-deep);"></span></div>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:13px; width:90px; font-weight:600;">💵 Efectivo</span>
-              <input type="number" id="mixtoEfectivo" min="0" step="0.01" placeholder="0.00" oninput="recalcMixto()" style="flex:1; padding:10px 12px; border-radius:12px; border:1.5px solid var(--line); font-family:inherit; font-size:15px; font-weight:700; background:var(--bg-card);">
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:13px; width:90px; font-weight:600;">📱 Transfer.</span>
-              <input type="number" id="mixtoTransferencia" min="0" step="0.01" placeholder="0.00" oninput="recalcMixto()" style="flex:1; padding:10px 12px; border-radius:12px; border:1.5px solid var(--line); font-family:inherit; font-size:15px; font-weight:700; background:var(--bg-card);">
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:13px; width:90px; font-weight:600;">💳 Tarjeta</span>
-              <input type="number" id="mixtoTarjeta" min="0" step="0.01" placeholder="0.00" oninput="recalcMixto()" style="flex:1; padding:10px 12px; border-radius:12px; border:1.5px solid var(--line); font-family:inherit; font-size:15px; font-weight:700; background:var(--bg-card);">
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1.5px solid var(--line);">
-              <span style="font-size:12px; font-weight:700; color:var(--ink-soft);">SUMA INGRESADA</span>
-              <span id="mixtoSuma" style="font-size:16px; font-weight:800; color:var(--accent-deep);">$0.00</span>
-            </div>
-            <div id="mixtoError" style="display:none; font-size:11px; font-weight:700; color:var(--danger); text-align:center; padding:6px; background:var(--danger-bg); border-radius:8px;"></div>
-          </div>
-        </div>
-
+        
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
@@ -3239,10 +3214,8 @@ if ('caches' in window) {
         : 0;
     }
 
-    // Si puede hacer TODAS las disponibles y nadie completó nada → precio total de la promo
-    // PERO si hay áreas ya completadas por otra staff → nunca devolver el total completo
-    const hayAreasCompletadas = (completedAreas || []).length > 0;
-    if (!hayAreasCompletadas && misPartes.length === divisionesDisponibles.length && divisionesDisponibles.length === promo.division.length) {
+    // Si puede hacer TODAS las disponibles → precio de esas divisiones (no el total)
+    if (misPartes.length === divisionesDisponibles.length && divisionesDisponibles.length === promo.division.length) {
       return promo.price; // nadie completó nada → precio total
     }
 
@@ -7755,10 +7728,6 @@ if ('caches' in window) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
         // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
         await renderAuthorizations(); // Reload list
-        // Refrescar lista Por Cobrar de Mikaela para que el total ya esté actualizado
-        // cuando presione el botón Cobrar (dos intentos para cubrir el lag del poll de Keyla)
-        setTimeout(() => { if (typeof loadPorCobrar === 'function') loadPorCobrar(); }, 5000);
-        setTimeout(() => { if (typeof loadPorCobrar === 'function') loadPorCobrar(); }, 10000);
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
       }
@@ -8165,35 +8134,18 @@ if ('caches' in window) {
     t._timeout = setTimeout(() => { t.style.opacity = '0'; }, 2500);
   }
 
-  async function cobrarDesdeBtn(btn) {
+  function cobrarDesdeBtn(btn) {
     const idEspera = btn.dataset.id || '';
     const nombre   = btn.dataset.nombre || '';
     const servicio = btn.dataset.servicio || '';
     const chica    = btn.dataset.chica || '';
-    let total    = btn.dataset.total || '0';
-    let regular  = btn.dataset.regular || total;
+    const total    = btn.dataset.total || '0';
+    const regular  = btn.dataset.regular || total;
     const promo    = btn.dataset.promo || '';
     let desglose = null;
     try {
       if (btn.dataset.desglose) desglose = JSON.parse(decodeURIComponent(btn.dataset.desglose));
     } catch(e) {}
-
-    // Refrescar total desde el Sheet antes de abrir cobro
-    // para asegurar que los servicios extra aprobados ya estén incluidos
-    try {
-      const freshData = await apiGet('getPorCobrar');
-      if (freshData && freshData.success && freshData.porCobrar) {
-        const freshItem = freshData.porCobrar.find(p => p.idEspera === idEspera);
-        if (freshItem) {
-          total   = String(freshItem.total   || total);
-          regular = String(freshItem.precioRegular || freshItem.total || regular);
-          if (freshItem.serviciosDetalle && freshItem.serviciosDetalle.length > 0) {
-            desglose = freshItem.serviciosDetalle;
-          }
-        }
-      }
-    } catch(e) { /* Si falla el refresh, usar los datos del dataset */ }
-
     openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
   }
 
@@ -8323,21 +8275,6 @@ if ('caches' in window) {
     });
     btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)';
 
-    // Mostrar/ocultar panel mixto
-    const mixtoPanel = document.getElementById('cobrarMixtoPanel');
-    if (metodo === 'Mixto') {
-      mixtoPanel.style.display = 'block';
-      const totalRef = window._cobrarTotalPromo || 0;
-      document.getElementById('mixtoTotalRef').textContent = 'Total: $' + Number(totalRef).toFixed(2);
-      document.getElementById('mixtoEfectivo').value = '';
-      document.getElementById('mixtoTransferencia').value = '';
-      document.getElementById('mixtoTarjeta').value = '';
-      document.getElementById('mixtoSuma').textContent = '$0.00';
-      document.getElementById('mixtoError').style.display = 'none';
-    } else {
-      mixtoPanel.style.display = 'none';
-    }
-
     const aviso      = document.getElementById('cobrarTarjetaAviso');
     const totalEl    = document.getElementById('cobrarTotal');
     const promoBanner= document.getElementById('cobrarPromoBanner');
@@ -8390,28 +8327,6 @@ if ('caches' in window) {
     }
   }
 
-
-  function recalcMixto() {
-    const ef = Number(document.getElementById('mixtoEfectivo').value || 0);
-    const tr = Number(document.getElementById('mixtoTransferencia').value || 0);
-    const ta = Number(document.getElementById('mixtoTarjeta').value || 0);
-    const suma = ef + tr + ta;
-    const total = Number(window._cobrarTotalPromo || 0);
-    document.getElementById('mixtoSuma').textContent = '$' + suma.toFixed(2);
-    const errEl = document.getElementById('mixtoError');
-    if (suma > total + 0.01) {
-      errEl.textContent = '⚠ La suma ($' + suma.toFixed(2) + ') supera el total ($' + total.toFixed(2) + ')';
-      errEl.style.display = 'block';
-      document.getElementById('mixtoSuma').style.color = 'var(--danger)';
-    } else if (Math.abs(suma - total) < 0.01) {
-      errEl.style.display = 'none';
-      document.getElementById('mixtoSuma').style.color = 'var(--success)';
-    } else {
-      errEl.style.display = 'none';
-      document.getElementById('mixtoSuma').style.color = 'var(--accent-deep)';
-    }
-  }
-
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
     btn.textContent = '⏳ Procesando...';
@@ -8452,26 +8367,6 @@ if ('caches' in window) {
       return;
     }
 
-    // Validar pago mixto antes de procesar
-    if (window._cobrarPago === 'Mixto') {
-      const ef2 = Number(document.getElementById('mixtoEfectivo').value || 0);
-      const tr2 = Number(document.getElementById('mixtoTransferencia').value || 0);
-      const ta2 = Number(document.getElementById('mixtoTarjeta').value || 0);
-      const sumaM = ef2 + tr2 + ta2;
-      const totalM = Number(window._cobrarTotalPromo || 0);
-      if (Math.abs(sumaM - totalM) > 0.5) {
-        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
-        alert('⚠ La suma del pago mixto ($' + sumaM.toFixed(2) + ') no coincide con el total ($' + totalM.toFixed(2) + '). Revisá los montos.');
-        return;
-      }
-      // Construir descripción mixta para guardar en Sheet
-      const partesMixto = [];
-      if (ef2 > 0) partesMixto.push('Efectivo:' + ef2.toFixed(2));
-      if (tr2 > 0) partesMixto.push('Transferencia:' + tr2.toFixed(2));
-      if (ta2 > 0) partesMixto.push('Tarjeta:' + ta2.toFixed(2));
-      window._cobrarMixtoDetalle = partesMixto.join('|');
-    }
-
     // Si tiene promo y paga con tarjeta, cobrar precio regular
     const totalServicios = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
       ? window._cobrarTotalRegular
@@ -8481,16 +8376,11 @@ if ('caches' in window) {
     const totalProductos = window._cobrarTotalProductos || 0;
     const totalFinal = totalServicios + totalProductos;
 
-    // Para pago mixto: formatear metodoPago con el desglose
-    const metodoPagoFinal = window._cobrarPago === 'Mixto'
-      ? 'Mixto:' + (window._cobrarMixtoDetalle || '')
-      : window._cobrarPago;
-
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
-        metodoPago: metodoPagoFinal,
+        metodoPago: window._cobrarPago,
         totalCobrado: totalFinal,
         totalServicios: totalServicios,
         totalProductos: totalProductos
@@ -8532,8 +8422,7 @@ if ('caches' in window) {
     } catch(e) {}
     await loadPorCobrar();
 
-    let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + (window._cobrarPago === 'Mixto' ? 'Mixto (' + (window._cobrarMixtoDetalle || '').replace(/\|/g,' + ').replace(/([A-Za-z]+):([\.0-9]+)/g,'$1 $$2') + ')' : window._cobrarPago);
-    window._cobrarMixtoDetalle = null;
+    let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
     if (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta') msg += '\n(Precio regular — promo no aplica con tarjeta)';
     alert(msg);
@@ -11762,10 +11651,10 @@ if ('caches' in window) {
 
   function renderAssignDirectStaff(staffAvailability, area) {
     const allStaff = [
-      { name: 'María',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
+      { name: 'María',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Yadira', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
       { name: 'Diana',  area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
