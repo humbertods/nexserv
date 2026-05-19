@@ -7728,10 +7728,6 @@ if ('caches' in window) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
         // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
         await renderAuthorizations(); // Reload list
-        // Refrescar lista Por Cobrar de Mikaela para que el total ya esté actualizado
-        // cuando presione el botón Cobrar (dos intentos para cubrir el lag del poll de Keyla)
-        setTimeout(() => { if (typeof loadPorCobrar === 'function') loadPorCobrar(); }, 5000);
-        setTimeout(() => { if (typeof loadPorCobrar === 'function') loadPorCobrar(); }, 10000);
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
       }
@@ -8138,35 +8134,18 @@ if ('caches' in window) {
     t._timeout = setTimeout(() => { t.style.opacity = '0'; }, 2500);
   }
 
-  async function cobrarDesdeBtn(btn) {
+  function cobrarDesdeBtn(btn) {
     const idEspera = btn.dataset.id || '';
     const nombre   = btn.dataset.nombre || '';
     const servicio = btn.dataset.servicio || '';
     const chica    = btn.dataset.chica || '';
-    let total    = btn.dataset.total || '0';
-    let regular  = btn.dataset.regular || total;
+    const total    = btn.dataset.total || '0';
+    const regular  = btn.dataset.regular || total;
     const promo    = btn.dataset.promo || '';
     let desglose = null;
     try {
       if (btn.dataset.desglose) desglose = JSON.parse(decodeURIComponent(btn.dataset.desglose));
     } catch(e) {}
-
-    // Refrescar total desde el Sheet antes de abrir cobro
-    // para asegurar que los servicios extra aprobados ya estén incluidos
-    try {
-      const freshData = await apiGet('getPorCobrar');
-      if (freshData && freshData.success && freshData.porCobrar) {
-        const freshItem = freshData.porCobrar.find(p => p.idEspera === idEspera);
-        if (freshItem) {
-          total   = String(freshItem.total   || total);
-          regular = String(freshItem.precioRegular || freshItem.total || regular);
-          if (freshItem.serviciosDetalle && freshItem.serviciosDetalle.length > 0) {
-            desglose = freshItem.serviciosDetalle;
-          }
-        }
-      }
-    } catch(e) { /* Si falla el refresh, usar los datos del dataset */ }
-
     openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
   }
 
@@ -11672,10 +11651,10 @@ if ('caches' in window) {
 
   function renderAssignDirectStaff(staffAvailability, area) {
     const allStaff = [
-      { name: 'María',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
-      { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'pestanas', 'retiro_lifting'] },
+      { name: 'María',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Yadira', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
       { name: 'Diana',  area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
