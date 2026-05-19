@@ -4914,6 +4914,34 @@ if ('caches' in window) {
     await finishAndSend();
   }
 
+  async function cobrarPromoCompleta(slot) {
+    slot = slot || window._finishingSlot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const promoData  = activePromos[clientKey] || window._finishPromoData;
+    if (!promoData || !promoData.promo) { alert('No hay datos de promo para esta clienta.'); return; }
+    const promo         = promoData.promo;
+    const precioPromo   = Number(promo.price   || 0);
+    const precioRegular = Number(promo.regular || promo.price || 0);
+    const promoNombre   = promo.name || 'Promo';
+    const idEspera      = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clienteCodigo = slot === 1 ? (window._as1Client   || '') : (window._as2Client   || '');
+    const msg = `¿Cobrar promo completa "${promoNombre}" a nombre de ${user.name}?\n\n• Precio promo: $${precioPromo}\n• Todo el valor se asigna a ${user.name}\n• La clienta va directamente a cobro`;
+    if (!confirm(msg)) return;
+    slotServices[slot] = [{ name: promoNombre, price: precioPromo, area: user.area || '', status: 'aprobado' }];
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey, clientName, svcNames: promoNombre,
+      total: String(precioPromo), promoNombre, precioRegular: String(precioRegular),
+      idEspera, clienteCodigo, areasExtras: [], promasExtraPendientes: [], _promoCompleta: true
+    };
+    window._finishFullPromo = true;
+    showToast('⏳ Enviando a cobro...');
+    try { await finishAndSend(); } catch(e) { alert('Error al enviar a cobro: ' + e.message); }
+  }
+
   function showConfirmServiceModal(slot) {
     const slotStr = String(slot);
     const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
@@ -5085,12 +5113,9 @@ if ('caches' in window) {
   }
 
   async function finishAndSend() {
-    // Mandar directo a cobrar (finaliza completamente)
     closeModal();
     const user = window.currentUser;
     const slot = window._finishingSlot || 1;
-
-    // Si _finishingData no está seteado (llamada directa desde botón), construirlo ahora
     if (!window._finishingData) {
       const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
       const clientKey  = normalizeClientKey(clientName);
@@ -5098,19 +5123,16 @@ if ('caches' in window) {
       const svcsAprov  = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
       const totalSlot  = svcsAprov.reduce((sum, s) => sum + Number(s.price || 0), 0);
       window._finishingData = {
-        clientKey,
-        clientName,
-        svcNames     : promoData ? promoData.promo.name : (svcsAprov.map(s => s.name).join(' + ') || 'Servicio'),
+        clientKey, clientName,
+        svcNames     : promoData ? promoData.promo.name : (svcsAprov.map(s=>s.name).join(' + ') || 'Servicio'),
         total        : String(totalSlot || (promoData ? promoData.promo.price : 0)),
         promoNombre  : promoData ? promoData.promo.name : '',
         precioRegular: promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalSlot),
         idEspera     : slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || ''),
         clienteCodigo: slot === 1 ? (window._as1Client   || '') : (window._as2Client   || ''),
-        areasExtras  : [],
-        promasExtraPendientes: window._takingPromasExtra || []
+        areasExtras  : [], promasExtraPendientes: window._takingPromasExtra || []
       };
     }
-
     const data = window._finishingData;
 
     // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
@@ -5970,12 +5992,6 @@ if ('caches' in window) {
             if (!svc.authId) svc.authId = authInBackend.id;
             if (authInBackend.estado === 'aprobado') {
               svc.status = 'aprobado';
-              if (svc.esPromoExtra && svc.promoData) {
-                const cn2 = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-                const ck2 = normalizeClientKey(cn2);
-                activePromos[ck2] = { promo: svc.promoData, startedBy: user?.area || 'cejas', completedAreas: [], _metadata: { displayName: cn2 } };
-                saveActivePromos();
-              }
             } else if (authInBackend.estado === 'rechazado') {
               svc.status = 'rechazado';
             }
@@ -8443,31 +8459,27 @@ if ('caches' in window) {
       }
       return;
     }
-
-    let metodoPagoFinal;
-    let totalServiciosFinal;
+    let metodoPagoFinal, totalServiciosFinal;
     if (window._cobrarEsMixto) {
       const mixto = window._cobrarMixto || {};
-      const suma  = Number(mixto.suma || 0);
-      const total = Number(window._cobrarTotalPromo || 0);
+      const suma = Number(mixto.suma || 0), total = Number(window._cobrarTotalPromo || 0);
       if (Math.abs(suma - total) > 0.05) {
         const errEl = document.getElementById("pagoMixtoError");
-        if (errEl) { errEl.style.display = "block"; errEl.textContent = "⚠️ La suma ($" + suma.toFixed(2) + ") no coincide con el total ($" + total.toFixed(2) + ")"; }
-        btn.disabled = false; btn.textContent = "✓ Confirmar cobro";
-        return;
+        if (errEl) { errEl.style.display="block"; errEl.textContent="⚠️ La suma ($"+suma.toFixed(2)+") no coincide con el total ($"+total.toFixed(2)+")"; }
+        btn.disabled=false; btn.textContent="✓ Confirmar cobro"; return;
       }
-      const partes = [];
-      if (mixto.efectivo > 0)      partes.push("Efectivo:"      + mixto.efectivo.toFixed(2));
-      if (mixto.tarjeta > 0)       partes.push("Tarjeta:"       + mixto.tarjeta.toFixed(2));
-      if (mixto.transferencia > 0) partes.push("Transferencia:" + mixto.transferencia.toFixed(2));
-      metodoPagoFinal = partes.length === 1 ? partes[0].split(":")[0] : "Mixto:" + partes.join("|");
-      totalServiciosFinal = (mixto.tarjeta > 0 && window._cobrarTienePromo)
-        ? Math.round(((mixto.efectivo + mixto.transferencia) + (mixto.tarjeta/Number(window._cobrarTotalPromo||1)) * Number(window._cobrarTotalRegular||window._cobrarTotalPromo||0)) * 100) / 100
+      const partes=[];
+      if (mixto.efectivo>0) partes.push("Efectivo:"+mixto.efectivo.toFixed(2));
+      if (mixto.tarjeta>0) partes.push("Tarjeta:"+mixto.tarjeta.toFixed(2));
+      if (mixto.transferencia>0) partes.push("Transferencia:"+mixto.transferencia.toFixed(2));
+      metodoPagoFinal = partes.length===1 ? partes[0].split(":")[0] : "Mixto:"+partes.join("|");
+      totalServiciosFinal = (mixto.tarjeta>0 && window._cobrarTienePromo)
+        ? Math.round(((mixto.efectivo+mixto.transferencia)+(mixto.tarjeta/Number(window._cobrarTotalPromo||1))*Number(window._cobrarTotalRegular||window._cobrarTotalPromo||0))*100)/100
         : suma;
     } else {
       metodoPagoFinal = window._cobrarPago;
-      if (!metodoPagoFinal) { btn.disabled = false; btn.textContent = "✓ Confirmar cobro"; alert("Seleccioná el método de pago"); return; }
-      totalServiciosFinal = (window._cobrarTienePromo && metodoPagoFinal === "Tarjeta") ? window._cobrarTotalRegular : window._cobrarTotalPromo;
+      if (!metodoPagoFinal) { btn.disabled=false; btn.textContent="✓ Confirmar cobro"; alert("Seleccioná el método de pago"); return; }
+      totalServiciosFinal = (window._cobrarTienePromo && metodoPagoFinal==="Tarjeta") ? window._cobrarTotalRegular : window._cobrarTotalPromo;
     }
     const totalServicios = totalServiciosFinal;
 
@@ -11683,12 +11695,23 @@ if ('caches' in window) {
       if (_tipoRD === 'multi') {
         area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
       } else if (_tipoRD === 'promo') {
-        // Para promo: usar el área de la primera promo seleccionada
-        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
-        if (promo && promo.division && promo.division.length > 0) {
-          const areaKeyRD = getPromoMainArea(promo);
-          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
-          area = areaMapRD[areaKeyRD] || 'Cejas';
+        // Para promo: PRIMERO respetar _secuencia si está definida
+        const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'retiro_lifting': 'Lifting / Retiro', 'facial': 'Facial' };
+        if (typeof _secuencia !== 'undefined' && _secuencia && _secuencia.length > 0) {
+          // Usar el área de la primera posición en la secuencia definida por Mikaela
+          area = areaMapRD[String(_secuencia[0].area || '').toLowerCase()] || 'Cejas';
+        } else {
+          // Sin secuencia: detectar área principal de la promo
+          const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+          if (promo && promo.division && promo.division.length > 0) {
+            const norm = s => String(s||'').toLowerCase().replace(/[^a-z]/g,' ');
+            const divs = promo.division;
+            const hasCejas   = divs.some(d => { const a = norm(d.area); return a.includes('ceja') || a.includes('brow') || a.includes('pigment') || a.includes('depilac'); });
+            const hasFacial  = divs.some(d => { const a = norm(d.area); return a.includes('facial') || a.includes('hidra') || a.includes('derma'); });
+            const hasPestana = divs.some(d => { const a = norm(d.area); return a.includes('pest') || a.includes('volumen') || a.includes('clasic') || a.includes('lifting') || a.includes('retiro'); });
+            const areaKeyRD  = hasCejas ? 'cejas' : hasFacial ? 'facial' : hasPestana ? 'pestanas' : 'cejas';
+            area = areaMapRD[areaKeyRD] || 'Cejas';
+          }
         }
       } else {
         area = document.getElementById('arrArea')?.value || 'Cejas';
@@ -11726,7 +11749,22 @@ if ('caches' in window) {
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
         if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
-        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.length > 0) { const ak2 = getPromoMainArea(p2); const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
+        else if (_tipoRD2 === 'promo') {
+          const am2 = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','retiro_lifting':'Lifting / Retiro','facial':'Facial'};
+          if (typeof _secuencia !== 'undefined' && _secuencia && _secuencia.length > 0) {
+            area2 = am2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+          } else {
+            const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p));
+            if (p2?.division?.length > 0) {
+              const norm2 = s => String(s||'').toLowerCase().replace(/[^a-z]/g,' ');
+              const hasCejas2   = p2.division.some(d => { const a=norm2(d.area); return a.includes('ceja')||a.includes('brow')||a.includes('pigment')||a.includes('depilac'); });
+              const hasFacial2  = p2.division.some(d => { const a=norm2(d.area); return a.includes('facial')||a.includes('hidra')||a.includes('derma'); });
+              const hasPestana2 = p2.division.some(d => { const a=norm2(d.area); return a.includes('pest')||a.includes('volumen')||a.includes('lifting')||a.includes('retiro'); });
+              const ak2 = hasCejas2 ? 'cejas' : hasFacial2 ? 'facial' : hasPestana2 ? 'pestanas' : 'cejas';
+              area2 = am2[ak2] || 'Cejas';
+            }
+          }
+        }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
@@ -11790,17 +11828,18 @@ if ('caches' in window) {
       // Para promo: área de la primera promo asignada
       // Secuencia manda: si hay secuencia definida, usar _secuencia[0]
       if (_secuencia && _secuencia.length > 0) {
+        // Respetar orden de atención definido por Mikaela
         const areaMapGA2 = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
         area = areaMapGA2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
       } else {
         const promoGA = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p => p));
         if (promoGA && promoGA.division && promoGA.division.length > 0) {
-          const divOrdGA = [...promoGA.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
-          const divStr = String(divOrdGA[0].area || '').toLowerCase();
-          const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') || divStr.includes('retiro') ? 'pestanas'
-            : divStr.includes('facial') || divStr.includes('hidra') ? 'facial'
-            : divStr.includes('depil') || divStr.includes('bikini') ? 'depilacion'
-            : divStr.includes('ceja') ? 'cejas' : 'cejas';
+          // Sin secuencia: detectar área principal correctamente (cejas > facial > pestanas)
+          const normGA = s => String(s||'').toLowerCase().replace(/[^a-z]/g,' ');
+          const hasCejasGA   = promoGA.division.some(d => { const a=normGA(d.area); return a.includes('ceja')||a.includes('brow')||a.includes('pigment')||a.includes('depilac'); });
+          const hasFacialGA  = promoGA.division.some(d => { const a=normGA(d.area); return a.includes('facial')||a.includes('hidra')||a.includes('derma'); });
+          const hasPestanaGA = promoGA.division.some(d => { const a=normGA(d.area); return a.includes('pest')||a.includes('volumen')||a.includes('lifting')||a.includes('retiro'); });
+          const areaKeyGA = hasCejasGA ? 'cejas' : hasFacialGA ? 'facial' : hasPestanaGA ? 'pestanas' : 'cejas';
           const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
           area = areaMapGA[areaKeyGA] || 'Cejas';
         }
@@ -12765,6 +12804,7 @@ if ('caches' in window) {
   window.completarYTomarSiguiente = completarYTomarSiguiente;
   window.finishAndSend         = finishAndSend;
   window.finishAndSendAll      = finishAndSendAll;
+  window.cobrarPromoCompleta   = cobrarPromoCompleta;
   window.finishAndContinue     = finishAndContinue;
   window.finishAndContinueSameStaff = finishAndContinueSameStaff;
   window.finishSlotAndContinue = finishSlotAndContinue;
