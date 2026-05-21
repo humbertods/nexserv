@@ -5167,11 +5167,15 @@ if ('caches' in window) {
     }
 
     // ── PASO 4: Construir desglose ─────────────────────────────────────────────
+    // BUG 4 FIX: incluir montoNormal para que Apps Script calcule bien la comisión con tarjeta
     const desgloseActual = svcsAprobados.map(s => ({
       staff: user?.name || '',
       servicio: s.name,
       area: s.area || user?.area || '',
-      monto: Number(s.price || 0)
+      monto: Number(s.price || 0),
+      montoNormal: promoDataFresh
+        ? Math.round(Number(s.price || 0) / (promoDataFresh.promo.price || 1) * (promoDataFresh.promo.regular || promoDataFresh.promo.price || 1))
+        : Number(s.price || 0)
     }));
 
     // Base: desglose del sheet (partes de staffs anteriores) + lo que hay en memoria
@@ -6287,11 +6291,19 @@ if ('caches' in window) {
     const montoComision = total;
 
     // Construir desglose
+    // BUG 4 FIX: incluir montoNormal para que Apps Script use precio regular al pagar con tarjeta
+    const montoRegularSlot2 = promoData
+      ? (() => {
+          const ratio = promoData.promo.price > 0 ? (total / promoData.promo.price) : 1;
+          return Math.round(Number(promoData.promo.regular) * ratio);
+        })()
+      : total;
     const desgloseSlot2 = svcs.filter(s => s.status !== 'rechazado').map(s => ({
       staff: user?.name || '',
       servicio: s.name,
       area: s.area || '',
-      monto: Number(s.price || 0)
+      monto: Number(s.price || 0),
+      montoNormal: promoData ? Math.round(Number(s.price || 0) / (promoData.promo.price || 1) * (promoData.promo.regular || promoData.promo.price || 1)) : Number(s.price || 0)
     }));
 
     // Leer desglose previo del sheet si es ticket SP- (áreas anteriores ya registradas)
@@ -8290,7 +8302,12 @@ if ('caches' in window) {
       const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
       document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
       document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
-      totalEl.textContent  = '$' + precioRegularDisplay;
+      // BUG 3 FIX: recalcular total con precio regular (no promo) + productos
+      const totalRegularNum = typeof totalRegular === 'number' ? totalRegular : Number(totalRegular);
+      const totalProductosActual = window._cobrarTotalProductos || 0;
+      const totalConProdRegular = totalRegularNum + totalProductosActual;
+      totalEl.textContent  = '$' + totalConProdRegular.toFixed(2);
+      window._cobrarTotalConProductos = totalConProdRegular; // BUG 3 FIX: actualizar para confirmarCobro
       totalEl.style.color  = 'var(--danger)';
       promoBanner.style.display = 'none';
       if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
@@ -8308,7 +8325,12 @@ if ('caches' in window) {
       }
     } else {
       aviso.style.display = 'none';
-      totalEl.textContent  = '$' + totalPromo;
+      // BUG 3 FIX: restaurar precio promo + productos al cambiar a Efectivo/Transferencia
+      const totalProductosActual2 = window._cobrarTotalProductos || 0;
+      const totalPromoNum = typeof totalPromo === 'number' ? totalPromo : Number(totalPromo);
+      const totalConProdPromo = totalPromoNum + totalProductosActual2;
+      totalEl.textContent  = '$' + (totalProductosActual2 > 0 ? totalConProdPromo.toFixed(2) : totalPromo);
+      window._cobrarTotalConProductos = totalConProdPromo; // BUG 3 FIX: restaurar para confirmarCobro
       totalEl.style.color  = 'var(--accent-deep)';
       if (tienePromo) promoBanner.style.display = 'block';
       if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
@@ -12212,16 +12234,22 @@ if ('caches' in window) {
       // Guardar copia de servicios ANTES de limpiar el slot
       window['_slotServicesBefore' + slot] = [...(slotServices[slot] || [])];
 
+      // BUG 1 FIX: calcular servicios aprobados ANTES de llamar al backend
+      // para incluir extras aprobados en montoChica y serviciosDetalle
+      const svcsHechosMu = (window['_slotServicesBefore' + slot] || slotServices[slot] || []).filter(function(s) {
+        return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
+      });
+      const totalHechoMu = svcsHechosMu.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+      const desgloseParaMu = svcsHechosMu.map(function(s){ return { staff: user?.name||'', servicio: s.name, area: s.area||user?.area||'', monto: Number(s.price||0) }; });
+
       const r = await apiPost('completarAreaTicketMulti', {
         idEspera,
-        chicaNombre: user?.name || ''
+        chicaNombre: user?.name || '',
+        montoChica: String(totalHechoMu),
+        serviciosDetalle: desgloseParaMu
       });
       if (r.success) {
-        // Calcular comisión de esta staff
-        const svcsHechosMu = (window['_slotServicesBefore' + slot] || slotServices[slot] || []).filter(function(s) {
-          return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
-        });
-        const totalHechoMu = svcsHechosMu.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+        // totalHechoMu ya calculado arriba (incluye extras aprobados)
         const pctMu = (user && user.area === 'facial') ? 0.4 : 0.3;
         const comisionMu = Math.round(totalHechoMu * pctMu * 100) / 100;
         const svcNombreMu = svcsHechosMu.map(function(s){ return s.name; }).join(' + ') || 'Servicio';
