@@ -604,7 +604,7 @@ if ('caches' in window) {
         <!-- TICKET DETALLADO: desglose por staff -->
         <div id="cobrarDesglose" style="background: var(--bg); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; display: none;">
           <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; letter-spacing: 0.04em;">DETALLE DE SERVICIOS</div>
-          <div id="cobrarDesgloseItems"></div>
+          <div id="cobrarDesgloseItems" style="max-height: 160px; overflow-y: auto;"></div>
           <div style="border-top: 1.5px solid var(--line); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">SUBTOTAL SERVICIOS</div>
             <div id="cobrarSubtotal" style="font-size: 16px; font-weight: 800;"></div>
@@ -623,20 +623,22 @@ if ('caches' in window) {
         </div>
 
         <!-- Aviso LEY SUPREMA: tarjeta invalida promo -->
-        <div id="cobrarTarjetaAviso" style="display: none; background: var(--danger-bg); border: 2px solid var(--danger); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; text-align: center;">
+        <div id="cobrarTarjetaAviso" style="display: none; background: var(--danger-bg); border: 1.5px solid var(--danger); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; text-align: center;">
           <div style="font-size: 13px; font-weight: 800; color: var(--danger);">🚫 TARJETA = PRECIO NORMAL</div>
           <div style="font-size: 11px; color: var(--danger); font-weight: 600; margin-top: 3px;">La promo NO aplica con tarjeta</div>
           <div style="font-size: 11px; color: #7a1c1c; font-weight: 500; margin-top: 4px;">Precio promo: <span id="cobrarPrecioPromo" style="text-decoration: line-through;"></span> → Normal: <span id="cobrarPrecioRegular" style="font-weight: 800;"></span></div>
         </div>
 
         <!-- TOTAL -->
-        <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
-        
-        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
-          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
-          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">Método de pago</div>
+          <div id="cobrarTotal" style="font-size:28px;font-weight:800;color:var(--accent-deep);letter-spacing:-0.03em;white-space:nowrap;"></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">💵<br>Efectivo</button>
+          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">💳<br>Tarjeta</button>
+          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">📱<br>Transfer.</button>
+          <button onclick="selectPago('Mixto', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">🔀<br>Mixto</button>
         </div>
         
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
@@ -3305,8 +3307,65 @@ if ('caches' in window) {
         return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
       });
 
-    // promasExtraPendientes: 2da/3ra promo independiente del ticket (si las hay)
-    const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
+    // promasExtraPendientes: 2da/3ra promo independiente del ticket
+    // Restaurar desde múltiples fuentes si _takingPromasExtra está vacío
+    let _promasExtraSource = window._takingPromasExtra || [];
+    if (_promasExtraSource.length === 0) {
+      const _idEsperaSlotBtn = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      // 1. sessionStorage
+      try {
+        const _stored = sessionStorage.getItem('nexserv_promasExtra_' + _idEsperaSlotBtn);
+        if (_stored) { _promasExtraSource = JSON.parse(_stored); window._takingPromasExtra = _promasExtraSource; }
+      } catch(eBtn) {}
+    }
+    if (_promasExtraSource.length === 0 && promoData && promoData.promasExtra && promoData.promasExtra.length > 0) {
+      // 2. activePromos
+      _promasExtraSource = promoData.promasExtra;
+      window._takingPromasExtra = _promasExtraSource;
+    }
+    // 3. Leer desde _takingData (datos del ticket cuando se tomó — más fresco)
+    if (_promasExtraSource.length === 0) {
+      const _td = window._takingData;
+      if (_td && _td.promasExtra && _td.promasExtra.length > 0) {
+        _promasExtraSource = _td.promasExtra;
+        window._takingPromasExtra = _promasExtraSource;
+        if (promoData) promoData.promasExtra = _promasExtraSource;
+        const _idBtn3 = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+        try { if (_idBtn3) sessionStorage.setItem('nexserv_promasExtra_' + _idBtn3, JSON.stringify(_promasExtraSource)); } catch(e3) {}
+      }
+    }
+    // 4. Leer desde _listaEsperaCache (lista de espera en memoria)
+    if (_promasExtraSource.length === 0 && window._listaEsperaCache) {
+      const _idBtn4 = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const _cached = (window._listaEsperaCache || []).find(w =>
+        w.id === _idBtn4 || w.idEspera === _idBtn4
+      );
+      if (_cached && _cached.promasExtra && _cached.promasExtra.length > 0) {
+        _promasExtraSource = _cached.promasExtra;
+        window._takingPromasExtra = _promasExtraSource;
+        if (promoData) promoData.promasExtra = _promasExtraSource;
+      }
+    }
+    // 5. Leer directo del Sheet via getServicioPromo (ticket ya en servicio)
+    // Solo si las otras fuentes fallaron — evitar fetch innecesario
+    if (_promasExtraSource.length === 0) {
+      const _idBtn5 = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      apiGet('getServicioPromo').then(function(spRes) {
+        if (!spRes.success) return;
+        const allSP5 = [...(spRes.enServicio||[]), ...(spRes.esperando||[])];
+        const t5 = allSP5.find(t => t.idEspera === _idBtn5 ||
+          (t.tomadaPor === (window.currentUser && window.currentUser.name) &&
+           t.nombre === (window._finishingData && window._finishingData.clientName)));
+        if (t5 && t5.promasExtra && t5.promasExtra.length > 0) {
+          window._takingPromasExtra = t5.promasExtra;
+          if (promoData) promoData.promasExtra = t5.promasExtra;
+          try { if (_idBtn5) sessionStorage.setItem('nexserv_promasExtra_' + _idBtn5, JSON.stringify(t5.promasExtra)); } catch(e5) {}
+          // Re-renderizar botones ahora que tenemos promasExtra
+          setTimeout(() => updateFinishButtons(slot), 50);
+        }
+      }).catch(function() {});
+    }
+    const promasExtraPendientes = _promasExtraSource.filter(p => p && (p.nombre || p.name));
     // slotActual: funciona tanto en updateFinishButtons (donde slot1 existe) como en finishSlot1
     const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
 
@@ -3315,7 +3374,13 @@ if ('caches' in window) {
       if (promasExtraPendientes.length > 0) {
         // Hay otra promo independiente pendiente (ej: promo 2 pestañas+cejas)
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
-        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
+        // Actualizar _finishingData con promasExtraPendientes para que finishAndNextPromo lo lea
+        if (window._finishingData) {
+          window._finishingData.promasExtraPendientes = promasExtraPendientes;
+        } else {
+          window._pendingPromasExtra = promasExtraPendientes;
+        }
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; if(window._finishingData) window._finishingData.promasExtraPendientes=${JSON.stringify(promasExtraPendientes)}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente promo)</button>`;
       } else {
         // No hay promasExtra — promo de una sola área o ya es la última
@@ -3512,14 +3577,9 @@ if ('caches' in window) {
     // Notificar a Mikaela que sigue en proceso
     showToast('✓ Parte completada — continuando con el combo...');
 
-    // El total final se registrará al mandar a cobrar con el precio completo
-    // Por ahora solo limpiar los servicios del slot para agregar el siguiente
-    slotServices[slot] = [];
-    renderServicesForSlot(slot);
-    document.getElementById('as1Total').textContent = '$0';
-    document.getElementById('as1SvcCount').textContent = '0';
-
-    // Actualizar botones de vuelta al estado normal para agregar siguiente servicio
+    // FIX: NO limpiar slotServices — los servicios ya hechos se acumulan
+    // para que finishAndSend sume el total correcto al cobrar.
+    // Solo actualizamos los botones para que la staff pueda agregar el siguiente servicio.
     updateFinishButtons(slot);
   }
 
@@ -3632,10 +3692,24 @@ if ('caches' in window) {
                 if (atencion && atencion.promoNombre) {
                   const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
                   if (promoFull) {
+                    // Leer promasExtra desde múltiples fuentes al registrar la promo
+                    const _promasExtraAtReg = (window._takingPromasExtra && window._takingPromasExtra.length > 0)
+                      ? window._takingPromasExtra
+                      : (window._takingData && window._takingData.promasExtra && window._takingData.promasExtra.length > 0)
+                        ? window._takingData.promasExtra
+                        : [];
+                    if (_promasExtraAtReg.length > 0 && (!window._takingPromasExtra || !window._takingPromasExtra.length)) {
+                      window._takingPromasExtra = _promasExtraAtReg;
+                      try {
+                        const _idReg = window._as1IdEspera || '';
+                        if (_idReg) sessionStorage.setItem('nexserv_promasExtra_' + _idReg, JSON.stringify(_promasExtraAtReg));
+                      } catch(eR) {}
+                    }
                     activePromos[clientKey] = {
                       promo: promoFull,
                       startedBy: window.currentUser?.area || 'cejas',
                       completedAreas: [],
+                      promasExtra: _promasExtraAtReg,
                       _metadata: { displayName: clientName }
                     };
                     saveActivePromos();
@@ -4236,6 +4310,15 @@ if ('caches' in window) {
               const match = p.match(/✅\s*(.*?)\s+completado por\s+(.*?)\s+·/);
               return match ? { staff: match[2].trim(), servicio: match[1].trim(), area: match[1].trim(), monto: 0, esHistorico: true } : null;
             }).filter(Boolean);
+            // Pre-llenar slotServices para que el modal de enganche muestre el servicio y precio
+            if (a.servicio && a.servicio !== '—' && !slotServices[1].length) {
+              const prePrecio = Number(a.total || a.precioMiArea || 0);
+              slotServices[1] = [{ name: a.servicio, price: prePrecio, area: a.area || '' }];
+              renderServicesForSlot(1);
+              document.getElementById('as1Total').textContent = '$' + prePrecio;
+              document.getElementById('as1SvcCount').textContent = '1';
+            }
+          }
           }
           
           // Si es depilación compartida (split), cargar solo los servicios de esta staff
@@ -4641,11 +4724,25 @@ if ('caches' in window) {
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
     
-    // Agregar servicio de la promo
+    // Agregar servicio de la promo — usar precio de la DIVISIÓN de esta área, no el total
+    // Buscar la división que corresponde al área de esta staff
+    const userAreaLower = (user.area || '').toLowerCase();
+    let precioMiDivision = promo.price; // fallback al total
+    if (promo.division && promo.division.length > 0) {
+      const miDiv = promo.division.find(d => {
+        const da = String(d.area||'').toLowerCase();
+        return da.includes(userAreaLower) || userAreaLower.includes(da) ||
+          (userAreaLower.includes('pest') && (da.includes('pest') || da.includes('lifting'))) ||
+          (userAreaLower.includes('ceja') && da.includes('ceja')) ||
+          (userAreaLower.includes('facial') && da.includes('facial')) ||
+          (userAreaLower.includes('depil') && da.includes('depil'));
+      });
+      if (miDiv && Number(miDiv.monto) > 0) precioMiDivision = Number(miDiv.monto);
+    }
     const servicioPromo = {
       name: 'Servicio promo: ' + promo.name,
       area: user.area,
-      price: promo.price
+      price: precioMiDivision
     };
     
     if (!slotServices[slot]) slotServices[slot] = [];
@@ -5070,6 +5167,9 @@ if ('caches' in window) {
   }
 
   async function finishAndSend() {
+    // Guard anti-doble: si ya hay un envío en curso, ignorar
+    if (window._finishInProgress) return;
+    window._finishInProgress = true;
     // Mandar directo a cobrar (finaliza completamente)
     closeModal();
     const user = window.currentUser;
@@ -5099,20 +5199,35 @@ if ('caches' in window) {
     }
 
     // ── ENGANCHE: si es SN- pero hay desglose acumulado en memoria, buscar también en SP ──
-    // Cuando Laura toma enganche de Lesly (SN-), el ticket del enganche es SP-
-    // El SN- original no tiene serviciosDetalle de Lesly — está en el SP- creado por continuarPromoALista
     if (idEsperaActual.startsWith('SN-') && !miTicketSheet) {
       try {
         const spData2 = await apiGet('getServicioPromo');
         if (spData2.success) {
           const allSP = [...(spData2.enServicio || []), ...(spData2.porCobrar || [])];
-          // Buscar SP ticket para esta clienta (puede tener desglose de la staff previa)
           const linkedSP = allSP.find(t =>
             (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
           );
           if (linkedSP && linkedSP.serviciosDetalle && linkedSP.serviciosDetalle.length > 0) {
             miTicketSheet = linkedSP;
-            // No cambiar idEsperaActual — solo usamos miTicketSheet para el desglose
+          }
+        }
+      } catch(e) {}
+    }
+
+    // ── MULTI-PROMO (LE-): buscar serviciosDetalle de promos anteriores en ListaEspera ──
+    // Cuando finishAndNextPromo manda a lista con siguiente promo, el ticket sigue siendo LE-
+    // La parte de la primera promo queda en col S (serviciosDetalle) del LE-
+    if (idEsperaActual.startsWith('LE-') && !miTicketSheet) {
+      try {
+        const leData = await apiGet('getListaCompleta');
+        if (leData.success) {
+          const allLE = [...(leData.enServicio || []), ...(leData.porCobrar || [])];
+          const linkedLE = allLE.find(t =>
+            t.idEspera === idEsperaActual ||
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
+          );
+          if (linkedLE && linkedLE.serviciosDetalle && linkedLE.serviciosDetalle.length > 0) {
+            miTicketSheet = linkedLE;
           }
         }
       } catch(e) {}
@@ -5227,7 +5342,7 @@ if ('caches' in window) {
           serviciosDetalle: desgloseAcumulado
         });
       }
-    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); }
+    } catch (err) { window._finishInProgress = false; console.error('❌ Error en apiPost finalizarServicio:', err); }
 
     // ── LIMPIEZA: siempre limpiar el slot independientemente del resultado del backend ──
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
@@ -5268,10 +5383,12 @@ if ('caches' in window) {
       show('staffHome');
       await new Promise(r => setTimeout(r, 300));
       loadStaffHome();
+      window._finishInProgress = false;
       alert(`✓ Tu parte lista. ${restNames} quedó en lista de espera para otra staff.`);
       return;
     }
 
+    window._finishInProgress = false;
     show('staffHome');
     await new Promise(r => setTimeout(r, 300));
     loadStaffHome();
@@ -5526,69 +5643,97 @@ if ('caches' in window) {
   }
   
   async function finishAndNextPromo() {
-    // Finalizar la parte actual y activar la siguiente promo del ticket
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot || 1;
-    const siguientePromo = data.promasExtraPendientes && data.promasExtraPendientes[0];
 
-    if (!siguientePromo) { alert('No hay siguiente promo'); return; }
+    // Leer promasExtraPendientes desde múltiples fuentes
+    const promasExtraSrc = (data && data.promasExtraPendientes && data.promasExtraPendientes.length > 0)
+      ? data.promasExtraPendientes
+      : (window._pendingPromasExtra && window._pendingPromasExtra.length > 0)
+        ? window._pendingPromasExtra
+        : (window._takingPromasExtra || []);
+
+    const siguientePromo = promasExtraSrc[0];
+    if (!siguientePromo) { alert('No hay siguiente promo registrada'); return; }
 
     closeModal();
 
     try {
-      // Finalizar la atencion actual (cobra la parte ya realizada)
-      // Las promasExtra restantes son las que vienen despues de la que se activa ahora
-      const promasExtraRestantes = data.promasExtraPendientes.slice(1);
+      const promasExtraRestantes = promasExtraSrc.slice(1);
+
+      // Calcular total y desglose de lo ya realizado
+      const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado');
+      const montoRealizado = svcs.reduce((s, v) => s + Number(v.price || 0), 0);
+      const svcNombres = svcs.map(s => s.name).join(' + ') || data?.svcNames || '';
+
+      // serviciosDetalle: congela la parte de esta staff para que Mikaela la vea al cobrar
+      const serviciosDetalle = svcs.length > 0 ? svcs.map(s => ({
+        staff: user?.name || '',
+        servicio: s.name,
+        area: user?.area || '',
+        monto: Number(s.price || 0)
+      })) : [{
+        staff: user?.name || '',
+        servicio: svcNombres || (data?.promoNombre || 'Promo'),
+        area: user?.area || '',
+        monto: montoRealizado || Number(data?.total || 0)
+      }];
 
       const result = await apiPost('finalizarAtencion', {
-        idEspera: window._as1IdEspera || '',
-        chicaNombre: user?.name || '',
-        clienteNombre: data.clientName,
-        clienteCodigo: window._as1Client || '',
-        servicio: data.svcNames,
-        total: data.total,
-        promoNombre: data.promoNombre,
-        precioRegular: data.precioRegular,
-        siguientePromo: siguientePromo.nombre,
-        siguientePromoPrecio: siguientePromo.precio,
-        siguientePromoRegular: siguientePromo.regular,
-        siguientePromoArea: siguientePromo._area || 'cejas',
-        promasExtraRestantes: promasExtraRestantes
+        idEspera:              window._as1IdEspera || '',
+        chicaNombre:           user?.name || '',
+        clienteNombre:         data?.clientName || '',
+        clienteCodigo:         window._as1Client || '',
+        servicio:              svcNombres || data?.svcNames || '',
+        total:                 String(montoRealizado || data?.total || '0'),
+        promoNombre:           data?.promoNombre || '',
+        precioRegular:         data?.precioRegular || data?.total || '0',
+        siguientePromo:        siguientePromo.nombre,
+        siguientePromoPrecio:  siguientePromo.precio || siguientePromo.price || 0,
+        siguientePromoRegular: siguientePromo.regular || siguientePromo.precio || 0,
+        siguientePromoArea:    siguientePromo._area || 'cejas',
+        serviciosDetalle:      serviciosDetalle,      // ← CONGELA el valor de esta promo
+        promasExtraRestantes:  promasExtraRestantes
       });
 
       if (result.success) {
-        // Limpiar slot actual
-        delete activePromos[normalizeClientKey(data.clientName)];
+        // Limpiar slot
+        delete activePromos[normalizeClientKey(data?.clientName || '')];
         slotServices[slot] = [];
+        window._pendingPromasExtra = null;
         if (user && activeClients[user.name]) {
           activeClients[user.name].splice(slot - 1, 1);
           updateCapacityUI(user.name);
         }
-        // Quitar la promo que acabamos de activar de las pendientes
-        window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
+        window._takingPromasExtra = promasExtraRestantes;
         try {
           const _idEsperaAct = window._as1IdEspera || '';
-          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
+          if (_idEsperaAct) {
+            sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(promasExtraRestantes));
+            // Marcar que este ticket tuvo multi-promo para que la siguiente staff sepa que es la última
+            sessionStorage.setItem('nexserv_promasExtra_consumed_' + _idEsperaAct, 'true');
+          }
         } catch(eS2) {}
-        try {
-          const _idEsperaAct = window._as1IdEspera || '';
-          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
-        } catch(eS2) {}
-        const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
-        const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
-        const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
-        var msgAlert = parteActual + ' completado. Siguiente: ' + siguientePromo.nombre + ' ($' + siguientePromo.precio + ')';
-        if (restantes) msgAlert += '. Pendiente despues: ' + restantes;
-        msgAlert += '. La clienta volvio a lista de espera.';
+
+        const AREA_LABELS_ALERT = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', facial: 'Facial', retiro_lifting: 'Lifting' };
+        const parteActual = AREA_LABELS_ALERT[user?.area || ''] || user?.area || 'Tu área';
+        let msgAlert = '✅ ' + parteActual + ' completado ($' + (montoRealizado || data?.total || 0) + ').
+
+Siguiente en lista: ' + siguientePromo.nombre + ' ($' + (siguientePromo.precio || siguientePromo.price || 0) + ').
+La clienta volvió a lista de espera.';
+        if (promasExtraRestantes.length > 0) msgAlert += '
+
+Pendiente después: ' + promasExtraRestantes.map(p => p.nombre).join(' + ');
         alert(msgAlert);
         show('staffHome');
+        await loadStaffHome();
       } else {
         alert('Error: ' + (result.message || 'No se pudo procesar'));
       }
     } catch (err) {
-      console.error(err);
-      alert('Error al procesar');
+      console.error('finishAndNextPromo error:', err);
+      alert('Error al procesar. Revisá la consola.');
     }
   }
 
@@ -6142,8 +6287,24 @@ if ('caches' in window) {
         (promoData.completedAreas.length >= promoData.promo.division.length - 1);
 
       // BTN 1: Yo hago toda la promo
+      // Para multi-promo: si hay desglose acumulado del sheet (primera promo ya congelada),
+      // el botón "hago todo" debe sumar ambas promos → usar finishAndSend no finishAndSendAll
+      const _idEsperaBtn = window._as1IdEspera || window._as2IdEspera || '';
+      const _esLE = _idEsperaBtn.startsWith('LE-');
+      // Es la última de multi-promo si: ticket LE- + hay desglose acumulado en obs/memoria
+      // O si _takingPromasExtra originalmente tenía items (se consumieron al llegar aquí)
+      const esUltimaDeMultiPromo = promoData && (promoData.completedAreas || []).length === 0 &&
+        (_esLE || (window._desgloseAcumulado || []).length > 0 ||
+         sessionStorage.getItem('nexserv_promasExtra_consumed_' + _idEsperaBtn) === 'true');
       const b1 = document.getElementById('finishDoAllBtn');
-      if (b1) b1.style.display = (puedeTodo && promoData) ? 'block' : 'none';
+      if (b1) {
+        b1.style.display = (puedeTodo && promoData) ? 'block' : 'none';
+        if (esUltimaDeMultiPromo && puedeTodo) {
+          b1.textContent = '🏁 Lista mi promo — clienta multi-promo terminada';
+          b1.style.background = 'linear-gradient(135deg,#1a6b4a,#0f4a33)';
+          b1.onclick = function() { closeModal(); finishAndSend(); };
+        }
+      }
 
       // ── CASO: Múltiples servicios en el slot (sin promo, mismo área) ──
       // Ej: Depilación cejas $8 + Depilación bigote $4 → mostrar 2 botones específicos
@@ -6929,6 +7090,34 @@ if ('caches' in window) {
   // ========== SECUENCIA DE SERVICIOS ==========
   let _secuencia = []; // [{area, label}]
 
+  // Helper: devuelve el área KEY ('cejas','pestanas','depilacion','facial') que corresponde
+  // al PRIMER servicio de una promo, respetando _secuencia si está definida.
+  // Prioridad: 1) _secuencia[0], 2) division[0] natural, 3) fallback cejas
+  function getFirstAreaFromPromo(promo) {
+    const areaMapKey = (str) => {
+      const s = String(str||'').toLowerCase();
+      return s.includes('pest')||s.includes('lifting')||s.includes('retiro') ? 'pestanas'
+        : s.includes('facial')||s.includes('hidra') ? 'facial'
+        : s.includes('depil')||s.includes('bikini') ? 'depilacion'
+        : 'cejas';
+    };
+    // 1. Secuencia definida por Mikaela — máxima prioridad
+    if (typeof _secuencia !== 'undefined' && _secuencia && _secuencia.length > 0) {
+      return String(_secuencia[0].area || 'cejas').toLowerCase();
+    }
+    // 2. _secuenciaGuardada (persiste en async)
+    if (window._secuenciaGuardada && window._secuenciaGuardada.length > 0) {
+      return String(window._secuenciaGuardada[0].area || 'cejas').toLowerCase();
+    }
+    // 3. division[0] de la promo (orden natural, sin ordenar por monto)
+    if (promo && promo.division && promo.division.length > 0) {
+      return areaMapKey(promo.division[0].area);
+    }
+    return 'cejas';
+  }
+
+  const AREA_KEY_TO_LABEL = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
+
   const AREA_LABELS_SEC = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
   const AREA_ICONS_SEC = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
 
@@ -7296,6 +7485,13 @@ if ('caches' in window) {
                     <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv || 'Esperando asignación'}</div></div>
                     <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
                 }
+                // ── Extras aprobados de esta área ──
+                (ar.extras || []).forEach(ex => {
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--success-bg);border-radius:8px;margin:2px 0 2px 8px;">
+                    <div style="width:22px;height:22px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;color:white;">➕</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">Servicio extra · ${ex.staff}</div><div style="font-size:11px;color:var(--ink-soft);">${ex.servicio} · <strong>$${Number(ex.precio).toFixed(2)}</strong></div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:3px 8px;border-radius:100px;">✓ APROBADO</div></div>`;
+                });
               });
             } else {
               // ── TICKET NORMAL / PROMO: timeline original ──
@@ -7368,6 +7564,13 @@ if ('caches' in window) {
                 totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
               }
             }
+            // Para TM: sumar extras aprobados de todas las áreas al total acumulado
+            if (esTM && a.areas) {
+              const totalExtras = (a.areas).reduce((sum, ar) => {
+                return sum + (ar.extras || []).reduce((s, ex) => s + Number(ex.precio || 0), 0);
+              }, 0);
+              totalAcumDisplay = totalAcumDisplay + totalExtras;
+            }
             const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
             const tmBadge = esTM ? ' <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>' : '';
             const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
@@ -7410,9 +7613,26 @@ if ('caches' in window) {
               }));
             }
             if (!desgloseData && esTM && p.areas) {
-              desgloseData = p.areas.map(a => ({
-                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area, monto: a.precio
-              }));
+              desgloseData = [];
+              p.areas.forEach(a => {
+                const totalExtrasA = (a.extras || []).reduce((s, ex) => s + Number(ex.precio || 0), 0);
+                const precioBaseA  = Number(a.precio || 0) - totalExtrasA;
+                desgloseData.push({
+                  staff: a.staff||'—',
+                  servicio: a.confirmado || a.tentativo,
+                  area: a.area,
+                  monto: precioBaseA > 0 ? precioBaseA : Number(a.precio || 0)
+                });
+                (a.extras || []).forEach(ex => {
+                  desgloseData.push({
+                    staff: ex.staff || a.staff || '—',
+                    servicio: '+ Extra: ' + ex.servicio,
+                    area: a.area,
+                    monto: Number(ex.precio || 0),
+                    esExtra: true
+                  });
+                });
+              });
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
             return `
@@ -7491,6 +7711,7 @@ if ('caches' in window) {
         hora: item.hora,
         cliente: item.nombre || item.clienteNombre || '',
         staff: item.chica || '',
+        staffReal: item.chica || item.staff || '', // nombre real para revertir comisión aunque HistorialOwner esté vacío
         servicio: item.servicio || '',
         precio: item.precio || 0,
         comision: item.comision || 0
@@ -7725,9 +7946,9 @@ if ('caches' in window) {
       const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
-        // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
-        // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
-        await renderAuthorizations(); // Reload list
+        // Recargar tanto la lista de autorizaciones como el panel En atención
+        // para que Mikaela vea el total actualizado inmediatamente
+        await Promise.all([renderAuthorizations(), loadMikaelaHome()]);
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
       }
@@ -8180,15 +8401,18 @@ if ('caches' in window) {
       window._cobrarDesglose = desglose;
       desgloseEl.style.display = 'block';
       simpleEl.style.display = 'none';
-      itemsEl.innerHTML = desglose.map(d => `
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
-          <div>
-            <div style="font-size:13px;font-weight:700;">${d.servicio}${d.congelado?' <span style=\"font-size:9px;background:var(--success);color:white;padding:2px 5px;border-radius:6px;font-weight:700;margin-left:4px;\">✅ LISTO</span>':''}</div>
-            <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area || ''}</div>
-          </div>
-          <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${Number(d.monto).toFixed(2)}</div>
-        </div>
-      `).join('');
+      itemsEl.innerHTML = desglose.map(d => {
+        if (d.esExtra) {
+          return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--success-bg);border-radius:8px;margin:2px 0;">'
+            + '<div><div style="font-size:12px;font-weight:700;color:var(--success);">➕ ' + d.servicio.replace('+ Extra: ','') + '</div>'
+            + '<div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">Servicio extra · ' + d.staff + '</div></div>'
+            + '<div style="font-size:14px;font-weight:800;color:var(--success);margin-left:12px;">+$' + Number(d.monto).toFixed(2) + '</div></div>';
+        }
+        return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ' + (d.congelado?'10px':'0') + ';border-bottom:1px solid var(--line);' + (d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':'') + '">'
+          + '<div><div style="font-size:13px;font-weight:700;">' + d.servicio + (d.congelado?' <span style="font-size:9px;background:var(--success);color:white;padding:2px 5px;border-radius:6px;font-weight:700;margin-left:4px;">✅ LISTO</span>':'') + '</div>'
+          + '<div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ' + d.staff + ' · ' + (d.area || '') + '</div></div>'
+          + '<div style="font-size:15px;font-weight:800;color:' + (d.congelado?'var(--success)':'var(--accent-deep)') + ';margin-left:12px;">$' + Number(d.monto).toFixed(2) + '</div></div>';
+      }).join('');
       const subtotalNum = desglose.reduce((s, d) => s + Number(d.monto || 0), 0);
       subtotalEl.textContent = '$' + subtotalNum.toFixed(2);
       window._cobrarTotalPromo = subtotalNum;
@@ -8275,6 +8499,44 @@ if ('caches' in window) {
     });
     btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)';
 
+    // Mostrar/ocultar campos de pago mixto
+    let mixtoEl = document.getElementById('cobrarMixtoFields');
+    if (metodo === 'Mixto') {
+      if (!mixtoEl) {
+        mixtoEl = document.createElement('div');
+        mixtoEl.id = 'cobrarMixtoFields';
+        mixtoEl.style.cssText = 'background:var(--bg);border-radius:16px;padding:14px;margin-bottom:12px;';
+        const totalActual = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
+        mixtoEl.innerHTML = `
+          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;letter-spacing:.04em;">DESGLOSE MIXTO</div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">💵 Efectivo</label>
+            <input id="mixtoEfectivo" type="number" min="0" step="0.01" placeholder="0.00"
+              style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);"
+              oninput="calcMixtoResto()" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+            <label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">💳 Tarjeta</label>
+            <input id="mixtoTarjeta" type="number" min="0" step="0.01" placeholder="0.00"
+              style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);"
+              oninput="calcMixtoResto()" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">📱 Transfer.</label>
+            <input id="mixtoTransferencia" type="number" min="0" step="0.01" placeholder="0.00"
+              style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);"
+              oninput="calcMixtoResto()" />
+          </div>
+          <div id="mixtoResto" style="font-size:12px;font-weight:700;margin-top:10px;text-align:center;color:var(--ink-soft);"></div>`;
+        // Insertar antes del botón confirmar
+        const cobrarBtn = document.getElementById('cobrarBtn');
+        cobrarBtn.parentNode.insertBefore(mixtoEl, cobrarBtn);
+      }
+      mixtoEl.style.display = 'block';
+    } else {
+      if (mixtoEl) mixtoEl.style.display = 'none';
+    }
+
     const aviso      = document.getElementById('cobrarTarjetaAviso');
     const totalEl    = document.getElementById('cobrarTotal');
     const promoBanner= document.getElementById('cobrarPromoBanner');
@@ -8327,6 +8589,27 @@ if ('caches' in window) {
     }
   }
 
+  function calcMixtoResto() {
+    const total = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
+    const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
+    const ta = parseFloat(document.getElementById('mixtoTarjeta')?.value || 0) || 0;
+    const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
+    const suma = ef + ta + tr;
+    const resto = Math.round((total - suma) * 100) / 100;
+    const restoEl = document.getElementById('mixtoResto');
+    if (!restoEl) return;
+    if (Math.abs(resto) < 0.01) {
+      restoEl.textContent = '✓ Total cuadra';
+      restoEl.style.color = 'var(--success)';
+    } else if (resto > 0) {
+      restoEl.textContent = 'Faltan $' + resto.toFixed(2);
+      restoEl.style.color = 'var(--danger)';
+    } else {
+      restoEl.textContent = 'Sobran $' + Math.abs(resto).toFixed(2);
+      restoEl.style.color = 'var(--warning, #f59e0b)';
+    }
+  }
+
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
     btn.textContent = '⏳ Procesando...';
@@ -8365,6 +8648,27 @@ if ('caches' in window) {
         btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
       }
       return;
+    }
+
+    // Pago mixto: validar que los montos cuadren con el total
+    if (window._cobrarPago === 'Mixto') {
+      const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
+      const ta = parseFloat(document.getElementById('mixtoTarjeta')?.value || 0) || 0;
+      const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
+      const totalMixto = ef + ta + tr;
+      const totalEsperado = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
+      if (Math.abs(totalMixto - totalEsperado) > 0.05) {
+        alert('El total ingresado ($' + totalMixto.toFixed(2) + ') no cuadra con el total a cobrar ($' + totalEsperado.toFixed(2) + '). Ajustá los montos.');
+        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
+        return;
+      }
+      // Construir etiqueta descriptiva del método mixto
+      const partes = [];
+      if (ef > 0) partes.push('Efectivo $' + ef.toFixed(2));
+      if (ta > 0) partes.push('Tarjeta $' + ta.toFixed(2));
+      if (tr > 0) partes.push('Transferencia $' + tr.toFixed(2));
+      window._cobrarPago = 'Mixto: ' + partes.join(' + ');
+      window._cobroPago  = window._cobrarPago;
     }
 
     // Si tiene promo y paga con tarjeta, cobrar precio regular
@@ -11299,6 +11603,14 @@ if ('caches' in window) {
         alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
         return;
       }
+      // Guard: no permitir enviar el mismo servicio si ya hay uno pendiente/aprobado en este slot
+      const yaExisteExtra = (slotServices[slot] || []).some(s =>
+        s.name === svc.name && (s.status === 'pendiente' || s.status === 'aprobado')
+      );
+      if (yaExisteExtra) {
+        alert('Ya existe una solicitud de "' + svc.name + '" pendiente o aprobada para esta clienta. No se puede agregar dos veces el mismo extra.');
+        return;
+      }
       svc.status = 'pendiente';
       svc.note = note;
       svc.requestedBy = user?.name || 'Staff';
@@ -11443,12 +11755,9 @@ if ('caches' in window) {
     if (!areaKey && tipo === 'promo') {
       const promoForArea = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p=>p));
       if (promoForArea && promoForArea.division && promoForArea.division.length > 0) {
-        const divOrdenada = [...promoForArea.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
-        const ds = String(divOrdenada[0].area||'').toLowerCase();
-        areaKey = ds.includes('pest')||ds.includes('lifting')||ds.includes('retiro') ? 'pestanas'
-          : ds.includes('facial')||ds.includes('hidra')||ds.includes('limpieza') ? 'facial'
-          : ds.includes('depil')||ds.includes('bikini') ? 'depilacion'
-          : ds.includes('ceja') ? 'cejas' : 'cejas';
+        // FIX: usar _secuencia para determinar la primera área (respeta orden de Mikaela)
+        const _firstAreaKey = getFirstAreaFromPromo(promoForArea);
+        areaKey = _firstAreaKey;
       }
     }
 
@@ -11594,18 +11903,10 @@ if ('caches' in window) {
       if (_tipoRD === 'multi') {
         area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
       } else if (_tipoRD === 'promo') {
-        // Para promo: usar el área de la primera promo seleccionada
-        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
-        if (promo && promo.division && promo.division.length > 0) {
-          const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
-          const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
-          const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
-            : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
-            : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
-            : divStr2.includes('ceja') ? 'cejas' : 'cejas';
-          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
-          area = areaMapRD[areaKeyRD] || 'Cejas';
-        }
+        window._secuenciaGuardada = (typeof _secuencia !== 'undefined' && _secuencia.length > 0) ? [..._secuencia] : null;
+        const promoRD = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+        const areaKeyRD = getFirstAreaFromPromo(promoRD);
+        area = AREA_KEY_TO_LABEL[areaKeyRD] || 'Cejas';
       } else {
         area = document.getElementById('arrArea')?.value || 'Cejas';
       }
@@ -11642,7 +11943,11 @@ if ('caches' in window) {
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
         if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
-        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
+        else if (_tipoRD2 === 'promo') {
+          const p2bg = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p));
+          const ak2 = getFirstAreaFromPromo(p2bg);
+          area2 = AREA_KEY_TO_LABEL[ak2] || 'Cejas';
+        }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
@@ -11711,14 +12016,9 @@ if ('caches' in window) {
       } else {
         const promoGA = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p => p));
         if (promoGA && promoGA.division && promoGA.division.length > 0) {
-          const divOrdGA = [...promoGA.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
-          const divStr = String(divOrdGA[0].area || '').toLowerCase();
-          const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') || divStr.includes('retiro') ? 'pestanas'
-            : divStr.includes('facial') || divStr.includes('hidra') ? 'facial'
-            : divStr.includes('depil') || divStr.includes('bikini') ? 'depilacion'
-            : divStr.includes('ceja') ? 'cejas' : 'cejas';
-          const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
-          area = areaMapGA[areaKeyGA] || 'Cejas';
+          // Sin secuencia: usar getFirstAreaFromPromo que respeta _secuencia
+          const areaKeyGA = getFirstAreaFromPromo(promoGA);
+          area = AREA_KEY_TO_LABEL[areaKeyGA] || 'Cejas';
         }
       }
     } else {
@@ -12261,11 +12561,24 @@ if ('caches' in window) {
           // Incluir todas las áreas con datos (ya completadas + la actual)
           tm.areas.forEach(ar => {
             if (ar.tentativo || ar.confirmado) {
+              // Precio base = precio del área MENOS los extras (que se listan por separado)
+              const totalExtras = (ar.extras || []).reduce((s, ex) => s + Number(ex.precio || 0), 0);
+              const precioBase  = Number(ar.precio || 0) - totalExtras;
               desgloseCompleto.push({
                 staff: ar.staff || user?.name || '',
                 servicio: ar.confirmado || ar.tentativo || ar.area || '',
                 area: ar.area || '',
-                monto: Number(ar.precio || 0)
+                monto: precioBase > 0 ? precioBase : Number(ar.precio || 0)
+              });
+              // Agregar cada extra como línea separada
+              (ar.extras || []).forEach(ex => {
+                desgloseCompleto.push({
+                  staff: ex.staff || ar.staff || '',
+                  servicio: '+ Extra: ' + ex.servicio,
+                  area: ar.area || '',
+                  monto: Number(ex.precio || 0),
+                  esExtra: true
+                });
               });
             }
           });
