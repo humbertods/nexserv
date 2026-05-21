@@ -604,7 +604,7 @@ if ('caches' in window) {
         <!-- TICKET DETALLADO: desglose por staff -->
         <div id="cobrarDesglose" style="background: var(--bg); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; display: none;">
           <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; letter-spacing: 0.04em;">DETALLE DE SERVICIOS</div>
-          <div id="cobrarDesgloseItems" style="max-height: 160px; overflow-y: auto;"></div>
+          <div id="cobrarDesgloseItems"></div>
           <div style="border-top: 1.5px solid var(--line); margin-top: 8px; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
             <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">SUBTOTAL SERVICIOS</div>
             <div id="cobrarSubtotal" style="font-size: 16px; font-weight: 800;"></div>
@@ -630,15 +630,13 @@ if ('caches' in window) {
         </div>
 
         <!-- TOTAL -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;">
-          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;">Método de pago</div>
-          <div id="cobrarTotal" style="font-size:28px;font-weight:800;color:var(--accent-deep);letter-spacing:-0.03em;white-space:nowrap;"></div>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 12px;">
-          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">💵<br>Efectivo</button>
-          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">💳<br>Tarjeta</button>
-          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">📱<br>Transfer.</button>
-          <button onclick="selectPago('Mixto', this)" class="pago-btn" style="padding: 10px 4px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; text-align:center;">🔀<br>Mixto</button>
+        <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
+        
+        <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
+          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
+          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
         </div>
         
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
@@ -3307,30 +3305,17 @@ if ('caches' in window) {
         return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
       });
 
-    // promasExtraPendientes: restaurar desde 4 fuentes
-    let _promasExtraSource = window._takingPromasExtra || [];
-    if (_promasExtraSource.length === 0) {
-      const _idBtn = slot1 ? (window._as1IdEspera||'') : (window._as2IdEspera||'');
-      try { const _s = sessionStorage.getItem('nexserv_promasExtra_'+_idBtn); if(_s) { _promasExtraSource = JSON.parse(_s); window._takingPromasExtra = _promasExtraSource; } } catch(e) {}
-    }
-    if (_promasExtraSource.length === 0 && promoData && promoData.promasExtra && promoData.promasExtra.length > 0) {
-      _promasExtraSource = promoData.promasExtra; window._takingPromasExtra = _promasExtraSource;
-    }
-    if (_promasExtraSource.length === 0 && window._takingData && window._takingData.promasExtra && window._takingData.promasExtra.length > 0) {
-      _promasExtraSource = window._takingData.promasExtra; window._takingPromasExtra = _promasExtraSource;
-      if (promoData) promoData.promasExtra = _promasExtraSource;
-    }
-    const promasExtraPendientes = _promasExtraSource.filter(p => p && (p.nombre || p.name));
+    // promasExtraPendientes: 2da/3ra promo independiente del ticket (si las hay)
+    const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
     // slotActual: funciona tanto en updateFinishButtons (donde slot1 existe) como en finishSlot1
     const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
 
     let html = '';
     if (puedeTodo) {
       if (promasExtraPendientes.length > 0) {
+        // Hay otra promo independiente pendiente (ej: promo 2 pestañas+cejas)
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
-        if (window._finishingData) window._finishingData.promasExtraPendientes = promasExtraPendientes;
-        else window._pendingPromasExtra = promasExtraPendientes;
-        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; if(window._finishingData) window._finishingData.promasExtraPendientes=${JSON.stringify(promasExtraPendientes)}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente promo)</button>`;
       } else {
         // No hay promasExtra — promo de una sola área o ya es la última
@@ -3647,19 +3632,10 @@ if ('caches' in window) {
                 if (atencion && atencion.promoNombre) {
                   const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
                   if (promoFull) {
-                    const _promasExtraAtReg = (window._takingPromasExtra && window._takingPromasExtra.length > 0)
-                      ? window._takingPromasExtra
-                      : (window._takingData && window._takingData.promasExtra && window._takingData.promasExtra.length > 0)
-                        ? window._takingData.promasExtra : [];
-                    if (_promasExtraAtReg.length > 0 && !window._takingPromasExtra?.length) {
-                      window._takingPromasExtra = _promasExtraAtReg;
-                      try { const _idReg = window._as1IdEspera||''; if(_idReg) sessionStorage.setItem('nexserv_promasExtra_'+_idReg, JSON.stringify(_promasExtraAtReg)); } catch(eR) {}
-                    }
                     activePromos[clientKey] = {
                       promo: promoFull,
                       startedBy: window.currentUser?.area || 'cejas',
                       completedAreas: [],
-                      promasExtra: _promasExtraAtReg,
                       _metadata: { displayName: clientName }
                     };
                     saveActivePromos();
@@ -5094,8 +5070,6 @@ if ('caches' in window) {
   }
 
   async function finishAndSend() {
-    if (window._finishInProgress) return;
-    window._finishInProgress = true;
     // Mandar directo a cobrar (finaliza completamente)
     closeModal();
     const user = window.currentUser;
@@ -5253,12 +5227,11 @@ if ('caches' in window) {
           serviciosDetalle: desgloseAcumulado
         });
       }
-    } catch (err) { window._finishInProgress = false; console.error('❌ Error en apiPost finalizarServicio:', err); }
+    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); }
 
     // ── LIMPIEZA: siempre limpiar el slot independientemente del resultado del backend ──
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
     if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
-    window._finishInProgress = false;
     window._as1IdEspera = '';
     window._as1Client = '';
     window._finishingData = null;
@@ -6956,25 +6929,6 @@ if ('caches' in window) {
   // ========== SECUENCIA DE SERVICIOS ==========
   let _secuencia = []; // [{area, label}]
 
-  function getFirstAreaFromPromo(promo) {
-    const areaMapKey = (str) => {
-      const s = String(str||'').toLowerCase();
-      return s.includes('pest')||s.includes('lifting')||s.includes('retiro') ? 'pestanas'
-        : s.includes('facial')||s.includes('hidra') ? 'facial'
-        : s.includes('depil')||s.includes('bikini') ? 'depilacion'
-        : 'cejas';
-    };
-    if (typeof _secuencia !== 'undefined' && _secuencia && _secuencia.length > 0)
-      return String(_secuencia[0].area || 'cejas').toLowerCase();
-    if (window._secuenciaGuardada && window._secuenciaGuardada.length > 0)
-      return String(window._secuenciaGuardada[0].area || 'cejas').toLowerCase();
-    if (promo && promo.division && promo.division.length > 0)
-      return areaMapKey(promo.division[0].area);
-    return 'cejas';
-  }
-
-  const AREA_KEY_TO_LABEL = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
-
   const AREA_LABELS_SEC = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
   const AREA_ICONS_SEC = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
 
@@ -7771,7 +7725,9 @@ if ('caches' in window) {
       const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
-        await Promise.all([renderAuthorizations(), loadMikaelaHome()]);
+        // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
+        // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
+        await renderAuthorizations(); // Reload list
       } else {
         alert('Error: ' + (result.message || 'No se pudo aprobar'));
       }
@@ -8319,27 +8275,6 @@ if ('caches' in window) {
     });
     btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)';
 
-    // Mostrar/ocultar campos de pago mixto
-    let mixtoEl = document.getElementById('cobrarMixtoFields');
-    if (metodo === 'Mixto') {
-      if (!mixtoEl) {
-        mixtoEl = document.createElement('div');
-        mixtoEl.id = 'cobrarMixtoFields';
-        mixtoEl.style.cssText = 'background:var(--bg);border-radius:16px;padding:14px;margin-bottom:12px;';
-        const totalActual = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
-        mixtoEl.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;letter-spacing:.04em;">DESGLOSE MIXTO</div>
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;"><label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">💵 Efectivo</label><input id="mixtoEfectivo" type="number" min="0" step="0.01" placeholder="0.00" style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);" oninput="calcMixtoResto()" /></div>
-          <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;"><label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">💳 Tarjeta</label><input id="mixtoTarjeta" type="number" min="0" step="0.01" placeholder="0.00" style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);" oninput="calcMixtoResto()" /></div>
-          <div style="display:flex;gap:10px;align-items:center;"><label style="font-size:12px;font-weight:700;width:80px;color:var(--ink-soft);">📱 Transfer.</label><input id="mixtoTransferencia" type="number" min="0" step="0.01" placeholder="0.00" style="flex:1;padding:10px 12px;border-radius:var(--radius-pill);border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);" oninput="calcMixtoResto()" /></div>
-          <div id="mixtoResto" style="font-size:12px;font-weight:700;margin-top:10px;text-align:center;color:var(--ink-soft);"></div>`;
-        const cobrarBtn = document.getElementById('cobrarBtn');
-        cobrarBtn.parentNode.insertBefore(mixtoEl, cobrarBtn);
-      }
-      mixtoEl.style.display = 'block';
-    } else {
-      if (mixtoEl) mixtoEl.style.display = 'none';
-    }
-
     const aviso      = document.getElementById('cobrarTarjetaAviso');
     const totalEl    = document.getElementById('cobrarTotal');
     const promoBanner= document.getElementById('cobrarPromoBanner');
@@ -8392,20 +8327,6 @@ if ('caches' in window) {
     }
   }
 
-  function calcMixtoResto() {
-    const total = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
-    const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
-    const ta = parseFloat(document.getElementById('mixtoTarjeta')?.value || 0) || 0;
-    const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
-    const suma = ef + ta + tr;
-    const resto = Math.round((total - suma) * 100) / 100;
-    const restoEl = document.getElementById('mixtoResto');
-    if (!restoEl) return;
-    if (Math.abs(resto) < 0.01) { restoEl.textContent = '✓ Total cuadra'; restoEl.style.color = 'var(--success)'; }
-    else if (resto > 0) { restoEl.textContent = 'Faltan $' + resto.toFixed(2); restoEl.style.color = 'var(--danger)'; }
-    else { restoEl.textContent = 'Sobran $' + Math.abs(resto).toFixed(2); restoEl.style.color = 'var(--warning, #f59e0b)'; }
-  }
-
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
     btn.textContent = '⏳ Procesando...';
@@ -8444,26 +8365,6 @@ if ('caches' in window) {
         btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
       }
       return;
-    }
-
-    // Pago mixto: validar que los montos cuadren
-    if (window._cobrarPago === 'Mixto') {
-      const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
-      const ta = parseFloat(document.getElementById('mixtoTarjeta')?.value || 0) || 0;
-      const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
-      const totalMixto = ef + ta + tr;
-      const totalEsperado = window._cobrarTotalConProductos || window._cobrarTotalPromo || 0;
-      if (Math.abs(totalMixto - totalEsperado) > 0.05) {
-        alert('El total ingresado ($' + totalMixto.toFixed(2) + ') no cuadra con $' + totalEsperado.toFixed(2) + '. Ajustá los montos.');
-        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
-        return;
-      }
-      const partes = [];
-      if (ef > 0) partes.push('Efectivo $' + ef.toFixed(2));
-      if (ta > 0) partes.push('Tarjeta $' + ta.toFixed(2));
-      if (tr > 0) partes.push('Transferencia $' + tr.toFixed(2));
-      window._cobrarPago = 'Mixto: ' + partes.join(' + ');
-      window._cobroPago  = window._cobrarPago;
     }
 
     // Si tiene promo y paga con tarjeta, cobrar precio regular
