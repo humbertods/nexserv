@@ -11535,22 +11535,13 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
-      // CRÍTICO: reordenar según la secuencia de Mikaela antes de crear el TM
-      const secuenciaKeysGTL = (_secuencia || []).map(s => String(s.area || '').toLowerCase());
-      if (secuenciaKeysGTL.length > 0) {
-        areasMulti.sort((a, b) => {
-          const ia = secuenciaKeysGTL.indexOf(String(a.area || '').toLowerCase());
-          const ib = secuenciaKeysGTL.indexOf(String(b.area || '').toLowerCase());
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        });
-      }
       const tmData = {
         codigo:       codigo,
         nombre:       nombre,
         prioridad:    prioridad,
         observaciones: obs,
         areas:        areasMulti,
-        secuencia:    _secuencia.map(s => s.area)
+        secuencia:    _secuencia.map(s => s.area) // ['pestanas','cejas'] etc
       };
 
       try {
@@ -11603,17 +11594,23 @@ if ('caches' in window) {
       if (_tipoRD === 'multi') {
         area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
       } else if (_tipoRD === 'promo') {
-        // Para promo: usar el área de la primera promo seleccionada
-        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
-        if (promo && promo.division && promo.division.length > 0) {
-          const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
-          const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
-          const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
-            : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
-            : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
-            : divStr2.includes('ceja') ? 'cejas' : 'cejas';
-          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
-          area = areaMapRD[areaKeyRD] || 'Cejas';
+        // REGLA: si Mikaela definió una secuencia, esa manda — no el área de la división
+        if (_secuencia && _secuencia.length > 0) {
+          const areaMapSeqP = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro' };
+          area = areaMapSeqP[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+        } else {
+          // Sin secuencia: calcular desde la división de la promo
+          const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+          if (promo && promo.division && promo.division.length > 0) {
+            const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
+            const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
+            const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
+              : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
+              : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
+              : divStr2.includes('ceja') ? 'cejas' : 'cejas';
+            const areaMapRD = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial' };
+            area = areaMapRD[areaKeyRD] || 'Cejas';
+          }
         }
       } else {
         area = document.getElementById('arrArea')?.value || 'Cejas';
@@ -11651,7 +11648,15 @@ if ('caches' in window) {
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
         if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
-        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
+        else if (_tipoRD2 === 'promo') {
+          if (_secuencia && _secuencia.length > 0) {
+            const _aMSP2 = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
+            area2 = _aMSP2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+          } else {
+            const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p));
+            if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; }
+          }
+        }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
@@ -11786,19 +11791,6 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
-      // CRÍTICO: reordenar areasMultiGA según la secuencia definida por Mikaela
-      // Sin esto, el área del formulario principal siempre queda en posición 0
-      // aunque la secuencia diga que debe atenderse después
-      const secuenciaKeys = (_secuencia || []).map(s => String(s.area || '').toLowerCase());
-      if (secuenciaKeys.length > 0) {
-        areasMultiGA.sort((a, b) => {
-          const ia = secuenciaKeys.indexOf(String(a.area || '').toLowerCase());
-          const ib = secuenciaKeys.indexOf(String(b.area || '').toLowerCase());
-          const pa = ia === -1 ? 99 : ia;
-          const pb = ib === -1 ? 99 : ib;
-          return pa - pb;
-        });
-      }
       try {
         const tmResult = await apiPost('crearTicketMulti', {
           codigo:       codigo,
