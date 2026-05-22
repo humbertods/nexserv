@@ -3245,12 +3245,26 @@ if ('caches' in window) {
         var miNombre = user && user.name ? user.name : '';
         var slotN = slot1 ? 1 : 2;
 
-        // Áreas pendientes (no completadas, no en servicio por esta staff)
+        // Áreas pendientes (no completadas)
         var areasEsperando = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
-        var hayMas = areasEsperando.length > 0;
+
+        // Respetar la secuencia del TM para mostrar el área correcta como "siguiente"
+        var sig = null;
+        if (areasEsperando.length > 0) {
+          if (tm.secuencia && tm.secuencia.length > 0) {
+            for (var si = 0; si < tm.secuencia.length; si++) {
+              var seqA = String(tm.secuencia[si]).trim().toLowerCase();
+              var matchA = areasEsperando.filter(function(a) {
+                return String(a.area||'').trim().toLowerCase() === seqA;
+              })[0];
+              if (matchA) { sig = matchA; break; }
+            }
+          }
+          if (!sig) sig = areasEsperando[0]; // fallback
+        }
+        var hayMas = sig !== null;
 
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
@@ -3980,9 +3994,8 @@ if ('caches' in window) {
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
 
-    // ── TICKET MULTI (TM): mostrar modal normal directamente ──────────────────
-    // El TM maneja la asignación de áreas en su propio flujo (handleTomarAreaTicketMulti)
-    // No debe activarse el split de depilación aunque el servicio contenga "Depi"
+    // ── TICKET MULTI (TM): ir directo al modal normal ─────────────────────────
+    // El TM asigna áreas en el backend — no mostrar checkboxes de depilación
     if (String(w.id || '').startsWith('TM-')) {
       splitEl.style.display = 'none';
       normalEl.style.display = 'block';
@@ -4207,7 +4220,11 @@ if ('caches' in window) {
         const a = aten[slot];
         if (slot === 0) {
           window._as1Client = a.codigo;
-          window._as1IdEspera = a.idEspera || window._takingId || ''; // ID ticket LE-XXXX
+          // FIX: si se tomó un TM, _as1IdEspera siempre es el TM-XXXX
+          const takingIdRaw = String(window._takingId || '');
+          window._as1IdEspera = takingIdRaw.startsWith('TM-')
+            ? takingIdRaw
+            : (a.idEspera || takingIdRaw || '');
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as1Avatar').textContent = initials;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
@@ -4267,7 +4284,7 @@ if ('caches' in window) {
           }
 
           // Si viene con servicio normal (NO promo), cargarlo
-          // Para TM: NO cargar aquí — se cargará en el bloque getTicketMulti con el precio correcto del área
+          // Para TM: NO cargar aquí — getTicketMulti cargará solo el precio del área de esta staff
           const esTMActual = window._as1IdEspera && window._as1IdEspera.startsWith('TM-');
           if (!esTMActual && a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo && !(window._depiMisParts && window._depiMisParts.length > 0)) {
             // El servicio puede venir como JSON string {"nombre":"...","precio":17} o como texto plano
@@ -11604,7 +11621,13 @@ if ('caches' in window) {
       const _tipoRD = window._arrTipo || 'normal';
       let area = 'Cejas';
       if (_tipoRD === 'multi') {
-        area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+        // REGLA: si hay secuencia definida, la primera área de la secuencia manda
+        if (_secuencia && _secuencia.length > 0) {
+          const areaMapSeq = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro' };
+          area = areaMapSeq[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+        } else {
+          area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+        }
       } else if (_tipoRD === 'promo') {
         // Para promo: usar el área de la primera promo seleccionada
         const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
@@ -11653,7 +11676,14 @@ if ('caches' in window) {
         });
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
-        if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
+        if (_tipoRD2 === 'multi') {
+          if (_secuencia && _secuencia.length > 0) {
+            const areaMapSeq2 = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro' };
+            area2 = areaMapSeq2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+          } else {
+            area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+          }
+        }
         else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
@@ -11713,7 +11743,13 @@ if ('caches' in window) {
     // Leer área correctamente según tipo
     let area = 'Cejas';
     if (tipo === 'multi') {
-      area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+      // REGLA: secuencia[0] manda siempre para el área de asignación del TM
+      if (_secuencia && _secuencia.length > 0) {
+        const areaMapSeqGA = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro' };
+        area = areaMapSeqGA[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+      } else {
+        area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+      }
     } else if (tipo === 'promo') {
       // Para promo: área de la primera promo asignada
       // Secuencia manda: si hay secuencia definida, usar _secuencia[0]
