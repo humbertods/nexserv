@@ -1663,13 +1663,13 @@ if ('caches' in window) {
             <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
             <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
           </div>
-          <div id="addSvcNoteWrapper" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
-            <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">⚠️ Requiere autorización de Mikaela</div>
-            <div style="font-size: 11px; color: #856404; margin-bottom: 10px;">Todo servicio adicional debe ser aprobado</div>
-            <label style="font-size: 12px; font-weight: 600; color: #856404; display: block; margin-bottom: 6px;">📝 Nota para Mikaela (obligatoria):</label>
-            <textarea id="addSvcNote" placeholder="Ej: La clienta quiere agregar diseño completo, está interesada hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 70px; resize: vertical; box-sizing: border-box;"></textarea>
+          <!-- Indicador automático de tipo — se actualiza al elegir el servicio -->
+          <div id="addSvcTipoIndicator" style="display:none; border-radius: 14px; padding: 12px 16px; margin-bottom: 12px; font-size: 12px; font-weight: 700;"></div>
+          <div id="addSvcNoteWrapper" style="margin-bottom: 14px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--ink-soft); display: block; margin-bottom: 6px;">📝 Nota para Mikaela (opcional):</label>
+            <textarea id="addSvcNote" placeholder="Ej: La clienta quiere agregar diseño completo." style="width: 100%; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 60px; resize: vertical; box-sizing: border-box;"></textarea>
           </div>
-          <button class="btn-primary" onclick="confirmAddService()" id="addSvcConfirmBtn">Solicitar autorización</button>
+          <button class="btn-primary" onclick="confirmAddService()" id="addSvcConfirmBtn">⏳ Solicitar a Mikaela</button>
         </div>
 
         <!-- TAB: PROMO -->
@@ -4012,57 +4012,6 @@ if ('caches' in window) {
       document.getElementById('takeModal').classList.add('active');
       return;
     }
-
-    // ── PROMO MULTI-ÁREA: divisiones de diferentes áreas ──────
-    // Cuando una promo tiene divisiones de áreas distintas (ej: Cejas + Pestañas),
-    // mostrar split para que la staff elija si hace todo o solo su parte.
-    // Mandamiento: la staff siempre elige antes de empezar.
-    if (w.promoNombre && w.promoNombre.trim() !== '' && typeof PROMOS !== 'undefined') {
-      const promoParaSplit = PROMOS.find(p => p.name === w.promoNombre);
-      if (promoParaSplit && promoParaSplit.division && promoParaSplit.division.length > 1) {
-        // Detectar si hay divisiones de áreas realmente diferentes
-        const AREA_FAMILIA = {
-          cejas: ['ceja', 'depil', 'bigot', 'pigment', 'brow'],
-          pestanas: ['pest', 'lifting', 'retiro', 'volumen', 'pelo a pelo', 'clasic', 'efecto', 'natural', 'hawaiano'],
-          facial: ['facial', 'hidra', 'limpiez']
-        };
-        const getFamilia = (texto) => {
-          const t = String(texto || '').toLowerCase();
-          for (const [familia, keys] of Object.entries(AREA_FAMILIA)) {
-            if (keys.some(k => t.includes(k))) return familia;
-          }
-          return 'otro';
-        };
-        const familias = [...new Set(promoParaSplit.division.map(d => getFamilia(d.area)))];
-        const esMultiArea = familias.length > 1;
-
-        if (esMultiArea) {
-          // Construir items desde las divisiones de la promo
-          const userArea = window.currentUser ? window.currentUser.area : '';
-          const misFamilias = AREA_FAMILIA[userArea] || [userArea];
-          const items = promoParaSplit.division.map(d => {
-            const familia = getFamilia(d.area);
-            const esMia = familia === userArea ||
-              (userArea === 'cejas' && ['cejas','depilacion'].includes(familia)) ||
-              misFamilias.some(k => String(d.area||'').toLowerCase().includes(k));
-            return {
-              nombre: String(d.area || '').replace('💅 ', '').replace('👁 ', '').replace('✨ ', ''),
-              precio: Number(d.monto || 0),
-              checked: esMia, // pre-marcar solo las divisiones de esta staff
-              familia: familia
-            };
-          });
-          window._depiItems = items;
-          window._depiEsPromoMultiArea = true; // flag para distinguirlo de depilación normal
-          splitEl.style.display = 'block';
-          normalEl.style.display = 'none';
-          renderDepiItems();
-          document.getElementById('takeModal').classList.add('active');
-          return;
-        }
-      }
-    }
-    window._depiEsPromoMultiArea = false;
 
     // ── DEPILACIÓN CORPORAL: múltiples ítems ──
     const esDepi = w.area === 'depilacion' || servicioStr0.toLowerCase().includes('depi') || servicioStr0.toLowerCase().includes('bikini') || servicioStr0.toLowerCase().includes('pierna') || servicioStr0.toLowerCase().includes('axila');
@@ -11298,29 +11247,77 @@ if ('caches' in window) {
 
   function updateAddServicePrice() {
     const val = document.getElementById('addSvcService').value;
-    if (!val) { document.getElementById('addSvcPriceDisplay').style.display = 'none'; return; }
+    const ind = document.getElementById('addSvcTipoIndicator');
+    if (!val) {
+      document.getElementById('addSvcPriceDisplay').style.display = 'none';
+      if (ind) ind.style.display = 'none';
+      return;
+    }
     const svc = JSON.parse(val);
     document.getElementById('addSvcPrice').textContent = '$' + svc.price;
     document.getElementById('addSvcPriceDisplay').style.display = 'block';
+
+    // Mandamiento #3: mostrar tipo automáticamente
+    if (ind && typeof esMismaAreaM3 !== 'undefined') {
+      const staffArea = window.currentUser?.area || 'cejas';
+      const mismo = esMismaAreaM3(staffArea, svc.area);
+      const areaLabels = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
+      if (mismo) {
+        ind.style.cssText = 'display:block;border-radius:14px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;background:var(--success-bg,#e8f5e9);color:var(--success,#2a7a4b);border:1.5px solid var(--success,#2a7a4b);';
+        ind.innerHTML = '✅ <strong>Tu área</strong> — Mikaela aprueba → suma a tu servicio';
+      } else {
+        ind.style.cssText = 'display:block;border-radius:14px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;background:#fff8e1;color:#8a6d00;border:1.5px solid #f0c040;';
+        ind.innerHTML = '🔗 <strong>Enganche a ' + (areaLabels[svc.area] || svc.area) + '</strong> — Mikaela aprueba → va a lista para otra staff';
+      }
+    }
   }
+
+  // ============================================================
+  // MANDAMIENTO #3 — SERVICIOS EXTRA
+  // ============================================================
+  // Todo servicio extra requiere autorización de Mikaela.
+  // La diferencia entre los 2 tipos se detecta automáticamente:
+  //
+  // Tipo 1 — Mismo área: Mikaela aprueba → suma al total de esa staff
+  // Tipo 2 — Otra área:  Mikaela aprueba → va a lista de espera
+  //                      para que la staff de esa área lo tome
+  //
+  // Ambos tipos son infinitamente repetibles.
+  // La staff NO necesita nota obligatoria — el tipo se detecta solo.
+  // ============================================================
+  const AREA_FAMILIA_M3 = {
+    cejas:         ['cejas', 'ceja', 'depilacion', 'depil', 'bigote', 'bigot', 'pigment', 'brow'],
+    pestanas:      ['pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen', 'pelo a pelo', 'clasic', 'efecto', 'natural', 'hawaiano'],
+    facial:        ['facial', 'hidra', 'limpiez', 'dermaplaning'],
+    retiro_lifting:['retiro', 'lifting', 'pest', 'pestanas']
+  };
+  function esMismaAreaM3(staffArea, servicioArea) {
+    const sa = String(staffArea || '').toLowerCase();
+    const sv = String(servicioArea || '').toLowerCase();
+    if (sa === sv) return true;
+    const familiaStaff = AREA_FAMILIA_M3[sa] || [sa];
+    return familiaStaff.some(k => sv.includes(k) || k.includes(sv));
+  }
+  window.esMismaAreaM3 = esMismaAreaM3;
+  // ── FIN MANDAMIENTO #3 ───────────────────────────────────────
 
   async function confirmAddService() {
     const val = document.getElementById('addSvcService').value;
     if (!val) { alert('Seleccioná un servicio'); return; }
-    
+
     const svc = JSON.parse(val);
     const slot = window._addServiceSlot || 1;
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
     const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+    const svcAreaKey = svc.area;
     svc.area = areaNames[svc.area] || svc.area;
 
-    // MODO ENGANCHE: Staff 2 cambia servicio directamente sin autorización
+    // MODO ENGANCHE: Staff 2 cambia servicio directamente (ya fue aprobado antes)
     if (window._modoEnganche) {
       window._modoEnganche = false;
       const engIdx = window._editEngancheIdx;
-      // Reemplazar el servicio en el slot
-      svc.status = undefined; // sin estado = aprobado por defecto
+      svc.status = undefined;
       if (slotServices[slot] && engIdx !== undefined) {
         slotServices[slot][engIdx] = svc;
       } else {
@@ -11331,42 +11328,33 @@ if ('caches' in window) {
       const total = slotServices[slot].reduce((s, v) => s + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
       document.getElementById('as' + slot + 'Total').textContent = '$' + total;
       document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
-      // Restaurar modal a modo normal
-      const modalTitle = document.querySelector('#addServiceModal .modal-title');
-      if (modalTitle) modalTitle.textContent = '➕ Agregar servicio';
-      const noteGroup = document.getElementById('addSvcNote')?.closest('.input-group');
-      if (noteGroup) noteGroup.style.display = 'block';
       closeModal();
       syncServiciosBackend(slot, total);
-      alert('✓ Servicio de enganche actualizado a: ' + svc.name + ' ($' + svc.price + ')');
+      showToast('✓ Servicio de enganche actualizado: ' + svc.name);
       return;
     }
 
-    // MODO NORMAL: requiere nota y autorización de Mikaela
-    // Solo validar nota si NO estamos en modo enganche
-    if (!window._modoEnganche) {
-      const note = document.getElementById('addSvcNote').value.trim();
-      if (!note || note.length < 10) {
-        alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
-        return;
-      }
-      svc.status = 'pendiente';
-      svc.note = note;
-      svc.requestedBy = user?.name || 'Staff';
-      svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
-      if (addServiceToSlot(slot, svc)) {
-        document.getElementById('addSvcNote').value = '';
-        closeModal();
-        await sendAuthorizationRequest(clientName, svc, slot);
-        recargarAutorizacionesStaff(slot);
-        alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
-      }
-      return;
-    }
+    // ── SIEMPRE: solicitar autorización a Mikaela ────────────────
+    // La nota es opcional — el tipo se detecta automáticamente por área
+    const staffArea = user?.area || 'cejas';
+    const mismo = esMismaAreaM3(staffArea, svcAreaKey);
+    const tipoLabel = mismo ? 'mismo área' : 'enganche a ' + (areaNames[svcAreaKey] || svcAreaKey);
+    const note = document.getElementById('addSvcNote').value.trim()
+      || (mismo ? 'Servicio extra ' + tipoLabel : 'Enganche → ' + svc.area);
 
-    // MODO ENGANCHE: llegamos aquí si _modoEnganche estaba true pero no se procesó arriba
-    // (por si el bloque enganche de arriba falló por alguna razón de índice)
-    window._modoEnganche = false;
+    svc.status = 'pendiente';
+    svc.note = note;
+    svc.requestedBy = user?.name || 'Staff';
+    svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    svc.tipoExtra = mismo ? 'mismo-area' : 'enganche'; // usado por recargarAutorizacionesStaff
+
+    if (addServiceToSlot(slot, svc)) {
+      document.getElementById('addSvcNote').value = '';
+      closeModal();
+      await sendAuthorizationRequest(clientName, svc, slot);
+      recargarAutorizacionesStaff(slot);
+      showToast('⏳ Esperando aprobación de Mikaela — ' + svc.name + ' ($' + svc.price + ') · ' + tipoLabel);
+    }
   }
   
   async function sendAuthorizationRequest(clientName, service, slot) {
