@@ -3248,7 +3248,6 @@ if ('caches' in window) {
         var areasEsperando = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        // Respetar la secuencia para mostrar el área correcta como "siguiente"
         var sig = null;
         if (areasEsperando.length > 0) {
           if (tm.secuencia && tm.secuencia.length > 0) {
@@ -4215,7 +4214,6 @@ if ('caches' in window) {
         const a = aten[slot];
         if (slot === 0) {
           window._as1Client = a.codigo;
-          // Fix: si se tomó un TM, _as1IdEspera siempre es el TM-XXXX
           const _tIdRaw = String(window._takingId || '');
           window._as1IdEspera = _tIdRaw.startsWith('TM-') ? _tIdRaw : (a.idEspera || _tIdRaw || '');
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
@@ -4276,7 +4274,6 @@ if ('caches' in window) {
             window._esSplitDepi = false;
           }
 
-          // Para TM: NO cargar aquí — getTicketMulti carga solo el precio del área de esta staff
           const _esTMNow = window._as1IdEspera && window._as1IdEspera.startsWith('TM-');
           if (!_esTMNow && a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo && !(window._depiMisParts && window._depiMisParts.length > 0)) {
             // El servicio puede venir como JSON string {"nombre":"...","precio":17} o como texto plano
@@ -11451,12 +11448,15 @@ if ('caches' in window) {
     }
 
     // Mapear área a clave interna
-    // REGLA: la secuencia definida por Mikaela manda siempre.
-    // _secuencia[0].area es el primer área que debe atenderse.
+    // REGLA: areaKey = área REAL del servicio principal (del formulario, NO de la secuencia)
+    // La secuencia define el ORDEN de atención, no el área de cada servicio
     let areaKey = '';
 
-    // 1) Si hay secuencia definida → usar el primer área de la secuencia
-    if (_secuencia && _secuencia.length > 0) {
+    // Para multi: usar el área del selector del formulario
+    if (tipo === 'multi') {
+      const areaMapM = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
+      areaKey = areaMapM[document.getElementById('arrAreaMulti')?.value || 'Cejas'] || 'cejas';
+    } else if (_secuencia && _secuencia.length > 0) {
       areaKey = String(_secuencia[0].area || '').toLowerCase();
     }
 
@@ -11613,6 +11613,7 @@ if ('caches' in window) {
       const _tipoRD = window._arrTipo || 'normal';
       let area = 'Cejas';
       if (_tipoRD === 'multi') {
+        // Para mostrar el staff correcto, usar la primera área de la secuencia
         if (_secuencia && _secuencia.length > 0) {
           const _aMS = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
           area = _aMS[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
@@ -11728,8 +11729,16 @@ if ('caches' in window) {
     const obsEl  = tipo === 'promo' ? document.getElementById('arrObsPromo') : tipo === 'multi' ? document.getElementById('arrObsMulti') : document.getElementById('arrObs');
 
     // Leer área correctamente según tipo
+    // Para mostrar el staff correcto en asignación directa: usar secuencia[0] si hay secuencia
+    // Para el área REAL del servicio principal en el TM: usar el selector del formulario
     let area = 'Cejas';
+    let areaKeyFormulario = 'cejas'; // área real del servicio principal
     if (tipo === 'multi') {
+      areaKeyFormulario = (function(){
+        const _aM = {'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial'};
+        return _aM[document.getElementById('arrAreaMulti')?.value || 'Cejas'] || 'cejas';
+      })();
+      // Para mostrar el staff correcto: secuencia[0] manda
       if (_secuencia && _secuencia.length > 0) {
         const _aMSGA = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
         area = _aMSGA[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
@@ -11764,7 +11773,8 @@ if ('caches' in window) {
     const promo = window._arrPromo || null;
 
     const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    const areaKey = areaMap[area] || 'cejas';
+    // Para TM: el área del servicio principal = área REAL del formulario (no secuencia[0])
+    const areaKey = tipo === 'multi' ? areaKeyFormulario : (areaMap[area] || 'cejas');
 
     const postData = {
       codigo: codigo,
