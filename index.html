@@ -633,10 +633,24 @@ if ('caches' in window) {
         <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
         
         <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
-        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
           <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
           <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
           <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
+          <button onclick="selectPago('Mixto', this)" class="pago-btn" style="flex: 1; padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">🔀 Mixto</button>
+        </div>
+        <!-- Panel pago mixto (visible solo al seleccionar Mixto) -->
+        <div id="cobrarMixtoPanel" style="display:none; background:var(--bg); border-radius:16px; padding:14px 16px; margin-bottom:14px; border:1.5px solid var(--line);">
+          <div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--ink-soft);">Indicá cuánto paga con cada método</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <div style="font-size:13px;font-weight:600;width:90px;">💵 Efectivo</div>
+            <input type="number" id="mixtoEfectivo" placeholder="0" min="0" step="0.01" oninput="recalcMixto()" style="flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:600;">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <div style="font-size:13px;font-weight:600;width:90px;">📱 Transfer.</div>
+            <input type="number" id="mixtoTransferencia" placeholder="0" min="0" step="0.01" oninput="recalcMixto()" style="flex:1;padding:10px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:600;">
+          </div>
+          <div id="mixtoDiferencia" style="font-size:12px;color:var(--ink-soft);font-weight:600;margin-top:4px;text-align:right;"></div>
         </div>
         
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
@@ -5167,15 +5181,11 @@ if ('caches' in window) {
     }
 
     // ── PASO 4: Construir desglose ─────────────────────────────────────────────
-    // BUG 4 FIX: incluir montoNormal para que Apps Script calcule bien la comisión con tarjeta
     const desgloseActual = svcsAprobados.map(s => ({
       staff: user?.name || '',
       servicio: s.name,
       area: s.area || user?.area || '',
-      monto: Number(s.price || 0),
-      montoNormal: promoDataFresh
-        ? Math.round(Number(s.price || 0) / (promoDataFresh.promo.price || 1) * (promoDataFresh.promo.regular || promoDataFresh.promo.price || 1))
-        : Number(s.price || 0)
+      monto: Number(s.price || 0)
     }));
 
     // Base: desglose del sheet (partes de staffs anteriores) + lo que hay en memoria
@@ -6291,19 +6301,11 @@ if ('caches' in window) {
     const montoComision = total;
 
     // Construir desglose
-    // BUG 4 FIX: incluir montoNormal para que Apps Script use precio regular al pagar con tarjeta
-    const montoRegularSlot2 = promoData
-      ? (() => {
-          const ratio = promoData.promo.price > 0 ? (total / promoData.promo.price) : 1;
-          return Math.round(Number(promoData.promo.regular) * ratio);
-        })()
-      : total;
     const desgloseSlot2 = svcs.filter(s => s.status !== 'rechazado').map(s => ({
       staff: user?.name || '',
       servicio: s.name,
       area: s.area || '',
-      monto: Number(s.price || 0),
-      montoNormal: promoData ? Math.round(Number(s.price || 0) / (promoData.promo.price || 1) * (promoData.promo.regular || promoData.promo.price || 1)) : Number(s.price || 0)
+      monto: Number(s.price || 0)
     }));
 
     // Leer desglose previo del sheet si es ticket SP- (áreas anteriores ya registradas)
@@ -8170,6 +8172,7 @@ if ('caches' in window) {
     const _tienePrecioDistinto = Number(precioRegular) > 0 && Number(precioRegular) !== Number(total);
     window._cobrarTienePromo = (promoNombre && promoNombre !== '' && promoNombre !== 'undefined') || _tienePrecioDistinto;
     window._cobrarDesglose = null;
+    window._cobrarMixto = null; // limpiar pago mixto previo
 
     document.getElementById('cobrarClientName').textContent = nombre;
     document.getElementById('cobrarTarjetaAviso').style.display = 'none';
@@ -8205,7 +8208,13 @@ if ('caches' in window) {
       subtotalEl.textContent = '$' + subtotalNum.toFixed(2);
       window._cobrarTotalPromo = subtotalNum;
       const subtotalNormal = desglose.reduce((s, d) => s + Number(d.montoNormal || d.monto || 0), 0);
-      window._cobrarTotalRegular = subtotalNormal > subtotalNum ? subtotalNormal : (Number(precioRegular) || subtotalNum);
+      // ERROR 2 FIX: cuando hay promo, el precioRegular del ticket (ej $72) es la fuente de verdad.
+      // subtotalNormal puede estar incorrecto si alguna parte no tiene montoNormal definido.
+      const precioRegularParam = Number(precioRegular) || 0;
+      const mejorRegular = (window._cobrarTienePromo && precioRegularParam > subtotalNum)
+        ? precioRegularParam
+        : (subtotalNormal > subtotalNum ? subtotalNormal : (precioRegularParam || subtotalNum));
+      window._cobrarTotalRegular = mejorRegular;
       window._cobrarTienePromo = window._cobrarTienePromo || (window._cobrarTotalRegular > window._cobrarTotalPromo);
     } else {
       // Modo simple
@@ -8291,10 +8300,14 @@ if ('caches' in window) {
     const totalEl    = document.getElementById('cobrarTotal');
     const promoBanner= document.getElementById('cobrarPromoBanner');
     const subtotalEl = document.getElementById('cobrarSubtotal');
+    const mixtoPanel = document.getElementById('cobrarMixtoPanel');
 
     const tienePromo  = window._cobrarTienePromo;
     const totalPromo  = window._cobrarTotalPromo  || '0';
     const totalRegular= window._cobrarTotalRegular || totalPromo;
+
+    // Ocultar panel mixto por defecto
+    if (mixtoPanel) mixtoPanel.style.display = 'none';
 
     if (metodo === 'Tarjeta' && tienePromo) {
       aviso.style.display = 'block';
@@ -8302,12 +8315,7 @@ if ('caches' in window) {
       const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
       document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
       document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
-      // BUG 3 FIX: recalcular total con precio regular (no promo) + productos
-      const totalRegularNum = typeof totalRegular === 'number' ? totalRegular : Number(totalRegular);
-      const totalProductosActual = window._cobrarTotalProductos || 0;
-      const totalConProdRegular = totalRegularNum + totalProductosActual;
-      totalEl.textContent  = '$' + totalConProdRegular.toFixed(2);
-      window._cobrarTotalConProductos = totalConProdRegular; // BUG 3 FIX: actualizar para confirmarCobro
+      totalEl.textContent  = '$' + precioRegularDisplay;
       totalEl.style.color  = 'var(--danger)';
       promoBanner.style.display = 'none';
       if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
@@ -8323,14 +8331,38 @@ if ('caches' in window) {
           }).join('');
         }
       }
+    } else if (metodo === 'Mixto') {
+      // Pago mixto: efectivo + transferencia, precio con promo (no tarjeta)
+      aviso.style.display = 'none';
+      totalEl.textContent  = '$' + totalPromo;
+      totalEl.style.color  = 'var(--accent-deep)';
+      if (tienePromo) promoBanner.style.display = 'block';
+      if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
+      if (mixtoPanel) {
+        mixtoPanel.style.display = 'block';
+        // Resetear campos
+        const ef = document.getElementById('mixtoEfectivo');
+        const tr = document.getElementById('mixtoTransferencia');
+        if (ef) ef.value = '';
+        if (tr) tr.value = '';
+        const dif = document.getElementById('mixtoDiferencia');
+        if (dif) dif.textContent = 'Total a cubrir: $' + (typeof totalPromo === 'number' ? totalPromo.toFixed(2) : totalPromo);
+      }
+      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
+        if (itemsEl2) {
+          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
+            const montoPromo = Number(d.monto || 0);
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
+              <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
+              <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
+              <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${montoPromo.toFixed(2)}</div></div>`;
+          }).join('');
+        }
+      }
     } else {
       aviso.style.display = 'none';
-      // BUG 3 FIX: restaurar precio promo + productos al cambiar a Efectivo/Transferencia
-      const totalProductosActual2 = window._cobrarTotalProductos || 0;
-      const totalPromoNum = typeof totalPromo === 'number' ? totalPromo : Number(totalPromo);
-      const totalConProdPromo = totalPromoNum + totalProductosActual2;
-      totalEl.textContent  = '$' + (totalProductosActual2 > 0 ? totalConProdPromo.toFixed(2) : totalPromo);
-      window._cobrarTotalConProductos = totalConProdPromo; // BUG 3 FIX: restaurar para confirmarCobro
+      totalEl.textContent  = '$' + totalPromo;
       totalEl.style.color  = 'var(--accent-deep)';
       if (tienePromo) promoBanner.style.display = 'block';
       if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
@@ -8348,6 +8380,30 @@ if ('caches' in window) {
       if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
     }
   }
+
+  function recalcMixto() {
+    const totalPromo = window._cobrarTotalPromo || 0;
+    const ef = Number(document.getElementById('mixtoEfectivo')?.value || 0);
+    const tr = Number(document.getElementById('mixtoTransferencia')?.value || 0);
+    const suma = ef + tr;
+    const diferencia = Number(totalPromo) - suma;
+    const dif = document.getElementById('mixtoDiferencia');
+    if (dif) {
+      if (Math.abs(diferencia) < 0.01) {
+        dif.textContent = '✅ Total cubierto ($' + Number(totalPromo).toFixed(2) + ')';
+        dif.style.color = 'var(--success)';
+      } else if (diferencia > 0) {
+        dif.textContent = 'Falta: $' + diferencia.toFixed(2);
+        dif.style.color = 'var(--danger)';
+      } else {
+        dif.textContent = 'Excede en: $' + Math.abs(diferencia).toFixed(2);
+        dif.style.color = 'var(--warning)';
+      }
+    }
+    // Guardar desglose mixto para confirmarCobro
+    window._cobrarMixto = { efectivo: ef, transferencia: tr };
+  }
+  window.recalcMixto = recalcMixto;
 
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
@@ -8389,6 +8445,18 @@ if ('caches' in window) {
       return;
     }
 
+    // Pago mixto: validar que sume correctamente
+    if (window._cobrarPago === 'Mixto') {
+      const mixto = window._cobrarMixto || { efectivo: 0, transferencia: 0 };
+      const sumaM = mixto.efectivo + mixto.transferencia;
+      const totalEsperado = window._cobrarTotalPromo || 0;
+      if (Math.abs(sumaM - totalEsperado) > 0.05) {
+        alert('El pago mixto no suma correctamente.\n\nEfectivo: $' + mixto.efectivo.toFixed(2) + '\nTransferencia: $' + mixto.transferencia.toFixed(2) + '\nTotal: $' + sumaM.toFixed(2) + '\nEsperado: $' + Number(totalEsperado).toFixed(2));
+        btn.disabled = false; btn.textContent = '✓ Confirmar cobro';
+        return;
+      }
+    }
+
     // Si tiene promo y paga con tarjeta, cobrar precio regular
     const totalServicios = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
       ? window._cobrarTotalRegular
@@ -8398,11 +8466,22 @@ if ('caches' in window) {
     const totalProductos = window._cobrarTotalProductos || 0;
     const totalFinal = totalServicios + totalProductos;
 
+    // Para pago mixto, construir metodoPago descriptivo
+    const metodoPagoFinal = window._cobrarPago === 'Mixto'
+      ? (() => {
+          const m = window._cobrarMixto || {};
+          const partes = [];
+          if (m.efectivo > 0) partes.push('Efectivo $' + Number(m.efectivo).toFixed(2));
+          if (m.transferencia > 0) partes.push('Transferencia $' + Number(m.transferencia).toFixed(2));
+          return 'Mixto (' + partes.join(' + ') + ')';
+        })()
+      : window._cobrarPago;
+
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
       await apiPost('confirmarCobro', {
         idEspera: window._cobrarId,
-        metodoPago: window._cobrarPago,
+        metodoPago: metodoPagoFinal,
         totalCobrado: totalFinal,
         totalServicios: totalServicios,
         totalProductos: totalProductos
@@ -12234,22 +12313,16 @@ if ('caches' in window) {
       // Guardar copia de servicios ANTES de limpiar el slot
       window['_slotServicesBefore' + slot] = [...(slotServices[slot] || [])];
 
-      // BUG 1 FIX: calcular servicios aprobados ANTES de llamar al backend
-      // para incluir extras aprobados en montoChica y serviciosDetalle
-      const svcsHechosMu = (window['_slotServicesBefore' + slot] || slotServices[slot] || []).filter(function(s) {
-        return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
-      });
-      const totalHechoMu = svcsHechosMu.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
-      const desgloseParaMu = svcsHechosMu.map(function(s){ return { staff: user?.name||'', servicio: s.name, area: s.area||user?.area||'', monto: Number(s.price||0) }; });
-
       const r = await apiPost('completarAreaTicketMulti', {
         idEspera,
-        chicaNombre: user?.name || '',
-        montoChica: String(totalHechoMu),
-        serviciosDetalle: desgloseParaMu
+        chicaNombre: user?.name || ''
       });
       if (r.success) {
-        // totalHechoMu ya calculado arriba (incluye extras aprobados)
+        // Calcular comisión de esta staff
+        const svcsHechosMu = (window['_slotServicesBefore' + slot] || slotServices[slot] || []).filter(function(s) {
+          return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
+        });
+        const totalHechoMu = svcsHechosMu.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
         const pctMu = (user && user.area === 'facial') ? 0.4 : 0.3;
         const comisionMu = Math.round(totalHechoMu * pctMu * 100) / 100;
         const svcNombreMu = svcsHechosMu.map(function(s){ return s.name; }).join(' + ') || 'Servicio';
