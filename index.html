@@ -3580,87 +3580,6 @@ if ('caches' in window) {
     }
   }
 
-  // ============================================================
-  // ██████╗ ██╗ ██╗     ███████╗██╗   ██╗███████╗███████╗
-  // ██╔══██╗██║ ██║     ██╔════╝╚██╗ ██╔╝██╔════╝██╔════╝
-  // ██████╔╝██║ ██║     █████╗   ╚████╔╝ █████╗  ███████╗
-  // ██╔══██╗██║ ██║     ██╔══╝    ╚██╔╝  ██╔══╝  ╚════██║
-  // ██║  ██║██║ ███████╗███████╗   ██║   ███████╗███████║
-  // ╚═╝  ╚═╝╚═╝ ╚══════╝╚══════╝   ╚═╝   ╚══════╝╚══════╝
-  //
-  // LOS MANDAMIENTOS DEL SISTEMA — REGLAS INMUTABLES
-  // Nunca duplicar esta lógica en otro lugar del código.
-  // ============================================================
-
-  // ── MANDAMIENTO #1 — ÁREA PRIORITARIA ───────────────────────
-  // Todo servicio se guía por el orden que dicte Mikaela.
-  // Si Mikaela no toca la sección de orden → primer servicio del formulario.
-  // Esta es la ÚNICA fuente de verdad para el área prioritaria.
-  function getAreaPrioritaria(tipo) {
-    const AREA_LABEL = {
-      cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas',
-      facial: 'Facial', retiro_lifting: 'Lifting / Retiro'
-    };
-    const AREA_KEY = {
-      'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas',
-      'Facial': 'facial', 'Lifting / Retiro': 'retiro_lifting'
-    };
-    // Regla 1: secuencia de Mikaela manda siempre
-    if (_secuencia && _secuencia.length > 0) {
-      const key = String(_secuencia[0].area || '').toLowerCase();
-      return { key, label: AREA_LABEL[key] || 'Cejas' };
-    }
-    // Regla 2: sin secuencia → primer servicio del formulario
-    if (tipo === 'multi') {
-      const label = document.getElementById('arrAreaMulti')?.value || 'Cejas';
-      return { key: AREA_KEY[label] || 'cejas', label };
-    }
-    if (tipo === 'promo') {
-      const promo = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos && _arrPromos.find(p => p));
-      if (promo && promo.division && promo.division.length > 0) {
-        const divOrd = [...promo.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
-        const d = String(divOrd[0].area || '').toLowerCase();
-        const key = d.includes('pest') || d.includes('lifting') || d.includes('retiro') ? 'pestanas'
-          : d.includes('facial') || d.includes('hidra') ? 'facial'
-          : d.includes('depil') || d.includes('bikini') ? 'depilacion'
-          : 'cejas';
-        return { key, label: AREA_LABEL[key] || 'Cejas' };
-      }
-    }
-    const label = document.getElementById('arrArea')?.value || 'Cejas';
-    return { key: AREA_KEY[label] || 'cejas', label };
-  }
-  window.getAreaPrioritaria = getAreaPrioritaria;
-
-  // ── MANDAMIENTO #2 — CONFIRMACIÓN OBLIGATORIA ───────────────
-  // Toda staff, al tomar cualquier clienta, SIEMPRE ve el modal
-  // "Confirmar servicio" antes de empezar.
-  // Sin excepciones: normal, promo, TM, enganche, depilación.
-  // Esta función reemplaza todos los setTimeout(showConfirmServiceModal)
-  // dispersos. Si algo falla → abre pantalla de servicio directamente.
-  function confirmarServicioObligatorio(slot, delayMs) {
-    const delay = delayMs || 350;
-    setTimeout(function() {
-      try {
-        const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-        if (!clientName || clientName === 'Sin clienta') {
-          // Datos no listos — reintentar una vez
-          setTimeout(function() {
-            try { showConfirmServiceModal(slot); }
-            catch(e) { show(slot === 1 ? 'activeService' : 'activeService2'); }
-          }, 500);
-          return;
-        }
-        showConfirmServiceModal(slot);
-      } catch(e) {
-        console.error('Mandamiento #2 error slot ' + slot + ':', e);
-        show(slot === 1 ? 'activeService' : 'activeService2');
-      }
-    }, delay);
-  }
-  window.confirmarServicioObligatorio = confirmarServicioObligatorio;
-  // ── FIN MANDAMIENTOS ─────────────────────────────────────────
-
   function normalizeClientKey(name) {
     return String(name || '')
       .trim()
@@ -4093,6 +4012,57 @@ if ('caches' in window) {
       document.getElementById('takeModal').classList.add('active');
       return;
     }
+
+    // ── PROMO MULTI-ÁREA: divisiones de diferentes áreas ──────
+    // Cuando una promo tiene divisiones de áreas distintas (ej: Cejas + Pestañas),
+    // mostrar split para que la staff elija si hace todo o solo su parte.
+    // Mandamiento: la staff siempre elige antes de empezar.
+    if (w.promoNombre && w.promoNombre.trim() !== '' && typeof PROMOS !== 'undefined') {
+      const promoParaSplit = PROMOS.find(p => p.name === w.promoNombre);
+      if (promoParaSplit && promoParaSplit.division && promoParaSplit.division.length > 1) {
+        // Detectar si hay divisiones de áreas realmente diferentes
+        const AREA_FAMILIA = {
+          cejas: ['ceja', 'depil', 'bigot', 'pigment', 'brow'],
+          pestanas: ['pest', 'lifting', 'retiro', 'volumen', 'pelo a pelo', 'clasic', 'efecto', 'natural', 'hawaiano'],
+          facial: ['facial', 'hidra', 'limpiez']
+        };
+        const getFamilia = (texto) => {
+          const t = String(texto || '').toLowerCase();
+          for (const [familia, keys] of Object.entries(AREA_FAMILIA)) {
+            if (keys.some(k => t.includes(k))) return familia;
+          }
+          return 'otro';
+        };
+        const familias = [...new Set(promoParaSplit.division.map(d => getFamilia(d.area)))];
+        const esMultiArea = familias.length > 1;
+
+        if (esMultiArea) {
+          // Construir items desde las divisiones de la promo
+          const userArea = window.currentUser ? window.currentUser.area : '';
+          const misFamilias = AREA_FAMILIA[userArea] || [userArea];
+          const items = promoParaSplit.division.map(d => {
+            const familia = getFamilia(d.area);
+            const esMia = familia === userArea ||
+              (userArea === 'cejas' && ['cejas','depilacion'].includes(familia)) ||
+              misFamilias.some(k => String(d.area||'').toLowerCase().includes(k));
+            return {
+              nombre: String(d.area || '').replace('💅 ', '').replace('👁 ', '').replace('✨ ', ''),
+              precio: Number(d.monto || 0),
+              checked: esMia, // pre-marcar solo las divisiones de esta staff
+              familia: familia
+            };
+          });
+          window._depiItems = items;
+          window._depiEsPromoMultiArea = true; // flag para distinguirlo de depilación normal
+          splitEl.style.display = 'block';
+          normalEl.style.display = 'none';
+          renderDepiItems();
+          document.getElementById('takeModal').classList.add('active');
+          return;
+        }
+      }
+    }
+    window._depiEsPromoMultiArea = false;
 
     // ── DEPILACIÓN CORPORAL: múltiples ítems ──
     const esDepi = w.area === 'depilacion' || servicioStr0.toLowerCase().includes('depi') || servicioStr0.toLowerCase().includes('bikini') || servicioStr0.toLowerCase().includes('pierna') || servicioStr0.toLowerCase().includes('axila');
@@ -4567,14 +4537,26 @@ if ('caches' in window) {
               }
               // TM: mostrar modal de confirmación igual que otros tipos
               // La staff debe confirmar/cambiar su servicio tentativo
-              confirmarServicioObligatorio(1, 300); // Mandamiento #2
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); }
+                catch(e) { console.error('confirmServiceModal TM error:', e); }
+              }, 300);
             }).catch(function() {
-              confirmarServicioObligatorio(1, 400); // Mandamiento #2
-              setTimeout(function(){ updateFinishButtons(1); }, 600);
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); } catch(e) {}
+                updateFinishButtons(1);
+              }, 400);
             });
           } else {
             // SP / promo compartida / enganche → siempre mostrar modal de confirmación
-            confirmarServicioObligatorio(1, 400); // Mandamiento #2
+            setTimeout(function() {
+              try {
+                showConfirmServiceModal(1);
+              } catch(eSvc) {
+                console.error('showConfirmServiceModal error:', eSvc);
+                // Fallback: abrir pantalla de servicio directo
+              }
+            }, 400);
           }
         } else {
           window._as2Client = a.codigo;
@@ -4665,10 +4647,10 @@ if ('caches' in window) {
                   }
                 }
               }
-              confirmarServicioObligatorio(2, 200); // Mandamiento #2
-            }).catch(function() { confirmarServicioObligatorio(2, 400); });
+              setTimeout(() => showConfirmServiceModal(2), 200);
+            }).catch(function() { setTimeout(() => showConfirmServiceModal(2), 400); });
           } else {
-            confirmarServicioObligatorio(2, 400); // Mandamiento #2
+            setTimeout(() => showConfirmServiceModal(2), 400);
           }
         }
         
