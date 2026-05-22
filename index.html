@@ -3235,63 +3235,31 @@ if ('caches' in window) {
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
 
-    // ── TICKET MIXTO (TM v2) — detectado por promoNombre = 'TM' ──────────────
-    // Usa el mismo flujo SP existente. Los botones son iguales al SP duo pero
-    // saben que hay más áreas en promasExtra
-    const clientKey4TM = normalizeClientKey(clientName);
-    const promoDataTM  = activePromos[clientKey4TM];
-    const esTMTicket   = window._availablePromo && window._availablePromo.name === 'TM'
-      || (promoDataTM && promoDataTM.promo && promoDataTM.promo.name === 'TM');
-
-    if (esTMTicket) {
-      // Leer las promasExtra (áreas restantes) del takingData o del slot
-      const promasExtraTM = window._takingPromasExtra || [];
-      const hayMasTM = promasExtraTM.length > 0;
-      const slotNTM = slot1 ? 1 : 2;
-      const sigNombreTM = hayMasTM ? (promasExtraTM[0].nombre || promasExtraTM[0].area || 'siguiente servicio') : '';
-
-      if (!hayMasTM) {
-        // Última área — botón de cierre final
-        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotNTM + '; finishAndSendAll();">✅ Terminé servicio — clienta múltiple</button>';
-      } else {
-        // Hay más áreas pendientes
-        btnContainer.innerHTML = ''
-          + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotNTM + '; finishSlotAndContinueTM();">➡️ Terminé — pasar a ' + sigNombreTM + '</button>'
-          + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotNTM + '; finishAndSendAll();">💰 Cobrar todo ahora</button>';
-      }
-      return;
-    }
-    // ── FIN TICKET MIXTO ─────────────────────────────────────
-
-    // ── TICKET MULTI (legacy TM-XXXX) ────────────────────────
+    // ── TICKET MULTI ─────────────────────────────────────────
     const _idEsperaSlot = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
     if (_idEsperaSlot.startsWith('TM-')) {
       apiGet('getTicketMulti').then(function(tmData) {
         if (!tmData.success) return;
         var tm = (tmData.activos || []).find(function(t) { return t.idEspera === _idEsperaSlot; });
         if (!tm) return;
+        var miNombre = user && user.name ? user.name : '';
         var slotN = slot1 ? 1 : 2;
 
+        // Áreas pendientes (no completadas, no en servicio por esta staff)
         var areasEsperando = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        var sig = null;
-        if (areasEsperando.length > 0) {
-          if (tm.secuencia && tm.secuencia.length > 0) {
-            for (var _si = 0; _si < tm.secuencia.length; _si++) {
-              var _seqA = String(tm.secuencia[_si]).trim().toLowerCase();
-              var _mA = areasEsperando.filter(function(a){ return String(a.area||'').trim().toLowerCase() === _seqA; })[0];
-              if (_mA) { sig = _mA; break; }
-            }
-          }
-          if (!sig) sig = areasEsperando[0];
-        }
-        var hayMas = sig !== null;
+        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
+        var hayMas = areasEsperando.length > 0;
+
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
         if (!hayMas) {
+          // No hay más áreas pendientes → botón de cierre multi-staff
           btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé servicio — clienta múltiple</button>';
         } else {
+          // Hay servicios pendientes → 3 botones (repetibles infinitamente)
+          // "Continuar siguiente servicio" puede tocarse N veces (cejas → bigote → labio → entrecejo...)
           btnContainer.innerHTML = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Continuar siguiente servicio</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
@@ -3303,7 +3271,7 @@ if ('caches' in window) {
       });
       return;
     }
-    // ── FIN TICKET MULTI legacy ───────────────────────────────
+    // ── FIN TICKET MULTI ─────────────────────────────────────
 
     if (!promoData || !promoData.promo) {
       // Sin promo — botón normal
@@ -5310,70 +5278,6 @@ if ('caches' in window) {
     alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
   }
   
-  async function finishSlotAndContinueTM() {
-    // Flujo TM v2: la staff terminó su área, la siguiente va a lista de espera
-    const slot = window._finishingSlot || 1;
-    const user = window.currentUser;
-    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
-    const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
-    const montoYaHecho = svcs.reduce((s, v) => s + Number(v.price || 0), 0);
-    const svcNames = svcs.map(s => s.name).join(' + ') || '';
-
-    // Siguiente área viene de promasExtra
-    const promasExtraTM = window._takingPromasExtra || [];
-    if (promasExtraTM.length === 0) {
-      alert('No hay áreas adicionales. Usá "Cobrar todo ahora".');
-      return;
-    }
-    const siguienteAreaObj = promasExtraTM[0];
-    const siguienteAreaKey = String(siguienteAreaObj.area || '').toLowerCase();
-    const siguienteServicio = String(siguienteAreaObj.nombre || siguienteAreaObj.area || '');
-    const montosiguiente = Number(siguienteAreaObj.precio || 0);
-    const areaActual = user?.area || '';
-
-    try {
-      showToast('⏳ Procesando...');
-      const result = await apiPost('continuarPromoALista', {
-        idEspera:           idEspera,
-        chicaNombre:        user?.name || '',
-        clienteNombre:      clientName,
-        servicio:           svcNames,
-        total:              String(montoYaHecho),
-        promoNombre:        'TM',
-        precioRegular:      String(montoYaHecho),
-        areaCompletada:     areaActual,
-        montoChica:         String(montoYaHecho),
-        servicioNombre:     svcNames,
-        tipoArea:           (window._availablePromo && window._availablePromo.tipo) || 'normal',
-        areasFaltantes:     siguienteServicio,
-        nuevaArea:          siguienteAreaKey,
-        montoSiguienteArea: String(montosiguiente),
-        servicioActualizado: svcNames + ' ✅'
-      });
-
-      if (result.success) {
-        // Actualizar promasExtra — sacar la primera (ya procesada)
-        window._takingPromasExtra = promasExtraTM.slice(1);
-        try { sessionStorage.setItem('nexserv_promasExtra_' + idEspera, JSON.stringify(window._takingPromasExtra)); } catch(eS) {}
-
-        slotServices[slot] = [];
-        if (user && activeClients[user.name]) {
-          activeClients[user.name].splice(slot - 1, 1);
-          updateCapacityUI(user.name);
-        }
-        showToast('✅ ' + svcNames + ' listo · Siguiente: ' + siguienteServicio + ' · Volvió a lista de espera');
-        show('staffHome');
-        setTimeout(() => loadStaffHome(), 300);
-      } else {
-        alert('Error: ' + (result.message || 'No se pudo procesar'));
-      }
-    } catch(err) {
-      alert('Error de conexión: ' + err.message);
-    }
-  }
-  window.finishSlotAndContinueTM = finishSlotAndContinueTM;
-
   async function finishSlotAndContinue(slot) {
     // Prepara los datos del slot igual que finishSlot1/2 y llama finishAndContinue
     window._finishingSlot = slot;
@@ -11631,17 +11535,26 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
+      // CRÍTICO: reordenar según la secuencia de Mikaela antes de crear el TM
+      const secuenciaKeysGTL = (_secuencia || []).map(s => String(s.area || '').toLowerCase());
+      if (secuenciaKeysGTL.length > 0) {
+        areasMulti.sort((a, b) => {
+          const ia = secuenciaKeysGTL.indexOf(String(a.area || '').toLowerCase());
+          const ib = secuenciaKeysGTL.indexOf(String(b.area || '').toLowerCase());
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        });
+      }
       const tmData = {
         codigo:       codigo,
         nombre:       nombre,
         prioridad:    prioridad,
         observaciones: obs,
         areas:        areasMulti,
-        secuencia:    _secuencia.map(s => s.area) // ['pestanas','cejas'] etc
+        secuencia:    _secuencia.map(s => s.area)
       };
 
       try {
-        const result = await apiPost('crearTicketMixto', tmData);
+        const result = await apiPost('crearTicketMulti', tmData);
         if (result && result.success) {
           window._arrPromo = null;
           document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
@@ -11873,15 +11786,27 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
+      // CRÍTICO: reordenar areasMultiGA según la secuencia definida por Mikaela
+      // Sin esto, el área del formulario principal siempre queda en posición 0
+      // aunque la secuencia diga que debe atenderse después
+      const secuenciaKeys = (_secuencia || []).map(s => String(s.area || '').toLowerCase());
+      if (secuenciaKeys.length > 0) {
+        areasMultiGA.sort((a, b) => {
+          const ia = secuenciaKeys.indexOf(String(a.area || '').toLowerCase());
+          const ib = secuenciaKeys.indexOf(String(b.area || '').toLowerCase());
+          const pa = ia === -1 ? 99 : ia;
+          const pb = ib === -1 ? 99 : ib;
+          return pa - pb;
+        });
+      }
       try {
-        const tmResult = await apiPost('crearTicketMixto', {
+        const tmResult = await apiPost('crearTicketMulti', {
           codigo:       codigo,
           nombre:       nombre,
           prioridad:    'Normal',
           observaciones: obs,
           areas:        areasMultiGA,
-          secuencia:    _secuencia.map(s => s.area),
-          asignadaA:    chica
+          secuencia:    _secuencia.map(s => s.area)
         });
         if (tmResult && tmResult.success) {
           window._arrPromo = null;
