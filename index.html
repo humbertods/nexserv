@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<script src="nexserv-mandamientos.js"></script>
 <script>
 // Matar cualquier Service Worker y cache registrado
 if ('serviceWorker' in navigator) {
@@ -1664,12 +1663,13 @@ if ('caches' in window) {
             <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
             <span id="addSvcPrice" style="font-size: 22px; font-weight: 800; color: var(--accent-deep);"></span>
           </div>
-          <div id="addSvcTipoIndicator" style="display:none;border-radius:14px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;"></div>
-          <div id="addSvcNoteWrapper" style="margin-bottom:14px;">
-            <label style="font-size:12px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:6px;">📝 Nota para Mikaela (opcional):</label>
-            <textarea id="addSvcNote" placeholder="Ej: La clienta quiere agregar diseño completo." style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;min-height:60px;resize:vertical;box-sizing:border-box;"></textarea>
+          <div id="addSvcNoteWrapper" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 700; color: #856404; margin-bottom: 8px;">⚠️ Requiere autorización de Mikaela</div>
+            <div style="font-size: 11px; color: #856404; margin-bottom: 10px;">Todo servicio adicional debe ser aprobado</div>
+            <label style="font-size: 12px; font-weight: 600; color: #856404; display: block; margin-bottom: 6px;">📝 Nota para Mikaela (obligatoria):</label>
+            <textarea id="addSvcNote" placeholder="Ej: La clienta quiere agregar diseño completo, está interesada hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 70px; resize: vertical; box-sizing: border-box;"></textarea>
           </div>
-          <button class="btn-primary" onclick="confirmAddService()" id="addSvcConfirmBtn">⏳ Solicitar a Mikaela</button>
+          <button class="btn-primary" onclick="confirmAddService()" id="addSvcConfirmBtn">Solicitar autorización</button>
         </div>
 
         <!-- TAB: PROMO -->
@@ -3980,24 +3980,6 @@ if ('caches' in window) {
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
 
-    // Split promo multi-área — M1 garantiza el área correcta
-    if (w.promoNombre && typeof PROMOS !== 'undefined') {
-      const _pS = PROMOS.find(p => p.name === w.promoNombre);
-      if (_pS && _pS.division && _pS.division.length > 1) {
-        const _F = {cejas:['ceja','depil','bigot','pigment'],pestanas:['pest','lifting','retiro','volumen','pelo','clasic','efecto'],facial:['facial','hidra','limpiez']};
-        const _gF = t => { const tx=String(t||'').toLowerCase(); for(const[f,ks]of Object.entries(_F)){if(ks.some(k=>tx.includes(k)))return f;} return 'otro'; };
-        if([...new Set(_pS.division.map(d=>_gF(d.area)))].length > 1) {
-          const _uA = window.currentUser?window.currentUser.area:'';
-          const _mF = _F[_uA]||[_uA];
-          window._depiItems = _pS.division.map(d=>({nombre:String(d.area||'').replace(/[💅👁✨] /g,''),precio:Number(d.monto||0),checked:_gF(d.area)===_uA||_mF.some(k=>String(d.area||'').toLowerCase().includes(k))}));
-          window._depiEsPromoMultiArea = true;
-          splitEl.style.display='block'; normalEl.style.display='none';
-          renderDepiItems(); document.getElementById('takeModal').classList.add('active'); return;
-        }
-      }
-    }
-    window._depiEsPromoMultiArea = false;
-
     // ── ENGANCHE: servicio contiene historial de áreas previas (✅) ──
     // Formato: "[✅Lesly: Cejas $12] | Limpieza profunda"
     const servicioStr0 = String(w.service || '');
@@ -4504,14 +4486,26 @@ if ('caches' in window) {
               }
               // TM: mostrar modal de confirmación igual que otros tipos
               // La staff debe confirmar/cambiar su servicio tentativo
-              confirmarServicioObligatorio(1, 300); // M2
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); }
+                catch(e) { console.error('confirmServiceModal TM error:', e); }
+              }, 300);
             }).catch(function() {
-              confirmarServicioObligatorio(1, 400); // M2
-              setTimeout(function(){ updateFinishButtons(1); }, 600);
+              setTimeout(function() {
+                try { showConfirmServiceModal(1); } catch(e) {}
+                updateFinishButtons(1);
+              }, 400);
             });
           } else {
             // SP / promo compartida / enganche → siempre mostrar modal de confirmación
-            confirmarServicioObligatorio(1, 400); // M2
+            setTimeout(function() {
+              try {
+                showConfirmServiceModal(1);
+              } catch(eSvc) {
+                console.error('showConfirmServiceModal error:', eSvc);
+                // Fallback: abrir pantalla de servicio directo
+              }
+            }, 400);
           }
         } else {
           window._as2Client = a.codigo;
@@ -4602,10 +4596,10 @@ if ('caches' in window) {
                   }
                 }
               }
-              confirmarServicioObligatorio(2, 200); // M2
-            }).catch(function() { confirmarServicioObligatorio(2, 400); });
+              setTimeout(() => showConfirmServiceModal(2), 200);
+            }).catch(function() { setTimeout(() => showConfirmServiceModal(2), 400); });
           } else {
-            confirmarServicioObligatorio(2, 400); // M2
+            setTimeout(() => showConfirmServiceModal(2), 400);
           }
         }
         
@@ -7345,26 +7339,20 @@ if ('caches' in window) {
                 <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf?' · Esperando confirmación':''}</div></div>
                 <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div></div>`;
               if (a.promoNombre) {
-                const _pED = a.promasExtra && a.promasExtra.length > 0 ? a.promasExtra : null;
-                if (_pED) {
-                  _pED.forEach(pe => {
-                    const _pAK = String(pe.area||pe._area||'').toLowerCase().replace(/ó/g,'o').replace(/á/g,'a').replace(/é/g,'e').replace(/ñ/g,'n');
-                    const _pIc = areaIcons[_pAK]||'⏳'; const _pLb = areaLabels[_pAK]||pe.area||pe._area||'';
-                    timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;"><div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${_pIc}</div><div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${_pLb} · <strong>$${pe.precio||0}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${pe.nombre||''}</div></div><div style="font-size:10px;font-weight:700;background:var(--warning-bg,#fff8e1);color:var(--warning,#8a6d00);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
+                const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
+                if (promoFull && promoFull.division) {
+                  const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                  const areasYa = new Set([areaActualNorm]);
+                  partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) areasYa.add(m[1].trim().toLowerCase()); });
+                  promoFull.division.forEach(d => {
+                    const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
+                    if (![...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea))) {
+                      timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
+                        <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dArea]||'⏳'}</div>
+                        <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dArea]||d.area} · $${d.monto}</div></div>
+                        <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
+                    }
                   });
-                } else {
-                  const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
-                  if (promoFull && promoFull.division) {
-                    const _aN = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
-                    const _aY = new Set([_aN]);
-                    partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) _aY.add(m[1].trim().toLowerCase()); });
-                    promoFull.division.forEach(d => {
-                      const dA = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
-                      if (![..._aY].some(ya => dA.includes(ya)||ya.includes(dA))) {
-                        timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;"><div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dA]||'⏳'}</div><div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dA]||d.area} · $${dA.monto||d.monto}</div></div><div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
-                      }
-                    });
-                  }
                 }
               }
             } // fin else normal/promo
@@ -8646,8 +8634,8 @@ if ('caches' in window) {
 
   function loadServicesForAreaMulti() {
     const area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
-    const areaMap = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
-    const catKey = areaMap[area] || 'cejas';
+    const _areaMapSvcMulti = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
+    const catKey = _areaMapSvcMulti[area] || 'cejas';
     const sel = document.getElementById('arrServiceMulti');
     if (!sel) return;
     sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
@@ -11274,7 +11262,6 @@ if ('caches' in window) {
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
     const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
-    const svcAreaKey = svc.area; // guardar key antes de convertir a label
     svc.area = areaNames[svc.area] || svc.area;
 
     // MODO ENGANCHE: Staff 2 cambia servicio directamente sin autorización
@@ -11304,24 +11291,31 @@ if ('caches' in window) {
       return;
     }
 
-    // M3: siempre pedir aprobación a Mikaela — nota opcional, tipo automático
-    const _staffArea = user?.area || 'cejas';
-    const _mismo = typeof esMismaAreaM3 !== 'undefined' && esMismaAreaM3(_staffArea, svcAreaKey || svc.area);
-    const _tipoLbl = _mismo ? 'mismo área' : 'enganche a ' + svc.area;
-    const note = document.getElementById('addSvcNote').value.trim()
-      || (_mismo ? 'Extra ' + _tipoLbl : 'Enganche → ' + svc.area);
-    svc.status = 'pendiente';
-    svc.note = note;
-    svc.requestedBy = user?.name || 'Staff';
-    svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
-    svc.tipoExtra = _mismo ? 'mismo-area' : 'enganche';
-    if (addServiceToSlot(slot, svc)) {
-      document.getElementById('addSvcNote').value = '';
-      closeModal();
-      await sendAuthorizationRequest(clientName, svc, slot);
-      recargarAutorizacionesStaff(slot);
-      showToast('⏳ Esperando aprobación de Mikaela — ' + svc.name + ' · ' + _tipoLbl);
+    // MODO NORMAL: requiere nota y autorización de Mikaela
+    // Solo validar nota si NO estamos en modo enganche
+    if (!window._modoEnganche) {
+      const note = document.getElementById('addSvcNote').value.trim();
+      if (!note || note.length < 10) {
+        alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+        return;
+      }
+      svc.status = 'pendiente';
+      svc.note = note;
+      svc.requestedBy = user?.name || 'Staff';
+      svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+      if (addServiceToSlot(slot, svc)) {
+        document.getElementById('addSvcNote').value = '';
+        closeModal();
+        await sendAuthorizationRequest(clientName, svc, slot);
+        recargarAutorizacionesStaff(slot);
+        alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
+      }
+      return;
     }
+
+    // MODO ENGANCHE: llegamos aquí si _modoEnganche estaba true pero no se procesó arriba
+    // (por si el bloque enganche de arriba falló por alguna razón de índice)
+    window._modoEnganche = false;
   }
   
   async function sendAuthorizationRequest(clientName, service, slot) {
@@ -11503,7 +11497,7 @@ if ('caches' in window) {
           : ds.includes('facial') || ds.includes('hidra') ? 'facial'
           : ds.includes('depil') || ds.includes('bikini') ? 'depilacion'
           : ds.includes('ceja') ? 'cejas' : 'cejas';
-        return { nombre: p.name, precio: p.price, regular: p.regular, area: _area, _area: _area };
+        return { nombre: p.name, precio: p.price, regular: p.regular, _area: _area };
       });
     }
     // Secuencia de servicios
@@ -11541,11 +11535,13 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
-      const _skGTL=(_secuencia||[]).map(s=>String(s.area||'').toLowerCase());
-      if(_skGTL.length>0) areasMulti.sort((a,b)=>{const ia=_skGTL.indexOf(String(a.area||'').toLowerCase());const ib=_skGTL.indexOf(String(b.area||'').toLowerCase());return(ia===-1?99:ia)-(ib===-1?99:ib);});
       const tmData = {
-        codigo: codigo, nombre: nombre, prioridad: prioridad, observaciones: obs,
-        areas: areasMulti, secuencia: _secuencia.map(s => s.area)
+        codigo:       codigo,
+        nombre:       nombre,
+        prioridad:    prioridad,
+        observaciones: obs,
+        areas:        areasMulti,
+        secuencia:    _secuencia.map(s => s.area) // ['pestanas','cejas'] etc
       };
 
       try {
@@ -11594,7 +11590,25 @@ if ('caches' in window) {
       const nombre = document.getElementById('arrSelName')?.textContent?.trim() || 'Clienta';
       // Leer área correctamente según el formulario activo
       const _tipoRD = window._arrTipo || 'normal';
-      const area = getAreaPrioritaria(_tipoRD).label; // M1
+      let area = 'Cejas';
+      if (_tipoRD === 'multi') {
+        area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+      } else if (_tipoRD === 'promo') {
+        // Para promo: usar el área de la primera promo seleccionada
+        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+        if (promo && promo.division && promo.division.length > 0) {
+          const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
+          const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
+          const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
+            : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
+            : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
+            : divStr2.includes('ceja') ? 'cejas' : 'cejas';
+          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
+          area = areaMapRD[areaKeyRD] || 'Cejas';
+        }
+      } else {
+        area = document.getElementById('arrArea')?.value || 'Cejas';
+      }
       const _svcRaw5 = document.getElementById('arrService')?.value || '';
       let _svcName5 = _svcRaw5;
       try { if (_svcRaw5.startsWith('{')) _svcName5 = JSON.parse(_svcRaw5).nombre || _svcRaw5; } catch(e) {}
@@ -11625,7 +11639,11 @@ if ('caches' in window) {
           if (!staffAvailability[chica]) staffAvailability[chica] = [];
           staffAvailability[chica].push(item.nombre);
         });
-        const area2 = getAreaPrioritaria(window._arrTipo||'normal').label; // M1
+        const _tipoRD2 = window._arrTipo || 'normal';
+        let area2 = 'Cejas';
+        if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
+        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
+        else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
     } catch(err) { /* timeout o error — staff ya visible */ }
@@ -11641,8 +11659,8 @@ if ('caches' in window) {
       { name: 'Diana',  area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
     ];
-    const areaMap = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
-    const areaKey = areaMap[area] || 'cejas';
+    const _areaMapGTL = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
+    const areaKey = _areaMapGTL[area] || 'cejas';
     const forArea = [], others = [];
 
     allStaff.forEach(staff => {
@@ -11680,19 +11698,41 @@ if ('caches' in window) {
     const svcEl  = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
     const obsEl  = tipo === 'promo' ? document.getElementById('arrObsPromo') : tipo === 'multi' ? document.getElementById('arrObsMulti') : document.getElementById('arrObs');
 
-    const area = getAreaPrioritaria(tipo).label; // M1
-    const areaMap = {'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial'};
-    const areaKeyFormulario = tipo==='multi'?(areaMap[document.getElementById('arrAreaMulti')?.value||'Cejas']||'cejas'):null;
-    const areaKey = areaKeyFormulario || areaMap[area] || 'cejas';
-        const _svcRawGA = svcEl?.value || '';
+    // Leer área correctamente según tipo
+    let area = 'Cejas';
+    if (tipo === 'multi') {
+      area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
+    } else if (tipo === 'promo') {
+      // Para promo: área de la primera promo asignada
+      // Secuencia manda: si hay secuencia definida, usar _secuencia[0]
+      if (_secuencia && _secuencia.length > 0) {
+        const areaMapGA2 = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial', 'retiro_lifting': 'Lifting / Retiro' };
+        area = areaMapGA2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
+      } else {
+        const promoGA = window._arrPromo || (typeof _arrPromos !== 'undefined' && _arrPromos.find(p => p));
+        if (promoGA && promoGA.division && promoGA.division.length > 0) {
+          const divOrdGA = [...promoGA.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
+          const divStr = String(divOrdGA[0].area || '').toLowerCase();
+          const areaKeyGA = divStr.includes('pest') || divStr.includes('lifting') || divStr.includes('retiro') ? 'pestanas'
+            : divStr.includes('facial') || divStr.includes('hidra') ? 'facial'
+            : divStr.includes('depil') || divStr.includes('bikini') ? 'depilacion'
+            : divStr.includes('ceja') ? 'cejas' : 'cejas';
+          const areaMapGA = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
+          area = areaMapGA[areaKeyGA] || 'Cejas';
+        }
+      }
+    } else {
+      area = document.getElementById('arrArea')?.value || 'Cejas';
+    }
+    const _svcRawGA = svcEl?.value || '';
     let servicioGA = _svcRawGA, precioGA = 0;
     try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
     const obs = obsEl?.value || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
     const promo = window._arrPromo || null;
 
-    const areaMap = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    const areaKey = areaMap[area] || 'cejas';
+    const _areaMapGA = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
+    const areaKey = _areaMapGA[area] || 'cejas';
 
     const postData = {
       codigo: codigo,
@@ -11737,8 +11777,6 @@ if ('caches' in window) {
           tipo:         a.tipo
         });
       });
-      const _sk=(_secuencia||[]).map(s=>String(s.area||'').toLowerCase());
-      if(_sk.length>0) areasMultiGA.sort((a,b)=>{const ia=_sk.indexOf(String(a.area||'').toLowerCase());const ib=_sk.indexOf(String(b.area||'').toLowerCase());return(ia===-1?99:ia)-(ib===-1?99:ib);});
       try {
         const tmResult = await apiPost('crearTicketMulti', {
           codigo:       codigo,
