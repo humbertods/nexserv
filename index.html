@@ -3980,6 +3980,47 @@ if ('caches' in window) {
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
 
+    // ── PROMO MULTI-ÁREA: mostrar checkboxes por división ────────────────────
+    // Cuando la promo tiene divisiones de áreas distintas (Cejas $5 + Pestañas $27),
+    // la staff elige qué partes hace — el resto va a lista para otra staff.
+    if (w.promoNombre && w.promoNombre.trim() !== '' && typeof PROMOS !== 'undefined') {
+      const _promoSplit = PROMOS.find(p => p.name === w.promoNombre);
+      if (_promoSplit && _promoSplit.division && _promoSplit.division.length > 1) {
+        const _FAMS = {
+          cejas:    ['ceja','depil','bigot','pigment','brow'],
+          pestanas: ['pest','lifting','retiro','volumen','pelo','clasic','efecto','natural','hawaiano'],
+          facial:   ['facial','hidra','limpiez']
+        };
+        const _getFam = (t) => {
+          const tx = String(t||'').toLowerCase();
+          for (const [f, ks] of Object.entries(_FAMS)) { if (ks.some(k => tx.includes(k))) return f; }
+          return 'otro';
+        };
+        const _fams = [...new Set(_promoSplit.division.map(d => _getFam(d.area)))];
+        if (_fams.length > 1) {
+          // Promo tiene divisiones de áreas distintas → mostrar split
+          const _userArea = window.currentUser ? window.currentUser.area : '';
+          const _misFams = _FAMS[_userArea] || [_userArea];
+          window._depiItems = _promoSplit.division.map(d => {
+            const _fam = _getFam(d.area);
+            const _esMia = _fam === _userArea || _misFams.some(k => String(d.area||'').toLowerCase().includes(k));
+            return {
+              nombre: String(d.area||'').replace('💅 ','').replace('👁 ','').replace('✨ ',''),
+              precio: Number(d.monto||0),
+              checked: _esMia, // pre-marcar solo las de esta staff
+              familia: _fam
+            };
+          });
+          window._depiEsPromoMultiArea = true;
+          splitEl.style.display = 'block'; normalEl.style.display = 'none';
+          renderDepiItems();
+          document.getElementById('takeModal').classList.add('active');
+          return;
+        }
+      }
+    }
+    window._depiEsPromoMultiArea = false;
+
     // ── ENGANCHE: servicio contiene historial de áreas previas (✅) ──
     // Formato: "[✅Lesly: Cejas $12] | Limpieza profunda"
     const servicioStr0 = String(w.service || '');
@@ -7339,28 +7380,28 @@ if ('caches' in window) {
                 <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf?' · Esperando confirmación':''}</div></div>
                 <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div></div>`;
               if (a.promoNombre) {
-                const promasExtraDisplay = a.promasExtra && a.promasExtra.length > 0 ? a.promasExtra : null;
-                if (promasExtraDisplay) {
-                  promasExtraDisplay.forEach(pe => {
-                    const peAK = String(pe.area||pe._area||'').toLowerCase().replace(/ó/g,'o').replace(/á/g,'a').replace(/é/g,'e').replace(/ñ/g,'n');
-                    const peIcon = areaIcons[peAK] || '⏳'; const peLabel = areaLabels[peAK] || pe.area || pe._area || '';
+                const _pED = a.promasExtra && a.promasExtra.length > 0 ? a.promasExtra : null;
+                if (_pED) {
+                  _pED.forEach(pe => {
+                    const _peAK = String(pe.area||pe._area||'').toLowerCase().replace(/ó/g,'o').replace(/á/g,'a').replace(/é/g,'e').replace(/ñ/g,'n');
+                    const _peIcon = areaIcons[_peAK]||'⏳'; const _peLabel = areaLabels[_peAK]||pe.area||pe._area||'';
                     timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;">
-                      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${peIcon}</div>
-                      <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${peLabel} · <strong>$${pe.precio||0}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${pe.nombre||''}</div></div>
-                      <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
+                      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${_peIcon}</div>
+                      <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${_peLabel} · <strong>$${pe.precio||0}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${pe.nombre||''}</div></div>
+                      <div style="font-size:10px;font-weight:700;background:var(--warning-bg,#fff8e1);color:var(--warning,#8a6d00);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
                   });
                 } else {
                   const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
                   if (promoFull && promoFull.division) {
-                    const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
-                    const areasYa = new Set([areaActualNorm]);
-                    partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) areasYa.add(m[1].trim().toLowerCase()); });
+                    const _aAN = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                    const _aY = new Set([_aAN]);
+                    partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) _aY.add(m[1].trim().toLowerCase()); });
                     promoFull.division.forEach(d => {
-                      const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
-                      if (![...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea))) {
+                      const dA = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
+                      if (![..._aY].some(ya => dA.includes(ya)||ya.includes(dA))) {
                         timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
-                          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dArea]||'⏳'}</div>
-                          <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dArea]||d.area} · $${d.monto}</div></div>
+                          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dA]||'⏳'}</div>
+                          <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dA]||d.area} · $${d.monto}</div></div>
                           <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
                       }
                     });
