@@ -7339,20 +7339,39 @@ if ('caches' in window) {
                 <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf?' · Esperando confirmación':''}</div></div>
                 <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div></div>`;
               if (a.promoNombre) {
-                const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
-                if (promoFull && promoFull.division) {
-                  const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
-                  const areasYa = new Set([areaActualNorm]);
-                  partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) areasYa.add(m[1].trim().toLowerCase()); });
-                  promoFull.division.forEach(d => {
-                    const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
-                    if (![...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea))) {
-                      timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
-                        <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dArea]||'⏳'}</div>
-                        <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dArea]||d.area} · $${d.monto}</div></div>
-                        <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
-                    }
+                // Si hay promasExtra (segunda promo / área pendiente), mostrarlas
+                const promasExtraDisplay = a.promasExtra && a.promasExtra.length > 0 ? a.promasExtra : null;
+
+                if (promasExtraDisplay) {
+                  // Mostrar cada promo extra pendiente como área en ESPERA
+                  promasExtraDisplay.forEach(pe => {
+                    const peAreaKey = String(pe.area||pe._area||'').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, s=>s==='é'?'e':'n');
+                    const peIcon = areaIcons[peAreaKey] || '⏳';
+                    const peLabel = areaLabels[peAreaKey] || pe.area || 'Servicio';
+                    const peNombre = pe.nombre || pe.name || pe.area || '';
+                    const pePrecio = pe.precio || 0;
+                    timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;">
+                      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${peIcon}</div>
+                      <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${peLabel} · <strong>$${pePrecio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${peNombre}</div></div>
+                      <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
                   });
+                } else {
+                  // Sin promasExtra: mostrar divisiones pendientes de la promo actual
+                  const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
+                  if (promoFull && promoFull.division) {
+                    const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                    const areasYa = new Set([areaActualNorm]);
+                    partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) areasYa.add(m[1].trim().toLowerCase()); });
+                    promoFull.division.forEach(d => {
+                      const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
+                      if (![...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea))) {
+                        timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
+                          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dArea]||'⏳'}</div>
+                          <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dArea]||d.area} · $${d.monto}</div></div>
+                          <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
+                      }
+                    });
+                  }
                 }
               }
             } // fin else normal/promo
@@ -11594,23 +11613,17 @@ if ('caches' in window) {
       if (_tipoRD === 'multi') {
         area = document.getElementById('arrAreaMulti')?.value || 'Cejas';
       } else if (_tipoRD === 'promo') {
-        // REGLA: si Mikaela definió una secuencia, esa manda — no el área de la división
-        if (_secuencia && _secuencia.length > 0) {
-          const areaMapSeqP = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro' };
-          area = areaMapSeqP[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
-        } else {
-          // Sin secuencia: calcular desde la división de la promo
-          const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
-          if (promo && promo.division && promo.division.length > 0) {
-            const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
-            const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
-            const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
-              : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
-              : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
-              : divStr2.includes('ceja') ? 'cejas' : 'cejas';
-            const areaMapRD = { 'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial' };
-            area = areaMapRD[areaKeyRD] || 'Cejas';
-          }
+        // Para promo: usar el área de la primera promo seleccionada
+        const promo = window._arrPromo || (_arrPromos && _arrPromos.find(p => p));
+        if (promo && promo.division && promo.division.length > 0) {
+          const divOrdRD = [...promo.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0));
+          const divStr2 = String(divOrdRD[0].area || '').toLowerCase();
+          const areaKeyRD = divStr2.includes('pest') || divStr2.includes('lifting') ? 'pestanas'
+            : divStr2.includes('facial') || divStr2.includes('hidra') ? 'facial'
+            : divStr2.includes('depil') || divStr2.includes('bikini') ? 'depilacion'
+            : divStr2.includes('ceja') ? 'cejas' : 'cejas';
+          const areaMapRD = { 'cejas': 'Cejas', 'depilacion': 'Depilación', 'pestanas': 'Pestañas', 'facial': 'Facial' };
+          area = areaMapRD[areaKeyRD] || 'Cejas';
         }
       } else {
         area = document.getElementById('arrArea')?.value || 'Cejas';
@@ -11648,15 +11661,7 @@ if ('caches' in window) {
         const _tipoRD2 = window._arrTipo || 'normal';
         let area2 = 'Cejas';
         if (_tipoRD2 === 'multi') { area2 = document.getElementById('arrAreaMulti')?.value || 'Cejas'; }
-        else if (_tipoRD2 === 'promo') {
-          if (_secuencia && _secuencia.length > 0) {
-            const _aMSP2 = {'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial','retiro_lifting':'Lifting / Retiro'};
-            area2 = _aMSP2[String(_secuencia[0].area||'').toLowerCase()] || 'Cejas';
-          } else {
-            const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p));
-            if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; }
-          }
-        }
+        else if (_tipoRD2 === 'promo') { const p2 = window._arrPromo || (typeof _arrPromos!=='undefined' && _arrPromos.find(p=>p)); if (p2?.division?.[0]) { const dOrd2=[...p2.division].sort((a,b)=>Number(b.monto||0)-Number(a.monto||0)); const ds2=String(dOrd2[0].area||'').toLowerCase(); const ak2=ds2.includes('pest')||ds2.includes('lifting')?'pestanas':ds2.includes('facial')||ds2.includes('hidra')?'facial':ds2.includes('depil')?'depilacion':ds2.includes('ceja')?'cejas':'cejas'; const am2={'cejas':'Cejas','depilacion':'Depilación','pestanas':'Pestañas','facial':'Facial'}; area2=am2[ak2]||'Cejas'; } }
         else { area2 = document.getElementById('arrArea')?.value || 'Cejas'; }
         renderAssignDirectStaff(staffAvailability, area2);
       }
