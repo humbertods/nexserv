@@ -4150,10 +4150,8 @@ function handleFinalizarServicioNormal(data) {
           '', 'Por cobrar');
       } catch(eA) {}
 
-      // Comisión parcial
-      if (data.chicaNombre && Number(data.total) > 0) {
-        updateComision(data.chicaNombre, Number(data.total));
-      }
+      // NOTA: la comisión se registra SOLO en handleConfirmarCobroNormal (al cobrar)
+      // NO llamar updateComision aquí para evitar doble registro
 
       return { success: true, message: 'Servicio finalizado, listo para cobrar' };
     }
