@@ -3278,8 +3278,8 @@ if ('caches' in window) {
 
           // Hay servicios pendientes → botones base (repetibles infinitamente)
           var btnsBaseTM = ''
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Continuar siguiente servicio</button>'
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">➡️ Terminé mi parte — tomar siguiente: ' + lbl + '</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">🤝 Terminé mi parte — pasar a otra staff: ' + lbl + '</button>'
             + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
           if (tienePromoEnTM) {
             btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — tomar todo el valor ($' + miPrecioNormalTM + ')</button>'
