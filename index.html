@@ -3021,57 +3021,55 @@ if ('caches' in window) {
 
   // === CARGAR DATOS DEL OWNER HOME ===
   async function loadOwnerHome() {
+    // Mostrar estado de carga inmediatamente
+    const histContainer = document.getElementById('ownerHistorial');
+    if (histContainer) histContainer.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:13px;">⏳ Cargando...</div>';
+
     try {
-      // Obtener número de semana actual
       const now = new Date();
       const startOfYear = new Date(now.getFullYear(), 0, 1);
       const weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
       document.getElementById('ownerWeekNum').textContent = weekNum;
 
-      // Cargar comisiones para calcular totales
-      const commResult = await apiGet('getComisiones');
-      let totalFact = 0;
-      let totalComm = 0;
-      let topCount = 0;
-      
+      // Cargar todo en paralelo
+      const [commResult, listaResult, histResult] = await Promise.all([
+        apiGet('getComisiones').catch(() => ({ success: false })),
+        apiGet('getListaEspera').catch(() => ({ success: false })),
+        apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
+      ]);
+
+      // Comisiones
+      let totalFact = 0, totalComm = 0;
       if (commResult.success && commResult.comisiones) {
         commResult.comisiones.forEach(c => {
           totalFact += Number(c.facturado) || 0;
           totalComm += Number(c.comision) || 0;
         });
       }
-
-      // Actualizar stats principales
       document.getElementById('ownerTotalFact').textContent = '$' + totalFact.toFixed(0);
       document.getElementById('ownerComm').textContent = '$' + totalComm.toFixed(0);
       document.getElementById('ownerNeto').textContent = '$' + (totalFact - totalComm).toFixed(0);
-
-      // Contar TOPs desde Clientas
-      try {
-        const clientasResult = await apiGet('getClientas');
-        if (clientasResult.success && clientasResult.clientas) {
-          topCount = clientasResult.clientas.filter(c => String(c.top || '').toLowerCase().includes('sí')).length;
-        }
-      } catch (e) {}
-      document.getElementById('ownerTop').textContent = topCount;
-
-      // Trend (placeholder por ahora)
       document.getElementById('ownerTrend').textContent = totalFact > 0 ? '↑ En curso' : '—';
 
+      // TOP — cargar en paralelo no bloqueante
+      apiGet('getClientas').then(r => {
+        if (r.success && r.clientas) {
+          const topCount = r.clientas.filter(c => String(c.top || '').toLowerCase().includes('sí')).length;
+          document.getElementById('ownerTop').textContent = topCount;
+        }
+      }).catch(() => {});
+
       // Estado del salón
-      const listaResult = await apiGet('getListaEspera');
       if (listaResult.success && listaResult.lista) {
-        const esperando = listaResult.lista.filter(l => l.estado && l.estado.toLowerCase() === 'esperando').length;
-        const enServicio = listaResult.lista.filter(l => l.estado && ['tomada', 'en servicio'].includes(l.estado.toLowerCase())).length;
-        const listas = listaResult.lista.filter(l => l.estado && l.estado.toLowerCase() === 'por cobrar').length;
-        
+        const esperando  = listaResult.lista.filter(l => l.estado?.toLowerCase() === 'esperando').length;
+        const enServicio = listaResult.lista.filter(l => ['tomada','en servicio'].includes(l.estado?.toLowerCase())).length;
+        const listas     = listaResult.lista.filter(l => l.estado?.toLowerCase() === 'por cobrar').length;
         document.getElementById('ownerEsperando').textContent = esperando;
-        document.getElementById('ownerServicio').textContent = enServicio;
-        document.getElementById('ownerListas').textContent = listas;
+        document.getElementById('ownerServicio').textContent  = enServicio;
+        document.getElementById('ownerListas').textContent    = listas;
       }
 
-      // Cargar historial reciente agrupado por staff
-      const histResult = await apiGet('getHistorial', { periodo: 'hoy' });
+      // Historial
       const histContainer = document.getElementById('ownerHistorial');
       if (histResult.success && histResult.porStaff && histResult.porStaff.length > 0) {
         histContainer.innerHTML = histResult.porStaff.map((s, idx) => `
@@ -10996,6 +10994,7 @@ if ('caches' in window) {
       const id = activeScreen.id;
       if (id === 'waitList') await renderWaitList();
       if (id === 'staffHome') await loadStaffHome();
+      if (id === 'ownerHome') await loadOwnerHome();
       if (id === 'clientDirectory') await renderClientDirectory();
       if (id === 'mikaelaHome') await loadMikaelaHome();
       if (id === 'ownerPromos') renderPromos();
