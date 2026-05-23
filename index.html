@@ -4003,7 +4003,19 @@ if ('caches' in window) {
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
 
-    // ── ENGANCHE: servicio contiene historial de áreas previas (✅) ──
+    // ── TICKET MULTI (TM-): mostrar solo el área de esta staff, botón simple ──
+    if (w.id && String(w.id).startsWith('TM-')) {
+      const areaLabels3 = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', facial:'Facial', retiro_lifting:'Lifting/Retiro' };
+      const areaLabel3 = areaLabels3[String(w.area||'').toLowerCase()] || w.area || 'Servicio';
+      document.getElementById('takeText').innerHTML =
+        `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>`
+        + `Área: <strong>${areaLabel3}</strong> · <strong>${_svcDisplay4}</strong><br>`
+        + `<span style="font-size:12px;color:var(--ink-soft);">Este es tu servicio asignado en el ticket multi.</span>`;
+      splitEl.style.display = 'none';
+      normalEl.style.display = 'block';
+      document.getElementById('takeModal').classList.add('active');
+      return;
+    }
     // Formato: "[✅Lesly: Cejas $12] | Limpieza profunda"
     const servicioStr0 = String(w.service || '');
     const tieneHistorial = servicioStr0.includes('✅');
@@ -4149,8 +4161,27 @@ if ('caches' in window) {
     closeModal();
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
-    
-    // Registrar toma en el API
+    const takingId = String(window._takingId || '');
+
+    // ── TICKET MULTI: usar endpoint específico ────────────────
+    if (takingId.startsWith('TM-')) {
+      try {
+        const result = await apiPost('tomarAreaTicketMulti', {
+          idEspera:    takingId,
+          chicaNombre: name,
+          chicaArea:   user?.area || ''
+        });
+        if (!result.success) { alert(result.message || 'Error al tomar el servicio TM'); return; }
+        simulateNotif('mikaela', name + ' tomó área TM de ' + (window._takingClient || 'clienta'), 'Ticket multi · ahora', false);
+      } catch(err) {
+        alert('Error de conexión'); return;
+      }
+      // Continuar al flujo de carga del panel (sin promo)
+      window._availablePromo = null;
+      window._takingSecuencia = window._takingData ? (window._takingData.secuencia || []) : [];
+      window._takingPromasExtra = [];
+    } else {
+    // ── FLUJO NORMAL / SN / SP / LE ──────────────────────────
     try {
       const result = await apiPost('tomarClienta', {
         idListaEspera: window._takingId,
@@ -4170,7 +4201,6 @@ if ('caches' in window) {
     
     // Guardar la promo disponible (si existe) pero NO aplicarla automáticamente
     const takingData = window._takingData;
-    const takingId = String(window._takingId || '');
     const clientKey = normalizeClientKey(window._takingClient || '');
 
     if (takingData && takingData.promoNombre && takingData.promoNombre.trim() !== '') {
@@ -4181,13 +4211,11 @@ if ('caches' in window) {
       };
     } else {
       window._availablePromo = null;
-      // Si es SN- (servicio normal sin promo), limpiar cualquier promo residual de esta clienta
       if (takingId.startsWith('SN-') && clientKey) {
         delete activePromos[clientKey];
         saveActivePromos();
       }
     }
-    // Pasar secuencia y promasExtra
     window._takingSecuencia = takingData ? (takingData.secuencia || []) : [];
     window._takingPromasExtra = takingData ? (takingData.promasExtra || []) : [];
     try {
@@ -4195,12 +4223,8 @@ if ('caches' in window) {
         sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
       }
     } catch(eS) {}
-    try {
-      if (window._takingPromasExtra.length > 0) {
-        sessionStorage.setItem('nexserv_promasExtra_' + (window._as1IdEspera||''), JSON.stringify(window._takingPromasExtra));
-      }
-    } catch(eS) {}
-    
+    } // ── fin else flujo normal ────────────────────────────────
+
     // Cargar clienta normalmente
     await loadClientAfterTake();
   }
