@@ -3070,7 +3070,6 @@ if ('caches' in window) {
       }
 
       // Historial
-      const histContainer = document.getElementById('ownerHistorial');
       if (histResult.success && histResult.porStaff && histResult.porStaff.length > 0) {
         histContainer.innerHTML = histResult.porStaff.map((s, idx) => `
           <div style="background: var(--bg-card); border-radius: 16px; margin-bottom: 10px; overflow: hidden; box-shadow: var(--shadow-card);">
