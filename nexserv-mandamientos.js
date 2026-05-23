@@ -251,8 +251,96 @@ window.calcularPrecioPromoCompletaM6 = function(contexto) {
   return { precio: precio, esCompleto: true };
 };
 
+// ── MANDAMIENTO #7 — FICHAS: SIEMPRE VISIBLES AL ABRIR CLIENTA ──────────────
+// Las tres áreas que manejan fichas deben ver el registro de la
+// clienta SIEMPRE que la abran, sin importar el slot.
+// Además, cada atención debe quedar registrada como visita.
+//
+// Reglas por área:
+//
+//   PESTAÑAS (loadPestFichaQuick):
+//     - Ficha siempre visible al abrir clienta (slots 1 y 2).
+//     - Tipo de visita obligatorio al registrar: "Nuevas" o "Retoque/Mantenimiento".
+//     - Si "Nuevas" → servicio completo (fullset), registrar modelo/diseño/tallas.
+//     - Si "Retoque" → mantenimiento de la ficha activa existente.
+//
+//   CEJAS PIGMENTO (loadCejasQuick):
+//     - Ficha visible si el servicio es de pigmento/efecto polvo (detectado por esSrvPigmento).
+//     - Tipo sesión: "Nueva sesión" / "Neutralización" / "Retoque".
+//     - Retoque implica 30-45 días desde la sesión anterior.
+//     - Primera sesión (sin ficha previa) = "Nueva sesión" por defecto.
+//
+//   FACIAL (loadFacialFichaQuick):
+//     - Ficha siempre visible al abrir clienta (slots 1 y 2).
+//     - Siempre registrar visita con: procedimiento, productos, observaciones.
+//     - Si no hay ficha previa → crear ficha base ANTES de registrar visita.
+//
+// Esta función determina el tipo de visita según el contexto de la clienta.
+// ──────────────────────────────────────────────────────────────────────────────
+window.determinarTipoVisitaM7 = function(area, contexto) {
+  // contexto = {
+  //   tieneFicha:    bool   — si ya tiene ficha registrada
+  //   hayHistorial:  bool   — si tiene visitas previas
+  //   diasDesdeUltima: number — días desde la última sesión (cejas pigmento)
+  //   servicioNombre: string — nombre del servicio actual
+  // }
+  if (area === 'pestanas') {
+    // Si no tiene ficha o el servicio incluye "nuevas" → Nuevas
+    const svc = String(contexto.servicioNombre || '').toLowerCase();
+    const esNueva = !contexto.tieneFicha
+      || svc.includes('nuevo') || svc.includes('nueva') || svc.includes('fullset') || svc.includes('full set')
+      || (!contexto.hayHistorial);
+    return { tipo: esNueva ? 'Nuevas' : 'Retoque/Mantenimiento', esNueva: esNueva };
+  }
+
+  if (area === 'cejas') {
+    if (!contexto.tieneFicha) return { tipo: 'Nueva sesión', esNueva: true };
+    const dias = Number(contexto.diasDesdeUltima || 0);
+    // 30-45 días = ventana ideal de retoque
+    if (dias >= 25) return { tipo: 'Retoque', esNueva: false, enVentanaRetoque: dias >= 25 && dias <= 60 };
+    return { tipo: 'Nueva sesión', esNueva: true };
+  }
+
+  if (area === 'facial') {
+    return {
+      tipo: contexto.tieneFicha ? 'Visita' : 'Primera visita',
+      esNueva: !contexto.tieneFicha
+    };
+  }
+
+  return { tipo: 'Visita', esNueva: false };
+};
+
+// Helper: cargar la ficha correcta para el área y slot dados.
+// Centraliza la lógica que antes estaba duplicada en 4+ puntos del index.
+window.cargarFichaSegunAreaM7 = function(area, clientKey, slot, clientCodigo, clientNombre) {
+  slot = slot || 1;
+  if (area === 'pestanas') {
+    if (typeof window.loadPestFichaQuick === 'function') {
+      window.loadPestFichaQuick(clientKey, slot);
+    }
+    return;
+  }
+  if (area === 'facial') {
+    if (typeof window.loadFacialFichaQuick === 'function') {
+      window.loadFacialFichaQuick(clientKey, slot);
+    }
+    return;
+  }
+  if (area === 'cejas' && clientCodigo) {
+    if (typeof window.esSrvPigmento === 'function') {
+      // La ficha de cejas solo aplica a servicios de pigmento — el caller verifica antes de llamar
+      if (typeof window.loadCejasQuick === 'function') {
+        setTimeout(function() {
+          window.loadCejasQuick(clientKey, slot, clientCodigo, clientNombre || '');
+        }, 400);
+      }
+    }
+  }
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.3 — Fecha: 2026-05-23
+// Versión: 1.4 — Fecha: 2026-05-23
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================

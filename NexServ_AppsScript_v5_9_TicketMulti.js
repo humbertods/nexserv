@@ -1794,7 +1794,13 @@ function handleGetServiciosHoy(params) {
       var staffH = String(rowH[7] || '').trim();
       if (params.chica && staffH !== params.chica) continue;
       var colE = String(rowH[4] || '').trim();
-      if (colE.startsWith('LE-') || colE.startsWith('SN-') || colE.startsWith('SP-')) continue;
+      // Excluir LE- y SN- porque ya aparecen via ListaEspera/ServicioNormal merge.
+      // SP- solo se excluye si NO es de esta staff — los SP de la propia staff son
+      // su parte de una promo compartida y deben aparecer en su historial (Bug #2 fix).
+      var esSP = colE.startsWith('SP-');
+      var esLE_SN = colE.startsWith('LE-') || colE.startsWith('SN-');
+      if (esLE_SN) continue;
+      if (esSP && params.chica && staffH !== params.chica) continue;
       // Excluir solo registros intermedios SP (pendiente cobro promo compartida)
       // 'Pendiente cobro TM' SÍ se incluye — es el servicio real de la staff TM
       var metodoPagoH = String(rowH[10] || '').trim();
