@@ -150,8 +150,63 @@ window.tmTienePromoM4 = function(areas) {
   });
 };
 
+// ── MANDAMIENTO #5 — DISTRIBUCIÓN AUTOMÁTICA AL COBRAR ──────────
+// Al confirmar cualquier cobro (simple, grupal o TM), el sistema
+// SIEMPRE distribuye a los tres destinos sin excepción:
+//
+//   Staff   → su panel de comisiones (Comisiones sheet)
+//             recibe: servicio + monto cobrado (base para comisión %)
+//             para CADA staff involucrada en el servicio
+//
+//   Mikaela → CierresPagos: servicio / staff / precio final (sin comisión)
+//             el desglose multi-staff debe llegar completo como JSON
+//
+//   Owner   → HistorialOwner: servicio / staff / precio final /
+//             comisión de la staff / hora — una fila por staff
+//
+// La invariante: si hay desglose (promo duo, TM, SP compartida),
+// cada parte se registra individualmente. Nunca se colapsa en una
+// sola fila perdiendo info de quién hizo qué.
+//
+// Esta función construye el payload de distribución a partir del
+// contexto del cobro y lo devuelve listo para mandarlo al backend.
+// El backend (confirmarCobro) hace la escritura — esta función
+// solo garantiza que el payload sea completo.
+// ──────────────────────────────────────────────────────────────────
+window.construirPayloadDistribucionM5 = function(contexto) {
+  // contexto = {
+  //   idEspera:      string,
+  //   metodoPago:    string,
+  //   totalCobrado:  number,
+  //   tienePromo:    bool,
+  //   usaPrecioNormal: bool,   // true si tarjeta invalidó la promo (M4)
+  //   desglose:      array | null  // [{ staff, servicio, area, monto, montoNormal }]
+  // }
+  const base = {
+    idEspera:      contexto.idEspera,
+    metodoPago:    contexto.metodoPago,
+    totalCobrado:  contexto.totalCobrado
+  };
+
+  // Si hay desglose multi-staff, mandarlo siempre para que el backend
+  // pueda distribuir comisiones y escribir HistorialOwner por parte.
+  if (contexto.desglose && contexto.desglose.length > 0) {
+    base.serviciosDetalle = contexto.desglose.map(function(d) {
+      return {
+        staff:       d.staff    || '',
+        servicio:    d.servicio || '',
+        area:        d.area     || '',
+        monto:       Number(d.monto      || 0),
+        montoNormal: Number(d.montoNormal || d.monto || 0)
+      };
+    });
+  }
+
+  return base;
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.1 — Fecha: 2026-05-23
+// Versión: 1.2 — Fecha: 2026-05-23
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================
