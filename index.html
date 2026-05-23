@@ -1857,7 +1857,19 @@ if ('caches' in window) {
         <div class="modal-handle"></div>
         <div class="modal-title">👁 Registrar visita de pestañas</div>
         <div style="font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:16px;text-align:center;">Se guardará en el historial (últimas 5 visitas)</div>
+
+        <!-- ── MANDAMIENTO #7: tipo de visita obligatorio ── -->
         <div class="input-group">
+          <label>Tipo de visita</label>
+          <select id="rvpTipoVisita" onchange="toggleRvpTipoVisita(this.value)" style="font-weight:700;">
+            <option value="">Seleccionar tipo...</option>
+            <option value="Nuevas">✨ Nuevas (fullset)</option>
+            <option value="Retoque">🔄 Retoque / Mantenimiento</option>
+          </select>
+        </div>
+        <div id="rvpAviso" style="display:none;background:var(--info-bg);border:1.5px solid var(--info);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;font-weight:600;color:var(--info);margin-top:8px;margin-bottom:4px;"></div>
+
+        <div class="input-group" style="margin-top:12px;">
           <label>Servicio realizado</label>
           <input type="text" id="rvpServicio" placeholder="Ej: Pelo a pelo clásicas fullset">
         </div>
@@ -1895,12 +1907,7 @@ if ('caches' in window) {
         </div>
         <div class="input-group" style="margin-top:12px;">
           <label>Observaciones</label>
-          <textarea id="rvpObs" placeholder="Estado de las pestañas, recomendaciones..." style="min-height:60px;resize:vertical;"></textarea>
-        </div>
-        <button id="rvpGuardarBtn" class="btn-primary" onclick="guardarVisitaPestanas()" style="background:linear-gradient(135deg,var(--top-purple),#5b21b6);margin-top:18px;">💾 Guardar visita</button>
-        <button class="btn-secondary" onclick="closeModal()" style="margin-top:10px;">Cancelar</button>
-      </div>
-    </div>
+
 
     <div class="modal-bg" id="newCejasPigmentoModal">
       <div class="modal">
@@ -1995,12 +2002,15 @@ if ('caches' in window) {
       </div>
     </div>
 
+    <!-- ── MANDAMIENTO #7: fichas rápidas slot 2 (pestañas / facial / cejas pigmento) ── -->
+    <div id="pestFichaQuick2" style="display: none; margin-bottom: 14px;"></div>
+    <div id="facialFichaQuick2" style="display: none; margin-bottom: 14px;"></div>
+    <div id="cejasQuick2" style="display: none; margin-bottom: 14px;"></div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 20px;">
       <button onclick="openAddService()" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">+ Agregar servicio</button>
       <button onclick="openPromoSelect(2)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;" id="promoBtn2">🏷 Aplicar promo</button>
     </div>
-
-    <div style="background: var(--bg-card); border-radius: 20px; padding: 18px; box-shadow: var(--shadow-card); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="font-size: 13px; font-weight: 600; color: var(--ink-soft);">Total actual</div>
         <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;">$17</div>
@@ -4439,6 +4449,19 @@ if ('caches' in window) {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
           }
 
+          // ── MANDAMIENTO #7: facial siempre carga su ficha al abrir clienta ──
+          if (user.area === 'facial') {
+            const _fKey1 = (a.codigo || '').toLowerCase().replace(/-/g, '');
+            window._currentFacialClientKey = _fKey1;
+            window._currentFacialClientNombre = a.nombre;
+            window._currentFacialClientCodigo = a.codigo;
+            const _fSvcs1 = slotServices[1] || [];
+            window._currentFacialSvcName  = _fSvcs1.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+            window._currentFacialSvcPrice = _fSvcs1.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
+            window._facialFichaSlot = 1;
+            setTimeout(function() { loadFacialFichaQuick(_fKey1, 1); }, 400);
+          }
+
           // Precargar ficha cejas pigmento si el servicio es de efecto polvo/permanente
           if (user.area === 'cejas' || user.role === 'owner') {
             const svcNameForPig = slotServices[1].find(function(s){ return esSrvPigmento(s.name); });
@@ -4576,6 +4599,26 @@ if ('caches' in window) {
           
           if (user.area === 'pestanas') {
             loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
+          }
+
+          // ── MANDAMIENTO #7: facial y cejas cargan ficha en slot 2 también ──
+          if (user.area === 'facial') {
+            const _fKey2 = (a.codigo || '').toLowerCase().replace(/-/g, '');
+            window._currentFacialClientKey = _fKey2;
+            window._currentFacialClientNombre = a.nombre;
+            window._currentFacialClientCodigo = a.codigo;
+            const _fSvcs2 = slotServices[2] || [];
+            window._currentFacialSvcName  = _fSvcs2.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+            window._currentFacialSvcPrice = _fSvcs2.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
+            window._facialFichaSlot = 2;
+            setTimeout(function() { loadFacialFichaQuick(_fKey2, 2); }, 400);
+          }
+          if (user.area === 'cejas' || user.role === 'owner') {
+            const _svcPig2 = slotServices[2] && slotServices[2].find(function(s){ return esSrvPigmento(s.name); });
+            if (_svcPig2) {
+              const _cKey2 = (a.codigo || '').toLowerCase().replace(/-/g, '');
+              setTimeout(function() { loadCejasQuick(_cKey2, 2, a.codigo, a.nombre); }, 500);
+            }
           }
 
           // Si es TM: cargar areas completas para slot 2
@@ -5381,7 +5424,21 @@ if ('caches' in window) {
     
     // Flujo sin promo: servicio de area cruzada (ej: facial agrega servicio de cejas)
     if (!promoData || !promoData.promo) {
-      const areasExtras = data.areasExtras || [];
+      // ── Bug #1 fix: recalcular areasExtras desde slotServices en tiempo real ──
+      const _svcsActuales = slotServices[slot] || [];
+      const _staffArea = user?.area || '';
+      const areasExtras = [...new Set(
+        _svcsActuales
+          .filter(s => s.status === 'aprobado')
+          .map(s => {
+            const a = String(s.area || '').toLowerCase();
+            if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+            if (a.includes('pesta') || a.includes('lifting') || a.includes('retiro')) return 'pestanas';
+            if (a.includes('facial')) return 'facial';
+            return null;
+          })
+          .filter(a => a && a !== _staffArea)
+      )];
       if (areasExtras.length === 0) {
         alert('No hay áreas adicionales para continuar. Usá "Mandar a cobrar".');
         return;
@@ -12374,14 +12431,44 @@ if ('caches' in window) {
       btn.textContent = '💾 Guardar visita facial';
     }
   }
+  // ── MANDAMIENTO #7: helper para el selector de tipo de visita pestañas ──
+  function toggleRvpTipoVisita(tipo) {
+    const aviso = document.getElementById('rvpAviso');
+    if (!aviso) return;
+    if (tipo === 'Nuevas') {
+      aviso.style.display = 'block';
+      aviso.textContent = '✨ Fullset nuevo — registrá el modelo, diseño y tallas que usaste.';
+      aviso.style.color = 'var(--top-purple)';
+      aviso.style.background = 'var(--top-purple-bg, #f5f0ff)';
+      aviso.style.borderColor = 'var(--top-purple)';
+    } else if (tipo === 'Retoque') {
+      aviso.style.display = 'block';
+      aviso.textContent = '🔄 Retoque/Mantenimiento — se actualizará la ficha activa de la clienta.';
+      aviso.style.color = 'var(--info)';
+      aviso.style.background = 'var(--info-bg)';
+      aviso.style.borderColor = 'var(--info)';
+    } else {
+      aviso.style.display = 'none';
+    }
+  }
+  window.toggleRvpTipoVisita = toggleRvpTipoVisita;
+
   function openRegistrarVisitaPestanas() {
     const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
     ['rvpServicio','rvpPrecio','rvpTallas','rvpObs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-    ['rvpModelo','rvpDiseno'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+    ['rvpModelo','rvpDiseno','rvpTipoVisita'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+    // ── MANDAMIENTO #7: pre-seleccionar tipo según si tiene ficha o no ──
+    const tieneFicha = c.pestanas?.fichas && c.pestanas.fichas.length > 0;
+    const tipoEl = document.getElementById('rvpTipoVisita');
+    if (tipoEl) { tipoEl.value = tieneFicha ? 'Retoque' : 'Nuevas'; toggleRvpTipoVisita(tipoEl.value); }
+    const avisoEl = document.getElementById('rvpAviso'); if (avisoEl) avisoEl.style.display = 'none';
     document.getElementById('registrarVisitaPestanasModal').classList.add('active');
   }
   async function guardarVisitaPestanas() {
     const c = CLIENT_PROFILES[currentProfileClient]; if (!c) return;
+    // ── MANDAMIENTO #7: tipo de visita obligatorio ──
+    const tipoVisita = (document.getElementById('rvpTipoVisita')?.value || '').trim();
+    if (!tipoVisita) { alert('Seleccioná el tipo de visita (Nuevas o Retoque)'); return; }
     const servicio = document.getElementById('rvpServicio').value.trim();
     const modelo = document.getElementById('rvpModelo').value;
     const diseno = document.getElementById('rvpDiseno').value;
@@ -12393,20 +12480,28 @@ if ('caches' in window) {
     btn.disabled = true; btn.textContent = 'Guardando...';
     try {
       const user = window.currentUser;
-      const servicioFinal = servicio || (modelo + (diseno ? ' · ' + diseno : ''));
-      const result = await apiPost('addFichaPestanas', { codigo: c.code, nombre: c.name, modelo, diseno, tallas, obs });
+      const servicioFinal = servicio || (tipoVisita + (modelo ? ' · ' + modelo : '') + (diseno ? ' · ' + diseno : ''));
+      // ── MANDAMIENTO #7: incluir tipoVisita en el registro ──
+      const result = await apiPost('addFichaPestanas', { codigo: c.code, nombre: c.name, modelo, diseno, tallas, obs, tipoVisita });
       if (result && result.success) {
         if (!c.pestanas) c.pestanas = { fichas: [], history: [] };
         if (!c.pestanas.history) c.pestanas.history = [];
         const today = new Date();
         const fecha = today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear();
-        c.pestanas.history.unshift({ service: servicioFinal, price: precio, date: fecha, by: user?.name||'', modelo, diseno, tallas });
+        c.pestanas.history.unshift({ service: servicioFinal, price: precio, date: fecha, by: user?.name||'', modelo, diseno, tallas, tipoVisita });
         if (c.pestanas.history.length > 5) c.pestanas.history = c.pestanas.history.slice(0, 5);
         if (!c.pestanas.fichas) c.pestanas.fichas = [];
-        c.pestanas.fichas.forEach(f => f.activa = false);
-        c.pestanas.fichas.unshift({ modelo, diseno: diseno||'—', tallas: tallas||'—', obs, fecha, activa: true });
-        if (c.pestanas.fichas.length > 5) c.pestanas.fichas.pop();
-        closeModal(); renderProfileTab(); showToast('✅ Visita de pestañas registrada');
+        // Si es retoque, no reemplazar la ficha activa — solo actualizar obs/tallas
+        if (tipoVisita === 'Nuevas') {
+          c.pestanas.fichas.forEach(f => f.activa = false);
+          c.pestanas.fichas.unshift({ modelo, diseno: diseno||'—', tallas: tallas||'—', obs, fecha, activa: true, tipoVisita });
+          if (c.pestanas.fichas.length > 5) c.pestanas.fichas.pop();
+        } else {
+          // Retoque: actualizar ficha activa si existe
+          const fichaActiva = c.pestanas.fichas.find(f => f.activa);
+          if (fichaActiva) { if (obs) fichaActiva.obs = obs; if (tallas) fichaActiva.tallas = tallas; }
+        }
+        closeModal(); renderProfileTab(); showToast('✅ ' + tipoVisita + ' de pestañas registrado');
       } else { alert('Error: ' + (result?.message || 'desconocido')); }
     } catch(e) { alert('Error de conexión'); }
     btn.disabled = false; btn.textContent = '💾 Guardar visita';
