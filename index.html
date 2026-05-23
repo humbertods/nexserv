@@ -8322,18 +8322,23 @@ if ('caches' in window) {
       try {
         const esTarjetaGrupal = metodoPago === 'Tarjeta';
         for (const c of clientas) {
-          // Si paga con tarjeta y tiene promo, cobrar precio regular
+          // ── MANDAMIENTO #4: tarjeta invalida promo ──
           const totalCobrado = (esTarjetaGrupal && c.promoNombre)
             ? String(c.precioRegular || c.total || '0')
             : String(c.total || '0');
-          await apiPost('confirmarCobro', {
-            idEspera: c.idEspera,
-            metodoPago,
-            totalCobrado,
-            precioRegular: String(c.precioRegular || c.total || '0'),
-            promoNombre: c.promoNombre || '',
-            esCobroGrupal: true
+          // ── MANDAMIENTO #5: payload completo para distribución a staff/Mikaela/Owner ──
+          const _payloadGrupal = window.construirPayloadDistribucionM5({
+            idEspera:        c.idEspera,
+            metodoPago:      metodoPago,
+            totalCobrado:    Number(totalCobrado),
+            tienePromo:      !!(c.promoNombre),
+            usaPrecioNormal: esTarjetaGrupal && !!(c.promoNombre),
+            desglose:        c.serviciosDetalle || null
           });
+          _payloadGrupal.precioRegular  = String(c.precioRegular || c.total || '0');
+          _payloadGrupal.promoNombre    = c.promoNombre || '';
+          _payloadGrupal.esCobroGrupal  = true;
+          await apiPost('confirmarCobro', _payloadGrupal);
         }
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
@@ -8359,15 +8364,22 @@ if ('caches' in window) {
     const totalProductos = window._cobrarTotalProductos || 0;
     const totalFinal = totalServicios + totalProductos;
 
+    // ── MANDAMIENTO #5: construir payload completo para distribución a los 3 destinos ──
+    // staff (comisiones) + Mikaela (CierresPagos) + Owner (HistorialOwner)
+    const _payloadM5 = window.construirPayloadDistribucionM5({
+      idEspera:        window._cobrarId,
+      metodoPago:      window._cobrarPago,
+      totalCobrado:    totalFinal,
+      tienePromo:      window._cobrarTienePromo,
+      usaPrecioNormal: window._cobrarTienePromo && window._cobrarPago === 'Tarjeta',
+      desglose:        window._cobrarDesglose
+    });
+    _payloadM5.totalServicios = totalServicios;
+    _payloadM5.totalProductos = totalProductos;
+
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
-      await apiPost('confirmarCobro', {
-        idEspera: window._cobrarId,
-        metodoPago: window._cobrarPago,
-        totalCobrado: totalFinal,
-        totalServicios: totalServicios,
-        totalProductos: totalProductos
-      });
+      await apiPost('confirmarCobro', _payloadM5);
     } catch (err) {
       console.error('confirmarCobro error:', err);
       btn.disabled = false;
