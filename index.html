@@ -7021,25 +7021,26 @@ if ('caches' in window) {
   });
 
   // ========== SECUENCIA DE SERVICIOS ==========
-  let _secuencia = []; // [{area, label}]
+  // NOTA: se usa window._secuencia para que getAreaPrioritaria() (mandamientos) pueda leerla.
+  window._secuencia = []; // [{area, label}]
 
   const AREA_LABELS_SEC = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
   const AREA_ICONS_SEC = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
 
   function addAreaSecuencia(area) {
-    _secuencia.push({ area, label: AREA_LABELS_SEC[area] || area });
+    window._secuencia.push({ area, label: AREA_LABELS_SEC[area] || area });
     renderSecuencia();
   }
 
   function removeSecuenciaItem(idx) {
-    _secuencia.splice(idx, 1);
+    window._secuencia.splice(idx, 1);
     renderSecuencia();
   }
 
   function moveSecuencia(idx, dir) {
     const newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= _secuencia.length) return;
-    [_secuencia[idx], _secuencia[newIdx]] = [_secuencia[newIdx], _secuencia[idx]];
+    if (newIdx < 0 || newIdx >= window._secuencia.length) return;
+    [window._secuencia[idx], window._secuencia[newIdx]] = [window._secuencia[newIdx], window._secuencia[idx]];
     renderSecuencia();
   }
 
@@ -7061,20 +7062,20 @@ if ('caches' in window) {
       empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
     }
     if (!list) return;
-    if (_secuencia.length === 0) {
+    if (window._secuencia.length === 0) {
       list.innerHTML = '';
       if (empty) empty.style.display = 'block';
       return;
     }
     if (empty) empty.style.display = 'none';
-    list.innerHTML = _secuencia.map((s, i) => `
+    list.innerHTML = window._secuencia.map((s, i) => `
       <div style="background: var(--bg-card); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px;">
         <div style="background: var(--accent); color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">${i + 1}</div>
         <div style="font-size: 16px;">${AREA_ICONS_SEC[s.area] || ''}</div>
         <div style="flex: 1; font-size: 14px; font-weight: 700;">${s.label}</div>
         <div style="display: flex; gap: 4px; flex-shrink: 0;">
           ${i > 0 ? `<button onclick="moveSecuencia(${i},-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↑</button>` : '<div style="width:30px"></div>'}
-          ${i < _secuencia.length - 1 ? `<button onclick="moveSecuencia(${i},1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↓</button>` : '<div style="width:30px"></div>'}
+          ${i < window._secuencia.length - 1 ? `<button onclick="moveSecuencia(${i},1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↓</button>` : '<div style="width:30px"></div>'}
           <button onclick="removeSecuenciaItem(${i})" style="width:30px;height:30px;border-radius:50%;border:none;background:var(--danger-bg);color:var(--danger);font-size:14px;cursor:pointer;font-weight:700;">✕</button>
         </div>
       </div>
@@ -7083,7 +7084,7 @@ if ('caches' in window) {
 
   function resetArrivalExtras() {
     _arrPromos = [];
-    _secuencia = [];
+    window._secuencia = [];
     renderSecuencia();
     const slots = document.getElementById('arrPromoSlots');
     if (slots) slots.innerHTML = '';
@@ -11591,8 +11592,8 @@ if ('caches' in window) {
       });
     }
     // Secuencia de servicios
-    if (_secuencia.length > 0) {
-      postData.secuencia = _secuencia;
+    if (window._secuencia.length > 0) {
+      postData.secuencia = window._secuencia;
     }
 
     // ── DETECCIÓN TICKET MULTI ──────────────────────────────
@@ -11834,7 +11835,7 @@ if ('caches' in window) {
           prioridad:    'Normal',
           observaciones: obs,
           areas:        areasMultiGA,
-          secuencia:    _secuencia.map(s => s.area)
+          secuencia:    window._secuencia.map(s => s.area)
         });
         if (tmResult && tmResult.success) {
           window._arrPromo = null;
