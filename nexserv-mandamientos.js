@@ -339,8 +339,116 @@ window.cargarFichaSegunAreaM7 = function(area, clientKey, slot, clientCodigo, cl
   }
 };
 
+// ── MANDAMIENTO #8 — CLASIFICACIÓN AUTOMÁTICA DEL TICKET PROMO ──────────────
+//
+// El botón "Servicio Promo" maneja 4 tipos de ticket.
+// NexServ DEBE clasificar automáticamente el tipo correcto según las promos
+// ingresadas por Mikaela, antes de crear el ticket.
+// La clasificación es determinista — Mikaela no elige el tipo manualmente.
+//
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ TIPO 1 — ServicioPromoIndividual                                        │
+// │   1 promo · todas las divisiones pertenecen a 1 staff                  │
+// │   Ej: "Depilación cejas $5 + Pigmento $14" → 1 staff de Cejas          │
+// │   Ticket: LE-XXXX (addServicioPromo)                                    │
+// │   Staff panel: botones SP normales (puedeTodo=true)                     │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │ TIPO 2 — ServicioPromoDuo                                               │
+// │   1 promo · divisiones cubren 2 áreas distintas (ej: Cejas + Pestañas) │
+// │   Ej: "Combo 24 Lifting: Cejas $5 + Pestañas $27"                      │
+// │   Ticket: LE-XXXX (addServicioPromo, promo con division multi-área)     │
+// │   Staff panel: botones SP compartida (puedeTodo=false, secuencia rige)  │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │ TIPO 3 — ServicioMultiPromos                                            │
+// │   2+ promos registradas → puede involucrar 2 o 3 staff distintas       │
+// │   Ej: "Combo 24 Lifting" (Cejas+Pestañas) + "Promo Facial"             │
+// │   Ticket: TM-XXXX (crearTicketMulti — cada promo = 1 área en el TM)    │
+// │   Staff panel: botones TM con lbl del siguiente servicio                │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │ TIPO 4 — ServicioPromoDuoCompleto  [implementado en Mandamiento #6]     │
+// │   1 promo multi-área pero la primera staff hace TODO (Mandamiento #6)   │
+// │   Ej: staff de Cejas decide tomar el Lifting también                    │
+// │   Ticket: igual que Tipo 2 (LE-XXXX)                                   │
+// │   Staff panel: botón "🎁 Cobrar promo completa" visible (puedeTodo=true │
+// │   porque AREA_CAPS de cejas incluye lifting/pestañas en sus caps)       │
+// └─────────────────────────────────────────────────────────────────────────┘
+//
+// ÁRBOL DE DECISIÓN (ejecutado en goToList / goAssign antes de postear):
+//
+//   ¿Hay más de 1 promo en _arrPromos?
+//     SÍ → TIPO 3 → crearTicketMulti (una área por promo)
+//     NO → ¿La única promo tiene divisiones en más de 1 área distinta?
+//           SÍ → TIPO 2 → addServicioPromo (promo con division multi-área)
+//                (Tipo 4 se activa si la staff presiona "🎁 Cobrar promo completa")
+//           NO → TIPO 1 → addServicioPromo (promo de 1 sola área)
+//
+// MAPEO DE ÁREAS en divisiones:
+//   'cejas', 'depilacion', 'depil', 'bigote', 'pigment', 'brow'  → 'cejas'
+//   'pestanas', 'pestañas', 'lifting', 'retiro', 'volumen'       → 'pestanas'
+//   'facial', 'hidra', 'limpiez', 'dermaplaning'                 → 'facial'
+//
+// INVARIANTE: la clasificación se basa en _arrPromos + _secuencia.
+// Mandamiento #1 sigue rigiendo el área prioritaria en todos los tipos.
+// Mandamiento #4 sigue aplicando en todos los tipos al cobrar.
+// ──────────────────────────────────────────────────────────────────────────────
+window.clasificarTicketPromoM8 = function() {
+  var promos = (window._arrPromos || []).filter(function(p) { return p !== null; });
+
+  if (promos.length === 0) {
+    return { tipo: null, mensaje: 'Sin promos registradas' };
+  }
+
+  // TIPO 3: 2 o más promos → siempre TM
+  if (promos.length > 1) {
+    return { tipo: 3, nombre: 'ServicioMultiPromos', ticket: 'TM' };
+  }
+
+  // 1 sola promo: analizar divisiones
+  var promo = promos[0];
+  var division = promo.division || [];
+
+  var AREA_KEY = function(raw) {
+    var s = String(raw || '').toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+    if (s.includes('pest') || s.includes('lifting') || s.includes('retiro') || s.includes('volumen')) return 'pestanas';
+    if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
+    if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
+    return 'cejas'; // default: cejas / pigmento / brow
+  };
+
+  // Extraer áreas únicas de las divisiones
+  var areasUnicas = [];
+  division.forEach(function(d) {
+    var k = AREA_KEY(d.area || d.servicio || '');
+    if (!areasUnicas.includes(k)) areasUnicas.push(k);
+  });
+
+  // Sin divisiones → tratar como 1 área
+  if (areasUnicas.length <= 1) {
+    return { tipo: 1, nombre: 'ServicioPromoIndividual', ticket: 'LE', areasUnicas: areasUnicas };
+  }
+
+  // 2+ áreas distintas en divisiones → Tipo 2 (o Tipo 4 si staff lo toma todo)
+  return { tipo: 2, nombre: 'ServicioPromoDuo', ticket: 'LE', areasUnicas: areasUnicas };
+};
+
+// Devuelve un string legible con el resumen del ticket para mostrarle a Mikaela
+// antes de confirmar el envío.
+window.resumenTicketPromoM8 = function() {
+  var c = window.clasificarTicketPromoM8();
+  if (!c.tipo) return '';
+  var promos = (window._arrPromos || []).filter(function(p) { return p !== null; });
+  var nombres = promos.map(function(p) { return p.name; }).join(' + ');
+  var staffStr = c.areasUnicas ? c.areasUnicas.length + ' staff' : '';
+  switch (c.tipo) {
+    case 1: return '✅ ' + nombres + ' · 1 staff · Ticket LE';
+    case 2: return '🤝 ' + nombres + ' · 2 staff (promo compartida) · Ticket LE';
+    case 3: return '🎯 ' + nombres + ' · ' + staffStr + '+ · Ticket Multi (TM)';
+    default: return '';
+  }
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.4 — Fecha: 2026-05-23
+// Versión: 1.5 — Fecha: 2026-05-23
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================
