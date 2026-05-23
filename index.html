@@ -3268,8 +3268,7 @@ if ('caches' in window) {
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
         if (!hayMas) {
-          // No hay más áreas pendientes → botón de cierre multi-staff
-          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé servicio — clienta múltiple</button>';
+          btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé mi parte — clienta multi-servicio a cobro</button>';
         } else {
           // ── MANDAMIENTO #6: si el área actual tiene promo, ofrecer tomar precio completo ──
           var miAreaTM = (tm.areas || []).find(function(a) { return String(a.estado||'').toLowerCase() === 'en servicio'; });
@@ -3277,11 +3276,12 @@ if ('caches' in window) {
           var miPrecioPromoTM  = miAreaTM ? Number(miAreaTM.precio || 0) : 0;
           var tienePromoEnTM   = miPrecioNormalTM > miPrecioPromoTM && miPrecioPromoTM > 0;
 
-          // Hay servicios pendientes → botones base (repetibles infinitamente)
+          // ── 2 botones conector de capa (diagrama TM) ──────────────────────────
+          // BTN 1: esta staff sigue — toma el siguiente área ella misma
+          // BTN 2: esta staff termina — el siguiente área queda libre para otra staff
           var btnsBaseTM = ''
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">➡️ Terminé mi parte — tomar siguiente: ' + lbl + '</button>'
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">🤝 Terminé mi parte — pasar a otra staff: ' + lbl + '</button>'
-            + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">🔗 Terminé mi parte — yo sigo con: ' + lbl + '</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:2px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--accent);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">↗️ Terminé mi parte — pasar ' + lbl + ' a otra staff</button>';
           if (tienePromoEnTM) {
             btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — tomar todo el valor ($' + miPrecioNormalTM + ')</button>'
               + btnsBaseTM;
@@ -3290,7 +3290,7 @@ if ('caches' in window) {
         }
       }).catch(function() {
         var slotN = slot1 ? 1 : 2;
-        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal()">✅ Terminé servicio — clienta múltiple</button>';
+        btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal()">✅ Terminé mi parte — clienta multi-servicio a cobro</button>';
       });
       return;
     }
@@ -5037,10 +5037,14 @@ if ('caches' in window) {
             <div style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:3px 8px;border-radius:100px;">✅ LISTO</div>
           </div>`;
         } else if (est === 'en servicio') {
+          const _tentItems = (ar.tentativo || 'Confirmar servicio').split(' + ').map(s => s.trim()).filter(Boolean);
+          const _tentHTML = _tentItems.length > 1
+            ? _tentItems.map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s}</div>`).join('')
+            : `<div style="font-size:12px;color:var(--ink-soft);">${ar.tentativo||'Confirmar servicio'}</div>`;
           timelineHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);">
             <div style="font-size:18px;">${icon}</div>
             <div style="flex:1;"><div style="font-size:13px;font-weight:800;color:var(--info);">👇 TU SERVICIO · ${label}</div>
-            <div style="font-size:12px;color:var(--ink-soft);">${ar.tentativo||'Confirmar servicio'}</div></div>
+            ${_tentHTML}</div>
             <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
           </div>`;
         }
@@ -7399,7 +7403,7 @@ if ('caches' in window) {
                 } else if (est === 'en servicio') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
-                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
                     <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
                 } else {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${notLast?'border-bottom:1px solid var(--line);':''}">
@@ -9001,8 +9005,96 @@ if ('caches' in window) {
     console.log('📦 serviciosAdicionales resultado:', result.length, result);
     return result;
   }
-  
-  // Toggle del selector de servicios
+
+  // ── buildAreasMultiTM ────────────────────────────────────────────────────
+  // Función ÚNICA que construye el array de áreas para crearTicketMulti.
+  // Fuente de verdad: siempre llama a esta función, nunca construyas areasMulti inline.
+  //
+  // Reglas:
+  //   - tipo='multi'  → área 1 = selector principal, áreas 2-N = adicionales
+  //   - tipo='promo'  → área 1 = promo 1 (con área deducida de su división mayor),
+  //                     área 2-N = promasExtra + adicionales
+  //   - tipo='normal' con adicionales → área 1 = servicio normal, áreas 2-N = adicionales
+  //
+  // Para promos: el área se deduce de la división de mayor monto (NO del areaKey del form).
+  // Para servicios normales: el área viene del selector de área.
+  // ────────────────────────────────────────────────────────────────────────────
+  function buildAreasMultiTM(tipo, areaKey, servicio, precio, promo) {
+    const AREA_KEY_FROM_DIV = function(raw) {
+      const s = String(raw || '').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, c=>c==='é'?'e':'n');
+      if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
+      if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
+      if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
+      return 'cejas';
+    };
+
+    const getPromoArea = function(p) {
+      if (!p || !p.division || p.division.length === 0) return areaKey || 'cejas';
+      const sorted = [...p.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
+      return AREA_KEY_FROM_DIV(sorted[0].area || sorted[0].servicio || '');
+    };
+
+    const areas = [];
+
+    if (tipo === 'promo') {
+      // Área 1: primera promo
+      const promo1 = _arrPromos.find(p => p !== null);
+      if (promo1) {
+        areas.push({
+          tentativo:    promo1.name,
+          area:         getPromoArea(promo1),
+          precio:       Number(promo1.price || 0),
+          precioNormal: Number(promo1.regular || promo1.price || 0),
+          tipo:         'promo'
+        });
+      }
+      // Áreas 2-N: promos adicionales
+      _arrPromos.filter(p => p !== null).slice(1).forEach(function(p) {
+        areas.push({
+          tentativo:    p.name,
+          area:         getPromoArea(p),
+          precio:       Number(p.price || 0),
+          precioNormal: Number(p.regular || p.price || 0),
+          tipo:         'promo'
+        });
+      });
+    } else {
+      // tipo=multi o tipo=normal: área 1 = servicio/promo del selector principal
+      if (promo) {
+        areas.push({
+          tentativo:    promo.name,
+          area:         getPromoArea(promo),
+          precio:       Number(promo.price || 0),
+          precioNormal: Number(promo.regular || promo.price || 0),
+          tipo:         'promo'
+        });
+      } else if (servicio) {
+        areas.push({
+          tentativo:    servicio,
+          area:         areaKey,
+          precio:       Number(precio || 0),
+          precioNormal: Number(precio || 0),
+          tipo:         'normal'
+        });
+      }
+    }
+
+    // Áreas adicionales (normales o promo) — siempre al final
+    getServiciosAdicionalesData().forEach(function(a) {
+      areas.push({
+        tentativo:    a.nombre,
+        area:         String(a.area || 'cejas').toLowerCase(),
+        precio:       Number(a.precio || 0),
+        precioNormal: Number(a.regular || a.precio || 0),
+        tipo:         a.tipo || 'normal'
+      });
+    });
+
+    return areas;
+  }
+  window.buildAreasMultiTM = buildAreasMultiTM;
+
+
   function toggleServiceSelector() {
     const box = document.getElementById('serviceSelectorBox');
     const area = document.getElementById('arrArea')?.value;
@@ -11609,60 +11701,22 @@ if ('caches' in window) {
       postData.secuencia = window._secuencia;
     }
 
-    const adicionales = getServiciosAdicionalesData();
-    // ── DETECCIÓN TICKET MULTI ──────────────────────────────
-    // TM si: tipo 'multi', servicios adicionales normales, O múltiples promos (promasExtra)
-    const promasExtraMulti = _arrPromos.filter(p => p !== null).slice(1);
-    const esMulti = tipo === 'multi' || adicionales.length > 0 || promasExtraMulti.length > 0;
+    // ── TICKET MULTI: siempre usar buildAreasMultiTM() ──────────────────────
+    const _adicionales = getServiciosAdicionalesData();
+    const _promasExtra = _arrPromos.filter(p => p !== null).slice(1);
+    const esMulti = tipo === 'multi' || _adicionales.length > 0 || _promasExtra.length > 0;
 
     if (esMulti) {
-      const areasMulti = [];
+      const areasMulti = buildAreasMultiTM(tipo, areaKey, servicio, precio, promo);
+      if (areasMulti.length === 0) { alert('Agregá al menos un servicio antes de continuar.'); return; }
 
-      // Área principal (servicio 1 / promo 1)
-      if (servicio || (promo && promo.name)) {
-        areasMulti.push({
-          tentativo:    promo ? promo.name : servicio,
-          area:         areaKey,
-          precio:       promo ? promo.price : precio,
-          precioNormal: promo ? promo.regular : precio,
-          tipo:         promo ? 'promo' : 'normal'
-        });
-      }
-
-      // Promos adicionales (2a, 3a) como áreas independientes del TicketMulti
-      promasExtraMulti.forEach(function(p) {
-        const divOrd = [...(p.division||[])].sort(function(a,b){ return Number(b.monto||0) - Number(a.monto||0); });
-        const ds = String((divOrd[0] && divOrd[0].area) || '').toLowerCase();
-        const _areaExtra = ds.includes('pest') || ds.includes('lifting') ? 'pestanas'
-          : ds.includes('facial') || ds.includes('hidra') ? 'facial'
-          : ds.includes('depil') || ds.includes('bikini') ? 'depilacion'
-          : ds.includes('ceja') ? 'cejas' : 'cejas';
-        areasMulti.push({
-          tentativo:    p.name,
-          area:         _areaExtra,
-          precio:       p.price,
-          precioNormal: p.regular,
-          tipo:         'promo'
-        });
-      });
-
-      // Servicios adicionales normales
-      adicionales.forEach(a => {
-        areasMulti.push({
-          tentativo:    a.nombre,
-          area:         a.area,
-          precio:       a.precio,
-          precioNormal: a.regular || a.precio,
-          tipo:         a.tipo
-        });
-      });
       const tmData = {
-        codigo:       codigo,
-        nombre:       nombre,
-        prioridad:    prioridad,
+        codigo:        codigo,
+        nombre:        nombre,
+        prioridad:     prioridad,
         observaciones: obs,
-        areas:        areasMulti,
-        secuencia:    window._secuencia.map(s => s.area) // ['pestanas','cejas'] etc
+        areas:         areasMulti,
+        secuencia:     window._secuencia.map(s => s.area)
       };
 
       try {
@@ -11691,6 +11745,7 @@ if ('caches' in window) {
       const accionAdd = tienePromo ? 'addServicioPromo' : 'addServicioNormal';
       const result = await apiPost(accionAdd, postData);
       console.log('📥 Respuesta de ' + accionAdd + ':', result);
+
       
       if (result && result.success) {
         console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
@@ -11843,40 +11898,27 @@ if ('caches' in window) {
 
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
-    // ── DETECCIÓN TICKET MULTI en asignación directa ─────────
-    // TM SOLO si hay servicios adicionales (híbrido). Múltiples promos = flujo SP encadenado.
-    const adicionalesGA = getServiciosAdicionalesData();
-    if (adicionalesGA.length > 0) {
-      const areasMultiGA = [];
-      if (servicioGA || (promo && promo.name)) {
-        areasMultiGA.push({
-          tentativo:    promo ? promo.name : servicioGA,
-          area:         areaKey,
-          precio:       promo ? promo.price : precioGA,
-          precioNormal: promo ? promo.regular : precioGA,
-          tipo:         promo ? 'promo' : 'normal'
-        });
-      }
-      adicionalesGA.forEach(a => {
-        areasMultiGA.push({
-          tentativo:    a.nombre,
-          area:         a.area,
-          precio:       a.precio,
-          precioNormal: a.regular || a.precio,
-          tipo:         a.tipo
-        });
-      });
+    // ── TICKET MULTI en asignación directa — usar buildAreasMultiTM() ────────
+    const _adicionalesGA = getServiciosAdicionalesData();
+    const _promasExtraGA = _arrPromos.filter(p => p !== null).slice(1);
+    const esMultiGA = tipo === 'multi' || _adicionalesGA.length > 0 || _promasExtraGA.length > 0;
+
+    if (esMultiGA) {
+      const areasMultiGA = buildAreasMultiTM(tipo, areaKey, servicioGA, precioGA, promo);
+      if (areasMultiGA.length === 0) { alert('Agregá al menos un servicio.'); return; }
+
       try {
         const tmResult = await apiPost('crearTicketMulti', {
-          codigo:       codigo,
-          nombre:       nombre,
-          prioridad:    'Normal',
+          codigo:        codigo,
+          nombre:        nombre,
+          prioridad:     'Normal',
           observaciones: obs,
-          areas:        areasMultiGA,
-          secuencia:    window._secuencia.map(s => s.area)
+          areas:         areasMultiGA,
+          secuencia:     window._secuencia.map(s => s.area)
         });
         if (tmResult && tmResult.success) {
           window._arrPromo = null;
+          _arrPromos = [];
           document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
           _numServiciosAdicionales = 0;
           simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
