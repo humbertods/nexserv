@@ -103,8 +103,55 @@ window.esMismaAreaM3 = function(staffArea, servicioArea) {
   return familia.some(k => sv.includes(k) || k.includes(sv));
 };
 
+// ── MANDAMIENTO #4 — MÉTODOS DE PAGO Y PRECIO CON PROMO ─────────
+// Transferencia y Efectivo son los únicos métodos válidos para promos.
+// Tarjeta = SIEMPRE precio normal, sin excepciones.
+// Aplica a: servicio simple con promo, promo compartida (SP),
+//           y ticket multi (TM) que contenga al menos una parte promo.
+//
+// Esta función recibe el contexto de cobro y devuelve:
+//   { totalFinal, usaPrecioNormal, desglose }
+// donde desglose[i].montoFinal ya refleja el precio correcto.
+// ──────────────────────────────────────────────────────────────────
+window.aplicarReglaPagoM4 = function(metodo, contexto) {
+  // contexto = {
+  //   tienePromo: bool,
+  //   totalPromo: number,
+  //   totalNormal: number,
+  //   desglose: [{ monto, montoNormal, ... }]  // puede ser null
+  // }
+  const esTarjeta     = metodo === 'Tarjeta';
+  const usaNormal     = esTarjeta && contexto.tienePromo;
+  const totalFinal    = usaNormal
+    ? (Number(contexto.totalNormal) || Number(contexto.totalPromo) || 0)
+    : (Number(contexto.totalPromo)  || 0);
+
+  let desglose = null;
+  if (contexto.desglose && contexto.desglose.length > 0) {
+    desglose = contexto.desglose.map(function(d) {
+      const montoFinal = usaNormal
+        ? Number(d.montoNormal || d.monto || 0)
+        : Number(d.monto || 0);
+      return Object.assign({}, d, { montoFinal: montoFinal });
+    });
+  }
+
+  return { totalFinal: totalFinal, usaPrecioNormal: usaNormal, desglose: desglose };
+};
+
+// Helper: dado un array de áreas TM, indica si alguna tiene precio promo
+// (precio < precioNormal), para saber si el ticket TM tiene promo adentro.
+window.tmTienePromoM4 = function(areas) {
+  if (!areas || areas.length === 0) return false;
+  return areas.some(function(a) {
+    const precio  = Number(a.precio  || 0);
+    const normal  = Number(a.precioNormal || a.precio || 0);
+    return normal > precio && precio > 0;
+  });
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.0 — Fecha: 2026-05-22
+// Versión: 1.1 — Fecha: 2026-05-23
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================
