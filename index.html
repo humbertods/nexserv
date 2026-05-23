@@ -7384,8 +7384,11 @@ if ('caches' in window) {
               }));
             }
             if (!desgloseData && esTM && p.areas) {
+              // ── MANDAMIENTO #4: incluir precioNormal para que tarjeta recalcule correctamente ──
               desgloseData = p.areas.map(a => ({
-                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area, monto: a.precio
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
+                monto: a.precio,
+                montoNormal: a.precioNormal || a.precio  // precio sin descuento promo
               }));
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
@@ -8128,9 +8131,10 @@ if ('caches' in window) {
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
     window._cobrarTotalRegular = Number(precioRegular) || Number(total) || 0;
-    // Para TM: si precioRegular > total, hay descuento promo que tarjeta no aplica
+    // ── MANDAMIENTO #4: detectar si hay promo (simple, SP, o TM con área promo adentro) ──
     const _tienePrecioDistinto = Number(precioRegular) > 0 && Number(precioRegular) !== Number(total);
-    window._cobrarTienePromo = (promoNombre && promoNombre !== '' && promoNombre !== 'undefined') || _tienePrecioDistinto;
+    const _promoNombreValida   = (promoNombre && promoNombre !== '' && promoNombre !== 'undefined');
+    window._cobrarTienePromo   = _promoNombreValida || _tienePrecioDistinto;
     window._cobrarDesglose = null;
 
     document.getElementById('cobrarClientName').textContent = nombre;
@@ -8168,7 +8172,10 @@ if ('caches' in window) {
       window._cobrarTotalPromo = subtotalNum;
       const subtotalNormal = desglose.reduce((s, d) => s + Number(d.montoNormal || d.monto || 0), 0);
       window._cobrarTotalRegular = subtotalNormal > subtotalNum ? subtotalNormal : (Number(precioRegular) || subtotalNum);
-      window._cobrarTienePromo = window._cobrarTienePromo || (window._cobrarTotalRegular > window._cobrarTotalPromo);
+      // ── MANDAMIENTO #4: detectar promo dentro de TM via tmTienePromoM4 ──
+      window._cobrarTienePromo = window._cobrarTienePromo
+        || (window._cobrarTotalRegular > window._cobrarTotalPromo)
+        || window.tmTienePromoM4(desglose);
     } else {
       // Modo simple
       desgloseEl.style.display = 'none';
@@ -8254,50 +8261,52 @@ if ('caches' in window) {
     const promoBanner= document.getElementById('cobrarPromoBanner');
     const subtotalEl = document.getElementById('cobrarSubtotal');
 
-    const tienePromo  = window._cobrarTienePromo;
-    const totalPromo  = window._cobrarTotalPromo  || '0';
-    const totalRegular= window._cobrarTotalRegular || totalPromo;
+    // ── MANDAMIENTO #4: tarjeta siempre cobra precio normal en promos ──
+    const resultado = window.aplicarReglaPagoM4(metodo, {
+      tienePromo:  window._cobrarTienePromo,
+      totalPromo:  window._cobrarTotalPromo  || 0,
+      totalNormal: window._cobrarTotalRegular || window._cobrarTotalPromo || 0,
+      desglose:    window._cobrarDesglose
+    });
 
-    if (metodo === 'Tarjeta' && tienePromo) {
+    if (resultado.usaPrecioNormal) {
       aviso.style.display = 'block';
-      const precioPromoDisplay   = typeof totalPromo   === 'number' ? totalPromo.toFixed(2)   : totalPromo;
-      const precioRegularDisplay = typeof totalRegular === 'number' ? totalRegular.toFixed(2) : totalRegular;
-      document.getElementById('cobrarPrecioPromo').textContent   = '$' + precioPromoDisplay;
-      document.getElementById('cobrarPrecioRegular').textContent = '$' + precioRegularDisplay;
-      totalEl.textContent  = '$' + precioRegularDisplay;
-      totalEl.style.color  = 'var(--danger)';
+      const promoDisp   = Number(window._cobrarTotalPromo  || 0).toFixed(2);
+      const normalDisp  = resultado.totalFinal.toFixed(2);
+      document.getElementById('cobrarPrecioPromo').textContent   = '$' + promoDisp;
+      document.getElementById('cobrarPrecioRegular').textContent = '$' + normalDisp;
+      totalEl.textContent = '$' + normalDisp;
+      totalEl.style.color = 'var(--danger)';
       promoBanner.style.display = 'none';
-      if (subtotalEl) { subtotalEl.textContent = '$' + precioRegularDisplay; subtotalEl.style.color = 'var(--danger)'; }
-      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+      if (subtotalEl) { subtotalEl.textContent = '$' + normalDisp; subtotalEl.style.color = 'var(--danger)'; }
+      if (resultado.desglose) {
         const itemsEl2 = document.getElementById('cobrarDesgloseItems');
         if (itemsEl2) {
-          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
-            const montoReal = Number(d.montoNormal || d.monto || 0);
-            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
+          itemsEl2.innerHTML = resultado.desglose.map(d => `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
               <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
               <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
-              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${montoReal.toFixed(2)}</div></div>`;
-          }).join('');
+              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${d.montoFinal.toFixed(2)}</div></div>`
+          ).join('');
         }
       }
     } else {
       aviso.style.display = 'none';
-      totalEl.textContent  = '$' + totalPromo;
-      totalEl.style.color  = 'var(--accent-deep)';
-      if (tienePromo) promoBanner.style.display = 'block';
-      if (window._cobrarDesglose && window._cobrarDesglose.length > 0) {
+      totalEl.textContent = '$' + resultado.totalFinal.toFixed(2);
+      totalEl.style.color = 'var(--accent-deep)';
+      if (window._cobrarTienePromo) promoBanner.style.display = 'block';
+      if (resultado.desglose) {
         const itemsEl2 = document.getElementById('cobrarDesgloseItems');
         if (itemsEl2) {
-          itemsEl2.innerHTML = window._cobrarDesglose.map(d => {
-            const montoPromo = Number(d.monto || 0);
-            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
+          itemsEl2.innerHTML = resultado.desglose.map(d => `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
               <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
               <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
-              <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${montoPromo.toFixed(2)}</div></div>`;
-          }).join('');
+              <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${d.montoFinal.toFixed(2)}</div></div>`
+          ).join('');
         }
       }
-      if (subtotalEl) { subtotalEl.textContent = '$' + totalPromo; subtotalEl.style.color = ''; }
+      if (subtotalEl) { subtotalEl.textContent = '$' + resultado.totalFinal.toFixed(2); subtotalEl.style.color = ''; }
     }
   }
 
