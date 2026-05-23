@@ -4600,26 +4600,8 @@ function handleCompletarAreaTicketMulti(data) {
         }
         ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
         var precioArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
-        try { updateComision(data.chicaNombre, precioArea); } catch(e2) {}
-        try {
-          var wsHO = getSheet('HistorialOwner');
-          var servicioArea = String(rows[i][base + 1] || rows[i][base] || '').replace(/.*\|\|/, '');
-          var horaAhora = Utilities.formatDate(new Date(), tz, 'HH:mm');
-          var areaStr2 = String(rows[i][base] || '').replace(/\|\|.*/, '') || 'multi';
-          wsHO.appendRow([
-            Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy'),
-            horaAhora,
-            String(rows[i][3] || ''),
-            String(rows[i][4] || ''),
-            '',
-            servicioArea || 'Servicio multi',
-            areaStr2,
-            data.chicaNombre,
-            precioArea,
-            Math.round(precioArea * pctStaff * 100) / 100,
-            'Pendiente cobro TM'  // TM: no filtrar en getServiciosHoy
-          ]);
-        } catch(eHO) {}
+        // Comisión se registra SOLO en handleConfirmarCobroMulti (al cobrar), no aquí
+        // NOTA: HistorialOwner se escribe SOLO en handleConfirmarCobroMulti (al cobrar)
         if (!esUltima) break;
       }
 
