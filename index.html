@@ -1217,6 +1217,7 @@ if ('caches' in window) {
             <button id="addPromoBtn" onclick="addPromoSlot()" style="padding: 6px 14px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">+ Promo</button>
           </div>
           <div id="arrPromoSlots"></div>
+          <div id="m8TicketResumen" style="display:none; background: var(--bg); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 12px; font-weight: 700; color: var(--ink-soft); text-align: center; margin-top: 6px;"></div>
           <div style="background: var(--warning-bg); border-radius: 12px; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #7a5a1c; text-align: center; margin-top: 8px;">
             Promos solo validas con efectivo o transferencia
           </div>
@@ -7008,9 +7009,24 @@ if ('caches' in window) {
           <option value="">Seleccionar promo...</option>
           ${PROMOS.filter(p => p.active).map((p, pi) => '<option value="' + pi + '"' + (promo && promo.name === p.name ? ' selected' : '') + '>' + p.name + ' - $' + p.price + '</option>').join('')}
         </select>
-        ${promo ? '<div style="margin-top: 6px; font-size: 11px; opacity: 0.9;">' + (promo.services || '') + ' - $' + promo.price + '</div>' : ''}
+        ${promo ? '<div style="margin-top: 6px; font-size: 11px; opacity: 0.9;">' + (promo.services || '') + ' — $' + promo.price + '</div>' : ''}
       </div>
     `).join('');
+
+    // ── MANDAMIENTO #8: actualizar indicador de tipo de ticket en tiempo real ──
+    const _resEl = document.getElementById('m8TicketResumen');
+    if (_resEl && window.clasificarTicketPromoM8) {
+      const _c8 = window.clasificarTicketPromoM8();
+      if (!_c8 || !_c8.tipo) {
+        _resEl.style.display = 'none';
+      } else {
+        const _iconos = { 1: '👤', 2: '🤝', 3: '🎯' };
+        const _colores = { 1: 'var(--success)', 2: 'var(--accent)', 3: 'var(--warning)' };
+        _resEl.style.display = 'block';
+        _resEl.style.color = _colores[_c8.tipo] || 'var(--ink-soft)';
+        _resEl.textContent = (_iconos[_c8.tipo] || '') + ' ' + (window.resumenTicketPromoM8 ? window.resumenTicketPromoM8() : _c8.nombre);
+      }
+    }
   }
 
   // Compatibilidad con _arrPromo (codigo existente)
@@ -11520,6 +11536,17 @@ if ('caches' in window) {
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
     const isTop = document.getElementById('arrSelTop')?.style.display !== 'none';
 
+    // ── MANDAMIENTO #8: clasificar ticket promo automáticamente ──
+    if (tipo === 'promo') {
+      const _c8 = window.clasificarTicketPromoM8 ? window.clasificarTicketPromoM8() : null;
+      if (_c8 && _c8.tipo) {
+        const _res8 = window.resumenTicketPromoM8 ? window.resumenTicketPromoM8() : '';
+        if (_res8) showToast(_res8, 3000);
+        console.log('🎯 M8 clasificación:', _c8);
+      }
+    }
+    // ── FIN MANDAMIENTO #8 ──
+
     // Leer área/servicio/obs según el tipo activo
     const areaEl    = tipo === 'multi' ? document.getElementById('arrAreaMulti')    : document.getElementById('arrArea');
     const servicioEl = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
@@ -11775,6 +11802,13 @@ if ('caches' in window) {
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
     const svcEl  = tipo === 'multi' ? document.getElementById('arrServiceMulti') : document.getElementById('arrService');
     const obsEl  = tipo === 'promo' ? document.getElementById('arrObsPromo') : tipo === 'multi' ? document.getElementById('arrObsMulti') : document.getElementById('arrObs');
+
+    // ── MANDAMIENTO #8: clasificar ticket promo automáticamente ──
+    if (tipo === 'promo') {
+      const _c8ga = window.clasificarTicketPromoM8 ? window.clasificarTicketPromoM8() : null;
+      if (_c8ga && _c8ga.tipo) console.log('🎯 M8 clasificación (assign):', _c8ga);
+    }
+    // ── FIN MANDAMIENTO #8 ──
 
     // ── MANDAMIENTO #1: área prioritaria siempre la determina getAreaPrioritaria() ──
     const _ap4 = window.getAreaPrioritaria(tipo);
