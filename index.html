@@ -3260,12 +3260,22 @@ if ('caches' in window) {
           // No hay más áreas pendientes → botón de cierre multi-staff
           btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé servicio — clienta múltiple</button>';
         } else {
-          // Hay servicios pendientes → 3 botones (repetibles infinitamente)
-          // "Continuar siguiente servicio" puede tocarse N veces (cejas → bigote → labio → entrecejo...)
-          btnContainer.innerHTML = ''
+          // ── MANDAMIENTO #6: si el área actual tiene promo, ofrecer tomar precio completo ──
+          var miAreaTM = (tm.areas || []).find(function(a) { return String(a.estado||'').toLowerCase() === 'en servicio'; });
+          var miPrecioNormalTM = miAreaTM ? Number(miAreaTM.precioNormal || miAreaTM.precio || 0) : 0;
+          var miPrecioPromoTM  = miAreaTM ? Number(miAreaTM.precio || 0) : 0;
+          var tienePromoEnTM   = miPrecioNormalTM > miPrecioPromoTM && miPrecioPromoTM > 0;
+
+          // Hay servicios pendientes → botones base (repetibles infinitamente)
+          var btnsBaseTM = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Continuar siguiente servicio</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Terminé mi servicio — pasar a otra staff</button>'
             + '<button class="btn-primary" style="margin-bottom:10px;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">Finalizar servicio</button>';
+          if (tienePromoEnTM) {
+            btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — tomar todo el valor ($' + miPrecioNormalTM + ')</button>'
+              + btnsBaseTM;
+          }
+          btnContainer.innerHTML = btnsBaseTM;
         }
       }).catch(function() {
         var slotN = slot1 ? 1 : 2;
@@ -4887,6 +4897,59 @@ if ('caches' in window) {
     window._finishFullPromo = true;
     showToast('⏳ Enviando a cobro...');
     try { await finishAndSend(); } catch(e) { alert('Error al enviar a cobro: ' + e.message); }
+  }
+
+  // ── MANDAMIENTO #6: staff toma precio completo de promo en ticket TM ──────
+  // Cuando el área de esta staff tiene promo (precio < precioNormal),
+  // puede optar por cobrar el precio normal completo en lugar del precio promo.
+  async function cobrarPromoCompletaTM(slot) {
+    slot = slot || window._finishingSlot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    if (!idEspera.startsWith('TM-')) return;
+
+    let miAreaTM = null;
+    try {
+      const tmData = await apiGet('getTicketMulti');
+      if (tmData.success) {
+        const tm = (tmData.activos || []).find(t => t.idEspera === idEspera);
+        if (tm) miAreaTM = (tm.areas || []).find(a => a.staff === user.name && String(a.estado||'').toLowerCase() === 'en servicio');
+      }
+    } catch(e) {}
+
+    if (!miAreaTM) { alert('No se encontraron datos del área en servicio.'); return; }
+
+    const precioNormal = Number(miAreaTM.precioNormal || miAreaTM.precio || 0);
+    const precioPromo  = Number(miAreaTM.precio || 0);
+    const clientName   = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+
+    const msg = `¿Cobrar precio normal "$${precioNormal}" a nombre de ${user.name}?\n\n• Precio promo de esta área: $${precioPromo}\n• Precio normal (sin promo): $${precioNormal}\n• La clienta va directamente a cobro\n\nUsar cuando la clienta quiere pagar la promo pero no realizó todas las áreas.`;
+    if (!confirm(msg)) return;
+
+    // ── Usar calcularPrecioPromoCompletaM6 para consistencia ──
+    const resultado = window.calcularPrecioPromoCompletaM6({
+      promo:         { price: precioPromo, regular: precioNormal, name: miAreaTM.tentativo || miAreaTM.area || 'Servicio' },
+      staffArea:     user.area || 'cejas',
+      tomarCompleto: true,
+      metodoPago:    'Efectivo'  // En este punto no sabemos el método; se aplica M4 al cobrar
+    });
+
+    // Actualizar slotServices con el precio normal
+    slotServices[slot] = [{ name: miAreaTM.tentativo || miAreaTM.confirmado || miAreaTM.area, price: precioNormal, area: user.area || '', status: 'aprobado', _promoCompleta: true }];
+    renderServicesForSlot(slot);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + precioNormal;
+
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey: normalizeClientKey(clientName), clientName,
+      svcNames: miAreaTM.tentativo || miAreaTM.area || 'Servicio',
+      total: String(precioNormal), promoNombre: '', precioRegular: String(precioNormal),
+      idEspera, areasExtras: [], promasExtraPendientes: [], _promoCompleta: true
+    };
+    window._finishFullPromo = true;
+    showToast('⏳ Enviando a cobro con precio normal...');
+    try { await completarAreaMultiFinal(); } catch(e) { alert('Error: ' + e.message); }
   }
 
   function showConfirmServiceModal(slot) {
