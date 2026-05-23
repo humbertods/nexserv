@@ -3089,18 +3089,29 @@ if ('caches' in window) {
               <div id="arrow-${idx}" style="color: var(--ink-faint); font-size: 12px; transition: transform 0.2s;">▼</div>
             </div>
             <div id="staff-detail-${idx}" style="display: none; border-top: 1px solid var(--line); padding: 0 16px;">
-              ${s.servicios.map((sv, si) => `
+              ${s.servicios.map((sv, si) => {
+                // Sanitizar servicio: si es JSON crudo, extraer nombre legible
+                let svcDisplay = sv.servicio || '';
+                if (svcDisplay.trim().startsWith('[') || svcDisplay.trim().startsWith('{')) {
+                  try {
+                    const parsed = JSON.parse(svcDisplay);
+                    if (Array.isArray(parsed)) svcDisplay = parsed.map(p => p.servicio || p.area || '').join(' + ');
+                    else svcDisplay = parsed.servicio || parsed.nombre || svcDisplay;
+                  } catch(e) { svcDisplay = svcDisplay.substring(0, 40); }
+                }
+                const svSafe = encodeURIComponent(JSON.stringify({...sv, servicio: svcDisplay}));
+                return `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; ${si < s.servicios.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
                   <div style="flex:1;">
                     <div style="font-size: 13px; font-weight: 600;">${sv.cliente}</div>
-                    <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${sv.servicio} · ${sv.hora}</div>
+                    <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${svcDisplay} · ${sv.hora}</div>
                   </div>
                   <div style="display:flex;align-items:center;gap:8px;">
                     <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Number(sv.precio || 0)}</div>
-                    <button onclick="confirmarEliminarOwner('${encodeURIComponent(JSON.stringify(sv))}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+                    <button onclick="confirmarEliminarOwner('${svSafe}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
                   </div>
-                </div>
-              `).join('')}
+                </div>`;
+              }).join('')}
               <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid var(--line); margin-top: 2px;">
                 <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft);">TOTAL</div>
                 <div style="font-size: 16px; font-weight: 800;">$${Number(s.totalFacturado || 0)}</div>
@@ -3149,6 +3160,10 @@ if ('caches' in window) {
       }
     } catch (err) {
       console.error('Error cargando owner home:', err);
+      const histContainer = document.getElementById('ownerHistorial');
+      if (histContainer) {
+        histContainer.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">⚠️ Error al cargar datos. Recargá la página.</div>';
+      }
     }
   }
 
