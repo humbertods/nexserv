@@ -11577,35 +11577,21 @@ if ('caches' in window) {
       );
       postData.precioMiArea = firstDiv ? Number(firstDiv.monto || firstDiv.price || promo.price) : Number(promo.price);
     }
-    // Promos adicionales (2 y 3) — incluir área deducida de cada promo
-    const promasExtra = _arrPromos.filter(p => p !== null).slice(1);
-    if (promasExtra.length > 0) {
-      postData.promasExtra = promasExtra.map(function(p) {
-        // Deducir área de la división de mayor monto
-        const divOrd = [...(p.division||[])].sort(function(a,b){ return Number(b.monto||0) - Number(a.monto||0); });
-        const ds = String((divOrd[0] && divOrd[0].area) || '').toLowerCase();
-        const _area = ds.includes('pest') || ds.includes('lifting') ? 'pestanas'
-          : ds.includes('facial') || ds.includes('hidra') ? 'facial'
-          : ds.includes('depil') || ds.includes('bikini') ? 'depilacion'
-          : ds.includes('ceja') ? 'cejas' : 'cejas';
-        return { nombre: p.name, precio: p.price, regular: p.regular, _area: _area };
-      });
-    }
     // Secuencia de servicios
     if (window._secuencia.length > 0) {
       postData.secuencia = window._secuencia;
     }
 
-    // ── DETECCIÓN TICKET MULTI ──────────────────────────────
-    // TM SOLO si: tipo === 'multi' O hay servicios adicionales (híbrido promo+normal)
-    // Múltiples promos del mismo flujo SP NO son TM — se manejan como promos encadenadas
     const adicionales = getServiciosAdicionalesData();
-    const esMulti = tipo === 'multi' || adicionales.length > 0;
+    // ── DETECCIÓN TICKET MULTI ──────────────────────────────
+    // TM si: tipo 'multi', servicios adicionales normales, O múltiples promos (promasExtra)
+    const promasExtraMulti = _arrPromos.filter(p => p !== null).slice(1);
+    const esMulti = tipo === 'multi' || adicionales.length > 0 || promasExtraMulti.length > 0;
 
     if (esMulti) {
       const areasMulti = [];
 
-      // Área principal (servicio 1)
+      // Área principal (servicio 1 / promo 1)
       if (servicio || (promo && promo.name)) {
         areasMulti.push({
           tentativo:    promo ? promo.name : servicio,
@@ -11616,7 +11602,24 @@ if ('caches' in window) {
         });
       }
 
-      // Servicios adicionales
+      // Promos adicionales (2a, 3a) como áreas independientes del TicketMulti
+      promasExtraMulti.forEach(function(p) {
+        const divOrd = [...(p.division||[])].sort(function(a,b){ return Number(b.monto||0) - Number(a.monto||0); });
+        const ds = String((divOrd[0] && divOrd[0].area) || '').toLowerCase();
+        const _areaExtra = ds.includes('pest') || ds.includes('lifting') ? 'pestanas'
+          : ds.includes('facial') || ds.includes('hidra') ? 'facial'
+          : ds.includes('depil') || ds.includes('bikini') ? 'depilacion'
+          : ds.includes('ceja') ? 'cejas' : 'cejas';
+        areasMulti.push({
+          tentativo:    p.name,
+          area:         _areaExtra,
+          precio:       p.price,
+          precioNormal: p.regular,
+          tipo:         'promo'
+        });
+      });
+
+      // Servicios adicionales normales
       adicionales.forEach(a => {
         areasMulti.push({
           tentativo:    a.nombre,
@@ -11632,13 +11635,14 @@ if ('caches' in window) {
         prioridad:    prioridad,
         observaciones: obs,
         areas:        areasMulti,
-        secuencia:    _secuencia.map(s => s.area) // ['pestanas','cejas'] etc
+        secuencia:    window._secuencia.map(s => s.area) // ['pestanas','cejas'] etc
       };
 
       try {
         const result = await apiPost('crearTicketMulti', tmData);
         if (result && result.success) {
           window._arrPromo = null;
+          _arrPromos = [];
           document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
           _numServiciosAdicionales = 0;
           simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
