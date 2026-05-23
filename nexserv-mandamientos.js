@@ -205,8 +205,54 @@ window.construirPayloadDistribucionM5 = function(contexto) {
   return base;
 };
 
+// ── MANDAMIENTO #6 — PROMO DUO: STAFF QUE REALIZA TOMA TODO EL VALOR ───────
+// Cuando existe una promo que combina áreas de distintas staffs
+// (ej: "Depilación cejas + bigote + pestañas aura $54") y la clienta
+// decide pagarlo aunque NO se realice la parte de otra área,
+// la staff que realizó el servicio recibe TODO el valor de la promo.
+//
+// Regla: si la clienta viene por una promo pero solo se atiende con
+// una staff (ya sea porque la otra área no se realiza, o porque la
+// clienta eligió así), esa staff cobra el precio completo de la promo.
+//
+// Aplica a:
+//   - Promo SP normal (una staff cobra toda la promo)
+//   - TM con promo adentro (el área con promo toma su precio completo)
+//
+// Esta función determina si aplica la regla del mandamiento 6
+// y devuelve el precio correcto para esa staff.
+// ──────────────────────────────────────────────────────────────────────────────
+window.calcularPrecioPromoCompletaM6 = function(contexto) {
+  // contexto = {
+  //   promo:         object   { price, regular, name, division }
+  //   staffArea:     string   área de la staff que realiza
+  //   tomarCompleto: bool     true = la staff toma todo el valor
+  //   metodoPago:    string   'Efectivo' | 'Transferencia' | 'Tarjeta'
+  // }
+  const promo = contexto.promo;
+  if (!promo) return { precio: 0, esCompleto: false };
+
+  const precioPromo   = Number(promo.price   || 0);
+  const precioRegular = Number(promo.regular || promo.price || 0);
+
+  if (!contexto.tomarCompleto) {
+    // Solo cobra su parte — buscar en division
+    const div = (promo.division || []).find(function(d) {
+      const dArea = String(d.area || '').toLowerCase();
+      return dArea.includes(contexto.staffArea) || contexto.staffArea.includes(dArea.replace(/[^a-z]/g,''));
+    });
+    const precio = div ? Number(div.monto || 0) : precioPromo;
+    return { precio: precio, esCompleto: false };
+  }
+
+  // Toma todo: aplica Mandamiento #4 si paga con tarjeta
+  const esTarjeta = contexto.metodoPago === 'Tarjeta';
+  const precio    = esTarjeta ? precioRegular : precioPromo;
+  return { precio: precio, esCompleto: true };
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.2 — Fecha: 2026-05-23
+// Versión: 1.3 — Fecha: 2026-05-23
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================
