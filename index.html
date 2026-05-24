@@ -69,8 +69,8 @@ if ('caches' in window) {
   @media (min-width: 500px) {
     .phone { border-radius: 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.03); min-height: 820px; }
   }
-  .screen { display: none; padding: 32px 24px 100px; animation: fadeIn .3s ease forwards; }
-  .screen.active { display: block; }
+  .screen { display: none; padding: 32px 24px 100px; }
+  .screen.active { display: block; animation: fadeIn .25s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   @keyframes slideDown {
