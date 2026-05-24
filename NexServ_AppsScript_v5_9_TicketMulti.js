@@ -582,7 +582,9 @@ function handleGetListaEspera() {
     }
   } catch(e) {}
 
-  // Merge con TicketMulti — solo la PRÓXIMA área según secuencia (una tarjeta por TM)
+  // Merge con TicketMulti — UNA tarjeta por ÁREA en estado Esperando
+  // Cada área genera su propia tarjeta con su servicio específico.
+  // La staff de esa área solo ve su tarjeta, no las de otras áreas.
   try {
     const tmR = handleGetTicketMulti({});
     if (tmR.success && tmR.activos) {
@@ -591,41 +593,34 @@ function handleGetListaEspera() {
           return String(a.estado || '').toLowerCase() === 'esperando';
         });
         if (areasEsperando.length === 0) return;
-        var proximaArea = null;
-        if (tm.secuencia && tm.secuencia.length > 0) {
-          for (var si = 0; si < tm.secuencia.length; si++) {
-            var seqArea = String(tm.secuencia[si]).toLowerCase();
-            var match = areasEsperando.filter(function(a) {
-              return String(a.area || '').toLowerCase() === seqArea;
-            })[0];
-            if (match) { proximaArea = match; break; }
-          }
-        }
-        if (!proximaArea) proximaArea = areasEsperando[0];
-        lista.push({
-          id          : tm.idEspera,
-          fecha       : '',
-          horaLlegada : '',
-          codigo      : tm.codigo,
-          nombre      : tm.nombre,
-          servicio    : proximaArea.tentativo || '',
-          area        : proximaArea.area || 'multi',
-          prioridad   : tm.prioridad || 'Normal',
-          estado      : 'Esperando',
-          tomadaPor   : '',
-          horaToma    : '',
-          observaciones: tm.observaciones || '',
-          total       : proximaArea.precio || 0,
-          promoNombre : '',
-          precioPromo : '',
-          precioRegular: '',
-          tipo        : 'TM',
-          secuencia   : tm.secuencia || [],
-          promasExtra : [],
-          esTop       : 'No',
-          asignadaA   : '',
-          fuente      : 'TicketMulti',
-          areaIdx     : proximaArea.idx
+
+        // Crear una tarjeta separada por cada área en estado Esperando
+        areasEsperando.forEach(function(area) {
+          lista.push({
+            id          : tm.idEspera,
+            fecha       : '',
+            horaLlegada : '',
+            codigo      : tm.codigo,
+            nombre      : tm.nombre,
+            servicio    : area.tentativo || '',        // solo el servicio de ESTA área
+            area        : area.area || 'multi',        // solo el área de ESTA tarjeta
+            prioridad   : tm.prioridad || 'Normal',
+            estado      : 'Esperando',
+            tomadaPor   : '',
+            horaToma    : '',
+            observaciones: tm.observaciones || '',
+            total       : area.precio || 0,
+            promoNombre : '',
+            precioPromo : '',
+            precioRegular: '',
+            tipo        : 'TM',
+            secuencia   : tm.secuencia || [],
+            promasExtra : [],
+            esTop       : 'No',
+            asignadaA   : '',
+            fuente      : 'TicketMulti',
+            areaIdx     : area.idx
+          });
         });
       });
     }
@@ -2129,8 +2124,7 @@ function updateComision(chicaNombre, precio) {
   const precioNum = Number(precio) || 0;
   if (precioNum <= 0) return;
 
-  // FIX: i=3 para incluir a María (primera chica en fila 4, índice 3)
-  for (let i = 3; i < data.length; i++) {
+  for (let i = 4; i < data.length; i++) {
     if (String(data[i][0]).trim() === chicaNombre) {
       const row = i + 1;
       const servicios = (Number(data[i][2]) || 0) + 1;
@@ -2656,8 +2650,7 @@ function handleCierreSemanal(data) {
   const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
 
   // Columnas Comisiones: A=Chica | B=Área | C=Servicios | D=Facturado | E=% Comisión | F=Comisión
-  // FIX: i=3 (fila 4) es la primera chica (María). i=4 la saltaba.
-  for (let i = 3; i < comData.length; i++) {
+  for (let i = 4; i < comData.length; i++) {
     const row = comData[i];
     if (!row[0]) continue;
 
@@ -2752,59 +2745,16 @@ function handleVerificarCierreAutomatico() {
 }
 
 function handlePagoIndividual(data) {
-  const wsPagos  = getSheet('CierresPagos');
-  const wsCom    = getSheet('Comisiones');
-  const pagData  = wsPagos.getDataRange().getValues();
-  const comData  = wsCom.getDataRange().getValues();
-  const today    = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-  const chicaNom = String(data.chica || '').trim();
+  const wsPagos = getSheet('CierresPagos');
+  const allData = wsPagos.getDataRange().getValues();
 
-  // 1. Leer datos actuales de Comisiones para esta chica
-  let comRow = -1, comisiones = 0, facturado = 0, servicios = 0, area = '', porcentaje = '';
-  for (let i = 3; i < comData.length; i++) {
-    if (String(comData[i][0] || '').trim() === chicaNom) {
-      comRow     = i + 1; // 1-indexed para getRange
-      area       = comData[i][1];
-      servicios  = Number(comData[i][2]) || 0;
-      facturado  = Number(comData[i][3]) || 0;
-      porcentaje = comData[i][4];
-      comisiones = Number(comData[i][5]) || 0;
-      break;
+  for (let i = 4; i < allData.length; i++) {
+    if (allData[i][3] === data.chica && allData[i][0] === data.semana && allData[i][9] !== 'Pagado') {
+      wsPagos.getRange(i + 1, 10).setValue('Pagado');
+      return { success: true };
     }
   }
-
-  // Obtener label de semana real desde encabezado de Comisiones (fila 2)
-  const semanaLabel = String(comData[1] ? comData[1][0] : '').split('·')[0].trim() || 'Semana actual';
-  const periodoLabel = String(comData[1] ? comData[1][0] : '');
-
-  // 2. Buscar en CierresPagos si ya existe registro para esta chica en semana actual
-  let pagoRow = -1;
-  for (let i = 1; i < pagData.length; i++) {
-    if (String(pagData[i][3] || '').trim() === chicaNom && pagData[i][9] !== 'Pagado') {
-      pagoRow = i + 1;
-      break;
-    }
-  }
-
-  if (pagoRow > 0) {
-    // Ya existe el registro — solo marcar como Pagado
-    wsPagos.getRange(pagoRow, 10).setValue('Pagado');
-  } else {
-    // No existe → agregar fila en CierresPagos y marcar Pagado
-    wsPagos.appendRow([
-      semanaLabel, periodoLabel, today,
-      chicaNom, area, porcentaje, servicios, facturado, comisiones, 'Pagado'
-    ]);
-  }
-
-  // 3. Resetear Comisiones para esta chica
-  if (comRow > 0) {
-    wsCom.getRange(comRow, 3).setValue(0); // C = servicios
-    wsCom.getRange(comRow, 4).setValue(0); // D = facturado
-    wsCom.getRange(comRow, 6).setValue(0); // F = comisión
-  }
-
-  return { success: true };
+  return { success: false };
 }
 
 // ============================================
@@ -4544,21 +4494,26 @@ function handleTomarAreaTicketMulti(data) {
     for (let i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() !== data.idEspera) continue;
       const rowNum = i + 3;
-      // Encontrar el área que corresponde a esta staff (primera en estado Esperando)
+
+      // FIX: si viene areaIdx, tomar ESA área específica (no la primera disponible)
+      // Esto evita que una staff tome el área de otra cuando ambas están en Esperando
+      const targetIdx = data.areaIdx ? Number(data.areaIdx) - 1 : -1;
+
       for (let a = 0; a < 4; a++) {
         const base   = TM_AREA_COL[a];
         const tent   = String(rows[i][base] || '').trim();
         const estado = String(rows[i][base + 3] || '').trim();
         if (!tent || estado !== 'Esperando') continue;
+        // Si viene areaIdx, solo tomar esa área; sino tomar la primera disponible
+        if (targetIdx >= 0 && a !== targetIdx) continue;
         // Marcar esta área como tomada
-        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio'); // Estado (col base+3, 1-indexed = base+4)
-        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre); // Staff
-        ws.getRange(rowNum, base + 4 + 1).setValue(hora);             // Hora toma
-        // Marcar ticket general como Activo si no lo estaba
+        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');
+        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre);
+        ws.getRange(rowNum, base + 4 + 1).setValue(hora);
         ws.getRange(rowNum, 6).setValue('Activo');
         return { success: true, areaIdx: a + 1, hora };
       }
-      return { success: false, message: 'No hay áreas disponibles' };
+      return { success: false, message: 'No hay áreas disponibles para esta staff' };
     }
     return { success: false, message: 'Ticket no encontrado' };
   } catch(e) { return { success: false, message: String(e) }; }
