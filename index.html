@@ -1908,12 +1908,7 @@ if ('caches' in window) {
         </div>
         <div class="input-group" style="margin-top:12px;">
           <label>Observaciones</label>
-          <textarea id="rvpObs" placeholder="Material usado, duración estimada, recomendaciones..." style="min-height:70px;resize:vertical;"></textarea>
-        </div>
-        <button id="rvpGuardarBtn" class="btn-primary" onclick="guardarVisitaPestanas()" style="background:linear-gradient(135deg,var(--success),#2d5a3a);margin-top:18px;">💾 Guardar visita</button>
-        <button class="btn-secondary" onclick="closeModal();" style="margin-top:10px;color:var(--ink-faint);">Saltar por ahora</button>
-      </div>
-    </div>
+
 
     <div class="modal-bg" id="newCejasPigmentoModal">
       <div class="modal">
@@ -2017,16 +2012,14 @@ if ('caches' in window) {
       <button onclick="openAddService()" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">+ Agregar servicio</button>
       <button onclick="openPromoSelect(2)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;" id="promoBtn2">🏷 Aplicar promo</button>
     </div>
-
-    <div style="background: var(--bg-card); border-radius: 20px; padding: 18px; box-shadow: var(--shadow-card); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="font-size: 13px; font-weight: 600; color: var(--ink-soft);">Total actual</div>
-        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;" id="as2Total">$0</div>
+        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;">$17</div>
       </div>
     </div>
 
     <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot2()">Finalizar servicio</button>
-    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="devolverALista(2)">Devolver a lista</button>
+    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera.')">Devolver a lista</button>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
@@ -4188,7 +4181,8 @@ if ('caches' in window) {
         const result = await apiPost('tomarAreaTicketMulti', {
           idEspera:    takingId,
           chicaNombre: name,
-          chicaArea:   user?.area || ''
+          chicaArea:   user?.area || '',
+          areaIdx:     window._takingData?.areaIdx || 0  // FIX: tomar el área específica
         });
         if (!result.success) { alert(result.message || 'Error al tomar el servicio TM'); return; }
         simulateNotif('mikaela', name + ' tomó área TM de ' + (window._takingClient || 'clienta'), 'Ticket multi · ahora', false);
@@ -9072,7 +9066,12 @@ if ('caches' in window) {
     };
 
     const getPromoArea = function(p) {
-      if (!p || !p.division || p.division.length === 0) return areaKey || 'cejas';
+      if (!p || !p.division || p.division.length === 0) {
+        // FIX: detectar área por nombre de la promo, no por areaKey del form
+        // (areaKey puede ser 'facial' aunque la promo sea de cejas/depilación)
+        const nameArea = AREA_KEY_FROM_DIV(p ? (p.name || '') : '');
+        return nameArea || areaKey || 'cejas';
+      }
       const sorted = [...p.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
       return AREA_KEY_FROM_DIV(sorted[0].area || sorted[0].servicio || '');
     };
