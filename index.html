@@ -3157,9 +3157,9 @@ if ('caches' in window) {
       }
     } catch (err) {
       console.error('Error cargando owner home:', err);
-      const histContainer = document.getElementById('ownerHistorial');
-      if (histContainer) {
-        histContainer.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">⚠️ Error al cargar datos. Recargá la página.</div>';
+      const _errContainer = document.getElementById('ownerHistorial');
+      if (_errContainer) {
+        _errContainer.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">⚠️ Error al cargar datos. Recargá la página.</div>';
       }
     }
   }
