@@ -2129,7 +2129,8 @@ function updateComision(chicaNombre, precio) {
   const precioNum = Number(precio) || 0;
   if (precioNum <= 0) return;
 
-  for (let i = 4; i < data.length; i++) {
+  // FIX: i=3 para incluir a María (primera chica en fila 4, índice 3)
+  for (let i = 3; i < data.length; i++) {
     if (String(data[i][0]).trim() === chicaNombre) {
       const row = i + 1;
       const servicios = (Number(data[i][2]) || 0) + 1;
@@ -2751,16 +2752,59 @@ function handleVerificarCierreAutomatico() {
 }
 
 function handlePagoIndividual(data) {
-  const wsPagos = getSheet('CierresPagos');
-  const allData = wsPagos.getDataRange().getValues();
+  const wsPagos  = getSheet('CierresPagos');
+  const wsCom    = getSheet('Comisiones');
+  const pagData  = wsPagos.getDataRange().getValues();
+  const comData  = wsCom.getDataRange().getValues();
+  const today    = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
+  const chicaNom = String(data.chica || '').trim();
 
-  for (let i = 4; i < allData.length; i++) {
-    if (allData[i][3] === data.chica && allData[i][0] === data.semana && allData[i][9] !== 'Pagado') {
-      wsPagos.getRange(i + 1, 10).setValue('Pagado');
-      return { success: true };
+  // 1. Leer datos actuales de Comisiones para esta chica
+  let comRow = -1, comisiones = 0, facturado = 0, servicios = 0, area = '', porcentaje = '';
+  for (let i = 3; i < comData.length; i++) {
+    if (String(comData[i][0] || '').trim() === chicaNom) {
+      comRow     = i + 1; // 1-indexed para getRange
+      area       = comData[i][1];
+      servicios  = Number(comData[i][2]) || 0;
+      facturado  = Number(comData[i][3]) || 0;
+      porcentaje = comData[i][4];
+      comisiones = Number(comData[i][5]) || 0;
+      break;
     }
   }
-  return { success: false };
+
+  // Obtener label de semana real desde encabezado de Comisiones (fila 2)
+  const semanaLabel = String(comData[1] ? comData[1][0] : '').split('·')[0].trim() || 'Semana actual';
+  const periodoLabel = String(comData[1] ? comData[1][0] : '');
+
+  // 2. Buscar en CierresPagos si ya existe registro para esta chica en semana actual
+  let pagoRow = -1;
+  for (let i = 1; i < pagData.length; i++) {
+    if (String(pagData[i][3] || '').trim() === chicaNom && pagData[i][9] !== 'Pagado') {
+      pagoRow = i + 1;
+      break;
+    }
+  }
+
+  if (pagoRow > 0) {
+    // Ya existe el registro — solo marcar como Pagado
+    wsPagos.getRange(pagoRow, 10).setValue('Pagado');
+  } else {
+    // No existe → agregar fila en CierresPagos y marcar Pagado
+    wsPagos.appendRow([
+      semanaLabel, periodoLabel, today,
+      chicaNom, area, porcentaje, servicios, facturado, comisiones, 'Pagado'
+    ]);
+  }
+
+  // 3. Resetear Comisiones para esta chica
+  if (comRow > 0) {
+    wsCom.getRange(comRow, 3).setValue(0); // C = servicios
+    wsCom.getRange(comRow, 4).setValue(0); // D = facturado
+    wsCom.getRange(comRow, 6).setValue(0); // F = comisión
+  }
+
+  return { success: true };
 }
 
 // ============================================
