@@ -2017,14 +2017,16 @@ if ('caches' in window) {
       <button onclick="openAddService()" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">+ Agregar servicio</button>
       <button onclick="openPromoSelect(2)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;" id="promoBtn2">🏷 Aplicar promo</button>
     </div>
+
+    <div style="background: var(--bg-card); border-radius: 20px; padding: 18px; box-shadow: var(--shadow-card); margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="font-size: 13px; font-weight: 600; color: var(--ink-soft);">Total actual</div>
-        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;">$17</div>
+        <div style="font-size: 28px; font-weight: 800; letter-spacing: -0.04em;" id="as2Total">$0</div>
       </div>
     </div>
 
     <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot2()">Finalizar servicio</button>
-    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="alert('Clienta devuelta a lista de espera.')">Devolver a lista</button>
+    <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="devolverALista(2)">Devolver a lista</button>
 
     <nav class="nav">
       <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
