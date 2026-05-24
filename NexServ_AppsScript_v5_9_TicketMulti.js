@@ -2655,7 +2655,8 @@ function handleCierreSemanal(data) {
   const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
 
   // Columnas Comisiones: A=Chica | B=Área | C=Servicios | D=Facturado | E=% Comisión | F=Comisión
-  for (let i = 4; i < comData.length; i++) {
+  // FIX: i=3 (fila 4) es la primera chica (María). i=4 la saltaba.
+  for (let i = 3; i < comData.length; i++) {
     const row = comData[i];
     if (!row[0]) continue;
 
