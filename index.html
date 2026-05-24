@@ -3021,6 +3021,7 @@ if ('caches' in window) {
 
   // === CARGAR DATOS DEL OWNER HOME ===
   async function loadOwnerHome() {
+    console.log('[loadOwnerHome] inicio');
     // Mostrar estado de carga inmediatamente
     const histContainer = document.getElementById('ownerHistorial');
     if (histContainer) histContainer.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:13px;">⏳ Cargando...</div>';
@@ -3032,11 +3033,13 @@ if ('caches' in window) {
       document.getElementById('ownerWeekNum').textContent = weekNum;
 
       // Cargar todo en paralelo
+      console.log('[loadOwnerHome] lanzando 3 API calls...');
       const [commResult, listaResult, histResult] = await Promise.all([
-        apiGet('getComisiones').catch(() => ({ success: false })),
-        apiGet('getListaEspera').catch(() => ({ success: false })),
-        apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
+        apiGet('getComisiones').catch(e => { console.warn('[loadOwnerHome] getComisiones error:', e.message); return { success: false }; }),
+        apiGet('getListaEspera').catch(e => { console.warn('[loadOwnerHome] getListaEspera error:', e.message); return { success: false }; }),
+        apiGet('getHistorial', { periodo: 'hoy' }).catch(e => { console.warn('[loadOwnerHome] getHistorial error:', e.message); return { success: false }; })
       ]);
+      console.log('[loadOwnerHome] resultados — comm:', commResult.success, '| lista:', listaResult.success, '| hist:', histResult.success);
 
       // Comisiones
       let totalFact = 0, totalComm = 0;
@@ -3624,9 +3627,19 @@ if ('caches' in window) {
   }
 
   async function show(id) {
+    // FIX: guard para detectar IDs inexistentes y no dejar pantalla en blanco
+    const targetScreen = document.getElementById(id);
+    if (!targetScreen) {
+      console.error('[show] Pantalla no encontrada:', id, '— redirigiendo a login');
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const loginEl = document.getElementById('login');
+      if (loginEl) loginEl.classList.add('active');
+      return;
+    }
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    targetScreen.classList.add('active');
     window.scrollTo(0, 0);
+    console.log('[show] → ' + id);
     if (id === 'waitList') renderWaitList();
     if (id === 'staffHome') loadStaffHome();
     if (id === 'ownerHome') loadOwnerHome();
@@ -3748,26 +3761,40 @@ if ('caches' in window) {
           'Facial': 'facial',
           'Todas': 'todas'
         };
+        // FIX: normalizar rol (trim + lowercase ya viene del Apps Script, pero por si acaso)
+        const rolNorm = String(r.rol || '').trim().toLowerCase();
+        const screenMap = {
+          'owner':  'ownerHome',
+          'dueño':  'ownerHome',
+          'dueno':  'ownerHome',
+          'admin':  'mikaelaHome',
+          'staff':  'staffHome'
+        };
+        console.log('[doLogin] API ok — rol:', rolNorm, '| nombre:', r.nombre, '| area:', r.area);
         user = {
           name: r.nombre,
-          role: r.rol,
-          area: areaMap[r.area] || r.area,
+          role: rolNorm,
+          area: areaMap[r.area] || r.area || '',
           maxClients: r.maxClients || 1,
           active: r.estado !== 'Bloqueado',
-          screen: r.rol === 'owner' ? 'ownerHome' : r.rol === 'admin' ? 'mikaelaHome' : 'staffHome'
+          screen: screenMap[rolNorm] || 'staffHome'
         };
       } else if (result.blocked) {
         btn.textContent = oldText; btn.disabled = false;
         show('blocked'); return;
       } else {
-        // Fallback a datos locales
+        // Fallback a datos locales (API respondió pero sin success)
+        console.warn('[doLogin] API sin success — result:', JSON.stringify(result).substring(0, 200));
         if (localUser && (localUser.pass === p || localUser.pass === u)) {
+          console.log('[doLogin] Usando fallback local para:', u);
           user = localUser;
         }
       }
     } catch (err) {
-      // Sin conexión: usar datos locales
+      // Sin conexión o error de red: usar datos locales
+      console.warn('[doLogin] Excepción en API:', err.message);
       if (localUser && (localUser.pass === p || localUser.pass === u)) {
+        console.log('[doLogin] Usando fallback local (catch) para:', u);
         user = localUser;
       }
     }
