@@ -5148,40 +5148,64 @@ if ('caches' in window) {
     }).join('');
 
     if (esTM && window._tmAreasActuales) {
-      // ── TICKET MULTI: mostrar historial completo + área actual ──
+      // ── TICKET MULTI: mostrar TODAS las áreas con checkboxes ──
+      // La staff puede marcar cuáles va a hacer ella (toma todas las marcadas de una vez)
       const areas = window._tmAreasActuales;
-      const areaIcons = { cejas: '💅', depilacion: '🪒', depilación: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
-      const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
-      let timelineHTML = '';
-      areas.forEach(ar => {
-        const aKey = String(ar.area||'').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, s=>s==='é'?'e':'n');
+      const areaIcons = { cejas:'💅', depilacion:'🪒', depilacion:'🪒', pestanas:'👁', retiro_lifting:'✨', facial:'🌿' };
+      const areaLabels = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
+      const user = window.currentUser;
+
+      let areasHTML = '';
+      areas.forEach((ar, i) => {
+        const aKey = String(ar.area||'').toLowerCase()
+          .replace(/ó/g,'o').replace(/á/g,'a').replace(/é/g,'e').replace(/ñ/g,'n');
         const icon = areaIcons[aKey] || '🔄';
         const label = areaLabels[aKey] || ar.area || 'Servicio';
         const est = String(ar.estado||'').toLowerCase();
-        if (est === 'completado') {
-          timelineHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">
-            <div style="font-size:18px;">${icon}</div>
-            <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'}</div>
-            <div style="font-size:12px;color:var(--ink-soft);">${ar.confirmado||ar.tentativo||''}</div></div>
-            <div style="font-size:13px;font-weight:800;color:var(--success);">$${ar.precio||0}</div>
-            <div style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:3px 8px;border-radius:100px;">✅ LISTO</div>
+        const esCompletado = est === 'completado';
+        const esEnServicio = est === 'en servicio';
+        const esEsperando  = est === 'esperando';
+        const esMio = ar.staff === (user && user.name);
+
+        if (esCompletado) {
+          areasHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;opacity:0.7;">
+            <span style="font-size:16px;">${icon}</span>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'}</div>
+              <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+            </div>
+            <div style="font-size:12px;font-weight:800;color:var(--success);">$${ar.precio||0}</div>
+            <span style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:2px 8px;border-radius:100px;">✅</span>
           </div>`;
-        } else if (est === 'en servicio') {
-          const _tentItems = (ar.tentativo || 'Confirmar servicio').split(' + ').map(s => s.trim()).filter(Boolean);
-          const _tentHTML = _tentItems.length > 1
-            ? _tentItems.map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s}</div>`).join('')
-            : `<div style="font-size:12px;color:var(--ink-soft);">${ar.tentativo||'Confirmar servicio'}</div>`;
-          timelineHTML += `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);">
-            <div style="font-size:18px;">${icon}</div>
-            <div style="flex:1;"><div style="font-size:13px;font-weight:800;color:var(--info);">👇 TU SERVICIO · ${label}</div>
-            ${_tentHTML}</div>
+        } else if (esEnServicio && esMio) {
+          // Mi área actual — preseleccionada, no se puede desmarcar
+          areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);cursor:pointer;">
+            <input type="checkbox" data-area-idx="${ar.idx}" checked disabled style="width:18px;height:18px;accent-color:var(--info);">
+            <span style="font-size:16px;">${icon}</span>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:800;color:var(--info);">👇 ${label} — yo</div>
+              <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+            </div>
             <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
-          </div>`;
+          </label>`;
+        } else if (esEsperando) {
+          // Áreas disponibles — la staff puede elegir tomarlas también
+          areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;border:1.5px solid var(--line);cursor:pointer;">
+            <input type="checkbox" data-area-idx="${ar.idx}" style="width:18px;height:18px;accent-color:var(--accent);">
+            <span style="font-size:16px;">${icon}</span>
+            <div style="flex:1;">
+              <div style="font-size:12px;font-weight:700;color:var(--ink);">${label}</div>
+              <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+            </div>
+            <div style="font-size:13px;font-weight:800;color:var(--ink);">$${ar.precio||0}</div>
+          </label>`;
         }
       });
-      document.getElementById('confirmSvcName').innerHTML = timelineHTML ||
-        `<div style="font-size:14px;font-weight:700;">${svcName}</div>`;
-      document.getElementById('confirmSvcPrice').textContent = '';
+
+      document.getElementById('confirmSvcTMPanel').style.display = 'block';
+      document.getElementById('confirmSvcNormalPanel').style.display = 'none';
+      document.getElementById('confirmSvcTMAreas').innerHTML = areasHTML;
+      document.getElementById('confirmSvcCambiarBtn').style.display = 'none';
       document.getElementById('confirmSvcTitle').textContent = '🎯 Ticket multi-servicio';
     } else {
       const esCompartida = window._desgloseAcumulado && window._desgloseAcumulado.length > 0;
@@ -5207,6 +5231,36 @@ if ('caches' in window) {
 
   async function confirmServiceAndClose() {
     closeModal();
+
+    // ── Si es TM: tomar también las áreas adicionales que marcó la staff ──
+    const _tmPanel = document.getElementById('confirmSvcTMPanel');
+    if (_tmPanel && _tmPanel.style.display !== 'none') {
+      const slot_tm = window._confirmSvcSlot || 1;
+      const idEspera_tm = slot_tm === 1 ? (window._as1IdEspera||'') : (window._as2IdEspera||'');
+      const user_tm = window.currentUser;
+      // Checkboxes desmarcados = áreas esperando que la staff NO va a tomar (no hacer nada)
+      // Checkboxes marcados (no disabled) = áreas que la staff TAMBIÉN quiere tomar
+      const extraChecks = document.querySelectorAll('#confirmSvcTMAreas input[type="checkbox"]:not([disabled]):checked');
+      for (const cb of extraChecks) {
+        const extraIdx = Number(cb.dataset.areaIdx);
+        if (extraIdx) {
+          try {
+            await apiPost('tomarAreaTicketMulti', {
+              idEspera: idEspera_tm,
+              chicaNombre: user_tm?.name || '',
+              chicaArea: user_tm?.area || '',
+              areaIdx: extraIdx
+            });
+          } catch(e) {}
+        }
+      }
+      // Resetear panel para la próxima vez
+      document.getElementById('confirmSvcTMPanel').style.display = 'none';
+      document.getElementById('confirmSvcNormalPanel').style.display = 'block';
+      const cambiarBtn = document.getElementById('confirmSvcCambiarBtn');
+      if (cambiarBtn) cambiarBtn.style.display = '';
+    }
+
     // Confirmar al backend que la staff aceptó el servicio → volver a "En servicio"
     try {
       const slot = window._confirmSvcSlot || 1;
@@ -13335,19 +13389,32 @@ if ('caches' in window) {
 <!-- ============================================ -->
 <!-- Modal: Confirmar o Cambiar servicio de enganche -->
 <div class="modal-bg" id="confirmServiceModal">
-  <div class="modal-card" style="background:var(--bg-card);border-radius:24px;padding:24px;max-width:420px;width:90%;margin:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);">
+  <div class="modal-card" style="background:var(--bg-card);border-radius:24px;padding:24px;max-width:420px;width:90%;margin:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto;">
     <div class="modal-title" id="confirmSvcTitle" style="font-size:17px;font-weight:800;text-align:center;margin-bottom:16px;">📋 Servicio asignado</div>
-    <div style="text-align:center; margin-bottom:20px;">
-      <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:10px;"></div>
-      <div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid var(--line);">
-        <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servicio asignado</div>
-        <div id="confirmSvcName" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;"></div>
-        <div id="confirmSvcPrice" style="font-size:22px;font-weight:900;color:var(--accent-deep);"></div>
+    <div style="margin-bottom:20px;">
+      <div id="confirmSvcClientName" style="font-size:16px;font-weight:700;margin-bottom:12px;text-align:center;"></div>
+
+      <!-- Vista TM: lista de áreas con checkboxes -->
+      <div id="confirmSvcTMPanel" style="display:none;">
+        <div style="font-size:11px;color:var(--ink-faint);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Servicios del ticket</div>
+        <div id="confirmSvcTMAreas" style="margin-bottom:14px;"></div>
+        <div style="font-size:12px;color:var(--ink-soft);line-height:1.5;text-align:center;background:var(--bg);border-radius:12px;padding:10px;">
+          Marcá los servicios que vas a realizar. Los que no marques quedan en espera para otra staff.
+        </div>
       </div>
-      <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;">Asesorá a la clienta y confirmá o cambiá el servicio.</div>
+
+      <!-- Vista normal: servicio simple -->
+      <div id="confirmSvcNormalPanel" style="display:block;">
+        <div style="background:var(--bg);border-radius:14px;padding:14px;margin-bottom:12px;border:1.5px solid var(--line);">
+          <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Servicio asignado</div>
+          <div id="confirmSvcName" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:4px;"></div>
+          <div id="confirmSvcPrice" style="font-size:22px;font-weight:900;color:var(--accent-deep);"></div>
+        </div>
+        <div style="font-size:13px;color:var(--ink-soft);line-height:1.5;text-align:center;">Asesorá a la clienta y confirmá o cambiá el servicio.</div>
+      </div>
     </div>
     <button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="confirmServiceAndClose()">✅ Confirmar servicio</button>
-    <button class="btn-primary outline" style="margin-bottom:10px;" onclick="changeServiceFromModal()">🔄 Cambiar servicio</button>
+    <button class="btn-primary outline" id="confirmSvcCambiarBtn" style="margin-bottom:10px;" onclick="changeServiceFromModal()">🔄 Cambiar servicio</button>
     <button class="btn-primary outline" onclick="closeModal()">Cancelar</button>
   </div>
 </div>
