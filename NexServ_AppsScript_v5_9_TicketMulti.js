@@ -582,9 +582,7 @@ function handleGetListaEspera() {
     }
   } catch(e) {}
 
-  // Merge con TicketMulti — UNA tarjeta por ÁREA en estado Esperando
-  // Cada área genera su propia tarjeta con su servicio específico.
-  // La staff de esa área solo ve su tarjeta, no las de otras áreas.
+  // Merge con TicketMulti — solo la PRÓXIMA área según secuencia (una tarjeta por TM)
   try {
     const tmR = handleGetTicketMulti({});
     if (tmR.success && tmR.activos) {
@@ -593,34 +591,41 @@ function handleGetListaEspera() {
           return String(a.estado || '').toLowerCase() === 'esperando';
         });
         if (areasEsperando.length === 0) return;
-
-        // Crear una tarjeta separada por cada área en estado Esperando
-        areasEsperando.forEach(function(area) {
-          lista.push({
-            id          : tm.idEspera,
-            fecha       : '',
-            horaLlegada : '',
-            codigo      : tm.codigo,
-            nombre      : tm.nombre,
-            servicio    : area.tentativo || '',        // solo el servicio de ESTA área
-            area        : area.area || 'multi',        // solo el área de ESTA tarjeta
-            prioridad   : tm.prioridad || 'Normal',
-            estado      : 'Esperando',
-            tomadaPor   : '',
-            horaToma    : '',
-            observaciones: tm.observaciones || '',
-            total       : area.precio || 0,
-            promoNombre : '',
-            precioPromo : '',
-            precioRegular: '',
-            tipo        : 'TM',
-            secuencia   : tm.secuencia || [],
-            promasExtra : [],
-            esTop       : 'No',
-            asignadaA   : '',
-            fuente      : 'TicketMulti',
-            areaIdx     : area.idx
-          });
+        var proximaArea = null;
+        if (tm.secuencia && tm.secuencia.length > 0) {
+          for (var si = 0; si < tm.secuencia.length; si++) {
+            var seqArea = String(tm.secuencia[si]).toLowerCase();
+            var match = areasEsperando.filter(function(a) {
+              return String(a.area || '').toLowerCase() === seqArea;
+            })[0];
+            if (match) { proximaArea = match; break; }
+          }
+        }
+        if (!proximaArea) proximaArea = areasEsperando[0];
+        lista.push({
+          id          : tm.idEspera,
+          fecha       : '',
+          horaLlegada : '',
+          codigo      : tm.codigo,
+          nombre      : tm.nombre,
+          servicio    : proximaArea.tentativo || '',
+          area        : proximaArea.area || 'multi',
+          prioridad   : tm.prioridad || 'Normal',
+          estado      : 'Esperando',
+          tomadaPor   : '',
+          horaToma    : '',
+          observaciones: tm.observaciones || '',
+          total       : proximaArea.precio || 0,
+          promoNombre : '',
+          precioPromo : '',
+          precioRegular: '',
+          tipo        : 'TM',
+          secuencia   : tm.secuencia || [],
+          promasExtra : [],
+          esTop       : 'No',
+          asignadaA   : '',
+          fuente      : 'TicketMulti',
+          areaIdx     : proximaArea.idx
         });
       });
     }
@@ -1889,11 +1894,15 @@ function handleGetAtenciones(params) {
   } catch(e) {}
 
   // Merge con ServicioNormal (tickets SN- en servicio)
+  // FIX: deduplicar por idEspera para evitar mostrar el mismo ticket dos veces
+  const idsYaAgregados = new Set(atenciones.map(a => a.idEspera));
   try {
     const snR = handleGetServicioNormal(params || {});
     if (snR.success && snR.enServicio) {
       snR.enServicio.forEach(sn => {
         if (params && params.chica && sn.tomadaPor !== params.chica) return;
+        if (idsYaAgregados.has(sn.idEspera)) return; // ya está desde ListaEspera
+        idsYaAgregados.add(sn.idEspera);
         atenciones.push({
           idEspera    : sn.idEspera,
           fecha       : sn.fecha,
@@ -1924,6 +1933,8 @@ function handleGetAtenciones(params) {
       spR.enServicio.forEach(function(sp) {
         if (params && params.chica && sp.tomadaPor !== params.chica) return;
         if (String(sp.estado || '').toLowerCase() === 'por cobrar') return;
+        if (idsYaAgregados.has(sp.idEspera)) return; // deduplicar
+        idsYaAgregados.add(sp.idEspera);
         atenciones.push({
           idEspera    : sp.idEspera,
           fecha       : sp.fecha,
@@ -2124,7 +2135,8 @@ function updateComision(chicaNombre, precio) {
   const precioNum = Number(precio) || 0;
   if (precioNum <= 0) return;
 
-  for (let i = 4; i < data.length; i++) {
+  // FIX: i=3 — María está en fila 4 (índice 3), i=4 la saltaba
+  for (let i = 3; i < data.length; i++) {
     if (String(data[i][0]).trim() === chicaNombre) {
       const row = i + 1;
       const servicios = (Number(data[i][2]) || 0) + 1;
@@ -2650,7 +2662,8 @@ function handleCierreSemanal(data) {
   const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
 
   // Columnas Comisiones: A=Chica | B=Área | C=Servicios | D=Facturado | E=% Comisión | F=Comisión
-  for (let i = 4; i < comData.length; i++) {
+  // FIX: i=3 — María está en fila 4 (índice 3)
+  for (let i = 3; i < comData.length; i++) {
     const row = comData[i];
     if (!row[0]) continue;
 
@@ -4494,26 +4507,21 @@ function handleTomarAreaTicketMulti(data) {
     for (let i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() !== data.idEspera) continue;
       const rowNum = i + 3;
-
-      // FIX: si viene areaIdx, tomar ESA área específica (no la primera disponible)
-      // Esto evita que una staff tome el área de otra cuando ambas están en Esperando
-      const targetIdx = data.areaIdx ? Number(data.areaIdx) - 1 : -1;
-
+      // Encontrar el área que corresponde a esta staff (primera en estado Esperando)
       for (let a = 0; a < 4; a++) {
         const base   = TM_AREA_COL[a];
         const tent   = String(rows[i][base] || '').trim();
         const estado = String(rows[i][base + 3] || '').trim();
         if (!tent || estado !== 'Esperando') continue;
-        // Si viene areaIdx, solo tomar esa área; sino tomar la primera disponible
-        if (targetIdx >= 0 && a !== targetIdx) continue;
         // Marcar esta área como tomada
-        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');
-        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre);
-        ws.getRange(rowNum, base + 4 + 1).setValue(hora);
+        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio'); // Estado (col base+3, 1-indexed = base+4)
+        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre); // Staff
+        ws.getRange(rowNum, base + 4 + 1).setValue(hora);             // Hora toma
+        // Marcar ticket general como Activo si no lo estaba
         ws.getRange(rowNum, 6).setValue('Activo');
         return { success: true, areaIdx: a + 1, hora };
       }
-      return { success: false, message: 'No hay áreas disponibles para esta staff' };
+      return { success: false, message: 'No hay áreas disponibles' };
     }
     return { success: false, message: 'Ticket no encontrado' };
   } catch(e) { return { success: false, message: String(e) }; }
