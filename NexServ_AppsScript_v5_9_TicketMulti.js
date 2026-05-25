@@ -1794,15 +1794,13 @@ function handleGetServiciosHoy(params) {
       var staffH = String(rowH[7] || '').trim();
       if (params.chica && staffH !== params.chica) continue;
       var colE = String(rowH[4] || '').trim();
-      // Excluir LE- y SN- porque ya aparecen via ListaEspera/ServicioNormal merge.
-      // SP- solo se excluye si NO es de esta staff — los SP de la propia staff son
-      // su parte de una promo compartida y deben aparecer en su historial (Bug #2 fix).
-      var esSP = colE.startsWith('SP-');
+      // FIX: deduplicar por fuente.
+      // LE- y SN- → ya vienen del merge de ListaEspera/ServicioNormal → excluir siempre.
+      // SP- → ya vienen del merge de ServicioPromo → excluir siempre.
+      // Solo incluir desde HistorialOwner los tickets TM- (que no tienen merge propio).
+      var esSP   = colE.startsWith('SP-');
       var esLE_SN = colE.startsWith('LE-') || colE.startsWith('SN-');
-      if (esLE_SN) continue;
-      if (esSP && params.chica && staffH !== params.chica) continue;
-      // Excluir solo registros intermedios SP (pendiente cobro promo compartida)
-      // 'Pendiente cobro TM' SÍ se incluye — es el servicio real de la staff TM
+      if (esLE_SN || esSP) continue; // ya aparece por su merge correspondiente
       var metodoPagoH = String(rowH[10] || '').trim();
       if (metodoPagoH === 'Pendiente cobro final' || metodoPagoH === 'Pendiente cobro') continue;
       var horaH = rowH[1] instanceof Date
@@ -4331,32 +4329,20 @@ function handleCrearTicketMulti(data) {
     // areas: array de { tentativo, area, precio, precioNormal, tipo }
     const areas = data.areas || [];
 
-    // ── AGRUPAR POR ÁREA ────────────────────────────────────
-    // Si varios servicios son del mismo área, combinarlos en uno solo
-    var areaGroups = {}; // { 'cejas': { tentativo, precio, precioNormal, tipo } }
-    var areaOrder  = []; // mantener el orden de aparición
-
-    areas.forEach(function(a) {
-      var aKey = String(a.area || 'otro').toLowerCase();
-      if (!areaGroups[aKey]) {
-        areaGroups[aKey] = {
-          area: a.area,
-          tentativo: a.tentativo || '',
-          precio: Number(a.precio || 0),
-          precioNormal: Number(a.precioNormal || a.precio || 0),
-          tipo: a.tipo || 'normal'
-        };
-        areaOrder.push(aKey);
-      } else {
-        // Mismo área — combinar nombre y sumar precio
-        areaGroups[aKey].tentativo += ' + ' + (a.tentativo || '');
-        areaGroups[aKey].precio    += Number(a.precio || 0);
-        areaGroups[aKey].precioNormal += Number(a.precioNormal || a.precio || 0);
-      }
+    // ── CADA SERVICIO ES UN SLOT INDEPENDIENTE ──────────────
+    // NO agrupar — cada servicio va a su propio slot (máx 4)
+    // Así "Combo 4 Lifting" y "Depilación de cejas" quedan en slots separados
+    // aunque sean del mismo área, y la staff puede tomarlos por separado
+    var areasAgrupadas = areas.slice(0, 4).map(function(a) {
+      return {
+        area: a.area || 'otro',
+        tentativo: a.tentativo || '',
+        precio: Number(a.precio || 0),
+        precioNormal: Number(a.precioNormal || a.precio || 0),
+        tipo: a.tipo || 'normal'
+      };
     });
-
-    var areasAgrupadas = areaOrder.map(function(k) { return areaGroups[k]; });
-    // ── FIN AGRUPACIÓN ──────────────────────────────────────
+    // ── FIN SLOTS INDEPENDIENTES ─────────────────────────────
 
     // Construir fila de 37 columnas (A=0 → AK=36)
     var row = Array(37).fill('');
