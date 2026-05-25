@@ -4584,7 +4584,8 @@ function handleCompletarAreaTicketMulti(data) {
       try {
         var wsComStaff = getSheet('Comisiones');
         var comDataStaff = wsComStaff.getDataRange().getValues();
-        for (var cj = 4; cj < comDataStaff.length; cj++) {
+        // FIX: i=3 — María está en fila 4 (índice 3)
+        for (var cj = 3; cj < comDataStaff.length; cj++) {
           if (String(comDataStaff[cj][0]||'').trim() === data.chicaNombre) {
             if (String(comDataStaff[cj][1]||'').toLowerCase().includes('facial') ||
                 String(comDataStaff[cj][4]||'').includes('40')) pctStaff = 0.4;
