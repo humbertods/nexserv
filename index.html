@@ -12134,15 +12134,29 @@ if ('caches' in window) {
       alert('Agregá al menos un servicio con área y servicio seleccionado.');
       return;
     }
-    if (areasMulti.length === 1 && areasMulti[0].tipo === 'normal') {
-      // Servicio simple — usar flujo normal sin TM
+    if (areasMulti.length === 1) {
+      // Un solo servicio → flujo simple (normal o promo), nunca TM
       const a = areasMulti[0];
+      const esPromo = a.tipo === 'promo';
       try {
-        const result = await apiPost('addServicioNormal', {
-          codigo: codigo, nombre: nombre, servicio: a.tentativo,
-          area: a.area, prioridad: prioridad, observaciones: obs,
-          esTop: isTop ? 'Sí' : 'No', total: a.precio
-        });
+        let result;
+        if (esPromo) {
+          // Promo de 1 área → addServicioPromo (flujo SP-)
+          result = await apiPost('addServicioPromo', {
+            codigo: codigo, nombre: nombre, servicio: a.tentativo,
+            area: a.area, prioridad: prioridad, observaciones: obs,
+            esTop: isTop ? 'Sí' : 'No', total: a.precio,
+            promoNombre: a.tentativo, precioPromo: a.precio,
+            precioRegular: a.precioNormal || a.precio
+          });
+        } else {
+          // Normal de 1 área → addServicioNormal (flujo SN-)
+          result = await apiPost('addServicioNormal', {
+            codigo: codigo, nombre: nombre, servicio: a.tentativo,
+            area: a.area, prioridad: prioridad, observaciones: obs,
+            esTop: isTop ? 'Sí' : 'No', total: a.precio
+          });
+        }
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + a.tentativo, isTop);
@@ -12154,7 +12168,7 @@ if ('caches' in window) {
       return;
     }
 
-    // Multi-área o con promo → TM
+    // 2+ áreas → TM
     try {
       const result = await apiPost('crearTicketMulti', {
         codigo: codigo, nombre: nombre, prioridad: prioridad,
@@ -12316,15 +12330,28 @@ if ('caches' in window) {
       return;
     }
 
-    if (areasMultiGA.length === 1 && areasMultiGA[0].tipo === 'normal') {
-      // Servicio simple con asignación directa
+    if (areasMultiGA.length === 1) {
+      // Un solo servicio → flujo simple, nunca TM
       const aGA = areasMultiGA[0];
+      const esPromoGA = aGA.tipo === 'promo';
       try {
-        const result = await apiPost('addServicioNormal', {
-          codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
-          area: aGA.area, prioridad: 'Normal', observaciones: obs,
-          esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
-        });
+        let result;
+        if (esPromoGA) {
+          result = await apiPost('addServicioPromo', {
+            codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
+            area: aGA.area, prioridad: 'Normal', observaciones: obs,
+            esTop: isTop ? 'Sí' : 'No', total: aGA.precio,
+            promoNombre: aGA.tentativo, precioPromo: aGA.precio,
+            precioRegular: aGA.precioNormal || aGA.precio,
+            asignadaA: chica
+          });
+        } else {
+          result = await apiPost('addServicioNormal', {
+            codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
+            area: aGA.area, prioridad: 'Normal', observaciones: obs,
+            esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
+          });
+        }
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta asignada a ' + chica, nombre + ' · ' + aGA.tentativo, isTop);
@@ -12337,7 +12364,7 @@ if ('caches' in window) {
       return;
     }
 
-    // Multi-área → TM con asignación directa
+    // 2+ áreas → TM con asignación directa
     try {
       const tmResult = await apiPost('crearTicketMulti', {
         codigo: codigo, nombre: nombre, prioridad: 'Normal',
