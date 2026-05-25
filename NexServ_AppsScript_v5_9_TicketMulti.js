@@ -2117,13 +2117,16 @@ function handleGetComisiones(params) {
     const row = data[i];
     if (!row[0]) continue;
     if (params && params.chica && String(row[0]).trim() !== params.chica) continue;
+    // FIX: forzar números para evitar que Sheets devuelva fechas cuando el formato está mal
+    const _facturado = row[3] instanceof Date ? 0 : Number(row[3]) || 0;
+    const _comision  = row[5] instanceof Date ? 0 : Number(row[5]) || 0;
     comisiones.push({
       chica: row[0],
       area: row[1],
-      servicios: row[2],
-      facturado: row[3],
+      servicios: Number(row[2]) || 0,
+      facturado: _facturado,
       porcentaje: row[4],
-      comision: row[5]
+      comision: _comision
     });
   }
   return { success: true, comisiones: comisiones };
