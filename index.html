@@ -1158,21 +1158,79 @@ if ('caches' in window) {
       </div>
 
       <!-- ══ PASO 1: SELECTOR DE TIPO ══ -->
-      <div id="arrTipoSelector" style="background: var(--bg-card); border-radius: 22px; padding: 20px; box-shadow: var(--shadow-card);">
-        <div style="font-size: 15px; font-weight: 800; color: var(--ink); text-align: center; margin-bottom: 16px;">Selecciona el tipo de clienta</div>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <button onclick="seleccionarTipoArrival('multi')" style="padding: 16px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
-            <span style="font-size: 18px;">🎯</span> Clienta Multi-servicios
-          </button>
-          <button onclick="seleccionarTipoArrival('normal')" style="padding: 16px; background: white; color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
-            <span style="font-size: 18px;">🛠</span> Clienta servicio normal
-          </button>
-          <button onclick="seleccionarTipoArrival('promo')" style="padding: 16px; background: white; color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
-            <span style="font-size: 18px;">🎁</span> Clienta promo normal
-          </button>
+      <!-- ══ FORMULARIO UNIFICADO TM ══ -->
+      <!-- Mikaela agrega servicios por área en cualquier orden, define la secuencia y envía -->
+      <div id="arrTipoSelector" style="display:none;"></div><!-- mantenido para compatibilidad -->
+      <div id="arrTipoConfirm" style="display:none;"></div>
+
+      <div id="arrFormUnificado" style="display:block;">
+        <!-- Servicios por área -->
+        <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:10px;">Servicios de la clienta</div>
+        <div id="tmServiciosContainer">
+          <!-- se renderizan dinámicamente por addServicioTM() -->
         </div>
-        <!-- Confirmación de tipo seleccionado -->
-        <div id="arrTipoConfirm" style="display:none; margin-top:14px; padding:12px 16px; border-radius:14px; font-size:13px; font-weight:700; text-align:center;"></div>
+
+        <!-- Botón agregar servicio -->
+        <button onclick="addServicioTM()" style="width:100%;padding:13px;margin-top:8px;background:var(--bg);border:2px dashed var(--line);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+          ➕ Agregar servicio
+        </button>
+
+        <!-- Resumen de áreas -->
+        <div id="tmResumenAreas" style="display:none;margin-top:14px;padding:12px 14px;background:var(--bg);border:1.5px solid var(--line);border-radius:14px;font-size:12px;font-weight:700;color:var(--ink-soft);"></div>
+
+        <!-- Orden de atención -->
+        <div style="margin-top:20px;">
+          <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:6px;">Orden de atención</div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px;">Tocá + para definir en qué orden atienden las áreas. Si no definís, cada área se atiende cuando haya una staff disponible.</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="tmSecuenciaBtns">
+            <!-- se renderizan dinámicamente según las áreas agregadas -->
+          </div>
+          <div id="secuenciaList" style="margin-bottom:8px;"></div>
+          <div id="secuenciaEmpty" style="font-size:12px;color:var(--ink-faint);text-align:center;padding:6px 0;display:block;">Sin orden definido</div>
+        </div>
+
+        <!-- Prioridad -->
+        <div class="section-title" style="margin-top:16px;">Prioridad</div>
+        <div class="priority-picker">
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="input-group" style="margin-top:16px;">
+          <label>Observaciones</label>
+          <textarea id="arrObs" placeholder="Notas especiales de esta visita..."></textarea>
+        </div>
+
+        <!-- Aviso promos -->
+        <div id="tmPromoAviso" style="display:none;background:var(--warning-bg);border-radius:12px;padding:10px 14px;font-size:11px;font-weight:600;color:#7a5a1c;text-align:center;margin-top:10px;">
+          ⚠️ Promos solo válidas con efectivo o transferencia
+        </div>
+
+        <!-- Acciones -->
+        <div class="section-title" style="margin-top:16px;">¿Cómo procedés?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+        </div>
+      </div>
+
+      <!-- Formularios legacy ocultos (usados por goToList/goAssign internamente) -->
+      <div id="arrFormNormal" style="display:none;">
+        <select id="arrArea" onchange="loadServicesForArea();" style="display:none;"><option>Cejas</option><option>Depilación</option><option>Pestañas</option><option>Lifting / Retiro</option><option>Facial</option></select>
+        <select id="arrService" style="display:none;"><option value="">-</option></select>
+        <textarea id="arrObsPromo" style="display:none;"></textarea>
+      </div>
+      <div id="arrFormPromo" style="display:none;">
+        <div id="arrPromoSlots"></div>
+        <div id="m8TicketResumen" style="display:none;"></div>
+      </div>
+      <div id="arrFormMulti" style="display:none;">
+        <select id="arrAreaMulti" style="display:none;"><option>Cejas</option><option>Depilación</option><option>Pestañas</option><option>Lifting / Retiro</option><option>Facial</option></select>
+        <select id="arrServiceMulti" style="display:none;"><option value="">-</option></select>
+        <div id="serviciosAdicionalesContainer" style="display:none;"></div>
+        <textarea id="arrObsMulti" style="display:none;"></textarea>
       </div>
 
       <!-- ══ FORMULARIO: SERVICIO NORMAL ══ -->
@@ -3633,7 +3691,7 @@ if ('caches' in window) {
   async function show(id) {
     const targetScreen = document.getElementById(id);
     if (!targetScreen) {
-      console.error('[show] Pantalla no encontrada:', id, '— redirigiendo a login');
+      console.error('[show] Pantalla no encontrada:', id);
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       const loginEl = document.getElementById('login');
       if (loginEl) loginEl.classList.add('active');
@@ -8695,21 +8753,15 @@ if ('caches' in window) {
     document.getElementById('arrivalSearch').style.display = 'none';
     document.getElementById('arrivalForm').style.display = 'block';
 
-    // Mostrar selector de tipo, ocultar sub-formularios
-    document.getElementById('arrTipoSelector').style.display = 'block';
-    document.getElementById('arrFormNormal').style.display = 'none';
-    document.getElementById('arrFormPromo').style.display = 'none';
-    document.getElementById('arrFormMulti').style.display = 'none';
-    window._arrTipo = 'normal';
+    // Inicializar el formulario TM unificado
+    document.getElementById('arrFormUnificado').style.display = 'block';
+    window._arrTipo = 'multi'; // siempre TM
 
-    // Resetear servicios adicionales
-    document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
-    _numServiciosAdicionales = 0;
-
-    // Cargar servicios del área inicial
-    loadServicesForArea();
-    // Resetear promos y secuencia al cambiar de clienta
-    resetArrivalExtras();
+    // Resetear y añadir primer slot automáticamente
+    if (typeof initFormTM === 'function') {
+      initFormTM();
+      addServicioTM(); // primer servicio automático
+    }
   }
   
   // Actualizar el label del botón según el área seleccionada
@@ -8794,6 +8846,233 @@ if ('caches' in window) {
 
   // ── SELECTOR DE TIPO DE CLIENTA ─────────────────────────
   window._arrTipo = 'normal'; // 'normal' | 'promo' | 'multi'
+
+  // ══════════════════════════════════════════════════════════════
+  // FORMULARIO TM UNIFICADO
+  // Mikaela agrega servicios por área → genera TM automáticamente
+  // ══════════════════════════════════════════════════════════════
+
+  // Estado del formulario TM
+  var _tmServicios = []; // [{ area, areaKey, servicio, precio, precioNormal, tipo }]
+  var _tmContador  = 0;
+
+  const TM_AREA_LABELS = {
+    'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas',
+    'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial'
+  };
+
+  // Inicializar formulario al seleccionar clienta
+  function initFormTM() {
+    _tmServicios = [];
+    _tmContador  = 0;
+    const container = document.getElementById('tmServiciosContainer');
+    if (container) container.innerHTML = '';
+    tmActualizarResumen();
+    tmActualizarSecuenciaBtns();
+    window._arrTipo = 'multi'; // siempre TM
+    window._arrPromo = null;
+    _arrPromos = [];
+    window._secuencia = [];
+    renderSecuencia();
+    const promoAviso = document.getElementById('tmPromoAviso');
+    if (promoAviso) promoAviso.style.display = 'none';
+  }
+
+  // Agregar un slot de servicio
+  function addServicioTM() {
+    _tmContador++;
+    const idx = _tmContador;
+    const container = document.getElementById('tmServiciosContainer');
+    if (!container) return;
+
+    const slot = document.createElement('div');
+    slot.id = 'tmSlot-' + idx;
+    slot.style.cssText = 'background:var(--bg-card);border:1.5px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;';
+    slot.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:800;color:var(--ink);">Servicio ${idx}</span>
+        <button onclick="quitarServicioTM(${idx})" style="background:var(--error-bg,#fee2e2);color:#dc2626;border:none;border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;">✕ Quitar</button>
+      </div>
+      <div class="input-group" style="margin-bottom:8px;">
+        <label style="font-size:11px;">Área</label>
+        <select id="tmArea-${idx}" onchange="onTmAreaChange(${idx})" style="font-weight:700;">
+          <option value="">Seleccioná el área...</option>
+          <option value="Cejas">Cejas</option>
+          <option value="Depilación">Depilación</option>
+          <option value="Pestañas">Pestañas</option>
+          <option value="Lifting / Retiro">Lifting / Retiro</option>
+          <option value="Facial">Facial</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <button id="tmBtnNormal-${idx}" onclick="setTipoTM(${idx},'normal')" style="padding:9px;border-radius:10px;border:2px solid var(--accent);background:var(--accent);color:white;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🛠 Normal</button>
+        <button id="tmBtnPromo-${idx}" onclick="setTipoTM(${idx},'promo')" style="padding:9px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🎁 Promo</button>
+      </div>
+      <div id="tmSvcNormal-${idx}" style="display:block;">
+        <select id="tmServicioSel-${idx}" onchange="onTmServicioChange(${idx})" style="width:100%;">
+          <option value="">Primero seleccioná el área</option>
+        </select>
+      </div>
+      <div id="tmSvcPromo-${idx}" style="display:none;">
+        <select id="tmPromoSel-${idx}" onchange="onTmPromoChange(${idx})" style="width:100%;">
+          <option value="">Cargando promos...</option>
+        </select>
+      </div>
+      <div id="tmPrecioDisplay-${idx}" style="display:none;margin-top:8px;padding:8px 12px;background:var(--bg);border-radius:10px;font-size:13px;font-weight:700;color:var(--accent);"></div>
+    `;
+    container.appendChild(slot);
+    _tmServicios.push({ idx, area: '', areaKey: '', servicio: '', precio: 0, precioNormal: 0, tipo: 'normal' });
+    tmActualizarSecuenciaBtns();
+  }
+
+  function quitarServicioTM(idx) {
+    const slot = document.getElementById('tmSlot-' + idx);
+    if (slot) slot.remove();
+    _tmServicios = _tmServicios.filter(s => s.idx !== idx);
+    tmActualizarResumen();
+    tmActualizarSecuenciaBtns();
+  }
+
+  function setTipoTM(idx, tipo) {
+    const svc = _tmServicios.find(s => s.idx === idx);
+    if (svc) svc.tipo = tipo;
+    document.getElementById('tmBtnNormal-' + idx).style.cssText =
+      tipo === 'normal' ? 'padding:9px;border-radius:10px;border:2px solid var(--accent);background:var(--accent);color:white;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+                       : 'padding:9px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
+    document.getElementById('tmBtnPromo-' + idx).style.cssText =
+      tipo === 'promo' ? 'padding:9px;border-radius:10px;border:2px solid var(--warning);background:var(--warning-bg);color:#7a5a1c;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+                      : 'padding:9px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;';
+    document.getElementById('tmSvcNormal-' + idx).style.display = tipo === 'normal' ? 'block' : 'none';
+    document.getElementById('tmSvcPromo-' + idx).style.display  = tipo === 'promo'  ? 'block' : 'none';
+    if (tipo === 'promo') cargarPromasTM(idx);
+    // resetear precio
+    if (svc) { svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0; }
+    const pd = document.getElementById('tmPrecioDisplay-' + idx);
+    if (pd) pd.style.display = 'none';
+    tmActualizarResumen();
+  }
+
+  async function onTmAreaChange(idx) {
+    await ensureCatalogoLoaded();
+    const areaEl = document.getElementById('tmArea-' + idx);
+    const area = areaEl ? areaEl.value : '';
+    const areaKey = TM_AREA_LABELS[area] || '';
+    const svc = _tmServicios.find(s => s.idx === idx);
+    if (svc) { svc.area = area; svc.areaKey = areaKey; svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0; }
+
+    // Cargar servicios normales
+    const sel = document.getElementById('tmServicioSel-' + idx);
+    if (sel && areaKey) {
+      sel.innerHTML = '<option value="">Seleccioná el servicio...</option>';
+      (CATALOGO[areaKey] || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ nombre: s.name, precio: s.price });
+        opt.textContent = s.name + ' — $' + s.price;
+        sel.appendChild(opt);
+      });
+    }
+    // Si está en modo promo, recargar promos
+    if (svc && svc.tipo === 'promo') cargarPromasTM(idx);
+    const pd = document.getElementById('tmPrecioDisplay-' + idx);
+    if (pd) pd.style.display = 'none';
+    tmActualizarResumen();
+    tmActualizarSecuenciaBtns();
+  }
+
+  function onTmServicioChange(idx) {
+    const sel = document.getElementById('tmServicioSel-' + idx);
+    if (!sel || !sel.value) return;
+    const d = JSON.parse(sel.value);
+    const svc = _tmServicios.find(s => s.idx === idx);
+    if (svc) { svc.servicio = d.nombre; svc.precio = d.precio; svc.precioNormal = d.precio; }
+    const pd = document.getElementById('tmPrecioDisplay-' + idx);
+    if (pd) { pd.textContent = '💵 $' + d.precio; pd.style.display = 'block'; }
+    tmActualizarResumen();
+  }
+
+  async function cargarPromasTM(idx) {
+    await ensureCatalogoLoaded();
+    const svc  = _tmServicios.find(s => s.idx === idx);
+    const areaKey = svc ? svc.areaKey : '';
+    const sel  = document.getElementById('tmPromoSel-' + idx);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Seleccioná la promo...</option>';
+    const promos = PROMOS.filter(p => p.active);
+    promos.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ nombre: p.name, precio: p.price, regular: p.regular, division: p.division });
+      opt.textContent = p.name + ' — $' + p.price + ' (regular $' + p.regular + ')';
+      sel.appendChild(opt);
+    });
+  }
+
+  function onTmPromoChange(idx) {
+    const sel = document.getElementById('tmPromoSel-' + idx);
+    if (!sel || !sel.value) return;
+    const d = JSON.parse(sel.value);
+    const svc = _tmServicios.find(s => s.idx === idx);
+    if (svc) { svc.servicio = d.nombre; svc.precio = d.precio; svc.precioNormal = d.regular || d.precio; svc._division = d.division; }
+    const pd = document.getElementById('tmPrecioDisplay-' + idx);
+    if (pd) { pd.textContent = '🎁 $' + d.precio + ' (precio normal $' + (d.regular || d.precio) + ')'; pd.style.display = 'block'; }
+    // Mostrar aviso promos
+    const aviso = document.getElementById('tmPromoAviso');
+    if (aviso) aviso.style.display = 'block';
+    tmActualizarResumen();
+  }
+
+  function tmActualizarResumen() {
+    const validos = _tmServicios.filter(s => s.area && s.servicio);
+    const resumen = document.getElementById('tmResumenAreas');
+    if (!resumen) return;
+    if (validos.length === 0) { resumen.style.display = 'none'; return; }
+    const total = validos.reduce((s, v) => s + v.precio, 0);
+    const totalNormal = validos.reduce((s, v) => s + v.precioNormal, 0);
+    const tienePromo = validos.some(v => v.tipo === 'promo');
+    resumen.style.display = 'block';
+    resumen.innerHTML = validos.map(v =>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);">
+        <span>${v.area} · ${v.servicio}</span>
+        <span style="font-weight:800;color:var(--accent);">$${v.precio}</span>
+      </div>`
+    ).join('') +
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;">
+      <span style="font-size:13px;font-weight:800;">Total</span>
+      <span style="font-size:15px;font-weight:800;color:var(--ink);">$${total}${tienePromo ? ' <span style="font-size:10px;color:var(--ink-soft);">(regular $' + totalNormal + ')</span>' : ''}</span>
+    </div>`;
+  }
+
+  function tmActualizarSecuenciaBtns() {
+    const container = document.getElementById('tmSecuenciaBtns');
+    if (!container) return;
+    const areas = [...new Set(_tmServicios.filter(s => s.areaKey).map(s => s.areaKey))];
+    const LABELS = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
+    container.innerHTML = areas.map(a =>
+      `<button onclick="addAreaSecuencia('${a}')" style="padding:8px 14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">+ ${LABELS[a]||a}</button>`
+    ).join('');
+    if (areas.length === 0) container.innerHTML = '<span style="font-size:12px;color:var(--ink-faint);">Primero agregá servicios</span>';
+  }
+
+  // Override goToList/goAssign to use _tmServicios directly
+  function buildTMAreasFromForm() {
+    return _tmServicios
+      .filter(s => s.area && s.servicio)
+      .map(s => ({
+        tentativo:    s.servicio,
+        area:         s.areaKey,
+        precio:       s.precio,
+        precioNormal: s.precioNormal,
+        tipo:         s.tipo
+      }));
+  }
+  window.buildTMAreasFromForm = buildTMAreasFromForm;
+  window.initFormTM = initFormTM;
+  window.addServicioTM = addServicioTM;
+  window.quitarServicioTM = quitarServicioTM;
+  window.setTipoTM = setTipoTM;
+  window.onTmAreaChange = onTmAreaChange;
+  window.onTmServicioChange = onTmServicioChange;
+  window.onTmPromoChange = onTmPromoChange;
+  window.cargarPromasTM = cargarPromasTM;
 
   function seleccionarTipoArrival(tipo) {
     const labels = {
@@ -9088,7 +9367,6 @@ if ('caches' in window) {
 
     const getPromoArea = function(p) {
       if (!p || !p.division || p.division.length === 0) {
-        // FIX: detectar área por nombre de la promo, no por areaKey del form
         const nameArea = AREA_KEY_FROM_DIV(p ? (p.name || '') : '');
         return nameArea || areaKey || 'cejas';
       }
@@ -11764,65 +12042,49 @@ if ('caches' in window) {
       postData.secuencia = window._secuencia;
     }
 
-    // ── TICKET MULTI: siempre usar buildAreasMultiTM() ──────────────────────
-    const _adicionales = getServiciosAdicionalesData();
-    const _promasExtra = _arrPromos.filter(p => p !== null).slice(1);
-    const esMulti = tipo === 'multi' || _adicionales.length > 0 || _promasExtra.length > 0;
-
-    if (esMulti) {
-      const areasMulti = buildAreasMultiTM(tipo, areaKey, servicio, precio, promo);
-      if (areasMulti.length === 0) { alert('Agregá al menos un servicio antes de continuar.'); return; }
-
-      const tmData = {
-        codigo:        codigo,
-        nombre:        nombre,
-        prioridad:     prioridad,
-        observaciones: obs,
-        areas:         areasMulti,
-        secuencia:     window._secuencia.map(s => s.area)
-      };
-
-      try {
-        const result = await apiPost('crearTicketMulti', tmData);
-        if (result && result.success) {
-          window._arrPromo = null;
-          _arrPromos = [];
-          document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
-          _numServiciosAdicionales = 0;
-          simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
-          alert('✅ Ticket multi-servicio creado (' + result.id + ')');
-          setTimeout(() => { show('mikaelaHome'); }, 400);
-        } else {
-          alert('Error al crear ticket multi: ' + (result?.message || 'Error desconocido'));
-        }
-      } catch(err) {
-        alert('Error de conexión: ' + err.message);
-      }
+    // ── USAR FORMULARIO TM UNIFICADO ─────────────────────────────────────
+    const areasMulti = buildTMAreasFromForm();
+    if (areasMulti.length === 0) {
+      alert('Agregá al menos un servicio con área y servicio seleccionado.');
       return;
     }
-    // ── FIN TICKET MULTI ─────────────────────────────────────
-
-    try {
-      // Ruta: si tiene promo → ListaEspera (flujo promo), si no → ServicioNormal
-      const tienePromo = window._arrPromo || (postData.promoNombre && postData.promoNombre.trim() !== '');
-      const accionAdd = tienePromo ? 'addServicioPromo' : 'addServicioNormal';
-      const result = await apiPost(accionAdd, postData);
-      console.log('📥 Respuesta de ' + accionAdd + ':', result);
-
-      
-      if (result && result.success) {
-        console.log('✅ Clienta agregada a lista de espera con ID:', result.id);
-        window._arrPromo = null;
-        simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + servicio, isTop);
-        setTimeout(() => { show('mikaelaHome'); }, 600);
-      } else {
-        console.error('❌ Error en la respuesta:', result);
-        alert('Error al agregar a lista de espera: ' + (result?.error || result?.message || 'Error desconocido'));
-      }
-    } catch (err) {
-      console.error('❌ Error enviando a lista:', err);
-      alert('Error de conexión al enviar a lista de espera. Verificá tu internet.');
+    if (areasMulti.length === 1 && areasMulti[0].tipo === 'normal') {
+      // Servicio simple — usar flujo normal sin TM
+      const a = areasMulti[0];
+      try {
+        const result = await apiPost('addServicioNormal', {
+          codigo: codigo, nombre: nombre, servicio: a.tentativo,
+          area: a.area, prioridad: prioridad, observaciones: obs,
+          esTop: isTop ? 'Sí' : 'No', total: a.precio
+        });
+        if (result && result.success) {
+          initFormTM();
+          simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + a.tentativo, isTop);
+          setTimeout(() => { show('mikaelaHome'); }, 600);
+        } else {
+          alert('Error: ' + (result?.error || result?.message || 'Error desconocido'));
+        }
+      } catch(err) { alert('Error de conexión: ' + err.message); }
+      return;
     }
+
+    // Multi-área o con promo → TM
+    try {
+      const result = await apiPost('crearTicketMulti', {
+        codigo: codigo, nombre: nombre, prioridad: prioridad,
+        observaciones: obs, areas: areasMulti,
+        secuencia: window._secuencia.map(s => s.area)
+      });
+      if (result && result.success) {
+        initFormTM();
+        const tienePromo = areasMulti.some(a => a.tipo === 'promo');
+        simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
+        alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
+        setTimeout(() => { show('mikaelaHome'); }, 400);
+      } else {
+        alert('Error al crear ticket: ' + (result?.message || 'Error desconocido'));
+      }
+    } catch(err) { alert('Error de conexión: ' + err.message); }
   }
 
   async function renderAssignDirect() {
@@ -11961,45 +12223,56 @@ if ('caches' in window) {
 
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
-    // ── TICKET MULTI en asignación directa — usar buildAreasMultiTM() ────────
-    const _adicionalesGA = getServiciosAdicionalesData();
-    const _promasExtraGA = _arrPromos.filter(p => p !== null).slice(1);
-    const esMultiGA = tipo === 'multi' || _adicionalesGA.length > 0 || _promasExtraGA.length > 0;
-
-    if (esMultiGA) {
-      const areasMultiGA = buildAreasMultiTM(tipo, areaKey, servicioGA, precioGA, promo);
-      if (areasMultiGA.length === 0) { alert('Agregá al menos un servicio.'); return; }
-
-      try {
-        const tmResult = await apiPost('crearTicketMulti', {
-          codigo:        codigo,
-          nombre:        nombre,
-          prioridad:     'Normal',
-          observaciones: obs,
-          areas:         areasMultiGA,
-          secuencia:     window._secuencia.map(s => s.area)
-        });
-        if (tmResult && tmResult.success) {
-          window._arrPromo = null;
-          _arrPromos = [];
-          document.getElementById('serviciosAdicionalesContainer').innerHTML = '';
-          _numServiciosAdicionales = 0;
-          simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
-          alert('✅ Ticket multi-servicio creado (' + tmResult.id + ')');
-          setTimeout(() => { show('mikaelaHome'); }, 400);
-        } else {
-          alert('Error al crear ticket multi: ' + (tmResult?.message || 'Error'));
-        }
-      } catch(err) {
-        alert('Error de conexión: ' + err.message);
-      }
+    // ── USAR FORMULARIO TM UNIFICADO (asignación directa) ────────────────
+    const areasMultiGA = buildTMAreasFromForm();
+    if (areasMultiGA.length === 0) {
+      alert('Agregá al menos un servicio con área y servicio seleccionado.');
       return;
     }
-    // ── FIN TICKET MULTI ─────────────────────────────────────
 
+    if (areasMultiGA.length === 1 && areasMultiGA[0].tipo === 'normal') {
+      // Servicio simple con asignación directa
+      const aGA = areasMultiGA[0];
+      try {
+        const result = await apiPost('addServicioNormal', {
+          codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
+          area: aGA.area, prioridad: 'Normal', observaciones: obs,
+          esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
+        });
+        if (result && result.success) {
+          initFormTM();
+          simulateNotif('staff', 'Nueva clienta asignada a ' + chica, nombre + ' · ' + aGA.tentativo, isTop);
+          alert('✅ Clienta asignada a ' + chica);
+          setTimeout(() => { show('mikaelaHome'); }, 400);
+        } else {
+          alert('Error: ' + (result?.error || result?.message || 'Error'));
+        }
+      } catch(err) { alert('Error de conexión: ' + err.message); }
+      return;
+    }
+
+    // Multi-área → TM con asignación directa
     try {
-      const tienePromoGA = promo !== null;
-      const accionGA = tienePromoGA ? 'addServicioPromo' : 'addServicioNormal';
+      const tmResult = await apiPost('crearTicketMulti', {
+        codigo: codigo, nombre: nombre, prioridad: 'Normal',
+        observaciones: obs, areas: areasMultiGA,
+        secuencia: window._secuencia.map(s => s.area)
+      });
+      if (tmResult && tmResult.success) {
+        initFormTM();
+        simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
+        alert('✅ Ticket creado (' + tmResult.id + ')');
+        setTimeout(() => { show('mikaelaHome'); }, 400);
+      } else {
+        alert('Error al crear ticket: ' + (tmResult?.message || 'Error'));
+      }
+    } catch(err) { alert('Error de conexión: ' + err.message); }
+    return;
+
+    // Legacy path (no longer reached)
+    try {
+      const tienePromoGA = false;
+      const accionGA = 'addServicioNormal';
       const result = await apiPost(accionGA, postData);
       console.log('📥 Respuesta de ' + accionGA + ':', result);
       
