@@ -1675,6 +1675,8 @@ function handleGetServiciosHoy(params) {
     const porcentaje = area.includes('facial') ? 0.4 : 0.3;
     const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
 
+    const _cLE = claveSvc(row[4], tomadaPor, Number(row[17]||row[12]||0), horaToma);
+    clavesDuplicadas.add(_cLE); // registrar para evitar duplicados desde otras fuentes
     servicios.push({
       nombre: row[4],
       servicio: row[5],
@@ -1769,6 +1771,9 @@ function handleGetServiciosHoy(params) {
       const porcentaje = area.includes('facial') ? 0.4 : 0.3;
       const comision = Math.round(precioMiArea * porcentaje * 100) / 100;
 
+      const _cSP = claveSvc(row[4], tomadaPor, precioMiArea, horaToma);
+      if (clavesDuplicadas.has(_cSP)) continue;
+      clavesDuplicadas.add(_cSP); // registrar para que HistorialOwner no duplique
       servicios.push({
         nombre     : String(row[4]||''),
         servicio   : String(row[5]||''),
