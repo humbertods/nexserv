@@ -3353,12 +3353,14 @@ if ('caches' in window) {
           var miPrecioPromoTM  = miAreaTM ? Number(miAreaTM.precio || 0) : 0;
           var tienePromoEnTM   = miPrecioNormalTM > miPrecioPromoTM && miPrecioPromoTM > 0;
 
-          // ── 2 botones conector de capa (diagrama TM) ──────────────────────────
-          // BTN 1: esta staff sigue — toma el siguiente área ella misma
-          // BTN 2: esta staff termina — el siguiente área queda libre para otra staff
+          // ── 3 botones conector de capa (diagrama TM) ──────────────────────────
+          // BTN A: yo sigo con el siguiente servicio del TM
+          // BTN B: el siguiente servicio va a otra staff de la misma área
+          // BTN C: terminé todo lo mío — enviar a cobro con Mikaela ahora
           var btnsBaseTM = ''
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">🔗 Terminé mi parte — yo sigo con: ' + lbl + '</button>'
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:2px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--accent);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">↗️ Terminé mi parte — pasar ' + lbl + ' a otra staff</button>';
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-deep));border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">🔗 Yo sigo — tomar ahora: ' + lbl + '</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--bg-card);border:2px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--accent);" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">↗️ Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
+            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           if (tienePromoEnTM) {
             btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — tomar todo el valor ($' + miPrecioNormalTM + ')</button>'
               + btnsBaseTM;
@@ -12703,9 +12705,11 @@ if ('caches' in window) {
         await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
         if (r.todasCompletadas) {
-          showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Comisión: $' + comisionMu + ' · Enviada a cobrar');
+          // FIX: si todas las áreas quedaron completas, la clienta pasa a cobro con Mikaela
+          // (aunque se haya usado el botón "pasar a otra staff" — el sistema detecta que ya no hay más)
+          showToast('✅ Multi-servicio completo · $' + totalHechoMu + ' · Enviado a cobrar con Mikaela');
         } else {
-          showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Tu comisión: $' + comisionMu + ' · Siguiente: ' + (r.siguienteArea || 'siguiente área'));
+          showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Tu comisión: $' + comisionMu + ' · Sigue: ' + (r.siguienteArea || 'siguiente área') + ' en lista de espera');
         }
       } else {
         alert('Error: ' + r.message);
@@ -12767,16 +12771,24 @@ if ('caches' in window) {
           activeClients[user.name].splice(slot - 1, 1);
           updateCapacityUI(user.name);
         }
-        // Calcular comisión de la última staff (usando copia guardada antes de limpiar)
         const totalFinal2 = svcsParaComision.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
         const pctFinal = (user && user.area === 'facial') ? 0.4 : 0.3;
         const comisionFinal = Math.round(totalFinal2 * pctFinal * 100) / 100;
         const svcFinalNombre = svcsParaComision.map(function(s){ return s.name; }).join(' + ') || 'Servicio';
 
+        if (r.todasCompletadas) {
+          // ── TODAS las áreas completadas → clienta pasa a "Por cobrar" con Mikaela ──
+          // El TM ya está marcado como "Por cobrar" en el backend.
+          // Solo mostrar toast y volver al home — Mikaela lo verá en su sección "Por cobrar".
+          showToast('✅ Multi-servicio completo · $' + totalFinal2 + ' · Enviado a cobrar con Mikaela');
+        } else {
+          // Aún quedan áreas → la clienta vuelve a lista de espera para la siguiente staff
+          showToast('✅ ' + svcFinalNombre + ' completado · Sigue: ' + (r.siguienteArea || 'siguiente área'));
+        }
+
         show('staffHome');
         await new Promise(res => setTimeout(res, 300));
         loadStaffHome();
-        showToast('✅ ' + svcFinalNombre + ' $' + totalFinal2 + ' · Comisión: $' + comisionFinal + ' · Enviada a cobrar');
       } else {
         alert('Error: ' + r.message);
       }
