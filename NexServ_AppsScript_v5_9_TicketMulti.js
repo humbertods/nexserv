@@ -1627,6 +1627,12 @@ function handleGetServiciosHoy(params) {
   const data = ws.getDataRange().getValues();
   const hoy = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
   const servicios = [];
+  // FIX: deduplicar usando clave compuesta nombre+staff+total+hora para evitar
+  // que el mismo servicio aparezca desde ServicioNormal Y desde HistorialOwner
+  const clavesDuplicadas = new Set();
+  function claveSvc(nombre, staff, total, hora) {
+    return String(nombre||'').trim() + '|' + String(staff||'').trim() + '|' + String(total||0) + '|' + String(hora||'').substring(0,5);
+  }
 
   for (let i = 3; i < data.length; i++) {
     const row = data[i];
@@ -1713,6 +1719,8 @@ function handleGetServiciosHoy(params) {
       const porcentaje = area.includes('facial') ? 0.4 : 0.3;
       const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
 
+      const _cN = claveSvc(row[4], tomadaPor, Number(row[16]||row[12]||0), horaToma);
+      clavesDuplicadas.add(_cN); // registrar para que HistorialOwner no duplique
       servicios.push({
         nombre     : String(row[4]||''),
         servicio   : String(row[5]||''),
@@ -1806,6 +1814,10 @@ function handleGetServiciosHoy(params) {
       var horaH = rowH[1] instanceof Date
         ? Utilities.formatDate(rowH[1], 'America/Guayaquil', 'HH:mm')
         : String(rowH[1] || '');
+      // FIX: deduplicar — no agregar si ya existe desde ServicioNormal/SP/LE
+      const _cH = claveSvc(rowH[3], staffH, Number(rowH[8]||0), horaH);
+      if (clavesDuplicadas.has(_cH)) continue;
+      clavesDuplicadas.add(_cH);
       servicios.push({
         nombre      : String(rowH[3] || ''),
         servicio    : String(rowH[5] || ''),
