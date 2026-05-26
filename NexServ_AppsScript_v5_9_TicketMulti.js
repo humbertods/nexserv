@@ -2250,6 +2250,41 @@ function handleUpdateServiciosAtencion(data) {
     }
   } catch(eP) {}
 
+  // Intentar en TicketMulti (tickets TM-)
+  try {
+    const wsTM = getTMSheet();
+    const rowsTM = wsTM.getRange(3, 1, Math.max(1, wsTM.getLastRow() - 2), 37).getValues();
+    for (let i = 0; i < rowsTM.length; i++) {
+      const tmId = String(rowsTM[i][0] || '').trim();
+      if (!tmId.startsWith('TM-')) continue;
+      const matchId = data.idEspera && tmId === String(data.idEspera).trim();
+      const tmNombre = String(rowsTM[i][2] || '').trim();
+      const matchN = tmNombre === data.clienteNombre;
+      if (!matchId && !matchN) continue;
+
+      // Encontrar el área de esta staff en el TM y actualizar tentativo + precio
+      const rowNum = i + 3;
+      for (let a = 0; a < 4; a++) {
+        const base = TM_AREA_COL[a];
+        const tent = String(rowsTM[i][base] || '').trim();
+        const staffEnArea = String(rowsTM[i][base + 2] || '').trim();
+        const estadoArea = String(rowsTM[i][base + 3] || '').toLowerCase();
+        if (!tent) continue;
+        if (staffEnArea === data.chicaNombre && estadoArea === 'en servicio') {
+          // Actualizar tentativo: mantener el prefijo "area||" y actualizar el servicio
+          const tentParts = tent.split('||');
+          const areaPrefix = tentParts[0] || '';
+          const newTent = areaPrefix + '||' + (data.servicios || tentParts[1] || tent);
+          wsTM.getRange(rowNum, base + 1).setValue(newTent); // col base (0-indexed) = base+1 (1-indexed)
+          // Actualizar precio en TM_PRECIO_COL
+          const aIdx = TM_AREA_COL.indexOf(base);
+          if (aIdx >= 0) wsTM.getRange(rowNum, TM_PRECIO_COL[aIdx] + 1).setValue(Number(data.total || 0));
+          return { success: true };
+        }
+      }
+    }
+  } catch(eTM) {}
+
   // Fallback: buscar en ListaEspera (tickets LE-)
   const ws = getSheet('ListaEspera');
   const allData = ws.getDataRange().getValues();
