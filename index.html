@@ -9263,12 +9263,59 @@ if ('caches' in window) {
     if (!sel || !sel.value) return;
     const d = JSON.parse(sel.value);
     const svc = _tmServicios.find(s => s.idx === idx);
-    if (svc) { svc.servicio = d.nombre; svc.precio = d.precio; svc.precioNormal = d.regular || d.precio; svc._division = d.division; }
+    if (!svc) return;
+
+    svc.servicio = d.nombre;
+    svc.precio = d.precio;
+    svc.precioNormal = d.regular || d.precio;
+    svc._division = d.division;
 
     const AREA_KEY_LABELS = {
       cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas',
       retiro_lifting: 'Lifting / Retiro', facial: 'Facial'
     };
+
+    // Si la promo tiene división multi-área:
+    // 1. Mostrar las áreas en los botones de secuencia directamente
+    // 2. NO crear slots adicionales — la promo se maneja como TM internamente
+    if (d.division && d.division.length > 1) {
+      const divAreas = d.division.map(dv => AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')));
+      const uniqAreas = [...new Set(divAreas)];
+      // Actualizar botones de secuencia con las áreas del combo
+      const container = document.getElementById('tmSecuenciaBtns');
+      if (container) {
+        const LABELS = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
+        container.innerHTML = uniqAreas.map(a =>
+          `<button onclick="addAreaSecuencia('${a}')" style="padding:8px 14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">+ ${LABELS[a]||a}</button>`
+        ).join('');
+      }
+      // Guardar la división en el svc para que buildTMAreasFromForm la use
+      svc._isComboMultiArea = true;
+      svc._comboAreas = d.division.map((dv, i) => ({
+        area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
+        tentativo: d.nombre,
+        precio: Number(dv.monto || 0),
+        precioNormal: Number(dv.monto || 0),
+        tipo: 'promo'
+      }));
+
+      // Mostrar precio total del combo (se dividirá al crear el TM)
+      const pd = document.getElementById('tmPrecioDisplay-' + idx);
+      if (pd) {
+        pd.innerHTML = '🎁 Combo multi-área: $' + d.precio +
+          d.division.map(dv => {
+            const ak = AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || ''));
+            return `<div style="font-size:11px;font-weight:600;color:var(--ink-soft);margin-top:3px;">• ${AREA_KEY_LABELS[ak]||ak}: $${dv.monto||0}</div>`;
+          }).join('');
+        pd.style.display = 'block';
+      }
+      const aviso = document.getElementById('tmPromoAviso');
+      if (aviso) aviso.style.display = 'block';
+      tmActualizarResumen();
+      return; // no ejecutar el resto
+    }
+
+    // Promo simple (1 sola área) — flujo normal
 
     // FIX: si la promo tiene división multi-área, auto-detectar y llenar las áreas
     if (d.division && d.division.length > 0) {
@@ -9276,14 +9323,25 @@ if ('caches' in window) {
       const divs = [...d.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
 
       // Llenar el área del slot actual con la primera división
+      // Detectar área de la primera división
       const area1Key = AREA_KEY_FROM_DIV(String(divs[0].area || divs[0].servicio || ''));
       const area1Label = AREA_KEY_LABELS[area1Key] || 'Cejas';
       const areaEl1 = document.getElementById('tmArea-' + idx);
+
+      // Si no hay área seleccionada, llenarla desde la división
       if (areaEl1 && !svc.area) {
         areaEl1.value = area1Label;
         svc.area = area1Label;
         svc.areaKey = area1Key;
-        onTmAreaChange(idx); // cargar servicios del área
+        onTmAreaChange(idx);
+      }
+
+      // FIX: si hay área seleccionada, encontrar la división que corresponde a esa área
+      // y usar su monto (no el precio total del combo)
+      let divMatchIdx = 0; // por defecto la primera división
+      if (svc.areaKey) {
+        const matchIdx = divs.findIndex(dv => AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')) === svc.areaKey);
+        if (matchIdx >= 0) divMatchIdx = matchIdx;
       }
 
       // Si hay más divisiones, crear slots adicionales automáticamente
@@ -9326,19 +9384,19 @@ if ('caches' in window) {
         }
       }
 
-      // Actualizar precio del slot actual con el monto de su división específica
-      const monto1 = Number(divs[0].monto || 0);
-      if (monto1 > 0 && svc) {
-        svc.precio = monto1;
-        svc.precioNormal = monto1;
+      // Actualizar precio del slot actual con el monto de SU división específica
+      const montoMio = Number(divs[divMatchIdx].monto || 0) || Number(divs[0].monto || 0);
+      if (montoMio > 0 && svc) {
+        svc.precio = montoMio;
+        svc.precioNormal = montoMio;
       }
 
-      // Mostrar info de la división en el precio display
+      // Mostrar info: área de esta staff y su precio
+      const labelMio = AREA_KEY_LABELS[AREA_KEY_FROM_DIV(String(divs[divMatchIdx].area || divs[divMatchIdx].servicio || ''))] || area1Label;
       const pd = document.getElementById('tmPrecioDisplay-' + idx);
       if (pd) {
-        const labelArea = area1Label || 'Área principal';
-        pd.innerHTML = '🎁 <b>' + labelArea + '</b>: $' + (monto1 || d.precio) +
-          ' <span style="font-size:11px;color:var(--ink-soft);">(combo: $' + d.precio + ' · regular: $' + (d.regular || d.precio) + ')</span>';
+        pd.innerHTML = '🎁 <b>' + labelMio + '</b>: $' + montoMio +
+          ' <span style="font-size:11px;color:var(--ink-soft);">(combo total: $' + d.precio + ')</span>';
         pd.style.display = 'block';
       }
     } else {
@@ -9385,17 +9443,33 @@ if ('caches' in window) {
     if (areas.length === 0) container.innerHTML = '<span style="font-size:12px;color:var(--ink-faint);">Primero agregá servicios</span>';
   }
 
-  // Override goToList/goAssign to use _tmServicios directly
+  // Build TM areas from form - expands combo multi-area promos into individual areas
   function buildTMAreasFromForm() {
-    return _tmServicios
-      .filter(s => s.area && s.servicio)
-      .map(s => ({
-        tentativo:    s.servicio,
-        area:         s.areaKey,
-        precio:       s.precio,
-        precioNormal: s.precioNormal,
-        tipo:         s.tipo
-      }));
+    const result = [];
+    _tmServicios.filter(s => s.servicio).forEach(s => {
+      if (s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0) {
+        // Combo multi-área: expandir en slots individuales por área
+        s._comboAreas.forEach(ca => {
+          result.push({
+            tentativo:    ca.tentativo || s.servicio,
+            area:         ca.area,
+            precio:       ca.precio,
+            precioNormal: ca.precioNormal || ca.precio,
+            tipo:         'promo'
+          });
+        });
+      } else if (s.area) {
+        // Servicio simple o promo de 1 área
+        result.push({
+          tentativo:    s.servicio,
+          area:         s.areaKey,
+          precio:       s.precio,
+          precioNormal: s.precioNormal,
+          tipo:         s.tipo
+        });
+      }
+    });
+    return result;
   }
   window.buildTMAreasFromForm = buildTMAreasFromForm;
   window.initFormTM = initFormTM;
@@ -9687,15 +9761,21 @@ if ('caches' in window) {
   //   - tipo='normal' con adicionales → área 1 = servicio normal, áreas 2-N = adicionales
   //
   // Para promos: el área se deduce de la división de mayor monto (NO del areaKey del form).
+  // Función global para detectar areaKey desde texto de área/servicio
+  function AREA_KEY_FROM_DIV(raw) {
+    const s = String(raw || '').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, c=>c==='é'?'e':'n');
+    if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
+    if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
+    if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
+    return 'cejas';
+  }
+  window.AREA_KEY_FROM_DIV = AREA_KEY_FROM_DIV;
+
   // Para servicios normales: el área viene del selector de área.
   // ────────────────────────────────────────────────────────────────────────────
   function buildAreasMultiTM(tipo, areaKey, servicio, precio, promo) {
-    const AREA_KEY_FROM_DIV = function(raw) {
-      const s = String(raw || '').toLowerCase().replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, c=>c==='é'?'e':'n');
-      if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
-      if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
-      if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
-      return 'cejas';
+    // AREA_KEY_FROM_DIV ahora es función global
+    {
     };
 
     const getPromoArea = function(p) {
