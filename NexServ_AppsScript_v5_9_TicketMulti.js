@@ -3597,7 +3597,42 @@ function handleEliminarServicio(data) {
       }
     }
 
-    // 2. Eliminar de TicketMulti si es TM
+    // 2. Eliminar de ServicioNormal y ServicioPromo (lo que ve la staff en "Servicios de hoy")
+    try {
+      // ServicioNormal
+      const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
+      const rowsN = wsN.getDataRange().getValues();
+      for (let i = rowsN.length - 1; i >= 1; i--) {
+        const rFechaN = rowsN[i][1] instanceof Date
+          ? Utilities.formatDate(rowsN[i][1], tz, 'dd/MM/yyyy')
+          : String(rowsN[i][1] || '');
+        const rClienteN = String(rowsN[i][4] || '').trim().toLowerCase();
+        const rStaffN   = String(rowsN[i][9] || '').trim().toLowerCase();
+        const matchN = rFechaN === fecha &&
+          (rClienteN.includes(cliente) || cliente.includes(rClienteN)) &&
+          (staff === '' || rStaffN.includes(staff) || staff.includes(rStaffN));
+        if (matchN) { wsN.deleteRow(i + 1); if (!esTM) break; }
+      }
+    } catch(eN2) {}
+
+    try {
+      // ServicioPromo
+      const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
+      const rowsP = wsP.getDataRange().getValues();
+      for (let i = rowsP.length - 1; i >= 1; i--) {
+        const rFechaP = rowsP[i][1] instanceof Date
+          ? Utilities.formatDate(rowsP[i][1], tz, 'dd/MM/yyyy')
+          : String(rowsP[i][1] || '');
+        const rClienteP = String(rowsP[i][4] || '').trim().toLowerCase();
+        const rStaffP   = String(rowsP[i][9] || '').trim().toLowerCase();
+        const matchP = rFechaP === fecha &&
+          (rClienteP.includes(cliente) || cliente.includes(rClienteP)) &&
+          (staff === '' || rStaffP.includes(staff) || staff.includes(rStaffP));
+        if (matchP) { wsP.deleteRow(i + 1); if (!esTM) break; }
+      }
+    } catch(eP2) {}
+
+    // 3. Eliminar de TicketMulti si es TM
     if (esTM && tmId) {
       try {
         const wsTM = getTMSheet();
@@ -3611,7 +3646,7 @@ function handleEliminarServicio(data) {
       } catch(eTM2) {}
     }
 
-    // 3. Eliminar de CierresPagos
+    // 4. Eliminar de CierresPagos
     try {
       const wsPagos = getSheet('CierresPagos');
       const pagosData = wsPagos.getDataRange().getValues();
@@ -3629,7 +3664,7 @@ function handleEliminarServicio(data) {
       }
     } catch(e) {}
 
-    // 4. Revertir comisiones
+    // 5. Revertir comisiones
     try {
       const wsComm = getSheet('Comisiones');
       const commData = wsComm.getDataRange().getValues();
