@@ -4789,23 +4789,28 @@ function handleCompletarYTomarSiguienteAreaTM(data) {
   if (resultCompletar.todasCompletadas) return resultCompletar;
   try {
     var ws   = getTMSheet();
-    var rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
+    // FIX: re-leer el sheet DESPUÉS de que handleCompletarAreaTicketMulti hizo sus cambios
+    // Si usamos rows stale, el slot recién completado todavía aparece como "En servicio"
+    // y podemos activar el mismo slot en vez del siguiente
+    var rowsFresh = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
     var hora = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-    for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== data.idEspera) continue;
+    for (var i = 0; i < rowsFresh.length; i++) {
+      if (String(rowsFresh[i][0]).trim() !== data.idEspera) continue;
       var rowNum = i + 3;
       for (var a = 0; a < 4; a++) {
         var base = TM_AREA_COL[a];
-        var tent = String(rows[i][base] || '').trim();
+        var tent = String(rowsFresh[i][base] || '').trim();
         if (!tent) continue;
-        if (String(rows[i][base + 3] || '').trim() !== 'Esperando') continue;
+        var estadoActual = String(rowsFresh[i][base + 3] || '').trim();
+        // Solo activar slots que están ESPERANDO (no los ya En servicio o Completado)
+        if (estadoActual !== 'Esperando') continue;
         ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre || '');
         ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');
         ws.getRange(rowNum, base + 4 + 1).setValue(hora);
         ws.getRange(rowNum, 6).setValue('En servicio');
         var tentLabel = tent.indexOf('||') !== -1 ? tent.split('||')[1] : tent;
         return { success: true, todasCompletadas: false,
-          siguienteArea: tentLabel, siguientePrecio: Number(rows[i][TM_PRECIO_COL[a]] || 0),
+          siguienteArea: tentLabel, siguientePrecio: Number(rowsFresh[i][TM_PRECIO_COL[a]] || 0),
           areasPendientes: resultCompletar.areasPendientes };
       }
       break;
