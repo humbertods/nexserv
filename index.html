@@ -12411,6 +12411,11 @@ if ('caches' in window) {
   }
 
   async function goToList() {
+    // Guard: evitar doble ejecución
+    if (window._goToListRunning) return;
+    window._goToListRunning = true;
+    setTimeout(() => { window._goToListRunning = false; }, 3000);
+
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
@@ -12646,6 +12651,11 @@ if ('caches' in window) {
   }
 
   async function goAssign(chica) {
+    // Guard: evitar doble ejecución por touch+click o doble tap
+    if (window._goAssignRunning) return;
+    window._goAssignRunning = true;
+    setTimeout(() => { window._goAssignRunning = false; }, 3000);
+
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
