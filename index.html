@@ -9264,8 +9264,89 @@ if ('caches' in window) {
     const d = JSON.parse(sel.value);
     const svc = _tmServicios.find(s => s.idx === idx);
     if (svc) { svc.servicio = d.nombre; svc.precio = d.precio; svc.precioNormal = d.regular || d.precio; svc._division = d.division; }
-    const pd = document.getElementById('tmPrecioDisplay-' + idx);
-    if (pd) { pd.textContent = '🎁 $' + d.precio + ' (precio normal $' + (d.regular || d.precio) + ')'; pd.style.display = 'block'; }
+
+    const AREA_KEY_LABELS = {
+      cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas',
+      retiro_lifting: 'Lifting / Retiro', facial: 'Facial'
+    };
+
+    // FIX: si la promo tiene división multi-área, auto-detectar y llenar las áreas
+    if (d.division && d.division.length > 0) {
+      // Ordenar por monto descendente → área principal primero
+      const divs = [...d.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
+
+      // Llenar el área del slot actual con la primera división
+      const area1Key = AREA_KEY_FROM_DIV(String(divs[0].area || divs[0].servicio || ''));
+      const area1Label = AREA_KEY_LABELS[area1Key] || 'Cejas';
+      const areaEl1 = document.getElementById('tmArea-' + idx);
+      if (areaEl1 && !svc.area) {
+        areaEl1.value = area1Label;
+        svc.area = area1Label;
+        svc.areaKey = area1Key;
+        onTmAreaChange(idx); // cargar servicios del área
+      }
+
+      // Si hay más divisiones, crear slots adicionales automáticamente
+      for (let i = 1; i < Math.min(divs.length, 3); i++) {
+        const divArea = String(divs[i].area || divs[i].servicio || '');
+        const areaKey = AREA_KEY_FROM_DIV(divArea);
+        const areaLabel = AREA_KEY_LABELS[areaKey] || '';
+        if (!areaLabel) continue;
+        // Solo crear si no hay ya un slot con esta área y promo
+        const yaExiste = _tmServicios.some(s => s.idx !== idx && s.areaKey === areaKey && s.tipo === 'promo');
+        if (!yaExiste) {
+          addServicioTM(); // crea nuevo slot
+          const newIdx = _tmContador; // el último creado
+          const newAreaEl = document.getElementById('tmArea-' + newIdx);
+          if (newAreaEl) {
+            newAreaEl.value = areaLabel;
+            const newSvc = _tmServicios.find(s => s.idx === newIdx);
+            if (newSvc) { newSvc.area = areaLabel; newSvc.areaKey = areaKey; }
+            onTmAreaChange(newIdx);
+            // Preseleccionar promo en el nuevo slot
+            setTimeout(() => {
+              setTipoTM(newIdx, 'promo');
+              setTimeout(async () => {
+                await cargarPromasTM(newIdx);
+                const newPromoSel = document.getElementById('tmPromoSel-' + newIdx);
+                if (newPromoSel) {
+                  // Buscar la misma promo en el nuevo selector
+                  for (const opt of newPromoSel.options) {
+                    if (opt.value) {
+                      try {
+                        const pd2 = JSON.parse(opt.value);
+                        if (pd2.nombre === d.nombre) { newPromoSel.value = opt.value; onTmPromoChange(newIdx); break; }
+                      } catch(e) {}
+                    }
+                  }
+                }
+              }, 300);
+            }, 100);
+          }
+        }
+      }
+
+      // Actualizar precio del slot actual con el monto de su división específica
+      const monto1 = Number(divs[0].monto || 0);
+      if (monto1 > 0 && svc) {
+        svc.precio = monto1;
+        svc.precioNormal = monto1;
+      }
+
+      // Mostrar info de la división en el precio display
+      const pd = document.getElementById('tmPrecioDisplay-' + idx);
+      if (pd) {
+        const labelArea = area1Label || 'Área principal';
+        pd.innerHTML = '🎁 <b>' + labelArea + '</b>: $' + (monto1 || d.precio) +
+          ' <span style="font-size:11px;color:var(--ink-soft);">(combo: $' + d.precio + ' · regular: $' + (d.regular || d.precio) + ')</span>';
+        pd.style.display = 'block';
+      }
+    } else {
+      // Promo sin división — mostrar precio normal
+      const pd = document.getElementById('tmPrecioDisplay-' + idx);
+      if (pd) { pd.textContent = '🎁 $' + d.precio + ' (precio normal $' + (d.regular || d.precio) + ')'; pd.style.display = 'block'; }
+    }
+
     // Mostrar aviso promos
     const aviso = document.getElementById('tmPromoAviso');
     if (aviso) aviso.style.display = 'block';
