@@ -1631,7 +1631,9 @@ function handleGetServiciosHoy(params) {
   // que el mismo servicio aparezca desde ServicioNormal Y desde HistorialOwner
   const clavesDuplicadas = new Set();
   function claveSvc(nombre, staff, total, hora) {
-    return String(nombre||'').trim() + '|' + String(staff||'').trim() + '|' + String(total||0) + '|' + String(hora||'').substring(0,5);
+    // FIX: truncar hora a los primeros 4 chars (HH:M) para capturar entradas con
+    // minutos ligeramente distintos (horaToma vs horaCobro) del mismo servicio
+    return String(nombre||'').trim() + '|' + String(staff||'').trim() + '|' + String(total||0) + '|' + String(hora||'').substring(0,4);
   }
 
   for (let i = 3; i < data.length; i++) {
