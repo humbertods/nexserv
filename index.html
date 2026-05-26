@@ -3306,11 +3306,11 @@ if ('caches' in window) {
     if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
 
     const AREA_FILTER_MAP = {
+      // FIX: cejas NO incluye 'pestanas'/'pestañas' puras — solo retiro/lifting de pestañas
+      // (que es un servicio que cejas staff puede hacer, distinto de las extensiones de pestañas)
       'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
-                   'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas', 'retiro_lifting',
-                   'pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen',
-                   'pelo a pelo', 'clasicas', 'clásicas', 'efecto'],
-      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen',
+                   'retiro de lifting', 'retiro de pestañas', 'retiro_lifting', 'retiro'],
+      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen',
                    'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura'],
       'facial':   ['facial', 'hidra', 'limpieza']
     };
