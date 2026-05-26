@@ -2430,12 +2430,9 @@ function handleAddVisitaFacial(data) {
       data.obs           || ''
     ]);
 
-    // Actualizar comisión de Laura (facial = 40%)
-    try {
-      if (data.staff && Number(data.precio) > 0) {
-        updateComision(data.staff, Number(data.precio));
-      }
-    } catch(ec) {}
+    // NOTA: updateComision NO se llama aquí.
+    // La comisión se registra en handleConfirmarCobroNormal cuando Mikaela cobra.
+    // Llamarla aquí causaba duplicados (se contaba 2 veces por servicio facial).
 
     return { success: true };
   } catch(e) {
