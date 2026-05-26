@@ -9342,6 +9342,8 @@ if ('caches' in window) {
       }
       const aviso = document.getElementById('tmPromoAviso');
       if (aviso) aviso.style.display = 'block';
+      // FIX: actualizar botones de secuencia con TODAS las áreas del combo
+      tmActualizarSecuenciaBtns();
       tmActualizarResumen();
       return; // no ejecutar el resto
     }
@@ -9466,7 +9468,16 @@ if ('caches' in window) {
   function tmActualizarSecuenciaBtns() {
     const container = document.getElementById('tmSecuenciaBtns');
     if (!container) return;
-    const areas = [...new Set(_tmServicios.filter(s => s.areaKey).map(s => s.areaKey))];
+    // Collect areas from slots AND from _comboAreas of multi-area combos
+    const areaSet = new Set();
+    _tmServicios.forEach(s => {
+      if (s.areaKey) areaSet.add(s.areaKey);
+      // For combos: also add all areas from _comboAreas
+      if (s._isComboMultiArea && s._comboAreas) {
+        s._comboAreas.forEach(ca => { if (ca.area) areaSet.add(ca.area); });
+      }
+    });
+    const areas = [...areaSet];
     const LABELS = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
     container.innerHTML = areas.map(a =>
       `<button onclick="addAreaSecuencia('${a}')" style="padding:8px 14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">+ ${LABELS[a]||a}</button>`
