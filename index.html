@@ -3452,15 +3452,22 @@ if ('caches' in window) {
     // slotActual: funciona tanto en updateFinishButtons (donde slot1 existe) como en finishSlot1
     const slotActual = (typeof slot1 !== 'undefined') ? (slot1 ? 1 : 2) : 1;
 
+    // FIX: si la promo tiene solo 1 división (servicio de una sola área),
+    // mostrar "Finalizar servicio" normal, no el botón de combo multi-área
+    const esPromoMultiArea = promo.division && promo.division.length > 1;
+
     let html = '';
-    if (puedeTodo) {
+    if (!esPromoMultiArea) {
+      // Promo de 1 sola área → botón simple de finalizar
+      html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
+    } else if (puedeTodo) {
       if (promasExtraPendientes.length > 0) {
-        // Hay otra promo independiente pendiente (ej: promo 2 pestañas+cejas)
+        // Hay otra promo independiente pendiente
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente promo)</button>`;
       } else {
-        // No hay promasExtra — promo de una sola área o ya es la última
+        // Promo multi-área que esta staff puede hacer toda
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Terminé todo el combo — mandar a cobrar</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndContinueSameStaff()">➡️ Siguiente servicio del combo</button>`;
       }
