@@ -9241,7 +9241,18 @@ if ('caches' in window) {
     const area = areaEl ? areaEl.value : '';
     const areaKey = TM_AREA_LABELS[area] || '';
     const svc = _tmServicios.find(s => s.idx === idx);
-    if (svc) { svc.area = area; svc.areaKey = areaKey; svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0; }
+    if (svc) {
+      svc.area = area; svc.areaKey = areaKey;
+      svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0;
+      // Si tenía un combo, resetear para que se reordene con la nueva área
+      if (svc._isComboMultiArea) {
+        svc._isComboMultiArea = false;
+        svc._comboAreas = null;
+        // Resetear secuencia para que se reconstruya con el nuevo orden
+        window._secuencia = [];
+        renderSecuencia();
+      }
+    }
 
     // Cargar servicios normales
     const sel = document.getElementById('tmServicioSel-' + idx);
@@ -9310,9 +9321,32 @@ if ('caches' in window) {
     // 1. Mostrar las áreas en los botones de secuencia directamente
     // 2. NO crear slots adicionales — la promo se maneja como TM internamente
     if (d.division && d.division.length > 1) {
-      const divAreas = d.division.map(dv => AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')));
+      // FIX: si Mikaela ya seleccionó un área, ese área va PRIMERO en _comboAreas
+      // Ordenar divisiones: la que coincide con el área seleccionada va primero
+      const selectedAreaKey = svc.areaKey || '';
+      const divsOrdenadas = [...d.division].sort((a, b) => {
+        const aKey = AREA_KEY_FROM_DIV(String(a.area || a.servicio || ''));
+        const bKey = AREA_KEY_FROM_DIV(String(b.area || b.servicio || ''));
+        if (selectedAreaKey) {
+          if (aKey === selectedAreaKey && bKey !== selectedAreaKey) return -1;
+          if (bKey === selectedAreaKey && aKey !== selectedAreaKey) return 1;
+        }
+        return 0; // mantener orden original si no hay match
+      });
+
+      svc._isComboMultiArea = true;
+      svc._comboAreas = divsOrdenadas.map(dv => ({
+        area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
+        tentativo: d.nombre,
+        precio: Number(dv.monto || 0),
+        precioNormal: Number(dv.monto || 0),
+        tipo: 'promo'
+      }));
+
+      const divAreas = svc._comboAreas.map(ca => ca.area);
       const uniqAreas = [...new Set(divAreas)];
-      // Actualizar botones de secuencia con las áreas del combo
+
+      // Actualizar botones de secuencia con las áreas del combo EN EL ORDEN CORRECTO
       const container = document.getElementById('tmSecuenciaBtns');
       if (container) {
         const LABELS = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
@@ -9320,15 +9354,16 @@ if ('caches' in window) {
           `<button onclick="addAreaSecuencia('${a}')" style="padding:8px 14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;">+ ${LABELS[a]||a}</button>`
         ).join('');
       }
-      // Guardar la división en el svc para que buildTMAreasFromForm la use
-      svc._isComboMultiArea = true;
-      svc._comboAreas = d.division.map((dv, i) => ({
-        area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
-        tentativo: d.nombre,
-        precio: Number(dv.monto || 0),
-        precioNormal: Number(dv.monto || 0),
-        tipo: 'promo'
-      }));
+
+      // FIX: auto-agregar la secuencia según el orden detectado (sin que Mikaela tenga que tocar los botones)
+      // Si Mikaela ya definió una secuencia manual, no sobreescribir
+      if (!window._secuencia || window._secuencia.length === 0) {
+        window._secuencia = [];
+        uniqAreas.forEach(a => {
+          const LABELS = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
+          addAreaSecuencia(a);
+        });
+      }
 
       // Mostrar precio total del combo (se dividirá al crear el TM)
       const pd = document.getElementById('tmPrecioDisplay-' + idx);
