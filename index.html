@@ -3787,7 +3787,34 @@ if ('caches' in window) {
                 const atencion = [...(r.enServicio||[])].find(a =>
                   a.nombre === clientName || normalizeClientKey(a.nombre) === clientKey
                 );
-                if (atencion && atencion.promoNombre) {
+
+                // FIX: si es ticket TM, restaurar botones desde getTicketMulti
+                const idEspera1 = window._as1IdEspera || '';
+                if (idEspera1.startsWith('TM-')) {
+                  try {
+                    const tmR = await apiGet('getTicketMulti');
+                    if (tmR.success) {
+                      const tm = (tmR.activos || []).find(t => t.idEspera === idEspera1);
+                      if (tm) {
+                        window._tmAreasActuales = tm.areas || [];
+                        // Restaurar slotServices con los servicios del área de esta staff
+                        const user1 = window.currentUser;
+                        const myArea1 = user1?.area || 'cejas';
+                        const miArea = (tm.areas || []).find(a =>
+                          String(a.area||'').toLowerCase().includes(myArea1.toLowerCase().substring(0,4)) &&
+                          String(a.estado||'').toLowerCase() === 'en servicio'
+                        );
+                        if (miArea && (!slotServices[1] || slotServices[1].length === 0)) {
+                          slotServices[1] = [{ name: miArea.tentativo || '', price: miArea.precio || 0, area: myArea1 }];
+                          renderServicesForSlot(1);
+                          document.getElementById('as1Total').textContent = '$' + (miArea.precio || 0);
+                          document.getElementById('as1SvcCount').textContent = '1';
+                        }
+                        updateFinishButtons(1);
+                      }
+                    }
+                  } catch(eTM) {}
+                } else if (atencion && atencion.promoNombre) {
                   const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
                   if (promoFull) {
                     activePromos[clientKey] = {
@@ -3797,14 +3824,11 @@ if ('caches' in window) {
                       _metadata: { displayName: clientName }
                     };
                     saveActivePromos();
-                    // Actualizar UI con precio correcto
                     const myPrice = getMyPromoPrice(promoFull, window.currentUser?.area || 'cejas');
-                    // Siempre cargar el servicio en slotServices
                     slotServices[1] = [{ name: promoFull.name, price: myPrice, area: window.currentUser?.area || 'cejas' }];
                     renderServicesForSlot(1);
                     document.getElementById('as1Total').textContent = '$' + myPrice;
                     document.getElementById('as1SvcCount').textContent = '1';
-                    // Actualizar botones DESPUÉS de llenar el slot
                     updateFinishButtons(1);
                   }
                 }
