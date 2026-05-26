@@ -4000,9 +4000,17 @@ if ('caches' in window) {
             updateCapacityUI(user.name);
           }
           
-          // Pestañas: cargar ficha rápida
+          // Pestañas: cargar ficha rápida desde el sheet
           if (user.area === 'pestanas') {
-            loadPestFichaQuick(a1.codigo.toLowerCase().replace(/-/g, ''), 1);
+            const _pk3 = a1.codigo.toLowerCase().replace(/-/g, '');
+            apiGet('getFichaPestanas', { codigo: a1.codigo }).then(pr3 => {
+              if (pr3.success && pr3.fichas && pr3.fichas.length > 0) {
+                if (!CLIENT_PROFILES[_pk3]) CLIENT_PROFILES[_pk3] = { name: a1.nombre, code: a1.codigo, pestanas: { fichas: [], history: [] } };
+                if (!CLIENT_PROFILES[_pk3].pestanas) CLIENT_PROFILES[_pk3].pestanas = { fichas: [], history: [] };
+                CLIENT_PROFILES[_pk3].pestanas.fichas = pr3.fichas;
+              }
+              loadPestFichaQuick(_pk3, 1);
+            }).catch(() => loadPestFichaQuick(_pk3, 1));
           }
         }
       } catch (err) {
@@ -4636,7 +4644,17 @@ if ('caches' in window) {
           }
           
           if (user.area === 'pestanas') {
-            loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 1);
+            // FIX: cargar fichas del sheet antes de mostrar el panel
+            const _pestKey1 = a.codigo.toLowerCase().replace(/-/g, '');
+            const _pestCodigo1 = a.codigo;
+            apiGet('getFichaPestanas', { codigo: _pestCodigo1 }).then(pr => {
+              if (pr.success && pr.fichas && pr.fichas.length > 0) {
+                if (!CLIENT_PROFILES[_pestKey1]) CLIENT_PROFILES[_pestKey1] = { name: a.nombre, code: _pestCodigo1, pestanas: { fichas: [], history: [] } };
+                if (!CLIENT_PROFILES[_pestKey1].pestanas) CLIENT_PROFILES[_pestKey1].pestanas = { fichas: [], history: [] };
+                CLIENT_PROFILES[_pestKey1].pestanas.fichas = pr.fichas;
+              }
+              loadPestFichaQuick(_pestKey1, 1);
+            }).catch(() => loadPestFichaQuick(_pestKey1, 1));
           }
 
           // ── MANDAMIENTO #7: facial siempre carga su ficha al abrir clienta ──
@@ -4788,7 +4806,15 @@ if ('caches' in window) {
           }
           
           if (user.area === 'pestanas') {
-            loadPestFichaQuick(a.codigo.toLowerCase().replace(/-/g, ''), 2);
+            const _pk2 = a.codigo.toLowerCase().replace(/-/g, '');
+            apiGet('getFichaPestanas', { codigo: a.codigo }).then(pr2 => {
+              if (pr2.success && pr2.fichas && pr2.fichas.length > 0) {
+                if (!CLIENT_PROFILES[_pk2]) CLIENT_PROFILES[_pk2] = { name: a.nombre, code: a.codigo, pestanas: { fichas: [], history: [] } };
+                if (!CLIENT_PROFILES[_pk2].pestanas) CLIENT_PROFILES[_pk2].pestanas = { fichas: [], history: [] };
+                CLIENT_PROFILES[_pk2].pestanas.fichas = pr2.fichas;
+              }
+              loadPestFichaQuick(_pk2, 2);
+            }).catch(() => loadPestFichaQuick(_pk2, 2));
           }
 
           // ── MANDAMIENTO #7: facial y cejas cargan ficha en slot 2 también ──
@@ -6840,7 +6866,15 @@ if ('caches' in window) {
         document.getElementById('as1SvcCount').textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
         
         if (user.area === 'pestanas') {
-          loadPestFichaQuick(a1.codigo.toLowerCase().replace(/-/g, ''), 1);
+          const _pk4 = a1.codigo.toLowerCase().replace(/-/g, '');
+          apiGet('getFichaPestanas', { codigo: a1.codigo }).then(pr4 => {
+            if (pr4.success && pr4.fichas && pr4.fichas.length > 0) {
+              if (!CLIENT_PROFILES[_pk4]) CLIENT_PROFILES[_pk4] = { name: a1.nombre, code: a1.codigo, pestanas: { fichas: [], history: [] } };
+              if (!CLIENT_PROFILES[_pk4].pestanas) CLIENT_PROFILES[_pk4].pestanas = { fichas: [], history: [] };
+              CLIENT_PROFILES[_pk4].pestanas.fichas = pr4.fichas;
+            }
+            loadPestFichaQuick(_pk4, 1);
+          }).catch(() => loadPestFichaQuick(_pk4, 1));
         }
       } else {
         section.style.display = 'none';
