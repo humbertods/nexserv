@@ -5349,8 +5349,20 @@ if ('caches' in window) {
         const svcs = slotServices[slot2] || [];
         window._currentFacialSvcName = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
         window._currentFacialSvcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
-        // Mostrar ficha rápida en el panel (no abrir modal de visita directo)
-        loadFacialFichaQuick(clientKey, slot2);
+        // FIX: cargar ficha facial del sheet antes de mostrar el panel
+        // Si ya existe ficha en el sheet, mostrarla; si no, mostrar "Sin ficha"
+        if (clientCodigo) {
+          apiGet('getFichaFacial', { codigo: clientCodigo }).then(facRes => {
+            if (facRes.success && facRes.ficha) {
+              if (!CLIENT_PROFILES[clientKey]) CLIENT_PROFILES[clientKey] = { name: clientNombre, code: clientCodigo, facial: {} };
+              if (!CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial = {};
+              CLIENT_PROFILES[clientKey].facial.ficha = facRes.ficha;
+            }
+            loadFacialFichaQuick(clientKey, slot2);
+          }).catch(() => loadFacialFichaQuick(clientKey, slot2));
+        } else {
+          loadFacialFichaQuick(clientKey, slot2);
+        }
       }, 400);
     }
   }
