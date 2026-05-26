@@ -644,22 +644,30 @@ if ('caches' in window) {
 
         <!-- Panel desglose pago mixto -->
         <div id="mixtoPanel" style="display:none;background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:14px;margin-bottom:16px;">
-          <div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Desglosar pago mixto</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div>
-              <label style="font-size:11px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:4px;">💵 Efectivo</label>
-              <input type="number" id="mixtoEfectivo" min="0" step="0.01" placeholder="0"
-                oninput="onMixtoInput('efectivo')"
-                style="width:100%;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px;font-weight:600;color:var(--ink-soft);display:block;margin-bottom:4px;">📱 Transferencia</label>
-              <input type="number" id="mixtoTransferencia" min="0" step="0.01" placeholder="0"
-                oninput="onMixtoInput('transferencia')"
-                style="width:100%;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;">
-            </div>
+          <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Desglosar pago mixto</div>
+          <!-- Fila 1 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
+            <select id="mixtoMetodo1" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">📱 Transferencia</option>
+              <option value="Tarjeta">💳 Tarjeta</option>
+            </select>
+            <input type="number" id="mixtoMonto1" min="0" step="0.01" placeholder="$0.00"
+              oninput="onMixtoInput()"
+              style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
           </div>
-          <div id="mixtoSuma" style="margin-top:8px;font-size:12px;font-weight:700;text-align:center;color:var(--ink-soft);"></div>
+          <!-- Fila 2 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
+            <select id="mixtoMetodo2" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+              <option value="Transferencia">📱 Transferencia</option>
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Tarjeta">💳 Tarjeta</option>
+            </select>
+            <input type="number" id="mixtoMonto2" min="0" step="0.01" placeholder="$0.00"
+              oninput="onMixtoInput()"
+              style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
+          </div>
+          <div id="mixtoSuma" style="font-size:12px;font-weight:700;text-align:center;color:var(--ink-soft);"></div>
         </div>
 
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
@@ -8603,12 +8611,12 @@ if ('caches' in window) {
     document.getElementById('cobrarModal').classList.add('active');
   }
 
-  function onMixtoInput(campo) {
+  function onMixtoInput() {
     const totalEl = document.getElementById('cobrarTotal');
     const total = parseFloat((totalEl?.textContent || '0').replace('$','')) || 0;
-    const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
-    const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
-    const suma = ef + tr;
+    const m1 = parseFloat(document.getElementById('mixtoMonto1')?.value || 0) || 0;
+    const m2 = parseFloat(document.getElementById('mixtoMonto2')?.value || 0) || 0;
+    const suma = Math.round((m1 + m2) * 100) / 100;
     const diff = Math.round((total - suma) * 100) / 100;
     const sumaEl = document.getElementById('mixtoSuma');
     if (sumaEl) {
@@ -8623,19 +8631,11 @@ if ('caches' in window) {
         sumaEl.style.color = 'var(--danger)';
       }
     }
-    // Auto-completar el otro campo si uno está lleno
-    if (campo === 'efectivo' && ef > 0 && diff >= 0) {
-      const trEl = document.getElementById('mixtoTransferencia');
-      if (trEl && (!trEl.value || parseFloat(trEl.value) === 0)) {
-        trEl.value = diff.toFixed(2);
-        onMixtoInput('transferencia');
-      }
-    } else if (campo === 'transferencia' && tr > 0 && diff >= 0) {
-      const efEl = document.getElementById('mixtoEfectivo');
-      if (efEl && (!efEl.value || parseFloat(efEl.value) === 0)) {
-        efEl.value = diff.toFixed(2);
-        onMixtoInput('efectivo');
-      }
+    // Auto-completar fila 2 si fila 1 tiene monto y fila 2 está vacía
+    const m2El = document.getElementById('mixtoMonto2');
+    if (m1 > 0 && diff > 0 && m2El && (!m2El.value || parseFloat(m2El.value) === 0)) {
+      m2El.value = diff.toFixed(2);
+      onMixtoInput();
     }
   }
 
@@ -8655,13 +8655,13 @@ if ('caches' in window) {
       mixtoPanel.style.display = metodo === 'Pago mixto' ? 'block' : 'none';
       if (metodo === 'Pago mixto') {
         // Resetear inputs
-        const ef = document.getElementById('mixtoEfectivo');
-        const tr = document.getElementById('mixtoTransferencia');
-        if (ef) ef.value = '';
-        if (tr) tr.value = '';
-        document.getElementById('mixtoSuma').textContent = 'Ingresá los montos';
-        document.getElementById('mixtoSuma').style.color = 'var(--ink-soft)';
-        setTimeout(() => ef?.focus(), 100);
+        const m1 = document.getElementById('mixtoMonto1');
+        const m2 = document.getElementById('mixtoMonto2');
+        if (m1) m1.value = '';
+        if (m2) m2.value = '';
+        const sumaEl = document.getElementById('mixtoSuma');
+        if (sumaEl) { sumaEl.textContent = 'Ingresá los montos'; sumaEl.style.color = 'var(--ink-soft)'; }
+        setTimeout(() => m1?.focus(), 100);
       }
     }
 
@@ -8725,22 +8725,24 @@ if ('caches' in window) {
     // FIX: si es pago mixto, validar y construir el string desglosado
     let _metodoPagoFinal = window._cobrarPago || window._cobroPago || 'Efectivo';
     if (_metodoPagoFinal === 'Pago mixto') {
-      const ef = parseFloat(document.getElementById('mixtoEfectivo')?.value || 0) || 0;
-      const tr = parseFloat(document.getElementById('mixtoTransferencia')?.value || 0) || 0;
+      const m1 = parseFloat(document.getElementById('mixtoMonto1')?.value || 0) || 0;
+      const m2 = parseFloat(document.getElementById('mixtoMonto2')?.value || 0) || 0;
+      const met1 = document.getElementById('mixtoMetodo1')?.value || 'Efectivo';
+      const met2 = document.getElementById('mixtoMetodo2')?.value || 'Transferencia';
       const totalNum = parseFloat((document.getElementById('cobrarTotal')?.textContent || '0').replace('$','')) || 0;
-      if (ef <= 0 && tr <= 0) {
-        alert('Ingresá los montos del pago mixto (efectivo y/o transferencia).');
+      if (m1 <= 0 && m2 <= 0) {
+        alert('Ingresá los montos del pago mixto.');
         return;
       }
-      const diff = Math.abs(totalNum - (ef + tr));
+      const diff = Math.abs(totalNum - (m1 + m2));
       if (diff > 0.1) {
-        alert('El total del pago mixto ($' + (ef+tr).toFixed(2) + ') no coincide con el total a cobrar ($' + totalNum.toFixed(2) + '). Ajustá los montos.');
+        alert('El total del pago mixto ($' + (m1+m2).toFixed(2) + ') no coincide con el total a cobrar ($' + totalNum.toFixed(2) + '). Ajustá los montos.');
         return;
       }
       // Construir string descriptivo
       const partes = [];
-      if (ef > 0) partes.push('$' + ef.toFixed(2) + ' efectivo');
-      if (tr > 0) partes.push('$' + tr.toFixed(2) + ' transferencia');
+      if (m1 > 0) partes.push('$' + m1.toFixed(2) + ' ' + met1.toLowerCase());
+      if (m2 > 0) partes.push('$' + m2.toFixed(2) + ' ' + met2.toLowerCase());
       _metodoPagoFinal = 'Mixto: ' + partes.join(' + ');
       window._cobrarPago = _metodoPagoFinal;
       window._cobroPago  = _metodoPagoFinal;
