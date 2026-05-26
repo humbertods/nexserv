@@ -9763,12 +9763,10 @@ if ('caches' in window) {
   // Para promos: el área se deduce de la división de mayor monto (NO del areaKey del form).
   // Función global para detectar areaKey desde texto de área/servicio
   function AREA_KEY_FROM_DIV(raw) {
-    // Quitar emojis y caracteres no-ASCII antes de normalizar
-    const s = String(raw || '')
-      .replace(/[^\u0000-\u007E\u00C0-\u024F]/g, ' ') // quitar emojis
-      .toLowerCase()
-      .replace(/[óo]/g,'o').replace(/[áa]/g,'a').replace(/[éeñ]/g, c=>c==='é'?'e':'n')
-      .trim();
+    // Normalizar: quitar diacríticos via NFD + strip non-ASCII + lowercase
+    let s = String(raw || '');
+    try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch(e) {}
+    s = s.replace(/[^a-zA-Z0-9 ]/g, ' ').toLowerCase().trim();
     if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
     if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
     if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
