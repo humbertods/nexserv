@@ -4466,7 +4466,9 @@ function handleCrearTicketMulti(data) {
 
     row[34] = precioNormalTotal;
     row[35] = precioPromoTotal;
-    row[36] = '';
+    // row[36]: JSON array of precioNormal per area slot (for tarjeta recalculation)
+    var precioNormalPorArea = areasAgrupadas.map(function(a) { return a.precioNormal || a.precio || 0; });
+    row[36] = JSON.stringify(precioNormalPorArea);
 
     ws.appendRow(row);
     return { success: true, id, areasCount: areasAgrupadas.length };
@@ -4510,9 +4512,21 @@ function handleGetTicketMulti(params) {
         const precioPromoArea  = Number(row[TM_PRECIO_COL[i]] || 0);
         const totalPromoTM     = Number(row[35] || 0);
         const totalNormalTM    = Number(row[34] || 0);
-        const precioNormalArea = (totalPromoTM > 0)
-          ? Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100
-          : precioPromoArea;
+        // FIX: leer precioNormal por área desde row[36] (JSON array)
+        // Si no existe, calcular proporcionalmente como fallback
+        var precioNormalArea = precioPromoArea;
+        try {
+          var normalArr = JSON.parse(String(row[36] || '[]'));
+          if (Array.isArray(normalArr) && normalArr[i] !== undefined) {
+            precioNormalArea = Number(normalArr[i]) || precioPromoArea;
+          } else if (totalPromoTM > 0 && totalNormalTM > 0) {
+            precioNormalArea = Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100;
+          }
+        } catch(eN) {
+          if (totalPromoTM > 0 && totalNormalTM > 0) {
+            precioNormalArea = Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100;
+          }
+        }
         areas.push({
           idx: i + 1,
           area:         areaVal,
