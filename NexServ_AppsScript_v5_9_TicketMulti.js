@@ -1017,11 +1017,14 @@ function handleGetListaCompleta() {
             if (est === 'en servicio') return (a.tentativo||a.area) + ' 🔄 ' + (a.staff||'');
             return (a.tentativo||a.area) + ' ⏳';
           }).join(' | ');
+          // FIX: calcular total como suma de precios actuales de cada área (no precioPromo estático)
+          var totalActualTM = (tm.areas || []).reduce(function(s, a) { return s + Number(a.precio || 0); }, 0);
+          if (totalActualTM === 0) totalActualTM = tm.precioPromo; // fallback
           enServicio.push({
             idEspera:  tm.idEspera, codigo: tm.codigo, nombre: tm.nombre,
             servicio:  resumenAreas, area: 'multi',
             tomadaPor: (tm.areas||[]).filter(function(a){ return a.staff && String(a.estado||'').toLowerCase()==='en servicio'; }).map(function(a){return a.staff;}).join(', ') || '—',
-            total: tm.precioPromo, estado: tm.estado,
+            total: totalActualTM, estado: tm.estado,
             horaToma: (tm.areas[0] && tm.areas[0].hora) ? tm.areas[0].hora : '',
             areas: tm.areas, secuencia: tm.secuencia || [],
             fuente: 'TicketMulti'
