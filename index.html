@@ -12339,24 +12339,34 @@ if ('caches' in window) {
     } catch(err) { alert('Error de conexión: ' + err.message); }
   }
 
+  function getAreaFromTMForm() {
+    // Leer el área del primer servicio del formulario TM unificado
+    const areaLabels = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting / Retiro', facial:'Facial' };
+    // Buscar primer slot con área definida
+    if (typeof _tmServicios !== 'undefined' && _tmServicios.length > 0) {
+      for (const s of _tmServicios) {
+        if (s.area) return s.area; // ya es el label (Cejas, Pestañas, etc.)
+      }
+    }
+    // Fallback: leer directo del DOM del primer slot
+    const firstAreaEl = document.querySelector('[id^="tmArea-"]');
+    if (firstAreaEl && firstAreaEl.value) return firstAreaEl.value;
+    // Fallback legacy
+    return document.getElementById('arrArea')?.value || 'Cejas';
+  }
+
   async function renderAssignDirect() {
     try {
       const nombre = document.getElementById('arrSelName')?.textContent?.trim() || 'Clienta';
-      // Leer área correctamente según el formulario activo
-      const _tipoRD = window._arrTipo || 'normal';
-      // ── MANDAMIENTO #1: área prioritaria siempre la determina getAreaPrioritaria() ──
-      const _ap2 = window.getAreaPrioritaria(_tipoRD);
-      const area = _ap2.label;
-      const _svcRaw5 = document.getElementById('arrService')?.value || '';
-      let _svcName5 = _svcRaw5;
-      try { if (_svcRaw5.startsWith('{')) _svcName5 = JSON.parse(_svcRaw5).nombre || _svcRaw5; } catch(e) {}
+      // Leer área del formulario TM unificado
+      const area = getAreaFromTMForm();
       const isTop = document.getElementById('arrSelTop')?.style?.display !== 'none';
       const clientEl = document.getElementById('assignDirectClient');
       if (clientEl) {
-        clientEl.innerHTML = `<div style="font-size:13px;color:${isTop?'var(--top-purple)':'var(--ink)'};font-weight:600;">${isTop?'⭐ ':''}${nombre}${_svcName5?' · '+_svcName5:''}</div>`;
+        clientEl.innerHTML = `<div style="font-size:13px;color:${isTop?'var(--top-purple)':'var(--ink)'};font-weight:600;">${isTop?'⭐ ':''}${nombre}</div>`;
       }
 
-      // Mostrar staff inmediatamente
+      // Mostrar staff inmediatamente con el área correcta
       renderAssignDirectStaff({}, area);
     } catch(e) {
       console.error('renderAssignDirect error:', e);
@@ -12377,10 +12387,8 @@ if ('caches' in window) {
           if (!staffAvailability[chica]) staffAvailability[chica] = [];
           staffAvailability[chica].push(item.nombre);
         });
-        // ── MANDAMIENTO #1: área prioritaria siempre la determina getAreaPrioritaria() ──
-        const _tipoRD2 = window._arrTipo || 'normal';
-        const _ap3 = window.getAreaPrioritaria(_tipoRD2);
-        const area2 = _ap3.label;
+        // Usar el mismo área del formulario TM
+        const area2 = getAreaFromTMForm();
         renderAssignDirectStaff(staffAvailability, area2);
       }
     } catch(err) { /* timeout o error — staff ya visible */ }
@@ -12442,9 +12450,8 @@ if ('caches' in window) {
     }
     // ── FIN MANDAMIENTO #8 ──
 
-    // ── MANDAMIENTO #1: área prioritaria siempre la determina getAreaPrioritaria() ──
-    const _ap4 = window.getAreaPrioritaria(tipo);
-    const area = _ap4.label;
+    // Leer área del formulario TM unificado
+    const area = getAreaFromTMForm();
     const _svcRawGA = svcEl?.value || '';
     let servicioGA = _svcRawGA, precioGA = 0;
     try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
