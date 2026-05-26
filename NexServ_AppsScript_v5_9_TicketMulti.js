@@ -4635,10 +4635,18 @@ function handleCompletarAreaTicketMulti(data) {
       }
 
       // Áreas que aún no están completadas
-      // IMPORTANTE: el área recién completada (areaCompletadaIdx) ya fue marcada arriba
-      // pero rows[i] tiene el valor antiguo — excluirla manualmente
+      // FIX: cuando esUltima=true, Lesly completó TODAS sus áreas en el loop anterior.
+      // rows[i] tiene valores viejos → excluir manualmente todas las áreas de esta staff
+      // (no solo areaCompletadaIdx) para que todasListas calcule correctamente.
+      var areasDeEstaStaff = new Set();
+      for (var ax = 0; ax < 4; ax++) {
+        if (String(rows[i][TM_AREA_COL[ax] + 2] || '').trim() === data.chicaNombre) {
+          areasDeEstaStaff.add(ax);
+        }
+      }
       var areasPendientes = areasConDatos.filter(function(a) {
-        if (a.idx === areaCompletadaIdx) return false; // recién completada
+        if (esUltima && areasDeEstaStaff.has(a.idx)) return false; // esta staff las completó todas
+        if (!esUltima && a.idx === areaCompletadaIdx) return false; // solo la recién completada
         return a.estado !== 'Completado';
       });
 
