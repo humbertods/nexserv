@@ -4994,49 +4994,148 @@ function handleConfirmarCobroMulti(data) {
 // PUSH NOTIFICATIONS (Web Push / VAPID)
 // ============================================
 
+// ── Credenciales FCM V1 ──────────────────────────────────────
+var FCM_PROJECT_ID    = 'nexserv-7e1bb';
+var FCM_CLIENT_EMAIL  = 'firebase-adminsdk-fbsvc@nexserv-7e1bb.iam.gserviceaccount.com';
+var FCM_PRIVATE_KEY   = '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDE/GLAhsnYaVYw\nsrwnYQ8SgDmUYQpS6EthqdLifgQap2/ghFhQD4j4oJXvenBV7oEgAofieShiehIz\n9Cmj8wHxulzKtEwa2son9wfufjTKZfPZPldEmdkpPA8yIrAvDSaUUok1GFAfGeTX\n3q6v6mx1z5xaXVOyYkADlil9pGQkjZ+qSM3AIMUG5WmKz+ISyMyduQHVdipBkQfz\nsYDx4BBf6uP8wkcCJ8lCA1duJZeyYvVqXZ0VvZu1NQET4SYDh5yMUcw1v6GfsMMq\ngPEXnWTWhixORjaVjyHxFkIT3iSYyZUoA5yEClwgYo28I0v0iiyjQuItoTCeRSoJ\niWOU65+tAgMBAAECggEAE62u49LTSTZEsPq6BykQC2YZ2nPTRzMDjM8dTRkPqeX+\nLCyscdsLcOMB93mAzWTVK3B1SK+X1DajqOMEYed90zst1+YpECm5NkLcXPvopCuJ\nL7OlninMYu0oC3chqKGkr/6KzG4QWvsIPHR3eQVvLlm+Idze5pwgDvuqS23nvyrl\n1/dpV3nPu/i0HiOZfN/bTv+wdakatAyz11jo51j/ZMwJa5joUnYY8745VtCIZP+M\n/9s75coQmRhajWsG2giwTk8bBlbpfx9sTZ2pFoV2c0CZ4sCb4ZJU6PXEMNiTCVc8\nSk+NJtZBISQQ+oWlbelppnqj2Alb90j0yCvrTWfFtQKBgQDp18p7xgcwSl6O7ZDJ\nQ1/lBatqwgMEXF55NN9Ct7ft1WuHpktlSM2BiYfpFLd71xGgQJXMo/U7c+x3MmpL\nBBYbw+ERTCwL60+8Y8DLixAuL53S0oLufAx3uG1Z3TLeohfIOK9IGlvnG+ny+B0q\npFHldwRau5BJglWaXNmz00AoKwKBgQDXppJyFYEdU+mBJ8GiMhbmnz93WcWjhgv3\n424r6tytrGvNHzNbHvZHzhk+NqJrQHn1qRZNI7Kexc0vmnjCyph5bpFyAlSZGuhD\nYfyIFCKpd1uTz0Pc6hJOcBRubSWqsYM+ny0/tnYw2PFsuETZ+D8tVKoL73Uy8QtI\nJvgztnHThwKBgHGVYIP4b1t0dDOmjxJDiJu8wkOL011V5ImpNdy5UjzS0nVEQBEF\naNTH0d1UM7+SerxFQr3w0dg7+Zr4QQsJBBgeb/8v6aEsfkF6jpYPiR91/4n8uJ5Q\nYNnyGiNxPxlG0JhveCxkqUk7lMpw2/HveNwlkFbmDjK2fRAKk7A2J06bAoGADHiX\nk31m4BlQMaXo7sZSyLeA5hgM8+32lzlRz7xfUrPb8BrTz3s05uYmU5C5R9aMtwY2\nQfPEiqYJva0DOtCYjL02MA+ucMQ7lln+TqhLcN10MFIWLJpkwKB+rfwl538oheCS\nr1KP9zc0jwMBCFHw5WA2DUal0nJaIqwOQn9UidUCgYEA4weZ9v5bpYEDjFSSFl5u\nRv+RG05FRNq87Eh6TUzyn/QURaK5Vv3/7XVbUmBLtZwCz7WkcYGopBu/ioU0VuSo\nPTsKnJn7Ms0lFYuvMTtxXV8N+FN6Ep0YnIOPpyDSOKsfshKD2JV3WwRF2Rir3M7q\neLO2fpC8zq0mbHOXNCk/blk=\n-----END PRIVATE KEY-----\n';
+
+function getFCMAccessToken() {
+  var now = Math.floor(Date.now() / 1000);
+  var header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=+$/, '');
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({
+    iss: FCM_CLIENT_EMAIL,
+    sub: FCM_CLIENT_EMAIL,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging'
+  })).replace(/=+$/, '');
+
+  var signInput = header + '.' + payload;
+  var signature = Utilities.base64EncodeWebSafe(
+    Utilities.computeRsaSha256Signature(signInput, FCM_PRIVATE_KEY)
+  ).replace(/=+$/, '');
+
+  var jwt = signInput + '.' + signature;
+
+  var tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,
+    muteHttpExceptions: true
+  });
+
+  var tokenData = JSON.parse(tokenResp.getContentText());
+  if (!tokenData.access_token) throw new Error('Token error: ' + tokenResp.getContentText());
+  return tokenData.access_token;
+}
+
 function handleGuardarPushSub(data) {
   if (!data.staffKey || !data.subscription) return { success: false, error: 'Datos incompletos' };
+  // Guardar suscripción — extraer el FCM token si viene en la suscripción
+  var sub;
+  try { sub = JSON.parse(data.subscription); } catch(e) { sub = {}; }
+  // Guardar la suscripción completa (endpoint + keys)
   PropertiesService.getScriptProperties().setProperty(data.staffKey, data.subscription);
+  Logger.log('[Push] Suscripción guardada para: ' + data.staffName + ' key=' + data.staffKey);
   return { success: true };
 }
 
 function handleEnviarPushStaff(data) {
   if (!data.staffKeys || !data.titulo) return { success: false, error: 'Datos incompletos' };
+
   var props = PropertiesService.getScriptProperties();
   var enviados = 0;
   var errores = [];
+
+  // Obtener access token OAuth2 para FCM V1
+  var accessToken;
+  try {
+    accessToken = getFCMAccessToken();
+  } catch(e) {
+    return { success: false, error: 'Error obteniendo token FCM: ' + e.message };
+  }
+
+  var fcmUrl = 'https://fcm.googleapis.com/v1/projects/' + FCM_PROJECT_ID + '/messages:send';
+
   data.staffKeys.forEach(function(key) {
     var subStr = props.getProperty(key);
-    if (!subStr) return;
+    if (!subStr) {
+      errores.push(key + ': sin suscripción');
+      return;
+    }
+
     try {
       var sub = JSON.parse(subStr);
-      var payload = JSON.stringify({
-        title: data.titulo,
-        body: data.cuerpo || '',
-        url: data.url || 'https://humbertods.github.io/nexserv/',
-        icon: 'https://humbertods.github.io/nexserv/icon-192.png',
-        tag: 'nexserv-' + Date.now()
-      });
-      var response = UrlFetchApp.fetch(sub.endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'TTL': '86400'
-        },
-        payload: payload,
-        muteHttpExceptions: true
-      });
-      var code = response.getResponseCode();
-      if (code === 410 || code === 404) {
-        props.deleteProperty(key);
-      } else if (code >= 200 && code < 300) {
-        enviados++;
+      var endpoint = sub.endpoint || '';
+
+      // Extraer el FCM token del endpoint
+      // Formato: https://fcm.googleapis.com/fcm/send/TOKEN  o
+      //          https://updates.push.services.mozilla.com/...
+      var fcmToken = null;
+      if (endpoint.includes('fcm.googleapis.com')) {
+        fcmToken = endpoint.split('/').pop();
+      }
+
+      var response;
+      if (fcmToken) {
+        // Usar FCM V1 API con el token
+        var fcmBody = {
+          message: {
+            token: fcmToken,
+            notification: {
+              title: data.titulo,
+              body: data.cuerpo || ''
+            },
+            webpush: {
+              notification: {
+                title: data.titulo,
+                body: data.cuerpo || '',
+                icon: 'https://humbertods.github.io/nexserv/icon-192.png',
+                tag: 'nexserv-cita',
+                renotify: true,
+                requireInteraction: false,
+                vibrate: [200, 100, 200]
+              },
+              fcm_options: {
+                link: 'https://humbertods.github.io/nexserv/'
+              }
+            }
+          }
+        };
+
+        response = UrlFetchApp.fetch(fcmUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + accessToken,
+            'Content-Type': 'application/json'
+          },
+          payload: JSON.stringify(fcmBody),
+          muteHttpExceptions: true
+        });
       } else {
-        errores.push(key + ': HTTP ' + code);
+        // Endpoint no-FCM (Firefox/Safari) — Web Push directo con VAPID
+        // Por ahora loguear y continuar
+        errores.push(key + ': endpoint no-FCM (' + endpoint.substring(0,40) + ')');
+        return;
+      }
+
+      var code = response.getResponseCode();
+      var body = response.getContentText();
+      Logger.log('[Push] ' + key + ': HTTP ' + code + ' — ' + body.substring(0, 150));
+
+      if (code === 200 || code === 201) {
+        enviados++;
+      } else if (code === 404 || code === 410) {
+        props.deleteProperty(key);
+        errores.push(key + ': token expirado, eliminado');
+      } else {
+        errores.push(key + ': HTTP ' + code + ' — ' + body.substring(0, 80));
       }
     } catch(e) {
       errores.push(key + ': ' + e.message);
     }
   });
+
   return { success: true, enviados: enviados, errores: errores };
 }
