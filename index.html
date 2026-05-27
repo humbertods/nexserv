@@ -3410,6 +3410,17 @@ if ('serviceWorker' in navigator) {
 
     // ── TICKET MULTI ─────────────────────────────────────────
     const _idEsperaSlot = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+
+    // SP- con promo individual → botón simple, no mostrar lógica multi-área
+    if (_idEsperaSlot.startsWith('SP-')) {
+      const _slotSP = slot1 ? 1 : 2;
+      btnContainer.innerHTML = `
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="window._finishingSlot=${_slotSP}; finishAndSend()">
+          ✅ Terminé — enviar a cobro con Mikaela
+        </button>`;
+      return;
+    }
+
     if (_idEsperaSlot.startsWith('TM-')) {
       apiGet('getTicketMulti').then(function(tmData) {
         if (!tmData.success) return;
@@ -13386,6 +13397,12 @@ if ('serviceWorker' in navigator) {
     const slot = window._finishingSlot || 1;
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+
+    // Si es SP- (promo individual), delegar a finishAndSend que sí maneja SP correctamente
+    if (idEspera && idEspera.startsWith('SP-')) {
+      await finishAndSend();
+      return;
+    }
 
     // Construir desglose completo: áreas previas (del TM) + área actual
     let desgloseCompleto = [];
