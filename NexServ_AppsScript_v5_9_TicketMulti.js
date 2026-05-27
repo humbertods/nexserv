@@ -4693,14 +4693,21 @@ function handleCompletarAreaTicketMulti(data) {
         var base = TM_AREA_COL[a];
         if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
         var estAreaActual = String(rows[i][base + 3] || '').trim();
+        if (estAreaActual === 'Completado') {
+          // Esta área ya estaba completa — continuar buscando la siguiente de esta staff
+          if (areaCompletadaIdx === -1) {
+            // Aún no encontramos la que hay que completar ahora — seguir buscando
+            continue;
+          }
+          // Ya registramos cuál completar — si no es esUltima, salimos
+          if (!esUltima) break;
+          continue;
+        }
+        // Primera área En servicio de esta staff = la que se completa ahora
         if (areaCompletadaIdx === -1) {
           areaCompletadaIdx = a;
           var rawTent = String(rows[i][base] || '');
           areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
-        }
-        if (estAreaActual === 'Completado') {
-          if (!esUltima) break;
-          continue;
         }
         ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
         var precioArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
@@ -4816,6 +4823,8 @@ function handleCompletarYTomarSiguienteAreaTM(data) {
   if (resultCompletar.todasCompletadas) return resultCompletar;
   try {
     var ws   = getTMSheet();
+    // Forzar escritura de los setValue() de handleCompletarAreaTicketMulti antes de releer
+    try { SpreadsheetApp.flush(); } catch(eF) {}
     // FIX: re-leer el sheet DESPUÉS de que handleCompletarAreaTicketMulti hizo sus cambios
     // Si usamos rows stale, el slot recién completado todavía aparece como "En servicio"
     // y podemos activar el mismo slot en vez del siguiente
