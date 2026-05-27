@@ -9502,9 +9502,20 @@ if ('caches' in window) {
         pd.style.display = 'block';
       }
     } else {
-      // Promo sin división — mostrar precio normal
+      // Promo sin división — precio normal viene de d.regular del sheet (sumaIndividual)
+      if (svc) {
+        svc.precio = d.precio;
+        svc.precioNormal = d.regular || d.precio; // d.regular = sumaIndividual de Paquetes
+      }
       const pd = document.getElementById('tmPrecioDisplay-' + idx);
-      if (pd) { pd.textContent = '🎁 $' + d.precio + ' (precio normal $' + (d.regular || d.precio) + ')'; pd.style.display = 'block'; }
+      const tieneRegular = d.regular && Number(d.regular) !== Number(d.precio);
+      if (pd) {
+        pd.innerHTML = '🎁 $' + d.precio +
+          (tieneRegular
+            ? ' <span style="font-size:11px;color:var(--ink-soft);">(regular $' + d.regular + ')</span>'
+            : ' <span style="font-size:11px;color:var(--warning,#b45309);">⚠️ Completar precio regular en Paquetes para recalcular con tarjeta</span>');
+        pd.style.display = 'block';
+      }
     }
 
     // Mostrar aviso promos
