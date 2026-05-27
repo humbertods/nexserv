@@ -3779,25 +3779,18 @@ if ('caches' in window) {
                 window._tmAreasActuales = tm.areas || [];
                 const miNombreR = user1?.name || '';
 
-                // Limpiar lista y mostrar completados de esta staff
+                // Separar áreas completadas y activas de esta staff
                 const svcListEl1 = document.getElementById('as1ServicesList');
                 const areasCompletadasR = (tm.areas || []).filter(a =>
                   String(a.staff||'') === miNombreR &&
                   String(a.estado||'').toLowerCase() === 'completado'
                 );
-                if (areasCompletadasR.length > 0 && svcListEl1) {
-                  // Limpiar chips previos de completados para no duplicar
-                  [...svcListEl1.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
-                  const histHtml1 = areasCompletadasR.map(ar =>
-                    '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'                    + '<span style="font-size:16px;">✅</span>'                    + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'                    + (ar.tentativo || ar.area || 'Servicio previo')                    + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'                    + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'                    + '</div>'                  ).join('');
-                  svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
-                }
-
-                // Restaurar slotServices con áreas EN SERVICIO de esta staff
                 const misAreasActivas = (tm.areas || []).filter(a =>
                   String(a.staff||'') === miNombreR &&
                   String(a.estado||'').toLowerCase() === 'en servicio'
                 );
+
+                // PASO 1: slotServices + renderServicesForSlot (borra innerHTML)
                 if (misAreasActivas.length > 0) {
                   slotServices[1] = misAreasActivas.map(ar => ({
                     name: ar.tentativo || ar.confirmado || '',
@@ -3807,7 +3800,22 @@ if ('caches' in window) {
                   renderServicesForSlot(1);
                 }
 
-                // Total = activos + completados de esta staff
+                // PASO 2: insertar chips completados DESPUÉS del render
+                if (areasCompletadasR.length > 0 && svcListEl1) {
+                  [...svcListEl1.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
+                  const histHtml1 = areasCompletadasR.map(ar =>
+                    '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                    + '<span style="font-size:16px;">✅</span>'
+                    + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                    + (ar.tentativo || ar.area || 'Servicio previo')
+                    + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                    + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
+                    + '</div>'
+                  ).join('');
+                  svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
+                }
+
+                // PASO 3: total y contador
                 const totalActivos = (slotServices[1] || []).reduce((s,v) => s + Number(v.price||0), 0);
                 const totalComp = areasCompletadasR.reduce((s,a) => s + Number(a.precio||0), 0);
                 document.getElementById('as1Total').textContent = '$' + (totalActivos + totalComp);
@@ -4709,39 +4717,37 @@ if ('caches' in window) {
                   var misAreas = (tm.areas || []).filter(function(ar) {
                     return ar.staff === (user2 && user2.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
                   });
-                  // Mostrar áreas COMPLETADAS de esta staff como historial readonly
-                  var miNombreTM = user2 && user2.name ? user2.name : '';
-                  var areasCompletadasTM = (tm.areas || []).filter(function(ar) {
-                    return String(ar.staff||'') === miNombreTM &&
-                           String(ar.estado||'').toLowerCase() === 'completado';
-                  });
-                  if (areasCompletadasTM.length > 0) {
-                    var svcListEl = document.getElementById('as1ServicesList');
-                    if (svcListEl) {
-                      var histHtmlTM = areasCompletadasTM.map(function(ar) {
-                        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
-                          + '<span style="font-size:16px;">&#x2705;</span>'
-                          + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
-                          + (ar.tentativo || ar.area || 'Servicio previo') + ' &middot; ' + (ar.staff || '&mdash;')
-                          + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
-                          + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
-                          + '</div>';
-                      }).join('');
-                      svcListEl.insertAdjacentHTML('afterbegin', histHtmlTM);
-                    }
-                  }
-
+                  // Separar completadas y activas de esta staff
                   if (misAreas.length > 0) {
-                    // Reemplazar slotServices con los servicios de esta staff en el TM
+                    // PASO 1: slotServices + render (borra innerHTML)
                     slotServices[1] = misAreas.map(function(ar) {
                       return { name: ar.tentativo || ar.confirmado || '', price: ar.precio || 0, area: ar.area };
                     });
                     renderServicesForSlot(1);
-                    var totalActivosTM = slotServices[1].reduce(function(s,v){ return s + Number(v.price||0); }, 0);
-                    var totalCompTM = areasCompletadasTM.reduce(function(s,ar){ return s + Number(ar.precio||0); }, 0);
-                    document.getElementById('as1Total').textContent = '$' + (totalActivosTM + totalCompTM);
-                    document.getElementById('as1SvcCount').textContent = String(slotServices[1].length + areasCompletadasTM.length);
                   }
+
+                  // PASO 2: insertar chips completados DESPUÉS del render
+                  var svcListElTM = document.getElementById('as1ServicesList');
+                  if (areasCompletadasTM.length > 0 && svcListElTM) {
+                    [...svcListElTM.querySelectorAll('.tm-completado-chip')].forEach(function(el){ el.remove(); });
+                    var histHtmlTM = areasCompletadasTM.map(function(ar) {
+                      return '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                        + '<span style="font-size:16px;">✅</span>'
+                        + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                        + (ar.tentativo || ar.area || 'Servicio previo')
+                        + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                        + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
+                        + '</div>';
+                    }).join('');
+                    svcListElTM.insertAdjacentHTML('afterbegin', histHtmlTM);
+                  }
+
+                  // PASO 3: total y contador
+                  var totalActivosTM = (slotServices[1] || []).reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+                  var totalCompTM = areasCompletadasTM.reduce(function(s,ar){ return s + Number(ar.precio||0); }, 0);
+                  document.getElementById('as1Total').textContent = '$' + (totalActivosTM + totalCompTM);
+                  document.getElementById('as1SvcCount').textContent = String((slotServices[1]||[]).length + areasCompletadasTM.length);
+
                   // Mostrar botones TM correctos en el panel desde el inicio
                   setTimeout(function() { updateFinishButtons(1); }, 600);
                 }
