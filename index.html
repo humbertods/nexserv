@@ -555,11 +555,11 @@ if ('caches' in window) {
     <button class="fab" onclick="show('newArrival')">+</button>
 
     <nav class="nav">
-      <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-      <button onclick="show('clientDirectory')"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('serviciosHistory')"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
-      <button onclick="openMkStock()"><span class="icon">🛍</span><span class="label-dock">Stock</span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Hoy</span></button>
+      <button onclick="show('clientDirectory')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm4 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-3 7c0-1.5 1.34-2.5 3-2.5s3 1 3 2.5v.5H5v-.5ZM13 9h5a.75.75 0 0 1 0 1.5h-5A.75.75 0 0 1 13 9Zm0 3.5h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"/></svg></span><span class="label-dock">Clientas</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('serviciosHistory')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Historial</span></button>
+      <button onclick="openMkStock()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6.5 2A4.5 4.5 0 0 0 2 6.5V18a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4V6.5A4.5 4.5 0 0 0 17.5 2h-11ZM9 6.5a3 3 0 0 0 6 0 1 1 0 1 1 2 0 5 5 0 0 1-10 0 1 1 0 0 1 2 0Z"/></svg></span><span class="label-dock">Stock</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
 
@@ -759,21 +759,21 @@ if ('caches' in window) {
     <!-- Tabs por área -->
     <div style="display: flex; gap: 0; margin-bottom: 16px; background: var(--bg-card); border-radius: var(--radius-pill); padding: 4px; box-shadow: var(--shadow-card); overflow-x: auto;">
       <button onclick="switchProfileTab('cejas', this)" class="profile-tab active-period" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .2s;">💅 Cejas</button>
-      <button onclick="switchProfileTab('depilacion', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">🪒 Depil.</button>
-      <button onclick="switchProfileTab('pigmento', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">💉 Pigm.</button>
+      <button onclick="switchProfileTab('depilacion', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg> Depil.</button>
+      <button onclick="switchProfileTab('pigmento', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Pigm.</button>
       <button onclick="switchProfileTab('pestanas', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">👁 Pest.</button>
-      <button onclick="switchProfileTab('facial', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;">✨ Facial</button>
+      <button onclick="switchProfileTab('facial', this)" class="profile-tab" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink-soft); white-space: nowrap; transition: all .2s;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Facial</button>
     </div>
 
     <!-- Contenido del tab -->
     <div id="profileTabContent"></div>
 
     <nav class="nav">
-      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
-      <button><span class="icon">♡</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">◉</span><span class="label-dock">Perfil</span></button>
-      <button><span class="icon">◐</span></button>
+      <button onclick="show('mikaelaHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09A5.99 5.99 0 0 1 16.5 3C19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35Z"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path fill-rule="evenodd" d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-5a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg></span><span class="label-dock">Perfil</span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2Zm0 2v16a8 8 0 0 0 0-16Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -781,7 +781,7 @@ if ('caches' in window) {
     <div class="modal-bg" id="facialFormModal">
       <div class="modal" style="max-height: 90%;">
         <div class="modal-handle"></div>
-        <div class="modal-title" id="facialFormTitle">✨ Nueva ficha facial</div>
+        <div class="modal-title" id="facialFormTitle"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Nueva ficha facial</div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="input-group">
@@ -883,11 +883,11 @@ if ('caches' in window) {
     <div id="clientDirectoryList"></div>
 
     <nav class="nav">
-      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span></button>
-      <button class="active"><span class="icon">📇</span><span class="label-dock">Clientas</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button><span class="icon">◉</span></button>
-      <button><span class="icon">◐</span></button>
+      <button onclick="show('mikaelaHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm4 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-3 7c0-1.5 1.34-2.5 3-2.5s3 1 3 2.5v.5H5v-.5ZM13 9h5a.75.75 0 0 1 0 1.5h-5A.75.75 0 0 1 13 9Zm0 3.5h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"/></svg></span><span class="label-dock">Clientas</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path fill-rule="evenodd" d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-5a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z"/></svg></span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2Zm0 2v16a8 8 0 0 0 0-16Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -936,7 +936,7 @@ if ('caches' in window) {
           <textarea id="ncObsCejas" placeholder="Ej: Cejas pobladas, solo depilación de forma..." style="min-height: 50px;"></textarea>
         </div>
         <div class="input-group">
-          <label>🪒 Depilación</label>
+          <label><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg> Depilación</label>
           <textarea id="ncObsDepil" placeholder="Ej: Piel sensible en bikini, usar cera baja temp..." style="min-height: 50px;"></textarea>
         </div>
         <div class="input-group">
@@ -944,7 +944,7 @@ if ('caches' in window) {
           <textarea id="ncObsPest" placeholder="Ej: Ojos sensibles, pegamento hipoalergénico..." style="min-height: 50px;"></textarea>
         </div>
         <div class="input-group">
-          <label>✨ Facial</label>
+          <label><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Facial</label>
           <textarea id="ncObsFacial" placeholder="Ej: Responde bien a limpieza con vapor..." style="min-height: 50px;"></textarea>
         </div>
 
@@ -992,7 +992,7 @@ if ('caches' in window) {
         </div>
 
         <!-- FICHA FACIAL (opcional) -->
-        <div style="font-size: 13px; font-weight: 700; margin: 18px 0 6px;">✨ Ficha facial <span style="font-size: 11px; color: var(--ink-faint); font-weight: 500;">(opcional)</span></div>
+        <div style="font-size: 13px; font-weight: 700; margin: 18px 0 6px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Ficha facial <span style="font-size: 11px; color: var(--ink-faint); font-weight: 500;">(opcional)</span></div>
         <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-bottom: 10px;">Si la clienta ya tiene historial facial, completá su ficha clínica.</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
           <div class="input-group">
@@ -1044,7 +1044,7 @@ if ('caches' in window) {
         </div>
 
         <!-- FICHA CEJAS EFECTO POLVO (opcional) -->
-        <div style="font-size: 13px; font-weight: 700; margin: 18px 0 6px;">💉 Cejas efecto polvo <span style="font-size: 11px; color: var(--ink-faint); font-weight: 500;">(opcional)</span></div>
+        <div style="font-size: 13px; font-weight: 700; margin: 18px 0 6px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Cejas efecto polvo <span style="font-size: 11px; color: var(--ink-faint); font-weight: 500;">(opcional)</span></div>
         <div style="font-size: 11px; color: var(--ink-soft); font-weight: 500; margin-bottom: 10px;">Si la clienta ya tiene historial de pigmentación, registrá su última sesión.</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="input-group">
@@ -1087,12 +1087,12 @@ if ('caches' in window) {
     <!-- Triple opción -->
     <div class="double-action" style="margin-bottom: 16px;">
       <div class="action-btn primary" onclick="show('arrivalExisting')">
-        <span class="icon">📇</span>
+        <span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm4 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-3 7c0-1.5 1.34-2.5 3-2.5s3 1 3 2.5v.5H5v-.5ZM13 9h5a.75.75 0 0 1 0 1.5h-5A.75.75 0 0 1 13 9Zm0 3.5h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"/></svg></span>
         <span class="label">Clienta existente</span>
         <span class="sub">ya está registrada</span>
       </div>
       <div class="action-btn" onclick="openNewClient(); show('clientDirectory');">
-        <span class="icon">✨</span>
+        <span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg></span>
         <span class="label">Clienta nueva</span>
         <span class="sub">registrarla ahora</span>
       </div>
@@ -1232,9 +1232,9 @@ if ('caches' in window) {
         <!-- Prioridad -->
         <div class="section-title" style="margin-top:16px;">Prioridad</div>
         <div class="priority-picker">
-          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
-          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
-          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#ef4444"/></svg></div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#f59e0b"/></svg></div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#22c55e"/></svg></div><div class="name">Normal</div></div>
         </div>
 
         <!-- Observaciones -->
@@ -1251,8 +1251,8 @@ if ('caches' in window) {
         <!-- Acciones -->
         <div class="section-title" style="margin-top:16px;">¿Cómo procedés?</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
-          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+          <div class="action-btn primary" onclick="goToList()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9Zm0 2h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4ZM7 10h10v1.5H7V10Zm0 3.5h10V15H7v-1.5Zm0 3.5h7v1.5H7V17Z"/></svg></span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="10" cy="7" r="4"/><path d="M2 19c0-3.314 3.582-6 8-6 1.29 0 2.5.25 3.55.69A5 5 0 0 0 18 21H2v-2Z"/><path d="M18 12v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2Z"/></svg></span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
         </div>
       </div>
 
@@ -1291,9 +1291,9 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">Prioridad</div>
         <div class="priority-picker">
-          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
-          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
-          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#ef4444"/></svg></div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#f59e0b"/></svg></div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#22c55e"/></svg></div><div class="name">Normal</div></div>
         </div>
         <div class="input-group" style="margin-top: 16px;">
           <label>Observaciones de la visita</label>
@@ -1301,8 +1301,8 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
-          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+          <div class="action-btn primary" onclick="goToList()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9Zm0 2h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4ZM7 10h10v1.5H7V10Zm0 3.5h10V15H7v-1.5Zm0 3.5h7v1.5H7V17Z"/></svg></span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="10" cy="7" r="4"/><path d="M2 19c0-3.314 3.582-6 8-6 1.29 0 2.5.25 3.55.69A5 5 0 0 0 18 21H2v-2Z"/><path d="M18 12v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2Z"/></svg></span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
         </div>
       </div>
 
@@ -1334,9 +1334,9 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">Prioridad</div>
         <div class="priority-picker">
-          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
-          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
-          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#ef4444"/></svg></div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#f59e0b"/></svg></div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#22c55e"/></svg></div><div class="name">Normal</div></div>
         </div>
         <div class="input-group" style="margin-top: 16px;">
           <label>Observaciones de la visita</label>
@@ -1344,8 +1344,8 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
-          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+          <div class="action-btn primary" onclick="goToList()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9Zm0 2h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4ZM7 10h10v1.5H7V10Zm0 3.5h10V15H7v-1.5Zm0 3.5h7v1.5H7V17Z"/></svg></span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="10" cy="7" r="4"/><path d="M2 19c0-3.314 3.582-6 8-6 1.29 0 2.5.25 3.55.69A5 5 0 0 0 18 21H2v-2Z"/><path d="M18 12v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2Z"/></svg></span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
         </div>
       </div>
 
@@ -1384,9 +1384,9 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">Prioridad</div>
         <div class="priority-picker">
-          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon">🔴</div><div class="name">Especial</div></div>
-          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon">🟡</div><div class="name">Con tiempo</div></div>
-          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon">🟢</div><div class="name">Normal</div></div>
+          <div class="priority-option especial" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#ef4444"/></svg></div><div class="name">Especial</div></div>
+          <div class="priority-option tiempo" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#f59e0b"/></svg></div><div class="name">Con tiempo</div></div>
+          <div class="priority-option normal selected" onclick="pickPriority(this)"><div class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="8" fill="#22c55e"/></svg></div><div class="name">Normal</div></div>
         </div>
         <div class="input-group" style="margin-top: 16px;">
           <label>Observaciones de la visita</label>
@@ -1394,8 +1394,8 @@ if ('caches' in window) {
         </div>
         <div class="section-title" style="margin-top: 16px;">¿Cómo procedés?</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-          <div class="action-btn primary" onclick="goToList()"><span class="icon">📋</span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
-          <div class="action-btn" onclick="show('assignDirect')"><span class="icon">👩</span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
+          <div class="action-btn primary" onclick="goToList()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9 2a1 1 0 0 0-1 1v1H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V3a1 1 0 0 0-1-1H9Zm0 2h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4ZM7 10h10v1.5H7V10Zm0 3.5h10V15H7v-1.5Zm0 3.5h7v1.5H7V17Z"/></svg></span><span class="label">Mandar a lista</span><span class="sub">la toma quien se desocupe</span></div>
+          <div class="action-btn" onclick="show('assignDirect')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="10" cy="7" r="4"/><path d="M2 19c0-3.314 3.582-6 8-6 1.29 0 2.5.25 3.55.69A5 5 0 0 0 18 21H2v-2Z"/><path d="M18 12v2h-2v2h2v2h2v-2h2v-2h-2v-2h-2Z"/></svg></span><span class="label">Asignar directo</span><span class="sub">elegí la chica ahora</span></div>
         </div>
       </div>
 
@@ -1458,11 +1458,11 @@ if ('caches' in window) {
     </div>
 
     <nav class="nav">
-      <button onclick="show('mikaelaHome')"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-      <button onclick="show('clientDirectory')"><span class="icon">📇</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">📊</span><span class="label-dock">Historial</span></button>
-      <button><span class="icon">◐</span></button>
+      <button onclick="show('mikaelaHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Hoy</span></button>
+      <button onclick="show('clientDirectory')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M4 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm4 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-3 7c0-1.5 1.34-2.5 3-2.5s3 1 3 2.5v.5H5v-.5ZM13 9h5a.75.75 0 0 1 0 1.5h-5A.75.75 0 0 1 13 9Zm0 3.5h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5Z"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Historial</span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 1 1 0 20A10 10 0 0 1 12 2Zm0 2v16a8 8 0 0 0 0-16Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -1502,11 +1502,11 @@ if ('caches' in window) {
         </div>
         <div style="display: flex; gap: 8px;" id="capacitySlots">
           <div class="capacity-slot" id="slot1" style="flex: 1; padding: 14px; border: 2px dashed var(--line); border-radius: var(--radius-sm); text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-faint); cursor: pointer;" onclick="if(this.dataset.active==='true') window.confirmarServicioObligatorio(1)">
-            <div style="font-size: 20px; margin-bottom: 4px;">💺</div>
+            <div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>
             Libre
           </div>
           <div class="capacity-slot" id="slot2" style="flex: 1; padding: 14px; border: 2px dashed var(--line); border-radius: var(--radius-sm); text-align: center; font-size: 12px; font-weight: 600; color: var(--ink-faint); cursor: pointer;" onclick="if(this.dataset.active==='true') window.confirmarServicioObligatorio(2)">
-            <div style="font-size: 20px; margin-bottom: 4px;">💺</div>
+            <div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>
             Libre
           </div>
         </div>
@@ -1515,7 +1515,7 @@ if ('caches' in window) {
 
     <!-- ATENDIENDO AHORA -->
     <div id="staffAtendiendoSection" style="display: none; margin-bottom: 16px;">
-      <div class="section-title">✂️ Atendiendo ahora</div>
+      <div class="section-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg> Atendiendo ahora</div>
       <div id="staffAtendiendoList"></div>
     </div>
 
@@ -1525,11 +1525,11 @@ if ('caches' in window) {
     </div>
 
     <nav class="nav">
-      <button class="active"><span class="icon">⌂</span><span class="label-dock">Hoy</span></button>
-      <button onclick="show('waitList')"><span class="icon">☰</span><span class="badge" id="navBadge">2</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('staffPromos')"><span class="icon">🏷</span></button>
-      <button onclick="openResumenSemana()"><span class="icon">📊</span><span class="label-dock">Semana</span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Hoy</span></button>
+      <button onclick="show('waitList')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="5" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="16.5" width="18" height="2.5" rx="1.25"/></svg></span><span class="badge" id="navBadge">2</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('staffPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
+      <button onclick="openResumenSemana()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Semana</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -1553,11 +1553,11 @@ if ('caches' in window) {
     <div id="waitListContent"></div>
 
     <nav class="nav">
-      <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
-      <button class="active"><span class="icon">☰</span><span class="label-dock">Espera</span><span class="badge" id="navBadge2">2</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('staffPromos')"><span class="icon">🏷</span></button>
-      <button onclick="openResumenSemana()"><span class="icon">📊</span><span class="label-dock">Semana</span></button>
+      <button onclick="show('staffHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="5" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="16.5" width="18" height="2.5" rx="1.25"/></svg></span><span class="label-dock">Espera</span><span class="badge" id="navBadge2">2</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('staffPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
+      <button onclick="openResumenSemana()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Semana</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -1570,7 +1570,7 @@ if ('caches' in window) {
         <!-- DEPILACIÓN: selector de partes que hará esta staff -->
         <div id="takeDepiSplit" style="display: none;">
           <div style="background: #fff8e6; border: 2px solid #e0a800; border-radius: 16px; padding: 14px; margin-bottom: 16px;">
-            <div style="font-size: 12px; font-weight: 800; color: #856404; margin-bottom: 10px;">🪒 ¿Qué parte del servicio hacés vos?</div>
+            <div style="font-size: 12px; font-weight: 800; color: #856404; margin-bottom: 10px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg> ¿Qué parte del servicio hacés vos?</div>
             <div style="font-size: 11px; color: #856404; margin-bottom: 12px;">Seleccioná los servicios que realizarás. Los que no marques quedarán en lista para otra staff.</div>
             <div id="takeDepiItems"></div>
           </div>
@@ -1703,11 +1703,11 @@ if ('caches' in window) {
     <button class="btn-primary outline" id="as1DevolverBtn" style="color: var(--danger); border-color: var(--danger-bg);" onclick="devolverALista(1)">Devolver a lista</button>
 
     <nav class="nav">
-      <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
-      <button><span class="icon">☰</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">✂</span><span class="label-dock">Atención</span></button>
-      <button onclick="show('staffPromos')"><span class="icon">🏷</span></button>
+      <button onclick="show('staffHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="5" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="16.5" width="18" height="2.5" rx="1.25"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9.5 12 3.5 6a3 3 0 1 1 2-2l4 4 4-4a3 3 0 1 1 2 2L9.5 12Zm0 0 6 6a3 3 0 1 1-2 2l-4-4-4 4a3 3 0 1 1-2-2l6-6ZM5 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm0 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg></span><span class="label-dock">Atención</span></button>
+      <button onclick="show('staffPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -1923,7 +1923,7 @@ if ('caches' in window) {
     <div class="modal-bg" id="registrarVisitaFacialModal">
       <div class="modal">
         <div class="modal-handle"></div>
-        <div class="modal-title">✨ Registrar visita facial</div>
+        <div class="modal-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Registrar visita facial</div>
         <div style="font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:16px;text-align:center;">Se guardará en el historial (últimas 5 visitas)</div>
         <div class="input-group">
           <label>Servicio realizado</label>
@@ -2016,7 +2016,7 @@ if ('caches' in window) {
     <div class="modal-bg" id="newCejasPigmentoModal">
       <div class="modal">
         <div class="modal-handle"></div>
-        <div class="modal-title">💉 Nueva sesión - Cejas efecto polvo</div>
+        <div class="modal-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Nueva sesión - Cejas efecto polvo</div>
         <div class="input-group">
           <label>Color utilizado</label>
           <input type="text" id="cpColor" placeholder="Ej: Castaño medio, Ash brown...">
@@ -2041,7 +2041,7 @@ if ('caches' in window) {
           <label>Observaciones</label>
           <textarea id="cpObs" placeholder="Detalles de la sesión, reacciones, etc..."></textarea>
         </div>
-        <button class="btn-primary" onclick="saveCejasPigmentoFicha()">💉 Guardar sesión</button>
+        <button class="btn-primary" onclick="saveCejasPigmentoFicha()"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Guardar sesión</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
@@ -2127,11 +2127,11 @@ if ('caches' in window) {
     <button class="btn-primary outline" style="color: var(--danger); border-color: var(--danger-bg);" onclick="devolverALista(2)">Devolver a lista</button>
 
     <nav class="nav">
-      <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
-      <button><span class="icon">☰</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">✂</span><span class="label-dock">Clienta 2</span></button>
-      <button onclick="show('staffPromos')"><span class="icon">🏷</span></button>
+      <button onclick="show('staffHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="5" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="16.5" width="18" height="2.5" rx="1.25"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M9.5 12 3.5 6a3 3 0 1 1 2-2l4 4 4-4a3 3 0 1 1 2 2L9.5 12Zm0 0 6 6a3 3 0 1 1-2 2l-4-4-4 4a3 3 0 1 1-2-2l6-6ZM5 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm0 14a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg></span><span class="label-dock">Clienta 2</span></button>
+      <button onclick="show('staffPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -2153,11 +2153,11 @@ if ('caches' in window) {
     <div id="staffPromosList"></div>
 
     <nav class="nav">
-      <button onclick="show('staffHome')"><span class="icon">⌂</span></button>
-      <button onclick="show('waitList')"><span class="icon">☰</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">🏷</span><span class="label-dock">Promos</span></button>
-      <button onclick="openResumenSemana()"><span class="icon">📊</span><span class="label-dock">Semana</span></button>
+      <button onclick="show('staffHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button onclick="show('waitList')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="5" width="18" height="2.5" rx="1.25"/><rect x="3" y="10.75" width="18" height="2.5" rx="1.25"/><rect x="3" y="16.5" width="18" height="2.5" rx="1.25"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span><span class="label-dock">Promos</span></button>
+      <button onclick="openResumenSemana()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Semana</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -2203,11 +2203,11 @@ if ('caches' in window) {
     </div>
 
     <nav class="nav">
-      <button class="active" onclick="show('ownerHome')"><span class="icon">⌂</span><span class="label-dock">Resumen</span></button>
-      <button onclick="show('ownerPromos')"><span class="icon">🏷</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('ownerReports')"><span class="icon">📊</span></button>
-      <button onclick="show('ownerPayments')"><span class="icon">💰</span></button>
+      <button class="active" onclick="show('ownerHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Resumen</span></button>
+      <button onclick="show('ownerPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('ownerReports')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span></button>
+      <button onclick="show('ownerPayments')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7ZM2 10h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -2235,11 +2235,11 @@ if ('caches' in window) {
     </button>
 
     <nav class="nav">
-      <button onclick="show('ownerHome')"><span class="icon">⌂</span></button>
-      <button class="active"><span class="icon">🏷</span><span class="label-dock">Promos</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('ownerReports')"><span class="icon">📊</span></button>
-      <button onclick="show('ownerPayments')"><span class="icon">💰</span></button>
+      <button onclick="show('ownerHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span><span class="label-dock">Promos</span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('ownerReports')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span></button>
+      <button onclick="show('ownerPayments')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7ZM2 10h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -2263,7 +2263,7 @@ if ('caches' in window) {
           </select>
         </div>
         <div class="input-group">
-          <label>🪒 Depilación <span style="font-size: 10px; color: var(--ink-faint); font-weight: 500;">(hasta 3 servicios)</span></label>
+          <label><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg> Depilación <span style="font-size: 10px; color: var(--ink-faint); font-weight: 500;">(hasta 3 servicios)</span></label>
           <select id="promoDepilacion1" onchange="updatePromoTotal()">
             <option value="">— No incluir —</option>
           </select>
@@ -2281,7 +2281,7 @@ if ('caches' in window) {
           </select>
         </div>
         <div class="input-group">
-          <label>✨ Facial</label>
+          <label><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Facial</label>
           <select id="promoFacial" onchange="updatePromoTotal()">
             <option value="">— No incluir —</option>
           </select>
@@ -2352,11 +2352,11 @@ if ('caches' in window) {
     </div>
 
     <nav class="nav">
-      <button onclick="show('ownerHome')"><span class="icon">⌂</span></button>
-      <button onclick="show('ownerPromos')"><span class="icon">🏷</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button class="active"><span class="icon">📊</span><span class="label-dock">Reportes</span></button>
-      <button onclick="show('ownerPayments')"><span class="icon">💰</span></button>
+      <button onclick="show('ownerHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button onclick="show('ownerPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Reportes</span></button>
+      <button onclick="show('ownerPayments')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7ZM2 10h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg></span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
   </div>
@@ -2415,11 +2415,11 @@ if ('caches' in window) {
     <div id="payHistory"></div>
 
     <nav class="nav">
-      <button onclick="show('ownerHome')"><span class="icon">⌂</span></button>
-      <button onclick="show('ownerPromos')"><span class="icon">🏷</span></button>
-      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon">↻</span></button>
-      <button onclick="show('ownerReports')"><span class="icon">📊</span></button>
-      <button class="active"><span class="icon">💰</span><span class="label-dock">Pagos</span></button>
+      <button onclick="show('ownerHome')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button onclick="show('ownerPromos')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h8.172a2 2 0 0 1 1.414.586l8.414 8.414a2 2 0 0 1 0 2.828l-5.172 5.172a2 2 0 0 1-2.828 0L4.586 11.586A2 2 0 0 1 4 10.172V4a1 1 0 0 0-1-1Zm4.5 4.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z"/></svg></span></button>
+      <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
+      <button onclick="show('ownerReports')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7ZM2 10h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg></span><span class="label-dock">Pagos</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
 
@@ -2628,7 +2628,7 @@ if ('caches' in window) {
     return selected;
   }
 
-  const AREA_LABELS = { cejas: '💅 Cejas', depilacion: '🪒 Depilación', pestanas: '👁 Pestañas', facial: '✨ Facial' };
+  const AREA_LABELS = { cejas: '💅 Cejas', depilacion: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg> Depilación', pestanas: '👁 Pestañas', facial: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg> Facial' };
   const AREA_COMM = { cejas: '30%', depilacion: '30%', pestanas: '30%', facial: '40%' };
   const AREA_STAFF = { cejas: 'María / Keyla / Lesly / Rosa', depilacion: 'María / Keyla / Lesly / Rosa', pestanas: 'Yadira / Diana', retiro_lifting: 'María / Keyla / Lesly / Rosa / Yadira / Diana', facial: 'Laura' };
 
@@ -2678,7 +2678,7 @@ if ('caches' in window) {
       row.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
           <div>
-            <div style="font-weight: 700; font-size: 13px;">${isDepiItem ? '🪒 ' : (AREA_LABELS[area] ? AREA_LABELS[area] + ' · ' : '')}${itemName}</div>
+            <div style="font-weight: 700; font-size: 13px;">${isDepiItem ? '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg> ' : (AREA_LABELS[area] ? AREA_LABELS[area] + ' · ' : '')}${itemName}</div>
             <div style="font-size: 10px; color: var(--ink-faint); margin-top: 2px;">→ La atiende: ${AREA_STAFF[area] || AREA_STAFF['cejas']} · Comisión: ${AREA_COMM[area]}</div>
           </div>
         </div>
@@ -5261,7 +5261,7 @@ if ('caches' in window) {
       // ── TICKET MULTI: mostrar TODAS las áreas con checkboxes ──
       // La staff puede marcar cuáles va a hacer ella (toma todas las marcadas de una vez)
       const areas = window._tmAreasActuales;
-      const areaIcons = { cejas:'💅', depilacion:'🪒', depilacion:'🪒', pestanas:'👁', retiro_lifting:'✨', facial:'🌿' };
+      const areaIcons = { cejas:'💅', depilacion:'<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>', pestanas:'👁', retiro_lifting:'✨', facial:'<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg>' };
       const areaLabels = { cejas:'Cejas', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
       const user = window.currentUser;
 
@@ -5825,7 +5825,7 @@ if ('caches' in window) {
       'depilacion': '💅 Depilación',
       'pestanas': '👁 Pestañas',
       'retiro_lifting': '👁 Lifting/Retiro',
-      'facial': '✨ Facial'
+      'facial': '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg> Facial'
     };
     
     // Encontrar la división correspondiente al área actual
@@ -5870,7 +5870,7 @@ if ('caches' in window) {
     const serviciosFaltantes = areasFaltantes.map(a => {
       const label = areaMap[a];
       const div = promo.division.find(d => d.area === label);
-      return div ? div.area.replace('💅 ', '').replace('👁 ', '').replace('✨ ', '') : a;
+      return div ? div.area.replace('💅 ', '').replace('👁 ', '').replace('✨ ', '').replace(/(<svg[^>]*>.*?<\/svg>)\s*/g, '') : a;
     }).join(' + ');
     
     console.log('División calculada:', {
@@ -6114,7 +6114,7 @@ if ('caches' in window) {
       slot1.style.background = 'var(--success-bg)';
       slot1.dataset.active = 'true';
     } else {
-      slot1.innerHTML = '<div style="font-size: 20px; margin-bottom: 4px;">💺</div>Libre';
+      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>Libre';
       slot1.style.border = '2px dashed var(--line)';
       slot1.style.background = 'transparent';
       slot1.dataset.active = 'false';
@@ -6126,7 +6126,7 @@ if ('caches' in window) {
       slot2.style.background = 'var(--info-bg)';
       slot2.dataset.active = 'true';
     } else {
-      slot2.innerHTML = '<div style="font-size: 20px; margin-bottom: 4px;">💺</div>Libre';
+      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>Libre';
       slot2.style.border = '2px dashed var(--line)';
       slot2.style.background = 'transparent';
       slot2.dataset.active = 'false';
@@ -6141,7 +6141,7 @@ if ('caches' in window) {
     if (!banner || !items) return;
     if (!secuencia || secuencia.length === 0) { banner.style.display = 'none'; return; }
 
-    const ICONS = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
+    const ICONS = { cejas: '💅', depilacion: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>', pestanas: '👁', retiro_lifting: '✨', facial: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg>' };
     const LABELS = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting', facial: 'Facial' };
 
     items.innerHTML = secuencia.map((area, i) => `
@@ -7359,7 +7359,7 @@ if ('caches' in window) {
   window._secuencia = []; // [{area, label}]
 
   const AREA_LABELS_SEC = { cejas: 'Cejas', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
-  const AREA_ICONS_SEC = { cejas: '💅', depilacion: '🪒', pestanas: '👁', retiro_lifting: '✨', facial: '🌿' };
+  const AREA_ICONS_SEC = { cejas: '💅', depilacion: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>', pestanas: '👁', retiro_lifting: '✨', facial: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg>' };
 
   function addAreaSecuencia(area) {
     window._secuencia.push({ area, label: AREA_LABELS_SEC[area] || area });
@@ -7693,7 +7693,7 @@ if ('caches' in window) {
         } else {
           atenList.innerHTML = enServicio.map(a => {
             const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-            const areaIcons = { cejas: '💅', depilacion: '🪒', depilación: '🪒', pestanas: '👁', pestañas: '👁', retiro_lifting: '✨', facial: '🌿' };
+            const areaIcons = { cejas: '💅', depilacion: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>', depilación: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>', pestanas: '👁', pestañas: '👁', retiro_lifting: '✨', facial: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg>' };
             const areaLabels = { cejas: 'Cejas', depilacion: 'Depilación', depilación: 'Depilación', pestanas: 'Pestañas', pestañas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
 
             let timelineHTML = '';
@@ -11130,7 +11130,7 @@ if ('caches' in window) {
     // Si NO puede ver la ficha (Mikaela, staff de cejas/pestañas): solo historial
     if (!canSeeFicha) {
       el.innerHTML = `
-        <div class="section-title">✨ Últimos faciales${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
+        <div class="section-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Últimos faciales${history.length > 0 ? ' <span class="count">' + history.length + '</span>' : ''}</div>
         ${history.length > 0 ? `
           <div class="card" style="padding: 10px 14px;">
             ${history.map((h, i) => `
@@ -11153,13 +11153,13 @@ if ('caches' in window) {
     el.innerHTML = `
       ${obsArea ? `
         <div style="background: var(--success-bg); border: 1.5px solid #a3d4b1; border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 14px;">
-          <div style="font-size: 11px; font-weight: 700; color: var(--success); margin-bottom: 4px;">✨ Obs. de facial</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--success); margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Obs. de facial</div>
           <div style="font-size: 13px; color: #2d5a3a; font-weight: 500; line-height: 1.5;">${obsArea}</div>
         </div>
       ` : ''}
       ${ficha ? `
         <div style="background: linear-gradient(135deg, var(--success) 0%, #2d5a3a 100%); color: white; border-radius: 22px; padding: 18px; margin-bottom: 16px;">
-          <div style="font-size: 12px; font-weight: 600; opacity: 0.8; margin-bottom: 12px;">✨ Ficha facial · ${clientName}</div>
+          <div style="font-size: 12px; font-weight: 600; opacity: 0.8; margin-bottom: 12px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg> Ficha facial · ${clientName}</div>
           
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px;">
             <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
@@ -11217,7 +11217,7 @@ if ('caches' in window) {
         </div>
       ` : `
         <div style="background: var(--bg-card); border: 2px dashed var(--line); border-radius: 22px; padding: 24px; text-align: center; margin-bottom: 16px;">
-          <div style="font-size: 28px; margin-bottom: 8px;">✨</div>
+          <div style="margin-bottom: 8px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,28.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg></div>
           <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Sin ficha facial</div>
           <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 14px;">Se creará en su primer servicio de facial</div>
           ${window.currentUser?.area === 'facial' || window.currentUser?.role === 'owner' ? '<button onclick="openFacialForm()" style="padding: 14px 28px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;">+ Crear ficha facial</button>' : ''}
@@ -11286,7 +11286,7 @@ if ('caches' in window) {
       el.innerHTML = `
         ${proxRetoque ? `
           <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white; border-radius: 20px; padding: 16px; margin-bottom: 16px;">
-            <div style="font-size: 11px; font-weight: 600; opacity: 0.9; margin-bottom: 8px;">💉 Próximo retoque recomendado</div>
+            <div style="font-size: 11px; font-weight: 600; opacity: 0.9; margin-bottom: 8px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Próximo retoque recomendado</div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-size: 18px; font-weight: 800; margin-bottom: 2px;">📅 ${proxRetoque.fecha}</div>
@@ -11299,7 +11299,7 @@ if ('caches' in window) {
           </div>
         ` : ''}
         
-        <div class="section-title">💉 Cejas efecto polvo ${numSesiones > 0 ? '(' + numSesiones + ' sesiones)' : ''}</div>
+        <div class="section-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg> Cejas efecto polvo ${numSesiones > 0 ? '(' + numSesiones + ' sesiones)' : ''}</div>
         
         ${numSesiones > 0 ? `
           <div class="card" style="padding: 10px 14px;">
@@ -11327,7 +11327,7 @@ if ('caches' in window) {
           </div>
         ` : `
           <div style="background: var(--bg-card); border: 2px dashed var(--line); border-radius: 22px; padding: 24px; text-align: center;">
-            <div style="font-size: 28px; margin-bottom: 8px;">💉</div>
+            <div style="margin-bottom: 8px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M28.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg></div>
             <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px;">Sin historial de pigmentación</div>
             <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 14px;">La primera sesión se registrará automáticamente</div>
             ${canEdit ? '<button onclick="openCejasPigmentoModal(\'' + codigo + '\', \'' + clientName + '\')" class="btn-primary">+ Registrar primera sesión</button>' : ''}
@@ -11354,7 +11354,7 @@ if ('caches' in window) {
   function renderGenericTab(el, data, tab) {
     const history = data?.history || [];
     const obsArea = data?.obsArea || '';
-    const icons = { cejas: '💅', depilacion: '🪒' };
+    const icons = { cejas: '💅', depilacion: '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z'/></svg>' };
     const labels = { cejas: 'Cejas', depilacion: 'Depilación' };
     const colors = { cejas: { bg: '#fff5eb', border: '#f0d9b8', text: '#8a5a2a' }, depilacion: { bg: '#f0f7ff', border: '#b8d4f0', text: '#2b5aa0' } };
     const c = colors[tab] || colors.cejas;
@@ -11898,7 +11898,7 @@ if ('caches' in window) {
       // Determinar qué parte le toca a esta chica
       const user = window.currentUser;
       const myArea = user?.area || 'cejas';
-      const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+      const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg> Facial';
       const myDiv = inProgress.promo.division.find(d => d.area === areaLabel);
       document.getElementById('promoInProgressMy').textContent = myDiv ? (areaLabel + ' — $' + myDiv.monto + ' (' + myDiv.comm + ')') : 'Tu área no está en esta promo';
       
@@ -12099,7 +12099,7 @@ if ('caches' in window) {
 
   function showPromoBanner(slot, promo, myArea, isContinuation) {
     const banner = document.getElementById('promoBanner' + slot);
-    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '✨ Facial';
+    const areaLabel = myArea === 'cejas' ? '💅 Cejas' : myArea === 'pestanas' ? '👁 Pestañas' : '<svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z'/><path d='M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z'/><path d='M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z'/><path d='M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z'/><path d='M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z'/><path d='M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z'/></svg> Facial';
     const myDiv = promo.division.find(d => d.area === areaLabel);
     
     document.getElementById('promoBannerName' + slot).textContent = promo.name;
@@ -13687,7 +13687,7 @@ if ('caches' in window) {
         var otroCount = fichas.length - 1;
         el.innerHTML = '<div style="background:linear-gradient(135deg,#92400e,#b45309);color:white;border-radius:20px;padding:16px;margin-bottom:10px;">'
           + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-          + '<div style="font-size:11px;font-weight:600;opacity:.8;">💉 Ficha activa · ' + clientNombre + '</div>'
+          + '<div style="font-size:11px;font-weight:600;opacity:.8;"><svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z'/><path d='M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z'/><path d='M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z'/></svg> Ficha activa · ' + clientNombre + '</div>'
           + '<div style="background:rgba(255,255,255,.2);padding:3px 10px;border-radius:var(--radius-pill);font-size:10px;font-weight:700;">' + (ultimaSesion.fecha || '—') + '</div>'
           + '</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">'
@@ -13704,7 +13704,7 @@ if ('caches' in window) {
           + (otroCount > 0 ? '<button onclick="loadCejasQuick(\'' + clientKey + '\',' + slot + ',\'' + clientCodigo + '\',\'' + clientNombre + '\')" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">📂 Ver ' + otroCount + ' sesión(es) anterior(es)</button>' : '');
       } else {
         el.innerHTML = '<div style="background:var(--bg-card);border:2px dashed #92400e;border-radius:20px;padding:18px;text-align:center;">'
-          + '<div style="font-size:24px;margin-bottom:6px;">💉</div>'
+          + '<div style="margin-bottom:6px;"><svg class='nx-icon' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='currentColor'><path d='M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z'/><path d='M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z'/><path d='M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z'/></svg></div>'
           + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:#92400e;">Sin ficha de efecto polvo</div>'
           + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Primera sesión de esta clienta</div>'
           + '<button onclick="abrirModalPigmento()" style="padding:14px 24px;background:linear-gradient(135deg,#92400e,#78350f);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Registrar primera sesión</button>'
