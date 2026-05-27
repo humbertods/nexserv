@@ -3693,7 +3693,43 @@ function handleEliminarServicio(data) {
       }
     } catch(e) {}
 
-    return { success: true, eliminado: eliminadoHist };
+    if (!eliminadoHist) {
+      // Intentar matching más flexible — solo por cliente + staff + precio (sin fecha estricta)
+      const wsHist2 = getSheet('HistorialOwner');
+      const histData2 = wsHist2.getDataRange().getValues();
+      for (let i = histData2.length - 1; i >= 3; i--) {
+        const rowCliente2  = String(histData2[i][3] || '').trim().toLowerCase();
+        const rowStaff2    = String(histData2[i][7] || '').trim().toLowerCase();
+        const rowServicio2 = String(histData2[i][5] || '').trim().toLowerCase();
+        const rowPrecio2   = Number(histData2[i][8] || 0);
+        const rowHora2     = histData2[i][1] instanceof Date
+          ? Utilities.formatDate(histData2[i][1], tz, 'HH:mm')
+          : String(histData2[i][1] || '');
+        const matchCliente2  = rowCliente2.includes(cliente) || cliente.includes(rowCliente2);
+        const matchStaff2    = staff === '' || rowStaff2.includes(staff) || staff.includes(rowStaff2);
+        const matchServicio2 = rowServicio2.includes(servicio.substring(0, 12)) || servicio.includes(rowServicio2.substring(0, 12));
+        const matchPrecio2   = Math.abs(rowPrecio2 - precio) < 0.5;
+        const matchHora2     = !hora || rowHora2 === hora || rowHora2.startsWith(hora.substring(0,5));
+        if (matchCliente2 && matchStaff2 && matchServicio2 && matchPrecio2 && matchHora2) {
+          const rowStaff2Val  = String(histData2[i][7] || '');
+          const rowComision2  = Number(histData2[i][9] || 0);
+          if (rowStaff2Val && rowComision2 > 0) {
+            if (!staffsAfectados[rowStaff2Val.toLowerCase()]) staffsAfectados[rowStaff2Val.toLowerCase()] = { precio: 0, comision: 0 };
+            staffsAfectados[rowStaff2Val.toLowerCase()].precio   += rowPrecio2;
+            staffsAfectados[rowStaff2Val.toLowerCase()].comision += rowComision2;
+          }
+          wsHist2.deleteRow(i + 1);
+          eliminadoHist = true;
+          break;
+        }
+      }
+    }
+
+    if (!eliminadoHist) {
+      return { success: false, error: 'No se encontró el registro en HistorialOwner. Verificá que el servicio no haya sido eliminado ya.' };
+    }
+
+    return { success: true, eliminado: true };
   } catch(e) {
     return { success: false, error: e.toString() };
   }
@@ -4958,14 +4994,9 @@ function handleConfirmarCobroMulti(data) {
 // PUSH NOTIFICATIONS (Web Push / VAPID)
 // ============================================
 
-var VAPID_PRIVATE_KEY = 'Ui8f9T4dFc078uBvJOXoGdz50Byisxt2MpGNcWWD1ow';
-var VAPID_PUBLIC_KEY  = 'BIpY_HrrM59Z_RxKCQD58bhFgy_p77Agz5A05OdQv5tr-amNn5eqVvTiLj7MoLOt_d7sRvOEw5oljgjV3WAmn9g';
-var VAPID_SUBJECT     = 'mailto:admin@nexserv.app';
-
 function handleGuardarPushSub(data) {
   if (!data.staffKey || !data.subscription) return { success: false, error: 'Datos incompletos' };
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty(data.staffKey, data.subscription);
+  PropertiesService.getScriptProperties().setProperty(data.staffKey, data.subscription);
   return { success: true };
 }
 
@@ -4974,112 +5005,38 @@ function handleEnviarPushStaff(data) {
   var props = PropertiesService.getScriptProperties();
   var enviados = 0;
   var errores = [];
-
   data.staffKeys.forEach(function(key) {
     var subStr = props.getProperty(key);
     if (!subStr) return;
     try {
       var sub = JSON.parse(subStr);
-      var sent = sendWebPush(sub, data.titulo, data.cuerpo || '', data.url || 'https://humbertods.github.io/nexserv/');
-      if (sent) enviados++;
+      var payload = JSON.stringify({
+        title: data.titulo,
+        body: data.cuerpo || '',
+        url: data.url || 'https://humbertods.github.io/nexserv/',
+        icon: 'https://humbertods.github.io/nexserv/icon-192.png',
+        tag: 'nexserv-' + Date.now()
+      });
+      var response = UrlFetchApp.fetch(sub.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'TTL': '86400'
+        },
+        payload: payload,
+        muteHttpExceptions: true
+      });
+      var code = response.getResponseCode();
+      if (code === 410 || code === 404) {
+        props.deleteProperty(key);
+      } else if (code >= 200 && code < 300) {
+        enviados++;
+      } else {
+        errores.push(key + ': HTTP ' + code);
+      }
     } catch(e) {
       errores.push(key + ': ' + e.message);
     }
   });
-
   return { success: true, enviados: enviados, errores: errores };
-}
-
-function sendWebPush(subscription, title, body, url) {
-  var endpoint = subscription.endpoint;
-  var p256dh   = subscription.keys ? subscription.keys.p256dh : null;
-  var auth     = subscription.keys ? subscription.keys.auth   : null;
-
-  var payload = JSON.stringify({ title: title, body: body, url: url, icon: '/nexserv/icon-192.png', tag: 'nexserv-' + Date.now() });
-
-  // Construir el JWT VAPID
-  var header  = base64url(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
-  var audience = endpoint.match(/^(https?:\/\/[^\/]+)/)[1];
-  var expiry   = Math.floor(Date.now() / 1000) + 43200;
-  var claims  = base64url(JSON.stringify({ aud: audience, exp: expiry, sub: VAPID_SUBJECT }));
-  var sigInput = header + '.' + claims;
-
-  // Firmar con la clave privada VAPID usando el servicio de firma de Apps Script
-  var privateKeyBytes = base64urlDecode(VAPID_PRIVATE_KEY);
-  var ecKey = {
-    crv: 'P-256',
-    d: VAPID_PRIVATE_KEY,
-    kty: 'EC',
-    x: VAPID_PUBLIC_KEY.substring(0, 43),
-    y: VAPID_PUBLIC_KEY.substring(43, 86)
-  };
-
-  // Apps Script no tiene firma ES256 nativa; usamos el endpoint de push con VAPID header
-  // Para Chrome/Firefox/Safari, el endpoint acepta la suscripción directamente con el Authorization header
-  var headers = {
-    'Content-Type': 'application/json',
-    'TTL': '86400'
-  };
-
-  // Si hay payload y claves de cifrado, enviarlo; si no, enviar vacío (solo notificación)
-  var options = {
-    method: 'POST',
-    headers: headers,
-    muteHttpExceptions: true
-  };
-
-  if (payload && p256dh && auth) {
-    // Cifrar el payload con las llaves del cliente
-    var encrypted = encryptPushPayload(payload, p256dh, auth);
-    if (encrypted) {
-      options.payload = encrypted.ciphertext;
-      options.headers['Content-Encoding'] = 'aes128gcm';
-      options.headers['Authorization'] = buildVapidHeader(audience, sigInput);
-    }
-  } else {
-    options.headers['Authorization'] = buildVapidHeader(audience, sigInput);
-  }
-
-  var response = UrlFetchApp.fetch(endpoint, options);
-  var code = response.getResponseCode();
-  if (code === 410 || code === 404) {
-    // Suscripción expirada — limpiar
-    var props = PropertiesService.getScriptProperties();
-    var allKeys = props.getKeys();
-    allKeys.forEach(function(k) {
-      try {
-        var s = JSON.parse(props.getProperty(k));
-        if (s && s.endpoint === endpoint) props.deleteProperty(k);
-      } catch(e) {}
-    });
-  }
-  return code >= 200 && code < 300;
-}
-
-function buildVapidHeader(audience, sigInput) {
-  // VAPID header simplificado — Apps Script no firma ES256 nativamente
-  // Usar el token base sin firma para compatibilidad con servidores de push que aceptan vapid-draft-02
-  return 'vapid t=' + sigInput + ', k=' + VAPID_PUBLIC_KEY;
-}
-
-function base64url(str) {
-  return Utilities.base64EncodeWebSafe(str).replace(/=+$/, '');
-}
-
-function base64urlDecode(str) {
-  var padding = '===='.slice(0, (4 - str.length % 4) % 4);
-  return Utilities.base64DecodeWebSafe(str + padding);
-}
-
-function encryptPushPayload(payload, p256dh, auth) {
-  // Cifrado aes128gcm básico usando Utilities de Apps Script
-  // Retorna null si no es posible (el push se envía sin payload)
-  try {
-    var salt = Utilities.newBlob(Utilities.getUuid().replace(/-/g,'')).getBytes().slice(0,16);
-    // Sin cifrado completo en Apps Script — retornar null para envío sin payload
-    // El SW mostrará la notificación igualmente si el servidor la construye
-    return null;
-  } catch(e) {
-    return null;
-  }
 }
