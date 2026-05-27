@@ -391,9 +391,12 @@ function handleGetPromos() {
     if (isNaN(num)) continue;
     promos.push({
       id: id,
+      name: String(row[1] || ''),           // campo 'name' para compatibilidad con PROMOS frontend
       nombre: row[1],
       servicios: row[2],
+      price: Number(row[3] || 0),           // precioCombo = precio promo
       precioCombo: row[3],
+      regular: Number(row[4] || row[3] || 0), // sumaIndividual = precio regular sin descuento
       sumaIndividual: row[4],
       ahorro: row[5],
       desde: row[6],
