@@ -3857,7 +3857,7 @@ if ('caches' in window) {
           } catch(e) { console.error('Error recargando promo:', e); }
         }
         if (activePromos[clientKey]) updateFinishButtons(1);
-      }, 300);
+      }, 500);
     }
     if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
     // Detener polling si el staff navega a otra pantalla
@@ -13762,10 +13762,24 @@ if ('caches' in window) {
         idEspera, chicaNombre: user?.name||'', chicaArea: user?.area||''
       });
       if (r.success) {
+        // Siempre refrescar _tmAreasActuales desde el backend tras cualquier acción TM
+        // Esto garantiza que si la staff navega y vuelve, el estado es correcto
+        try {
+          const tmFresh = await apiGet('getTicketMulti');
+          const idEsperaFresh = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+          const tmObj = (tmFresh.activos || []).find(t => t.idEspera === idEsperaFresh);
+          if (tmObj) {
+            if (slot === 1) window._tmAreasActuales  = tmObj.areas || [];
+            else             window._tmAreasActuales2 = tmObj.areas || [];
+          }
+        } catch(eFresh) {}
+
         if (r.todasCompletadas) {
-          showToast('🎯 Todo completado — finalizá el servicio');
-          // Actualizar botones: solo mostrar "Finalizar servicio"
-          updateFinishButtons(slot);
+          showToast('🎯 Todo completado — este es el último servicio');
+          const btnContainer = document.getElementById('as' + slot + 'FinishBtns');
+          if (btnContainer) {
+            btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slot + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
+          }
         } else {
           // Cargar el siguiente servicio en el panel (sin salir de la clienta)
           const sigNombre = r.siguienteArea || '';
@@ -13777,15 +13791,13 @@ if ('caches' in window) {
             if (!yaExiste) {
               slotServices[slot].push({ name: sigNombre, price: sigPrecio, area: user?.area || '' });
               renderServicesForSlot(slot);
-              // Actualizar total
               const nuevoTotal = slotServices[slot].reduce((s,v) => s + Number(v.price||0), 0);
               document.getElementById('as' + slot + 'Total').textContent = '$' + nuevoTotal;
               document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
             }
           }
-          showToast('✅ Siguiente servicio cargado: ' + sigNombre);
-          // Volver a consultar el TM — si hay más áreas pendientes, mostrar botones de nuevo
-          updateFinishButtons(slot);
+          showToast('✅ Siguiente servicio tomado: ' + sigNombre);
+          setTimeout(() => updateFinishButtons(slot), 300);
         }
       } else {
         alert('Error: ' + r.message);
