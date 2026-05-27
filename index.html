@@ -2761,6 +2761,38 @@ if ('serviceWorker' in navigator) {
     const pi = document.getElementById('promoPrice');
     if (pi) pi.addEventListener('input', updatePromoTotal);
     initPromoSelects();
+
+    // ── Restaurar sesión persistida ──────────────────────────
+    try {
+      const saved = localStorage.getItem('nexserv_session');
+      if (saved) {
+        const user = JSON.parse(saved);
+        if (user && user.name && user.role && user.active !== false) {
+          window.currentUser = user;
+          const roleLabelEl = document.getElementById('roleLabel');
+          if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
+          if (user.role === 'staff') {
+            const el = document.getElementById('staffName');
+            const av = document.getElementById('staffAvatar');
+            const wl = document.getElementById('waitListAvatar');
+            if (el) el.textContent = user.name;
+            if (av) av.textContent = user.name[0];
+            if (wl) wl.textContent = user.name[0];
+          }
+          show(user.screen || 'staffHome');
+          console.log('[Sesión] Restaurada para:', user.name);
+          // Re-suscribir push sin pedir permiso (ya lo dio antes)
+          setTimeout(() => {
+            if (!window._pushSuscrito && typeof suscribirPushActual === 'function') {
+              suscribirPushActual();
+            }
+          }, 2500);
+        }
+      }
+    } catch(e) {
+      console.warn('[Sesión] Error al restaurar:', e.message);
+    }
+    // ────────────────────────────────────────────────────────
   });
 
   const USERS = {
@@ -3967,7 +3999,9 @@ if ('serviceWorker' in navigator) {
     const roleLabelEl = document.getElementById('roleLabel');
     if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
     window.currentUser = user;
-    
+    // Persistir sesión para que sobreviva cierre de app
+    try { localStorage.setItem('nexserv_session', JSON.stringify(user)); } catch(e) {}
+
     if (user.role === 'staff') {
       document.getElementById('staffName').textContent = user.name;
       document.getElementById('staffAvatar').textContent = user.name[0];
@@ -4061,6 +4095,8 @@ if ('serviceWorker' in navigator) {
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
     window.currentUser = null;
+    // Limpiar sesión persistida
+    try { localStorage.removeItem('nexserv_session'); } catch(e) {}
     commVisible = false;
     closeUserMenu();
     show('login');
