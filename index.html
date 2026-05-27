@@ -3176,6 +3176,7 @@ if ('caches' in window) {
 
       // Historial
       if (histResult.success && histResult.porStaff && histResult.porStaff.length > 0) {
+        window._ownerItems = [];
         histContainer.innerHTML = histResult.porStaff.map((s, idx) => `
           <div style="background: var(--bg-card); border-radius: 16px; margin-bottom: 10px; overflow: hidden; box-shadow: var(--shadow-card);">
             <div onclick="toggleStaffHistorial(${idx})" style="display: flex; align-items: center; padding: 14px 16px; cursor: pointer; gap: 12px;">
@@ -3201,7 +3202,7 @@ if ('caches' in window) {
                     else svcDisplay = parsed.servicio || parsed.nombre || svcDisplay;
                   } catch(e) { svcDisplay = svcDisplay.substring(0, 40); }
                 }
-                const svSafe = encodeURIComponent(JSON.stringify({...sv, servicio: svcDisplay}));
+                const ownerItemIdx = window._ownerItems.push({...sv, servicio: svcDisplay}) - 1;
                 return `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; ${si < s.servicios.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
                   <div style="flex:1;">
@@ -3210,7 +3211,7 @@ if ('caches' in window) {
                   </div>
                   <div style="display:flex;align-items:center;gap:8px;">
                     <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Number(sv.precio || 0)}</div>
-                    <button onclick="confirmarEliminarOwner('${svSafe}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+                    <button onclick="confirmarEliminarOwner(${ownerItemIdx})" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
                   </div>
                 </div>`;
               }).join('')}
@@ -3269,10 +3270,10 @@ if ('caches' in window) {
     }
   }
 
-  function confirmarEliminarOwner(svJson) {
-    let sv;
-    try { sv = JSON.parse(decodeURIComponent(svJson)); } catch(e) { return; }
-    const msg = `¿Eliminar este registro?\n\n• Cliente: ${sv.cliente}\n• Servicio: ${sv.servicio}\n• Monto: $${sv.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
+  function confirmarEliminarOwner(idx) {
+    const sv = window._ownerItems && window._ownerItems[idx];
+    if (!sv) { alert('Error: no se encontró el registro. Recargá la página.'); return; }
+    const msg = `¿Eliminar este registro?\n\n• Cliente: ${sv.cliente}\n• Servicio: ${sv.servicio}\n• Monto: $${sv.precio}\n\nEsto revertirá la comisión y eliminará el registro de HistorialOwner, Comisiones y Servicios. No se puede deshacer.`;
     if (!confirm(msg)) return;
     eliminarServicio({
       nombre:   sv.cliente || sv.nombre || '',
@@ -7904,7 +7905,14 @@ if ('caches' in window) {
       });
       if (result.success) {
         showToast('✓ Registro eliminado correctamente');
-        loadServiciosHistory(); // recargar
+        // Recargar la pantalla correcta según desde dónde se llamó
+        const activeScreen = document.querySelector('.screen.active')?.id || '';
+        if (activeScreen === 'ownerHome') {
+          window._ownerItems = [];
+          loadOwnerHome();
+        } else {
+          loadServiciosHistory();
+        }
       } else {
         alert('Error al eliminar: ' + (result.error || 'desconocido'));
       }
