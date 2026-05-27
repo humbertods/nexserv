@@ -4739,6 +4739,30 @@ function handleCompletarAreaTicketMulti(data) {
         return a.estado !== 'Completado';
       });
 
+      // FIX: cuando esUltima=true, áreas "Esperando" sin staff asignada = nadie las tomó.
+      // Si la clienta se retira antes de completar todas las áreas, esas áreas se cancelan.
+      // No deben volver a lista de espera — el TM pasa directo a "Por cobrar" con lo hecho.
+      if (esUltima) {
+        var areasSinTomar = areasPendientes.filter(function(a) {
+          var staffArea = String(rows[i][TM_AREA_COL[a.idx] + 2] || '').trim();
+          return (!staffArea || a.estado === 'Esperando'); // nadie la tomó
+        });
+        if (areasSinTomar.length > 0 && areasSinTomar.length === areasPendientes.length) {
+          // TODAS las áreas pendientes son "Esperando" sin staff → la clienta se retira
+          // Cancelar esas áreas y mandar a cobro con lo que se hizo
+          for (var ac = 0; ac < 4; ac++) {
+            var baseC = TM_AREA_COL[ac];
+            if (!String(rows[i][baseC] || '').trim()) continue;
+            var estC = String(rows[i][baseC + 3] || '').trim();
+            var staffC = String(rows[i][baseC + 2] || '').trim();
+            if (estC === 'Esperando' && !staffC) {
+              ws.getRange(rowNum, baseC + 3 + 1).setValue('Cancelado');
+            }
+          }
+          areasPendientes = []; // forzar todasListas = true
+        }
+      }
+
       var todasListas = areasPendientes.length === 0;
 
       // Determinar si hay siguiente área según secuencia
