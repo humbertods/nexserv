@@ -3415,7 +3415,7 @@ if ('serviceWorker' in navigator) {
     if (_idEsperaSlot.startsWith('SP-')) {
       const _slotSP = slot1 ? 1 : 2;
       btnContainer.innerHTML = `
-        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="window._finishingSlot=${_slotSP}; finishAndSend()">
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
           ✅ Terminé — enviar a cobro con Mikaela
         </button>`;
       return;
@@ -5532,6 +5532,40 @@ if ('serviceWorker' in navigator) {
       const confirmBtn = document.getElementById('addSvcConfirmBtn');
       if (confirmBtn) confirmBtn.textContent = 'Confirmar cambio';
     }, 100);
+  }
+
+  async function finalizarServicioSP(slot) {
+    slot = slot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clienteCodigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+
+    // Obtener datos del servicio desde slotServices o desde activePromos
+    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const promoData = activePromos[clientKey];
+    const totalFinal = svcs.reduce((s,v) => s + Number(v.price||0), 0) || (promoData ? Number(promoData.promo?.price||0) : 0);
+    const svcNames = svcs.map(s => s.name).join(' + ') || promoData?.promo?.name || 'Servicio';
+    const precioRegular = promoData ? String(Number(promoData.promo?.regular || promoData.promo?.price || totalFinal)) : String(totalFinal);
+    const promoNombre = promoData?.promo?.name || '';
+
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey, clientName, svcNames,
+      total: String(totalFinal),
+      promoNombre, precioRegular,
+      idEspera, clienteCodigo,
+      areasExtras: [], promasExtraPendientes: []
+    };
+
+    showToast('⏳ Enviando a cobro...');
+    try {
+      await finishAndSend();
+    } catch(e) {
+      alert('Error al enviar a cobro: ' + e.message);
+    }
   }
 
   async function finishAndSend() {
@@ -13398,9 +13432,9 @@ if ('serviceWorker' in navigator) {
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
 
-    // Si es SP- (promo individual), delegar a finishAndSend que sí maneja SP correctamente
+    // Si es SP- (promo individual), delegar a finalizarServicioSP que prepara _finishingData
     if (idEspera && idEspera.startsWith('SP-')) {
-      await finishAndSend();
+      await finalizarServicioSP(slot);
       return;
     }
 
