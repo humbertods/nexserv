@@ -3375,24 +3375,12 @@ if ('caches' in window) {
         var miNombre = user && user.name ? user.name : '';
         var slotN = slot1 ? 1 : 2;
 
-        // Áreas pendientes: 'esperando' O 'en servicio' por staff distinta a esta
-        // (cuando "Yo sigo" se presionó, el área siguiente pasa a 'En servicio' — no 'Esperando')
+        // Áreas pendientes (no completadas, no en servicio por esta staff)
         var areasEsperando = (tm.areas || []).filter(function(a) {
-          var est = String(a.estado||'').toLowerCase();
-          var staffArea = String(a.staff||'').toLowerCase();
-          var miNombreLow = miNombre.toLowerCase();
-          // Incluir áreas esperando, o en servicio tomadas por esta misma staff (ya tomó el siguiente)
-          return est === 'esperando' || (est === 'en servicio' && staffArea === miNombreLow);
-        });
-        // Excluir el área que ya está actualmente 'En servicio' por esta staff (la que acaba de completar)
-        // Solo si hay más de una área 'en servicio' de esta staff, necesitamos la que aún no empieza
-        // En práctica: filtrar solo las que son el SIGUIENTE (no el que terminó)
-        var areasEsperandoNext = (tm.areas || []).filter(function(a) {
           return String(a.estado||'').toLowerCase() === 'esperando';
         });
-        // Si hay áreas esperando = usar esas; si no pero hay en servicio = ya las tomó = todasCompletadas desde UI
-        var hayMas = areasEsperandoNext.length > 0;
-        var sig = hayMas ? areasEsperandoNext[0] : null;
+        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
+        var hayMas = areasEsperando.length > 0;
 
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
@@ -3809,18 +3797,48 @@ if ('caches' in window) {
                       const tm = (tmR.activos || []).find(t => t.idEspera === idEspera1);
                       if (tm) {
                         window._tmAreasActuales = tm.areas || [];
-                        // Restaurar slotServices con los servicios del área de esta staff
                         const user1 = window.currentUser;
-                        const myArea1 = user1?.area || 'cejas';
-                        const miArea = (tm.areas || []).find(a =>
-                          String(a.area||'').toLowerCase().includes(myArea1.toLowerCase().substring(0,4)) &&
+                        const miNombreR = user1?.name || '';
+
+                        // Mostrar áreas COMPLETADAS de esta staff como historial readonly
+                        const areasCompletadasR = (tm.areas || []).filter(a =>
+                          String(a.staff||'') === miNombreR &&
+                          String(a.estado||'').toLowerCase() === 'completado'
+                        );
+                        if (areasCompletadasR.length > 0) {
+                          const svcListEl1 = document.getElementById('as1SvcList');
+                          if (svcListEl1) {
+                            const histHtml1 = areasCompletadasR.map(ar =>
+                              '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                              + '<span style="font-size:16px;">✅</span>'
+                              + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                              + (ar.tentativo || ar.area || 'Servicio previo')
+                              + '</div><div style="font-size:11px;color:var(--success);">Completado · $' + (ar.precio || 0) + '</div></div>'
+                              + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
+                              + '</div>'
+                            ).join('');
+                            svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
+                          }
+                        }
+
+                        // Restaurar slotServices con áreas EN SERVICIO de esta staff (por nombre)
+                        const misAreasActivas = (tm.areas || []).filter(a =>
+                          String(a.staff||'') === miNombreR &&
                           String(a.estado||'').toLowerCase() === 'en servicio'
                         );
-                        if (miArea && (!slotServices[1] || slotServices[1].length === 0)) {
-                          slotServices[1] = [{ name: miArea.tentativo || '', price: miArea.precio || 0, area: myArea1 }];
+                        if (misAreasActivas.length > 0 && (!slotServices[1] || slotServices[1].length === 0)) {
+                          slotServices[1] = misAreasActivas.map(ar => ({
+                            name: ar.tentativo || ar.confirmado || '',
+                            price: ar.precio || 0,
+                            area: ar.area || user1?.area || 'cejas'
+                          }));
                           renderServicesForSlot(1);
-                          document.getElementById('as1Total').textContent = '$' + (miArea.precio || 0);
-                          document.getElementById('as1SvcCount').textContent = '1';
+                          // Total = activos + completados de esta staff (refleja trabajo real)
+                          const totalActivos = slotServices[1].reduce((s,v) => s + Number(v.price||0), 0);
+                          const totalCompletados = areasCompletadasR.reduce((s,a) => s + Number(a.precio||0), 0);
+                          const totalFinalR = totalActivos + totalCompletados;
+                          document.getElementById('as1Total').textContent = '$' + totalFinalR;
+                          document.getElementById('as1SvcCount').textContent = String(slotServices[1].length + areasCompletadasR.length);
                         }
                         updateFinishButtons(1);
                       }
@@ -13756,14 +13774,9 @@ if ('caches' in window) {
       });
       if (r.success) {
         if (r.todasCompletadas) {
-          showToast('🎯 Todo completado — este es el último servicio');
-          // todasCompletadas=true: el TM ya pasó a "Por cobrar" en el backend
-          // getTicketMulti ya NO lo devuelve como activo → updateFinishButtons() quedaría en blanco
-          // Renderizar el botón final directamente sin hacer otra llamada al backend
-          const btnContainer = document.getElementById('as' + slot + 'FinishBtns');
-          if (btnContainer) {
-            btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slot + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
-          }
+          showToast('🎯 Todo completado — finalizá el servicio');
+          // Actualizar botones: solo mostrar "Finalizar servicio"
+          updateFinishButtons(slot);
         } else {
           // Cargar el siguiente servicio en el panel (sin salir de la clienta)
           const sigNombre = r.siguienteArea || '';
@@ -13781,9 +13794,9 @@ if ('caches' in window) {
               document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
             }
           }
-          showToast('✅ Siguiente servicio tomado: ' + sigNombre);
-          // Volver a consultar el TM — mostrar botones actualizados
-          setTimeout(() => updateFinishButtons(slot), 300);
+          showToast('✅ Siguiente servicio cargado: ' + sigNombre);
+          // Volver a consultar el TM — si hay más áreas pendientes, mostrar botones de nuevo
+          updateFinishButtons(slot);
         }
       } else {
         alert('Error: ' + r.message);
