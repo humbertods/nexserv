@@ -12326,16 +12326,19 @@ if ('caches' in window) {
 
   function openAddService(slot) {
     window._addServiceSlot = slot || 1;
-    window._modoEnganche = false;
-    // Resetear al tab Servicio y título
-    switchAddSvcTab('servicio');
-    const titleEl = document.getElementById('addSvcModalTitle');
-    if (titleEl) titleEl.textContent = '➕ Agregar servicio';
-    // Restaurar nota si fue ocultada
-    const noteWrapper = document.getElementById('addSvcNoteWrapper');
-    if (noteWrapper) noteWrapper.style.display = 'block';
-    const confirmBtn = document.getElementById('addSvcConfirmBtn');
-    if (confirmBtn) confirmBtn.textContent = 'Solicitar autorización';
+    const esEnganche = window._modoEnganche === true;
+    if (!esEnganche) {
+      window._modoEnganche = false;
+      // Resetear al tab Servicio y título solo en modo normal
+      switchAddSvcTab('servicio');
+      const titleEl = document.getElementById('addSvcModalTitle');
+      if (titleEl) titleEl.textContent = '➕ Agregar servicio';
+      // Restaurar nota si fue ocultada
+      const noteWrapper = document.getElementById('addSvcNoteWrapper');
+      if (noteWrapper) noteWrapper.style.display = 'block';
+      const confirmBtn = document.getElementById('addSvcConfirmBtn');
+      if (confirmBtn) confirmBtn.textContent = 'Solicitar autorización';
+    }
 
     const user = window.currentUser;
     const areaSel = document.getElementById('addSvcArea');
