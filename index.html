@@ -2504,27 +2504,37 @@ if ('caches' in window) {
     }
   }
 
-  async function apiPost(action, data) {
+  async function apiPost(action, data, { retries = 2, timeoutMs = 18000 } = {}) {
     if (!data) data = {};
     data.action = action;
-    data._t = Date.now(); // Cache-busting
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'text/plain;charset=utf-8'
-        },
-        redirect: 'follow',
-        body: JSON.stringify(data)
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    data._t = Date.now();
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          redirect: 'follow',
+          signal: controller.signal,
+          body: JSON.stringify(data)
+        });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        const result = await res.json();
+        return result;
+      } catch (err) {
+        clearTimeout(timer);
+        console.warn(`API intento ${attempt + 1} fallido (${action}):`, err.message);
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+          data._t = Date.now();
+          continue;
+        }
+        console.error('API Error final:', err);
+        return { error: err.message };
       }
-      const result = await res.json();
-      return result;
-    } catch (err) {
-      console.error('API Error:', err);
-      return { error: err.message };
     }
   }
 
@@ -10471,7 +10481,8 @@ if ('caches' in window) {
       } catch (err) {
         btn.textContent = 'Guardar cambios';
         btn.disabled = false;
-        alert('Error de conexión. Verificá tu internet e intentá de nuevo.');
+        const reintentar = confirm('⚠️ Error al guardar: ' + (err.message || 'Load failed') + '\n\nTus datos NO se perdieron.\n¿Querés intentar guardar de nuevo?');
+        if (reintentar) saveNewClient();
       }
     } else {
       // MODO NUEVO (código original)
@@ -10557,7 +10568,8 @@ if ('caches' in window) {
     } catch (err) {
       btn.textContent = 'Registrar clienta completa';
       btn.disabled = false;
-      alert('Error de conexión. Verificá tu internet e intentá de nuevo.');
+      const reintentar = confirm('⚠️ Error al guardar: ' + (err.message || 'Load failed') + '\n\nTus datos NO se perdieron.\n¿Querés intentar guardar de nuevo?');
+      if (reintentar) saveNewClient();
     }
     } // FIN MODO NUEVO
   }
