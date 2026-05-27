@@ -14007,9 +14007,21 @@ if ('serviceWorker' in navigator) {
 // ═══════════════════════════════════════════════════════
 // NEXSERV PUSH NOTIFICATIONS
 // ═══════════════════════════════════════════════════════
-const VAPID_PUBLIC_KEY = 'BIpY_HrrM59Z_RxKCQD58bhFgy_p77Agz5A05OdQv5tr-amNn5eqVvTiLj7MoLOt_d7sRvOEw5oljgjV3WAmn9g';
+// ═══════════════════════════════════════════════════
+// NEXSERV PUSH — Firebase Cloud Messaging (FCM V1)
+// ═══════════════════════════════════════════════════
 
-// Mapa nombre → clave de suscripción en el backend
+// Config Firebase
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyD-placeholder',
+  projectId: 'nexserv-7e1bb',
+  messagingSenderId: '916241480118',
+  appId: '1:916241480118:web:nexserv'
+};
+
+// VAPID key pública (de Firebase → Cloud Messaging → Certificados push web)
+const FCM_VAPID_KEY = 'BKeDhHC2eacfeNuzo-KGuXPsiScbwASUefbn7ljApYTyukll4Qpkq4_oNMYDV8JtiW65ZMPNqqJC0OwGnx3OVig';
+
 const STAFF_PUSH_MAP = {
   'María':  'push_maria',
   'Keyla':  'push_keyla',
@@ -14027,58 +14039,59 @@ function urlBase64ToUint8Array(base64String) {
   return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
 }
 
-// Suscribir al usuario actual al push
 async function suscribirPushActual() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.warn('[Push] No soportado en este navegador');
+    return;
+  }
   try {
     const reg = await navigator.serviceWorker.ready;
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') { console.log('[Push] Permiso denegado'); return; }
 
+    // Suscribir con la VAPID key de Firebase
     let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-      });
-    }
+    if (sub) await sub.unsubscribe(); // forzar nueva suscripción con nueva key
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(FCM_VAPID_KEY)
+    });
 
     const user = window.currentUser;
     if (!user) return;
     const key = STAFF_PUSH_MAP[user.name];
     if (!key) return;
 
-    // Guardar suscripción en el backend (Google Sheets PropertiesService)
-    await apiPost('guardarPushSub', {
+    const result = await apiPost('guardarPushSub', {
       staffKey: key,
       staffName: user.name,
       subscription: JSON.stringify(sub)
     });
-    console.log('[Push] Suscripción guardada para', user.name);
-    window._pushSuscrito = true;
+
+    if (result && result.success) {
+      console.log('[Push] ✓ Suscripción FCM guardada para', user.name);
+      window._pushSuscrito = true;
+    } else {
+      console.warn('[Push] Error guardando:', result);
+    }
   } catch(err) {
     console.warn('[Push] Error al suscribir:', err.message);
   }
 }
 
-// Enviar notificación push a una o varias chicas
 async function enviarPushStaff(nombres, titulo, cuerpo) {
   if (!Array.isArray(nombres)) nombres = [nombres];
   const keys = nombres.map(n => STAFF_PUSH_MAP[n]).filter(Boolean);
   if (keys.length === 0) return;
   try {
-    await apiPost('enviarPushStaff', {
-      staffKeys: keys,
-      titulo: titulo,
-      cuerpo: cuerpo
-    });
-    console.log('[Push] Enviado a:', nombres.join(', '));
+    const result = await apiPost('enviarPushStaff', { staffKeys: keys, titulo, cuerpo });
+    console.log('[Push] Enviado a:', nombres.join(', '), '— resultado:', result);
   } catch(err) {
-    console.warn('[Push] Error enviando notificación:', err.message);
+    console.warn('[Push] Error enviando:', err.message);
   }
 }
 
-// ── Suscribir automáticamente cuando la staff inicia sesión ──
+// Suscribir al iniciar sesión
 const _origDoLogin = window.doLogin;
 window.doLogin = async function(...args) {
   const result = await _origDoLogin?.apply(this, args);
@@ -14086,7 +14099,6 @@ window.doLogin = async function(...args) {
   return result;
 };
 
-// Por si ya está logueada al cargar
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     if (window.currentUser && !window._pushSuscrito) suscribirPushActual();
