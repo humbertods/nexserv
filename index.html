@@ -2,12 +2,13 @@
 <html lang="es">
 <head>
 <script>
-// Matar cualquier Service Worker y cache registrado
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
-}
-if ('caches' in window) {
-  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  navigator.serviceWorker.register('/nexserv/sw.js', { scope: '/nexserv/' })
+    .then(reg => {
+      window._swReg = reg;
+      console.log('[NexServ] SW registrado:', reg.scope);
+    })
+    .catch(err => console.warn('[NexServ] SW error:', err));
 }
 </script>
 <meta charset="UTF-8">
@@ -12657,6 +12658,7 @@ if ('caches' in window) {
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + a.tentativo, isTop);
+          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+nombre+' · '+a.tentativo);
           setTimeout(() => { show('mikaelaHome'); }, 600);
         } else {
           alert('Error: ' + (result?.error || result?.message || 'Error desconocido'));
@@ -12676,6 +12678,9 @@ if ('caches' in window) {
         initFormTM();
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
         simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
+        const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
+        const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
+        enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+nombre+' · '+areasMulti.length+' servicios');
         alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
@@ -12864,6 +12869,7 @@ if ('caches' in window) {
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta asignada a ' + chica, nombre + ' · ' + aGA.tentativo, isTop);
+          enviarPushStaff([chica], '📌 Clienta asignada a vos', (isTop?'⭐ ':'')+nombre+' · '+aGA.tentativo);
           alert('✅ Clienta asignada a ' + chica);
           setTimeout(() => { show('mikaelaHome'); }, 400);
         } else {
@@ -12883,6 +12889,9 @@ if ('caches' in window) {
       if (tmResult && tmResult.success) {
         initFormTM();
         simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
+        const _areasKeysGA = [...new Set(areasMultiGA.map(a=>a.area))];
+        const _staffGA = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeysGA.some(k=>m[n].includes(k));});
+        enviarPushStaff(_staffGA, '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+nombre+' · '+areasMultiGA.length+' servicios');
         alert('✅ Ticket creado (' + tmResult.id + ')');
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
@@ -13956,6 +13965,98 @@ if ('caches' in window) {
 
 
 </div>
+
+
+<script>
+// ═══════════════════════════════════════════════════════
+// NEXSERV PUSH NOTIFICATIONS
+// ═══════════════════════════════════════════════════════
+const VAPID_PUBLIC_KEY = 'BIpY_HrrM59Z_RxKCQD58bhFgy_p77Agz5A05OdQv5tr-amNn5eqVvTiLj7MoLOt_d7sRvOEw5oljgjV3WAmn9g';
+
+// Mapa nombre → clave de suscripción en el backend
+const STAFF_PUSH_MAP = {
+  'María':  'push_maria',
+  'Keyla':  'push_keyla',
+  'Lesly':  'push_lesly',
+  'Rosa':   'push_rosa',
+  'Yadira': 'push_yadira',
+  'Diana':  'push_diana',
+  'Laura':  'push_laura'
+};
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Suscribir al usuario actual al push
+async function suscribirPushActual() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { console.log('[Push] Permiso denegado'); return; }
+
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const user = window.currentUser;
+    if (!user) return;
+    const key = STAFF_PUSH_MAP[user.name];
+    if (!key) return;
+
+    // Guardar suscripción en el backend (Google Sheets PropertiesService)
+    await apiPost('guardarPushSub', {
+      staffKey: key,
+      staffName: user.name,
+      subscription: JSON.stringify(sub)
+    });
+    console.log('[Push] Suscripción guardada para', user.name);
+    window._pushSuscrito = true;
+  } catch(err) {
+    console.warn('[Push] Error al suscribir:', err.message);
+  }
+}
+
+// Enviar notificación push a una o varias chicas
+async function enviarPushStaff(nombres, titulo, cuerpo) {
+  if (!Array.isArray(nombres)) nombres = [nombres];
+  const keys = nombres.map(n => STAFF_PUSH_MAP[n]).filter(Boolean);
+  if (keys.length === 0) return;
+  try {
+    await apiPost('enviarPushStaff', {
+      staffKeys: keys,
+      titulo: titulo,
+      cuerpo: cuerpo
+    });
+    console.log('[Push] Enviado a:', nombres.join(', '));
+  } catch(err) {
+    console.warn('[Push] Error enviando notificación:', err.message);
+  }
+}
+
+// ── Suscribir automáticamente cuando la staff inicia sesión ──
+const _origDoLogin = window.doLogin;
+window.doLogin = async function(...args) {
+  const result = await _origDoLogin?.apply(this, args);
+  setTimeout(suscribirPushActual, 2000);
+  return result;
+};
+
+// Por si ya está logueada al cargar
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    if (window.currentUser && !window._pushSuscrito) suscribirPushActual();
+  }, 3000);
+});
+</script>
 
 </body>
 </html>
