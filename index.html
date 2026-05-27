@@ -3763,115 +3763,101 @@ if ('caches' in window) {
     if (id === 'activeService') {
       restoreActivePromos();
       recargarAutorizacionesStaff(1);
-      // Rellenar slot con promo si está vacío pero hay promo en memoria
-      const _clientNameNow = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
-      const _clientKeyNow = normalizeClientKey(_clientNameNow);
-      if (_clientNameNow && activePromos[_clientKeyNow] && (!slotServices[1] || slotServices[1].length === 0)) {
-        const _promo = activePromos[_clientKeyNow].promo;
-        const _price = getMyPromoPrice(_promo, window.currentUser?.area || 'cejas');
-        slotServices[1] = [{ name: _promo.name, price: _price, area: window.currentUser?.area || 'cejas' }];
-        renderServicesForSlot(1);
-        document.getElementById('as1Total').textContent = '$' + _price;
-        document.getElementById('as1SvcCount').textContent = '1';
-        updateFinishButtons(1);
-      } else {
-        setTimeout(async () => {
+      setTimeout(async () => {
+        const idEsperaActual = window._as1IdEspera || '';
         const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
-        if (clientName) {
-          const clientKey = normalizeClientKey(clientName);
-          if (!activePromos[clientKey] && PROMOS.length > 0) {
-            // Buscar si la clienta tiene promo en el backend
-            try {
-              const r = await apiGet('getListaCompleta');
-              if (r.success) {
-                const atencion = [...(r.enServicio||[])].find(a =>
-                  a.nombre === clientName || normalizeClientKey(a.nombre) === clientKey
+        const clientKey = normalizeClientKey(clientName);
+        const user1 = window.currentUser;
+
+        // ── TICKET MULTI (TM): restaurar siempre desde el backend ──────────────
+        if (idEsperaActual.startsWith('TM-')) {
+          try {
+            const tmR = await apiGet('getTicketMulti');
+            if (tmR.success) {
+              const tm = (tmR.activos || []).find(t => t.idEspera === idEsperaActual);
+              if (tm) {
+                window._tmAreasActuales = tm.areas || [];
+                const miNombreR = user1?.name || '';
+
+                // Limpiar lista y mostrar completados de esta staff
+                const svcListEl1 = document.getElementById('as1ServicesList');
+                const areasCompletadasR = (tm.areas || []).filter(a =>
+                  String(a.staff||'') === miNombreR &&
+                  String(a.estado||'').toLowerCase() === 'completado'
                 );
+                if (areasCompletadasR.length > 0 && svcListEl1) {
+                  // Limpiar chips previos de completados para no duplicar
+                  [...svcListEl1.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
+                  const histHtml1 = areasCompletadasR.map(ar =>
+                    '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'                    + '<span style="font-size:16px;">✅</span>'                    + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'                    + (ar.tentativo || ar.area || 'Servicio previo')                    + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'                    + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'                    + '</div>'                  ).join('');
+                  svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
+                }
 
-                // FIX: si es ticket TM, restaurar botones desde getTicketMulti
-                const idEspera1 = window._as1IdEspera || '';
-                if (idEspera1.startsWith('TM-')) {
-                  try {
-                    const tmR = await apiGet('getTicketMulti');
-                    if (tmR.success) {
-                      const tm = (tmR.activos || []).find(t => t.idEspera === idEspera1);
-                      if (tm) {
-                        window._tmAreasActuales = tm.areas || [];
-                        const user1 = window.currentUser;
-                        const miNombreR = user1?.name || '';
+                // Restaurar slotServices con áreas EN SERVICIO de esta staff
+                const misAreasActivas = (tm.areas || []).filter(a =>
+                  String(a.staff||'') === miNombreR &&
+                  String(a.estado||'').toLowerCase() === 'en servicio'
+                );
+                if (misAreasActivas.length > 0) {
+                  slotServices[1] = misAreasActivas.map(ar => ({
+                    name: ar.tentativo || ar.confirmado || '',
+                    price: ar.precio || 0,
+                    area: ar.area || user1?.area || 'cejas'
+                  }));
+                  renderServicesForSlot(1);
+                }
 
-                        // Mostrar áreas COMPLETADAS de esta staff como historial readonly
-                        const areasCompletadasR = (tm.areas || []).filter(a =>
-                          String(a.staff||'') === miNombreR &&
-                          String(a.estado||'').toLowerCase() === 'completado'
-                        );
-                        if (areasCompletadasR.length > 0) {
-                          const svcListEl1 = document.getElementById('as1SvcList');
-                          if (svcListEl1) {
-                            const histHtml1 = areasCompletadasR.map(ar =>
-                              '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
-                              + '<span style="font-size:16px;">✅</span>'
-                              + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
-                              + (ar.tentativo || ar.area || 'Servicio previo')
-                              + '</div><div style="font-size:11px;color:var(--success);">Completado · $' + (ar.precio || 0) + '</div></div>'
-                              + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
-                              + '</div>'
-                            ).join('');
-                            svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
-                          }
-                        }
+                // Total = activos + completados de esta staff
+                const totalActivos = (slotServices[1] || []).reduce((s,v) => s + Number(v.price||0), 0);
+                const totalComp = areasCompletadasR.reduce((s,a) => s + Number(a.precio||0), 0);
+                document.getElementById('as1Total').textContent = '$' + (totalActivos + totalComp);
+                document.getElementById('as1SvcCount').textContent = String((slotServices[1]||[]).length + areasCompletadasR.length);
+                updateFinishButtons(1);
+              }
+            }
+          } catch(eTM) { console.error('Error restaurando TM:', eTM); }
+          return; // TM procesado — no seguir con lógica de promo
+        }
 
-                        // Restaurar slotServices con áreas EN SERVICIO de esta staff (por nombre)
-                        const misAreasActivas = (tm.areas || []).filter(a =>
-                          String(a.staff||'') === miNombreR &&
-                          String(a.estado||'').toLowerCase() === 'en servicio'
-                        );
-                        if (misAreasActivas.length > 0 && (!slotServices[1] || slotServices[1].length === 0)) {
-                          slotServices[1] = misAreasActivas.map(ar => ({
-                            name: ar.tentativo || ar.confirmado || '',
-                            price: ar.precio || 0,
-                            area: ar.area || user1?.area || 'cejas'
-                          }));
-                          renderServicesForSlot(1);
-                          // Total = activos + completados de esta staff (refleja trabajo real)
-                          const totalActivos = slotServices[1].reduce((s,v) => s + Number(v.price||0), 0);
-                          const totalCompletados = areasCompletadasR.reduce((s,a) => s + Number(a.precio||0), 0);
-                          const totalFinalR = totalActivos + totalCompletados;
-                          document.getElementById('as1Total').textContent = '$' + totalFinalR;
-                          document.getElementById('as1SvcCount').textContent = String(slotServices[1].length + areasCompletadasR.length);
-                        }
-                        updateFinishButtons(1);
-                      }
-                    }
-                  } catch(eTM) {}
-                } else if (atencion && atencion.promoNombre) {
-                  const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
-                  if (promoFull) {
-                    activePromos[clientKey] = {
-                      promo: promoFull,
-                      startedBy: window.currentUser?.area || 'cejas',
-                      completedAreas: [],
-                      _metadata: { displayName: clientName }
-                    };
-                    saveActivePromos();
-                    const myPrice = getMyPromoPrice(promoFull, window.currentUser?.area || 'cejas');
-                    slotServices[1] = [{ name: promoFull.name, price: myPrice, area: window.currentUser?.area || 'cejas' }];
-                    renderServicesForSlot(1);
-                    document.getElementById('as1Total').textContent = '$' + myPrice;
-                    document.getElementById('as1SvcCount').textContent = '1';
-                    updateFinishButtons(1);
-                  }
+        // ── PROMO (SP / no-TM): restaurar desde activePromos o backend ─────────
+        if (clientName && activePromos[clientKey] && (!slotServices[1] || slotServices[1].length === 0)) {
+          const _promo = activePromos[clientKey].promo;
+          const _price = getMyPromoPrice(_promo, user1?.area || 'cejas');
+          slotServices[1] = [{ name: _promo.name, price: _price, area: user1?.area || 'cejas' }];
+          renderServicesForSlot(1);
+          document.getElementById('as1Total').textContent = '$' + _price;
+          document.getElementById('as1SvcCount').textContent = '1';
+          updateFinishButtons(1);
+        } else if (clientName && !activePromos[clientKey] && PROMOS.length > 0) {
+          try {
+            const r = await apiGet('getListaCompleta');
+            if (r.success) {
+              const atencion = [...(r.enServicio||[])].find(a =>
+                a.nombre === clientName || normalizeClientKey(a.nombre) === clientKey
+              );
+              if (atencion && atencion.promoNombre) {
+                const promoFull = PROMOS.find(p => p.name === atencion.promoNombre);
+                if (promoFull) {
+                  activePromos[clientKey] = {
+                    promo: promoFull,
+                    startedBy: user1?.area || 'cejas',
+                    completedAreas: [],
+                    _metadata: { displayName: clientName }
+                  };
+                  saveActivePromos();
+                  const myPrice = getMyPromoPrice(promoFull, user1?.area || 'cejas');
+                  slotServices[1] = [{ name: promoFull.name, price: myPrice, area: user1?.area || 'cejas' }];
+                  renderServicesForSlot(1);
+                  document.getElementById('as1Total').textContent = '$' + myPrice;
+                  document.getElementById('as1SvcCount').textContent = '1';
+                  updateFinishButtons(1);
                 }
               }
-            } catch(e) { console.error('Error recargando promo:', e); }
-          }
+            }
+          } catch(e) { console.error('Error recargando promo:', e); }
         }
-        // updateFinishButtons se llama dentro del bloque de recarga cuando hay datos
-        // Solo llamarlo aquí si no se llamó dentro (cuando la promo ya estaba en activePromos)
-        const clientKey2 = normalizeClientKey(clientName);
-        if (activePromos[clientKey2]) updateFinishButtons(1);
-      }, 500);
-      } // cierre else
+        if (activePromos[clientKey]) updateFinishButtons(1);
+      }, 300);
     }
     if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
     // Detener polling si el staff navega a otra pantalla
@@ -4593,7 +4579,7 @@ if ('caches' in window) {
               // Fix 2: partes previas (promo compartida) — mostrar como historial readonly
               if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
                 window._desgloseAcumulado = a.serviciosDetalle;
-                const svcListEl = document.getElementById('as1SvcList');
+                const svcListEl = document.getElementById('as1ServicesList');
                 if (svcListEl) {
                   const histHtml = a.serviciosDetalle.map(function(d) {
                     return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
@@ -4723,12 +4709,14 @@ if ('caches' in window) {
                   var misAreas = (tm.areas || []).filter(function(ar) {
                     return ar.staff === (user2 && user2.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
                   });
-                  // Mostrar áreas completadas previamente como historial readonly
+                  // Mostrar áreas COMPLETADAS de esta staff como historial readonly
+                  var miNombreTM = user2 && user2.name ? user2.name : '';
                   var areasCompletadasTM = (tm.areas || []).filter(function(ar) {
-                    return String(ar.estado||'').toLowerCase() === 'completado';
+                    return String(ar.staff||'') === miNombreTM &&
+                           String(ar.estado||'').toLowerCase() === 'completado';
                   });
                   if (areasCompletadasTM.length > 0) {
-                    var svcListEl = document.getElementById('as1SvcList');
+                    var svcListEl = document.getElementById('as1ServicesList');
                     if (svcListEl) {
                       var histHtmlTM = areasCompletadasTM.map(function(ar) {
                         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
@@ -4749,9 +4737,10 @@ if ('caches' in window) {
                       return { name: ar.tentativo || ar.confirmado || '', price: ar.precio || 0, area: ar.area };
                     });
                     renderServicesForSlot(1);
-                    var totalTM = slotServices[1].reduce(function(s,v){ return s + Number(v.price||0); }, 0);
-                    document.getElementById('as1Total').textContent = '$' + totalTM;
-                    document.getElementById('as1SvcCount').textContent = String(slotServices[1].length);
+                    var totalActivosTM = slotServices[1].reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+                    var totalCompTM = areasCompletadasTM.reduce(function(s,ar){ return s + Number(ar.precio||0); }, 0);
+                    document.getElementById('as1Total').textContent = '$' + (totalActivosTM + totalCompTM);
+                    document.getElementById('as1SvcCount').textContent = String(slotServices[1].length + areasCompletadasTM.length);
                   }
                   // Mostrar botones TM correctos en el panel desde el inicio
                   setTimeout(function() { updateFinishButtons(1); }, 600);
