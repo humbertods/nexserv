@@ -14115,17 +14115,20 @@ async function suscribirPushActual() {
 
     // Suscribir con la VAPID key de Firebase
     let sub = await reg.pushManager.getSubscription();
-    if (sub) await sub.unsubscribe(); // forzar nueva suscripción con nueva key
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(FCM_VAPID_KEY)
-    });
+    // Solo suscribir si no hay suscripción activa
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(FCM_VAPID_KEY)
+      });
+    }
 
     const user = window.currentUser;
     if (!user) return;
     const key = STAFF_PUSH_MAP[user.name];
     if (!key) return;
 
+    console.log('[Push] Endpoint:', sub.endpoint.substring(0, 60) + '...');
     const result = await apiPost('guardarPushSub', {
       staffKey: key,
       staffName: user.name,
