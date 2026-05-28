@@ -452,6 +452,8 @@ if ('serviceWorker' in navigator) {
   .period-btn.active-period { background: var(--ink) !important; color: white !important; }
 </style>
 <!-- ── MANDAMIENTOS DEL SISTEMA ── cargado antes del body para que sus funciones estén disponibles globalmente -->
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
 <script src="nexserv-mandamientos.js"></script>
 </head>
 <body>
@@ -14469,10 +14471,12 @@ async function confirmarGasto() {
 
 // Config Firebase
 const FIREBASE_CONFIG = {
-  apiKey: 'AIzaSyD-placeholder',
+  apiKey: 'AIzaSyCEFhAeGjy9IJy7uIYLDrUb4OglpeTIaRo',
+  authDomain: 'nexserv-7e1bb.firebaseapp.com',
   projectId: 'nexserv-7e1bb',
+  storageBucket: 'nexserv-7e1bb.firebasestorage.app',
   messagingSenderId: '916241480118',
-  appId: '1:916241480118:web:nexserv'
+  appId: '1:916241480118:web:cdf7aae6e823e08b22e917'
 };
 
 // VAPID key pública (de Firebase → Cloud Messaging → Certificados push web)
@@ -14507,30 +14511,36 @@ async function suscribirPushActual() {
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') { console.log('[Push] Permiso denegado'); return; }
 
-    // Suscribir con la VAPID key de Firebase
-    let sub = await reg.pushManager.getSubscription();
-    // Solo suscribir si no hay suscripción activa
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(FCM_VAPID_KEY)
-      });
+    if (!window.firebase || !firebase.messaging) {
+      console.warn('[Push] SDK de Firebase no cargado');
+      return;
     }
+    if (!window._fbApp) {
+      window._fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    const messaging = firebase.messaging();
+
+    // Obtener un token FCM real (compatible con FCM v1)
+    const token = await messaging.getToken({
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration: reg
+    });
+    if (!token) { console.warn('[Push] getToken devolvió vacío'); return; }
 
     const user = window.currentUser;
     if (!user) return;
     const key = STAFF_PUSH_MAP[user.name];
     if (!key) return;
 
-    console.log('[Push] Endpoint:', sub.endpoint.substring(0, 60) + '...');
+    console.log('[Push] Token FCM:', token.substring(0, 24) + '...');
     const result = await apiPost('guardarPushSub', {
       staffKey: key,
       staffName: user.name,
-      subscription: JSON.stringify(sub)
+      token: token
     });
 
     if (result && result.success) {
-      console.log('[Push] ✓ Suscripción FCM guardada para', user.name);
+      console.log('[Push] ✓ Token FCM guardado para', user.name);
       window._pushSuscrito = true;
     } else {
       console.warn('[Push] Error guardando:', result);
