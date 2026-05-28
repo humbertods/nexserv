@@ -8964,6 +8964,11 @@ if ('serviceWorker' in navigator) {
         mkRenderEsperandoCobro();
         closeModal();
         showToast('✓ Cobro grupal confirmado — ' + metodoPago);
+        const _totalGrupal = clientas.reduce((s,c) => s + Number(c.total||0), 0);
+        enviarPushOwner(
+          '💰 Cobro grupal — $' + _totalGrupal.toFixed(2),
+          clientas.length + ' clientas · ' + metodoPago
+        );
         setTimeout(() => loadMikaelaHome(), 600);
       } catch(e) {
         console.error(e);
@@ -9038,6 +9043,12 @@ if ('serviceWorker' in navigator) {
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
     if (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta') msg += '\n(Precio regular — promo no aplica con tarjeta)';
+    // Notificar al owner del cobro
+    const _clienteCobro = document.getElementById('cobrarClientName')?.textContent || 'Clienta';
+    enviarPushOwner(
+      '💰 Pago recibido — $' + totalFinal.toFixed(2),
+      _clienteCobro + ' · ' + window._cobrarPago + (totalProductos > 0 ? ' (inc. productos)' : '')
+    );
     alert(msg);
   }
   async function filterArrivalClients() {
@@ -14074,13 +14085,15 @@ const FIREBASE_CONFIG = {
 const FCM_VAPID_KEY = 'BKeDhHC2eacfeNuzo-KGuXPsiScbwASUefbn7ljApYTyukll4Qpkq4_oNMYDV8JtiW65ZMPNqqJC0OwGnx3OVig';
 
 const STAFF_PUSH_MAP = {
-  'María':  'push_maria',
-  'Keyla':  'push_keyla',
-  'Lesly':  'push_lesly',
-  'Rosa':   'push_rosa',
-  'Yadira': 'push_yadira',
-  'Diana':  'push_diana',
-  'Laura':  'push_laura'
+  'María':    'push_maria',
+  'Keyla':    'push_keyla',
+  'Lesly':    'push_lesly',
+  'Rosa':     'push_rosa',
+  'Yadira':   'push_yadira',
+  'Diana':    'push_diana',
+  'Laura':    'push_laura',
+  'Mikaela':  'push_mikaela',
+  'Owner':    'push_owner'
 };
 
 function urlBase64ToUint8Array(base64String) {
@@ -14127,6 +14140,20 @@ async function suscribirPushActual() {
     }
   } catch(err) {
     console.warn('[Push] Error al suscribir:', err.message);
+  }
+}
+
+async function enviarPushOwner(titulo, cuerpo) {
+  // Notificar al owner (Humberto) de pagos
+  try {
+    await apiPost('enviarPushStaff', {
+      staffKeys: ['push_owner'],
+      titulo: titulo,
+      cuerpo: cuerpo
+    });
+    console.log('[Push] Owner notificado:', titulo);
+  } catch(err) {
+    console.warn('[Push] Error push owner:', err.message);
   }
 }
 
