@@ -531,6 +531,42 @@ if ('serviceWorker' in navigator) {
       <div class="stat purple"><div class="label">Por cobrar</div><div class="value" id="mkStatCobrar">—</div></div>
     </div>
 
+    <!-- ===== CAJA CHICA ===== -->
+    <div id="cajaChicaPanel" style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+        <span class="section-title" style="margin:0;">Caja chica</span>
+        <span id="cajaPrivacyToggle" onclick="toggleCajaPrivacy()" title="Ocultar / mostrar montos"
+              style="cursor:pointer;font-size:16px;color:var(--ink-soft);user-select:none;">✱</span>
+      </div>
+      <div class="card" style="padding:14px 16px;">
+        <div id="cajaResumen" style="font-size:14px;">
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Efectivo</span><span class="caja-num" data-k="efectivo">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Transferencia</span><span class="caja-num" data-k="transferencia">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Tarjeta</span><span class="caja-num" data-k="tarjeta">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--danger);"><span>Gastos</span><span class="caja-num" data-k="gastos">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid var(--line);margin-top:4px;font-weight:800;"><span>Total</span><span class="caja-num" data-k="total" style="color:var(--success);">—</span></div>
+        </div>
+        <div id="cajaCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;">✅ Caja cerrada hoy</div>
+        <div id="cierreCajaBtn" onclick="toggleCierreCaja()"
+             style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:#fff;border-radius:var(--radius-pill);padding:12px;margin-top:12px;cursor:pointer;font-weight:700;font-size:13px;">
+          CIERRE CAJA <span id="cierreChevron" style="transition:transform .2s;">▾</span>
+        </div>
+        <div id="cierreCajaDetalle" style="display:none;border:1.5px solid var(--line);border-radius:14px;padding:14px;margin-top:10px;"></div>
+        <div id="aperturaBtn" onclick="toggleAperturaCaja()"
+             style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--radius-pill);padding:11px;margin-top:8px;cursor:pointer;font-weight:700;font-size:13px;color:var(--ink-soft);">
+          APERTURA DE CAJA (BASE) <span id="aperturaChevron" style="transition:transform .2s;">▾</span>
+        </div>
+        <div id="aperturaForm" style="display:none;margin-top:10px;">
+          <label style="font-size:12px;color:var(--ink-soft);font-weight:600;">Agregar base (efectivo)</label>
+          <input type="number" id="aperturaMonto" min="0" step="0.01" placeholder="0.00"
+                 style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:15px;font-weight:700;margin:6px 0 10px;box-sizing:border-box;background:var(--bg-card);color:var(--ink);">
+          <button onclick="confirmarApertura()" style="width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Confirmar base</button>
+          <button onclick="toggleAperturaCaja()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+    <!-- ===== /CAJA CHICA ===== -->
+
     <!-- AUTORIZACIONES PENDIENTES -->
     <div id="authorizationsSection" style="display: none;">
       <div class="section-title" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 10px 16px; border-radius: 12px; margin-bottom: 12px;">
@@ -1148,6 +1184,36 @@ if ('serviceWorker' in navigator) {
         </select>
       </div>
       <button onclick="vdPagarAhora()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:16px;font-weight:800;color:var(--accent);cursor:pointer;">Pagar ahora</button>
+    </div>
+
+    <!-- Botón Registrar Gastos Varios -->
+    <div id="gvToggleBtn" onclick="toggleGastosVarios()"
+         style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-card);border:2px solid var(--line);border-radius:var(--radius-sm);padding:16px 20px;cursor:pointer;margin-top:16px;transition:border-color .15s,border-radius .15s;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M6 2a2 2 0 0 0-2 2v17a1 1 0 0 0 1.5.87L8 20.5l2.5 1.37a1 1 0 0 0 1 0L14 20.5l2.5 1.37A1 1 0 0 0 18 21V4a2 2 0 0 0-2-2H6Zm2 5h6a1 1 0 1 1 0 2H8a1 1 0 0 1 0-2Zm0 4h6a1 1 0 1 1 0 2H8a1 1 0 0 1 0-2Z"/></svg>
+        <div style="font-size:15px;font-weight:700;color:var(--ink);">Registrar Gastos Varios</div>
+      </div>
+      <span id="gvChevron" style="font-size:18px;transition:transform .2s;color:var(--ink-soft);">▾</span>
+    </div>
+    <div id="gvForm" style="display:none;background:var(--bg-card);border:2px solid var(--accent);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:16px 18px 18px;margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);">Descripción</label>
+      <input id="gvDescripcion" type="text" placeholder="Ej: envío productos"
+             style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin:6px 0 12px;">
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;">
+          <label style="font-size:12px;font-weight:700;color:var(--ink-soft);">Monto ($)</label>
+          <input id="gvMonto" type="number" min="0" step="0.01" placeholder="0.00"
+                 style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;font-weight:700;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-top:6px;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-size:12px;font-weight:700;color:var(--ink-soft);">Responsable</label>
+          <input id="gvResponsable" type="text" placeholder="Ej: Sra. rosa"
+                 style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-top:6px;">
+        </div>
+      </div>
+      <button id="gvConfirmBtn" onclick="confirmarGasto()"
+              style="width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-top:14px;">Confirmar gasto</button>
+      <button onclick="toggleGastosVarios()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>
     </div>
 
     <div style="text-align: center; font-size: 12px; color: var(--ink-faint); font-weight: 500; line-height: 1.6;">
@@ -7841,6 +7907,7 @@ if ('serviceWorker' in navigator) {
   // === POR COBRAR (Mikaela) ===
 
   async function loadMikaelaHome() {
+    loadCajaChica();
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
       'tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
@@ -14068,6 +14135,219 @@ if ('serviceWorker' in navigator) {
   window.removeSecuenciaItem   = removeSecuenciaItem;
   window.moveSecuencia         = moveSecuencia;
   window.applyPromoCompleta    = applyPromoCompleta;
+
+/* ======================= CAJA CHICA (frontend) ======================= */
+window._cajaData = null;
+window._cajaPriv = false;
+
+function fmtCaja_(n) {
+  if (window._cajaPriv) return '✱✱✱';
+  return '$' + (Number(n) || 0).toFixed(2);
+}
+
+function parseMetodoPagoCaja_(metodoRaw, total) {
+  const m = String(metodoRaw || '').trim();
+  const low = m.toLowerCase();
+  const norm = (s) => {
+    s = s.toLowerCase();
+    if (s.includes('efect')) return 'efectivo';
+    if (s.includes('transf')) return 'transferencia';
+    if (s.includes('tarj'))  return 'tarjeta';
+    return null;
+  };
+  if (low.startsWith('mixto')) {
+    const partes = m.replace(/^mixto:?/i, '').split('+');
+    const out = [];
+    partes.forEach(p => {
+      const mt = p.match(/\$?\s*([\d.,]+)\s*([a-záéíóúñ]+)/i);
+      if (mt) {
+        const monto = parseFloat(mt[1].replace(',', '.')) || 0;
+        const met = norm(mt[2]);
+        if (met && monto > 0) out.push({ metodo: met, monto: monto });
+      }
+    });
+    return out;
+  }
+  const met = norm(low);
+  if (met) return [{ metodo: met, monto: Number(total) || 0 }];
+  return [];
+}
+
+function computeCajaBreakdown_(servicios, gastos) {
+  const bd = {
+    efectivo:      { total: 0, items: [] },
+    transferencia: { total: 0, items: [] },
+    tarjeta:       { total: 0, items: [] },
+    gastos:        { total: 0, items: [] }
+  };
+  (servicios || []).forEach(s => {
+    const partes = parseMetodoPagoCaja_(s.metodoPago, s.total);
+    partes.forEach(p => {
+      bd[p.metodo].total += p.monto;
+      bd[p.metodo].items.push({ cliente: s.clienteNombre || 'Clienta', monto: p.monto });
+    });
+  });
+  (gastos || []).forEach(g => {
+    bd.gastos.total += Number(g.monto) || 0;
+    bd.gastos.items.push({ id: g.id, descripcion: g.descripcion || 'Gasto', monto: Number(g.monto) || 0 });
+  });
+  bd.totalBruto = bd.efectivo.total + bd.transferencia.total + bd.tarjeta.total;
+  bd.totalNeto  = bd.totalBruto - bd.gastos.total;
+  return bd;
+}
+
+async function loadCajaChica() {
+  const panel = document.getElementById('cajaChicaPanel');
+  if (!panel) return;
+  try {
+    const [caja, cobros] = await Promise.all([
+      apiGet('getCajaChica'),
+      apiGet('getServiciosCobrados', { filtro: 'hoy' })
+    ]);
+    const apertura = (caja && caja.success) ? (caja.apertura || 0) : 0;
+    const cerrada  = (caja && caja.success) ? !!caja.cerrada : false;
+    const gastos   = (caja && caja.success) ? (caja.gastos || []) : [];
+    const servicios = (cobros && cobros.success) ? (cobros.servicios || []) : [];
+
+    const bd = cerrada
+      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,items:[]}, totalBruto:0, totalNeto:0 }
+      : computeCajaBreakdown_(servicios, gastos);
+
+    window._cajaData = { bd, apertura, cerrada };
+    renderCajaCompact_();
+
+    const nota = document.getElementById('cajaCerradaNota');
+    const btn  = document.getElementById('cierreCajaBtn');
+    if (nota) nota.style.display = cerrada ? 'block' : 'none';
+    if (btn)  btn.style.display  = cerrada ? 'none'  : 'flex';
+    if (cerrada) {
+      const det = document.getElementById('cierreCajaDetalle');
+      if (det) det.style.display = 'none';
+    }
+  } catch (e) {
+    console.warn('loadCajaChica error:', e.message);
+  }
+}
+
+function renderCajaCompact_() {
+  if (!window._cajaData) return;
+  const bd = window._cajaData.bd;
+  const set = (k, v) => { const el = document.querySelector('.caja-num[data-k="' + k + '"]'); if (el) el.textContent = v; };
+  set('efectivo',      fmtCaja_(bd.efectivo.total));
+  set('transferencia', fmtCaja_(bd.transferencia.total));
+  set('tarjeta',       fmtCaja_(bd.tarjeta.total));
+  set('gastos',        window._cajaPriv ? '✱✱✱' : '-$' + (bd.gastos.total).toFixed(2));
+  set('total',         fmtCaja_(bd.totalBruto));
+}
+
+function toggleCajaPrivacy() {
+  window._cajaPriv = !window._cajaPriv;
+  renderCajaCompact_();
+}
+
+function toggleCierreCaja() {
+  const det = document.getElementById('cierreCajaDetalle');
+  const chev = document.getElementById('cierreChevron');
+  const open = det.style.display === 'none';
+  det.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+  if (open) renderCierreDetalle_();
+}
+
+function renderCierreDetalle_() {
+  const det = document.getElementById('cierreCajaDetalle');
+  if (!window._cajaData) { det.innerHTML = ''; return; }
+  const bd = window._cajaData.bd;
+  const apertura = window._cajaData.apertura || 0;
+  const metodoBlock = (titulo, obj, color) => {
+    if (!obj.items.length) return '';
+    let h = '<div style="font-weight:800;margin-top:10px;' + (color ? 'color:' + color + ';' : '') + '">' + titulo + '</div>';
+    obj.items.forEach(it => {
+      const signo = color ? '-' : '';
+      h += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
+         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion) + '</span><span>' + signo + '$' + (it.monto).toFixed(2) + '</span></div>';
+    });
+    const signoT = color ? '-' : '';
+    h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
+       + '<span>&nbsp;&nbsp;Total</span><span>' + signoT + '$' + (obj.total).toFixed(2) + '</span></div>';
+    return h;
+  };
+  let html = '<div style="text-align:center;font-weight:800;margin-bottom:6px;">CIERRE CAJA</div>';
+  html += metodoBlock('Efectivo', bd.efectivo);
+  html += metodoBlock('Transferencia', bd.transferencia);
+  html += metodoBlock('Tarjeta', bd.tarjeta);
+  html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL</span><span>$' + bd.totalNeto.toFixed(2) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Apertura de caja</span><span>$' + (Number(apertura)||0).toFixed(2) + '</span></div>';
+  html += '<button onclick="confirmarCierreCaja()" style="width:100%;padding:13px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-top:14px;">Confirmar cierre</button>';
+  html += '<button onclick="toggleCierreCaja()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>';
+  det.innerHTML = html;
+}
+
+async function confirmarCierreCaja() {
+  if (!window._cajaData) return;
+  if (!confirm('¿Confirmar el cierre de caja del día? Quedará en cero para mañana.')) return;
+  const bd = window._cajaData.bd;
+  const snapshot = {
+    fecha: new Date().toLocaleDateString('es-EC'),
+    efectivo: bd.efectivo, transferencia: bd.transferencia, tarjeta: bd.tarjeta,
+    gastos: bd.gastos, totalBruto: bd.totalBruto, totalNeto: bd.totalNeto,
+    apertura: window._cajaData.apertura || 0
+  };
+  const res = await apiPost('cerrarCaja', { snapshot: snapshot, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
+  if (res && res.success) { alert('Caja cerrada ✅'); loadCajaChica(); }
+  else { alert((res && res.error) || 'No se pudo cerrar la caja.'); }
+}
+
+function toggleAperturaCaja() {
+  const f = document.getElementById('aperturaForm');
+  const chev = document.getElementById('aperturaChevron');
+  const open = f.style.display === 'none';
+  f.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+  if (open && window._cajaData) document.getElementById('aperturaMonto').value = window._cajaData.apertura || '';
+}
+
+async function confirmarApertura() {
+  const monto = parseFloat(document.getElementById('aperturaMonto').value || 0) || 0;
+  const res = await apiPost('addAperturaCaja', { monto: monto, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
+  if (res && res.success) { toggleAperturaCaja(); loadCajaChica(); }
+  else { alert((res && res.error) || 'No se pudo guardar la base.'); }
+}
+
+function toggleGastosVarios() {
+  const f = document.getElementById('gvForm');
+  const btn = document.getElementById('gvToggleBtn');
+  const chev = document.getElementById('gvChevron');
+  const open = f.style.display === 'none';
+  f.style.display = open ? 'block' : 'none';
+  if (chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+  if (btn) btn.style.borderRadius = open ? 'var(--radius-sm) var(--radius-sm) 0 0' : 'var(--radius-sm)';
+}
+
+async function confirmarGasto() {
+  const desc = (document.getElementById('gvDescripcion').value || '').trim();
+  const monto = parseFloat(document.getElementById('gvMonto').value || 0) || 0;
+  const resp = (document.getElementById('gvResponsable').value || '').trim();
+  if (!desc)      { alert('Escribí una descripción del gasto.'); return; }
+  if (monto <= 0) { alert('Ingresá un monto válido.'); return; }
+  const btn = document.getElementById('gvConfirmBtn');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  const res = await apiPost('addGastoCaja', { descripcion: desc, monto: monto, responsable: resp, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
+  btn.disabled = false; btn.textContent = 'Confirmar gasto';
+  if (res && res.success) {
+    document.getElementById('gvDescripcion').value = '';
+    document.getElementById('gvMonto').value = '';
+    document.getElementById('gvResponsable').value = '';
+    toggleGastosVarios();
+    alert('Gasto agregado a Caja Chica ✅');
+    if (typeof loadCajaChica === 'function') loadCajaChica();
+  } else {
+    alert((res && res.error) || 'No se pudo guardar el gasto.');
+  }
+}
+/* ===================== /CAJA CHICA (frontend) ===================== */
+
 
 </script>
 
