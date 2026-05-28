@@ -4190,11 +4190,14 @@ if ('serviceWorker' in navigator) {
     window._listaEsperaCache = lista;
 
     const myList = lista.filter(w => {
-      // Si tiene asignación directa, solo la ve la chica asignada
+      // Si tiene asignación directa, SOLO la ve y puede tomar la chica asignada
       if (w.asignadaA && w.asignadaA.trim() !== '') {
         return w.asignadaA === user.name;
       }
-      // Si no tiene asignación directa, filtrar por área
+      // Si NO tiene asignación directa, filtrar por área
+      // También excluir las que están ya en servicio o completadas
+      const estado = String(w.estado || w.status || '').toLowerCase();
+      if (estado === 'en servicio' || estado === 'completada') return false;
       return allowed.includes(w.area);
     });
     
@@ -4258,6 +4261,13 @@ if ('serviceWorker' in navigator) {
   function openTake(idx) {
     const w = window._waitListData[idx];
     if (!w) { alert('Error: no se encontró la clienta'); return; }
+
+    // Bloquear si está asignada a otra staff
+    const user = window.currentUser;
+    if (w.asignadaA && w.asignadaA.trim() !== '' && w.asignadaA !== (user?.name || '')) {
+      alert('⚠️ Esta clienta está asignada directamente a ' + w.asignadaA + '. Solo ella puede tomarla.');
+      return;
+    }
     
     window._takingData = w;
     window._takingId = w.id;
@@ -4434,6 +4444,15 @@ if ('serviceWorker' in navigator) {
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
     const takingId = String(window._takingId || '');
+
+    // Validar asignación directa ANTES de llamar al backend
+    const takingDataCheck = window._takingData;
+    if (takingDataCheck && takingDataCheck.asignadaA && takingDataCheck.asignadaA.trim() !== '') {
+      if (takingDataCheck.asignadaA !== name) {
+        alert('⚠️ Esta clienta está asignada directamente a ' + takingDataCheck.asignadaA + '. No podés tomarla.');
+        return;
+      }
+    }
 
     // ── TICKET MULTI: usar endpoint específico ────────────────
     if (takingId.startsWith('TM-')) {
