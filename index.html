@@ -8208,6 +8208,7 @@ if ('serviceWorker' in navigator) {
       if (result.success) {
         showToast('✓ Registro eliminado correctamente');
         loadServiciosHistory(); // recargar
+        if (typeof loadCajaChica === 'function') loadCajaChica(); // sincronizar caja chica
       } else {
         alert('Error al eliminar: ' + (result.error || 'desconocido'));
       }
