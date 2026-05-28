@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexserv-v1';
+const CACHE_NAME = 'nexserv-v2';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -9,9 +9,26 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('push', e => {
-  if (!e.data) return;
-  let data;
-  try { data = e.data.json(); } catch { data = { title: 'NexServ', body: e.data.text() }; }
+  // FCM puede enviar sin payload (notificación solo display)
+  let data = { title: 'NexServ', body: 'Nueva actualización' };
+
+  if (e.data) {
+    try {
+      data = e.data.json();
+      // FCM v1 entrega el contenido dentro de "notification" (y a veces dentro de "data").
+      const n = data.notification || data.data || {};
+      data = {
+        title: data.title || n.title || 'NexServ',
+        body:  data.body  || n.body  || '',
+        icon:  data.icon  || n.icon,
+        tag:   data.tag   || n.tag,
+        url:   (data.fcmOptions && data.fcmOptions.link) || (n.fcm_options && n.fcm_options.link) || data.url
+      };
+    } catch {
+      const text = e.data.text();
+      if (text) data = { title: 'NexServ', body: text };
+    }
+  }
 
   const options = {
     body: data.body || '',
@@ -38,4 +55,9 @@ self.addEventListener('notificationclick', e => {
       if (clients.openWindow) return clients.openWindow(url);
     })
   );
+});
+
+// Manejar mensajes del cliente
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });

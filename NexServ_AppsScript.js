@@ -5052,13 +5052,11 @@ function getFCMAccessToken() {
 }
 
 function handleGuardarPushSub(data) {
-  if (!data.staffKey || !data.subscription) return { success: false, error: 'Datos incompletos' };
-  // Guardar suscripción — extraer el FCM token si viene en la suscripción
-  var sub;
-  try { sub = JSON.parse(data.subscription); } catch(e) { sub = {}; }
-  // Guardar la suscripción completa (endpoint + keys)
-  PropertiesService.getScriptProperties().setProperty(data.staffKey, data.subscription);
-  Logger.log('[Push] Suscripción guardada para: ' + data.staffName + ' key=' + data.staffKey);
+  // Nuevo formato: se guarda el token FCM (string). Compat: si llega 'subscription', se intenta igual.
+  var token = data.token || data.subscription;
+  if (!data.staffKey || !token) return { success: false, error: 'Datos incompletos' };
+  PropertiesService.getScriptProperties().setProperty(data.staffKey, token);
+  Logger.log('[Push] Token guardado para: ' + data.staffName + ' key=' + data.staffKey);
   return { success: true };
 }
 
@@ -5087,15 +5085,11 @@ function handleEnviarPushStaff(data) {
     }
 
     try {
-      var sub = JSON.parse(subStr);
-      var endpoint = sub.endpoint || '';
-
-      // Extraer el FCM token del endpoint
-      // Formato: https://fcm.googleapis.com/fcm/send/TOKEN  o
-      //          https://updates.push.services.mozilla.com/...
-      var fcmToken = null;
-      if (endpoint.includes('fcm.googleapis.com')) {
-        fcmToken = endpoint.split('/').pop();
+      // Nuevo formato: subStr ES el token FCM. Compat: si quedó una suscripción vieja (JSON), se descarta.
+      var fcmToken = subStr;
+      if (subStr.charAt(0) === '{') {
+        errores.push(key + ': suscripción antigua, re-suscribir (volver a entrar a la app)');
+        return;
       }
 
       var response;
@@ -5135,9 +5129,7 @@ function handleEnviarPushStaff(data) {
           muteHttpExceptions: true
         });
       } else {
-        // Endpoint no-FCM (Firefox/Safari) — Web Push directo con VAPID
-        // Por ahora loguear y continuar
-        errores.push(key + ': endpoint no-FCM (' + endpoint.substring(0,40) + ')');
+        errores.push(key + ': token vacío');
         return;
       }
 
