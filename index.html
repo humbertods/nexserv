@@ -3481,6 +3481,17 @@ if ('serviceWorker' in navigator) {
       return;
     }
 
+    // Si el ticket es SN- (normal), nunca mostrar botones de promo aunque haya promoData
+    // La promo puede estar asignada pero no aplicada al ticket
+    if (_idEsperaSlot.startsWith('SN-')) {
+      const _slotSN = slot1 ? 1 : 2;
+      btnContainer.innerHTML = `
+        <button class="btn-primary" style="margin-bottom:10px;" onclick="window.finishSlot${_slotSN}(); return false;">
+          Finalizar servicio
+        </button>`;
+      return;
+    }
+
     // Con promo multi-área — verificar si puede hacer todo sola
     const AREA_CAPS = {
       // Cejas staff (María, Keyla, Lesly) también hacen pestañas/lifting/retiro
