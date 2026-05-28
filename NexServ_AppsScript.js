@@ -45,6 +45,8 @@ function doGet(e) {
       case 'inicializarPestanas': result = handleInicializarPestanas(); break;
       case 'limpiarAtenciones': result = handleLimpiarAtenciones(); break;
       case 'getMarcaProductos': result = handleGetMarcaProductos(); break;
+      case 'getCajaChica':     result = handleGetCajaChica(e.parameter);     break;
+      case 'getCajaHistorico': result = handleGetCajaHistorico(e.parameter); break;
       case 'guardarPushSub':  result = handleGuardarPushSub(data);  break;
       case 'enviarPushStaff': result = handleEnviarPushStaff(data); break;
       default: result = { error: 'Acción no reconocida' };
@@ -142,6 +144,10 @@ function doPost(e) {
       case 'completarAreaTicketMulti': result = handleCompletarAreaTicketMulti(data); break;
       case 'confirmarCobroMulti':    result = handleConfirmarCobroMulti(data);    break;
       case 'confirmarServicioMulti': result = handleConfirmarServicioMulti(data); break;
+      case 'addGastoCaja':    result = handleAddGastoCaja(data);    break;
+      case 'addAperturaCaja': result = handleAddAperturaCaja(data); break;
+      case 'anularGastoCaja': result = handleAnularGastoCaja(data); break;
+      case 'cerrarCaja':      result = handleCerrarCaja(data);      break;
       case 'guardarPushSub':  result = handleGuardarPushSub(data);  break;
       case 'enviarPushStaff': result = handleEnviarPushStaff(data); break;
       default: result = { error: 'Acción no reconocida' };
@@ -5154,3 +5160,113 @@ function handleEnviarPushStaff(data) {
 
   return { success: true, enviados: enviados, errores: errores };
 }
+
+/* ======================= CAJA CHICA ======================= */
+const CAJA_TZ = 'America/Guayaquil';
+
+function getCajaSheet_() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let ws = ss.getSheetByName('CajaChica');
+  if (!ws) {
+    ws = ss.insertSheet('CajaChica');
+    ws.appendRow(['Fecha','Hora','Tipo','Descripcion','Monto','Responsable','RegistradoPor','Estado','Snapshot']);
+    ws.getRange(1, 1, 1, 9).setFontWeight('bold');
+  }
+  return ws;
+}
+function cajaHoy_()        { return Utilities.formatDate(new Date(), CAJA_TZ, 'dd/MM/yyyy'); }
+function cajaFechaStr_(v)  { return (v instanceof Date) ? Utilities.formatDate(v, CAJA_TZ, 'dd/MM/yyyy') : String(v || '').trim(); }
+
+function handleGetCajaChica(params) {
+  const fecha = (params && params.fecha) ? String(params.fecha) : cajaHoy_();
+  const ws = getCajaSheet_();
+  const rows = ws.getDataRange().getValues();
+  let apertura = null, cerrada = false, cierre = null;
+  const gastos = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (cajaFechaStr_(r[0]) !== fecha) continue;
+    const tipo = String(r[2] || '').toLowerCase();
+    if (String(r[7] || 'activo').toLowerCase() === 'anulado') continue;
+    if (tipo === 'apertura') {
+      apertura = Number(r[4]) || 0;
+    } else if (tipo === 'gasto') {
+      gastos.push({ id: i + 1, hora: r[1], descripcion: r[3], monto: Number(r[4]) || 0, responsable: r[5] || '', registradoPor: r[6] || '' });
+    } else if (tipo === 'cierre') {
+      cerrada = true;
+      try { cierre = r[8] ? JSON.parse(r[8]) : null; } catch (e) { cierre = null; }
+    }
+  }
+  return { success: true, fecha: fecha, apertura: apertura, gastos: gastos, cerrada: cerrada, cierre: cierre };
+}
+
+function handleAddGastoCaja(data) {
+  const ws = getCajaSheet_();
+  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
+  ws.appendRow([cajaHoy_(), hora, 'gasto', String(data.descripcion || '').trim(), Number(data.monto) || 0,
+                String(data.responsable || '').trim(), String(data.registradoPor || '').trim(), 'activo', '']);
+  return { success: true };
+}
+
+function handleAddAperturaCaja(data) {
+  const ws = getCajaSheet_();
+  const hoy = cajaHoy_();
+  const rows = ws.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (cajaFechaStr_(rows[i][0]) === hoy &&
+        String(rows[i][2] || '').toLowerCase() === 'apertura' &&
+        String(rows[i][7] || 'activo').toLowerCase() !== 'anulado') {
+      ws.getRange(i + 1, 5).setValue(Number(data.monto) || 0);
+      ws.getRange(i + 1, 7).setValue(String(data.registradoPor || '').trim());
+      return { success: true, actualizada: true };
+    }
+  }
+  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
+  ws.appendRow([hoy, hora, 'apertura', 'Base de caja', Number(data.monto) || 0, '', String(data.registradoPor || '').trim(), 'activo', '']);
+  return { success: true, actualizada: false };
+}
+
+function handleAnularGastoCaja(data) {
+  const ws = getCajaSheet_();
+  const fila = Number(data.id) || 0;
+  if (fila < 2) return { error: 'Fila inválida' };
+  const r = ws.getRange(fila, 1, 1, 9).getValues()[0];
+  if (String(r[2] || '').toLowerCase() !== 'gasto') return { error: 'No es un gasto' };
+  ws.getRange(fila, 8).setValue('anulado');
+  return { success: true };
+}
+
+function handleCerrarCaja(data) {
+  const ws = getCajaSheet_();
+  const hoy = cajaHoy_();
+  const rows = ws.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (cajaFechaStr_(rows[i][0]) === hoy &&
+        String(rows[i][2] || '').toLowerCase() === 'cierre' &&
+        String(rows[i][7] || 'activo').toLowerCase() !== 'anulado') {
+      return { error: 'La caja de hoy ya fue cerrada.' };
+    }
+  }
+  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
+  const snap = data.snapshot || {};
+  ws.appendRow([hoy, hora, 'cierre', 'Cierre de caja', Number(snap.totalNeto) || 0, '',
+                String(data.registradoPor || '').trim(), 'activo', JSON.stringify(snap)]);
+  return { success: true };
+}
+
+function handleGetCajaHistorico(params) {
+  const ws = getCajaSheet_();
+  const rows = ws.getDataRange().getValues();
+  const cierres = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (String(r[2] || '').toLowerCase() !== 'cierre') continue;
+    if (String(r[7] || 'activo').toLowerCase() === 'anulado') continue;
+    let snap = null;
+    try { snap = r[8] ? JSON.parse(r[8]) : null; } catch (e) {}
+    cierres.push({ fecha: cajaFechaStr_(r[0]), hora: r[1], totalNeto: Number(r[4]) || 0, snapshot: snap });
+  }
+  cierres.reverse();
+  return { success: true, cierres: cierres };
+}
+/* ===================== /CAJA CHICA ===================== */
