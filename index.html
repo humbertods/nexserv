@@ -3477,20 +3477,22 @@ if ('serviceWorker' in navigator) {
     // ── FIN TICKET MULTI ─────────────────────────────────────
 
     if (!promoData || !promoData.promo) {
-      // Sin promo — botón normal
+      // Sin promo — botón directo sin abrir modal de opciones
+      const _slotNP = slot1 ? 1 : 2;
       btnContainer.innerHTML = `
-        <button class="btn-primary" style="margin-bottom:10px;" onclick="window.finishSlot${slot1?1:2}(); return false;">
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
+          onclick="prepararYFinalizar(${_slotNP})">
           Finalizar servicio
         </button>`;
       return;
     }
 
-    // Si el ticket es SN- (normal), nunca mostrar botones de promo aunque haya promoData
-    // La promo puede estar asignada pero no aplicada al ticket
+    // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData
     if (_idEsperaSlot.startsWith('SN-')) {
       const _slotSN = slot1 ? 1 : 2;
       btnContainer.innerHTML = `
-        <button class="btn-primary" style="margin-bottom:10px;" onclick="window.finishSlot${_slotSN}(); return false;">
+        <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
+          onclick="prepararYFinalizar(${_slotSN})">
           Finalizar servicio
         </button>`;
       return;
@@ -6512,6 +6514,69 @@ if ('serviceWorker' in navigator) {
     }
   }
   
+  async function prepararYFinalizar(slot) {
+    const user = window.currentUser;
+    const slotStr = String(slot || 1);
+    const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clientCode = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+
+    // Sincronizar autorizaciones primero
+    await syncAuthorizationStates(slot);
+
+    const svcs = slotServices[slot] || [];
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      alert('⏳ Hay servicios pendientes de autorización de Mikaela. Esperá antes de finalizar.');
+      return;
+    }
+
+    const svcsOk = svcs.filter(s => s.status !== 'rechazado');
+    let total = svcsOk.reduce((s, v) => s + Number(v.price || 0), 0);
+    let svcNames = svcsOk.map(s => s.name).join(' + ');
+
+    // Si slotServices está vacío, intentar recuperar desde el panel activo
+    if (svcsOk.length === 0) {
+      const totalEl = document.getElementById('as' + slotStr + 'Total');
+      const totalFromPanel = totalEl ? Number((totalEl.textContent || '').replace('$','').trim()) : 0;
+      const svcCountEl = document.getElementById('as' + slotStr + 'SvcCount');
+      // Intentar obtener el servicio desde el backend
+      try {
+        const atenRes = await apiGet('getAtenciones', { chica: user?.name || '' });
+        if (atenRes.success && atenRes.atenciones) {
+          const aten = atenRes.atenciones.find(a => a.codigo === clientCode || a.nombre === clientName);
+          if (aten) {
+            svcNames = aten.servicio || aten.promoNombre || 'Servicio';
+            total = Number(aten.total || totalFromPanel || 0);
+            // Rellenar slotServices
+            slotServices[slot] = [{ name: svcNames, price: total, area: aten.area || '' }];
+          }
+        }
+      } catch(e) {}
+      if (!svcNames) svcNames = 'Servicio';
+      if (total === 0 && document.getElementById('as' + slotStr + 'Total')) {
+        total = Number((document.getElementById('as' + slotStr + 'Total').textContent || '0').replace('$','')) || 0;
+      }
+    }
+
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey, clientName, svcNames,
+      total: String(total),
+      promoNombre: '',
+      precioRegular: String(total),
+      idEspera, clienteCodigo: clientCode,
+      areasExtras: [], promasExtraPendientes: []
+    };
+
+    try {
+      await finishAndSend();
+    } catch(e) {
+      alert('Error al finalizar: ' + e.message);
+    }
+  }
+
   async function finishSlot1() {
     const user = window.currentUser;
     const displayName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
@@ -13995,6 +14060,7 @@ if ('serviceWorker' in navigator) {
   window.confirmServiceAndClose = confirmServiceAndClose;
   window.compartirSiguienteServicio = compartirSiguienteServicio;
   window.finishSlot1           = finishSlot1;
+  window.prepararYFinalizar     = prepararYFinalizar;
   window.finishSlot2           = finishSlot2;
 
   // Secuencia de orden de atención (usados desde onclick en HTML)
