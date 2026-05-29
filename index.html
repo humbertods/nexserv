@@ -7831,23 +7831,22 @@ body.rol-staff #confirmSvcClientName::after {
 
     if (!modelo) { alert('Seleccioná el modelo'); return; }
 
-    // Obtener código/nombre — del perfil en memoria o del slot activo como fallback
+    // Obtener código/nombre — preferir el código LIMPIO del slot, no el texto del elemento
+    // (as{N}Code muestra "C-0007 · Llegó 10:52"; hay que quedarse solo con "C-0007")
     let clientCodigo = '', clientNombre = '';
     const client = CLIENT_PROFILES[clientKey];
-    if (client) {
-      clientCodigo = client.code || '';
-      clientNombre = client.name || '';
-    } else {
-      const slotNum = slot || 1;
-      clientCodigo = (document.getElementById('as' + slotNum + 'Code')?.textContent || '').trim();
-      clientNombre = (document.getElementById('as' + slotNum + 'Name')?.textContent || '').replace(' ⭐','').trim();
-      if (clientCodigo) {
-        CLIENT_PROFILES[clientKey] = {
-          name: clientNombre, code: clientCodigo,
-          pestanas: { fichas: [], history: [] },
-          cejas: { history: [] }, depilacion: { history: [] }, facial: { history: [] }
-        };
-      }
+    const slotNum = slot || 1;
+    clientCodigo = (slotNum === 1 ? window._as1Client : window._as2Client)
+                || (client && client.code)
+                || (document.getElementById('as' + slotNum + 'Code')?.textContent || '').split('·')[0].trim();
+    clientNombre = (client && client.name)
+                || (document.getElementById('as' + slotNum + 'Name')?.textContent || '').replace(' ⭐','').trim();
+    if (!client && clientCodigo) {
+      CLIENT_PROFILES[clientKey] = {
+        name: clientNombre, code: clientCodigo,
+        pestanas: { fichas: [], history: [] },
+        cejas: { history: [] }, depilacion: { history: [] }, facial: { history: [] }
+      };
     }
 
     // Guardar en Google Sheets
