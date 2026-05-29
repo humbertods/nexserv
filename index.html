@@ -4361,6 +4361,11 @@ body.rol-staff #confirmSvcClientName::after {
     // Intentar cargar desde API
     let lista = [];
     try {
+      // Mapa de clientas frecuentes por área (para las estrellas de color)
+      try {
+        const fr = await apiGet('getClientasFrecuentes');
+        if (fr && fr.success) window._frecMapa = fr.mapa || {};
+      } catch(eFr) {}
       const result = await apiGet('getListaEspera');
       if (result.success && result.lista) {
         lista = result.lista.map(w => {
@@ -4439,7 +4444,7 @@ body.rol-staff #confirmSvcClientName::after {
         <div class="waitlist-top">
           <div class="waitlist-client">
             <div class="waitlist-code">${w.code} · llegó ${w.waiting}</div>
-            <div class="waitlist-name">${clienteDisplay(w.name, w.code)}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${w.asignadaA ? ' <span style="background: var(--accent-bg); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 700; margin-left: 6px;">Asignada directamente</span>' : ''}</div>
+            <div class="waitlist-name">${clienteDisplay(w.name, w.code)}${estrellasFrecuente(w.code)}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${w.asignadaA ? ' <span style="background: var(--accent-bg); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 700; margin-left: 6px;">Asignada directamente</span>' : ''}</div>
           </div>
           ${priBadge[w.priority] || priBadge['normal']}
         </div>
@@ -13186,18 +13191,45 @@ body.rol-staff #confirmSvcClientName::after {
   function removeService(slot) {
     // Legacy - ya no se usa, reemplazado por removeServiceItem
   }
+  // Estrellas de clienta frecuente POR ÁREA (color = peso del servicio)
+  const FREC_AREA_STAR = {
+    cejas:      { color: '#F5C518', label: 'Frecuente cejas' },
+    facial:     { color: '#D4AF37', label: 'Frecuente facial' },
+    pestanas:   { color: '#9C5BD1', label: 'Frecuente pestañas' },
+    depilacion: { color: '#2D9D5A', label: 'Frecuente depilación corporal' }
+  };
+  function estrellasFrecuente(codigo) {
+    const areas = (window._frecMapa && codigo && window._frecMapa[codigo]) || [];
+    if (!areas.length) return '';
+    return ' ' + areas.map(function(a) {
+      const s = FREC_AREA_STAR[a];
+      return s ? '<span title="' + s.label + '" style="color:' + s.color + ';font-size:14px;line-height:1;">★</span>' : '';
+    }).join('');
+  }
+  window.estrellasFrecuente = estrellasFrecuente;
+
   function mostrarClientasFrecuentes() {
     const lista = window._clientasFrecuentes || [];
     const cont = document.getElementById('frecuentesList');
     if (!cont) return;
+    // Leyenda de colores por área
+    const leyenda = '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:14px;font-size:11px;color:var(--ink-soft);">'
+      + Object.keys(FREC_AREA_STAR).map(function(a){
+          return '<span style="display:inline-flex;align-items:center;gap:3px;"><span style="color:' + FREC_AREA_STAR[a].color + ';font-size:14px;">★</span>' + FREC_AREA_STAR[a].label.replace('Frecuente ','') + '</span>';
+        }).join('')
+      + '</div>';
     if (lista.length === 0) {
-      cont.innerHTML = '<div style="text-align:center; color:var(--ink-soft); font-size:13px; padding:24px 0;">Aún no hay clientas con más de 2 visitas este mes.</div>';
+      cont.innerHTML = leyenda + '<div style="text-align:center; color:var(--ink-soft); font-size:13px; padding:24px 0;">Aún no hay clientas con más de 2 visitas este mes.</div>';
     } else {
-      cont.innerHTML = lista.map(function(c, i) {
-        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '⭐';
+      cont.innerHTML = leyenda + lista.map(function(c, i) {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+        const stars = (c.areasFrecuentes || []).map(function(a){
+          const s = FREC_AREA_STAR[a];
+          return s ? '<span title="' + s.label + '" style="color:' + s.color + ';font-size:15px;line-height:1;">★</span>' : '';
+        }).join('');
         return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg);border-radius:12px;margin-bottom:8px;">'
-          + '<span style="font-size:18px;">' + medal + '</span>'
-          + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--ink);">' + (c.nombre || c.codigo || 'Clienta') + '</div>'
+          + (medal ? '<span style="font-size:18px;">' + medal + '</span>' : '')
+          + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--ink);">' + (c.nombre || c.codigo || 'Clienta') + ' ' + stars + '</div>'
           + (c.codigo ? '<div style="font-size:11px;color:var(--ink-soft);">' + c.codigo + '</div>' : '') + '</div>'
           + '<div style="font-size:12px;font-weight:800;color:var(--purple);">' + c.visitas + ' visitas</div>'
           + '</div>';
