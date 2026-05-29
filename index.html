@@ -3591,9 +3591,20 @@ body.rol-staff #confirmSvcClientName::after {
     // ── TICKET MULTI ─────────────────────────────────────────
     const _idEsperaSlot = slot1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
 
-    // SP- con promo individual → botón simple, no mostrar lógica multi-área
+    // SP- con promo → si hay servicios de OTRA área en el slot, ofrecer pasarlos a otra staff
     if (_idEsperaSlot.startsWith('SP-')) {
       const _slotSP = slot1 ? 1 : 2;
+      const _myAreaSP = user?.area || 'cejas';
+      const _svcsSP = (slotServices[_slotSP] || []).filter(s =>
+        s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+      const _otrasSP = _svcsSP.filter(s => !window.esMismaAreaM3(_myAreaSP, s.area || s.name));
+      if (_otrasSP.length > 0) {
+        const _nombresSP = _otrasSP.map(s => s.name).join(', ');
+        btnContainer.innerHTML =
+          '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:13px;padding:15px;" onclick="finalizarYPasarOtraArea(' + _slotSP + ')">✅ Terminé mi parte — enviar ' + _nombresSP + ' a otra staff</button>'
+          + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')">💰 Lo hice todo yo — cobrar todo</button>';
+        return;
+      }
       btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
           ✅ Terminé — enviar a cobro con Mikaela
@@ -6070,6 +6081,43 @@ body.rol-staff #confirmSvcClientName::after {
       alert('Error al enviar a cobro: ' + e.message);
     }
   }
+
+  // La staff terminó su parte: envía los servicios de OTRA área a su lista de espera
+  // (para que otra staff los tome) y luego cobra solo su parte.
+  async function finalizarYPasarOtraArea(slot) {
+    slot = slot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const myArea = user.area || 'cejas';
+    const codigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+    const nombre = (document.getElementById('as' + slot + 'Name')?.textContent || '').replace(' ⭐','').trim();
+    const svcs = (slotServices[slot] || []).filter(s =>
+      s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const otras = svcs.filter(s => !window.esMismaAreaM3(myArea, s.area || s.name));
+    if (otras.length === 0) { await finalizarServicioSP(slot); return; }
+
+    showToast('⏳ Enviando a otra staff...');
+    const areaNames = { 'Cejas':'cejas', 'Depilación':'depilacion', 'Pestañas':'pestanas', 'Facial':'facial', 'Lifting / Retiro':'retiro_lifting' };
+    for (const s of otras) {
+      const areaDestino = areaNames[s.area] || String(s.area || 'cejas').toLowerCase();
+      try {
+        await apiPost('addServicioNormal', {
+          codigo: codigo, nombre: nombre,
+          servicio: s.name, area: areaDestino,
+          precio: Number(s.price || 0), prioridad: 'Normal',
+          observaciones: 'Pasado por ' + (user.name || 'staff') + ' durante atención'
+        });
+      } catch(e) {}
+      // Marcar como enviado para que NO se cobre con esta staff
+      const ref = (slotServices[slot] || []).find(x => x === s);
+      if (ref) ref.status = 'enganche-enviado';
+    }
+    try { renderServicesForSlot(slot); } catch(e) {}
+    showToast('✅ ' + otras.map(s => s.name).join(', ') + ' enviado a otra staff');
+    // Cobrar solo la parte de esta staff
+    await finalizarServicioSP(slot);
+  }
+  window.finalizarYPasarOtraArea = finalizarYPasarOtraArea;
 
   async function finishAndSend() {
     // Mandar directo a cobrar (finaliza completamente)
