@@ -489,6 +489,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuSeguridadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerSesiones');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Zm0 6a2.5 2.5 0 0 1 1 4.78V15a1 1 0 1 1-2 0v-2.22A2.5 2.5 0 0 1 12 8Z"/></svg> Seguridad app
     </button>
+    <button class="user-menu-item" id="menuPushTestBtn" style="display:none;" onclick="closeUserMenu(); probarNotificaciones();">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a6 6 0 0 0-6 6c0 3.5-1.5 5-2 6h16c-.5-1-2-2.5-2-6a6 6 0 0 0-6-6Zm0 20a3 3 0 0 0 3-3H9a3 3 0 0 0 3 3Z"/></svg> Probar notificaciones
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -4210,6 +4213,11 @@ body.rol-staff #confirmSvcClientName::after {
     startHeartbeat(true);
     // Persistir sesión para que sobreviva cierre de app
     try { localStorage.setItem('nexserv_session', JSON.stringify(user)); } catch(e) {}
+    // Registrar token de notificaciones de forma confiable tras cada login
+    if (typeof suscribirPushActual === 'function') {
+      window._pushSuscrito = false;
+      setTimeout(suscribirPushActual, 1500);
+    }
 
     if (user.role === 'staff') {
       document.getElementById('staffName').textContent = user.name;
@@ -4321,6 +4329,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cajaBtn = document.getElementById('menuCajaBtn');
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const pushBtn = document.getElementById('menuPushTestBtn');
+    if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -15045,7 +15055,38 @@ async function enviarPushStaff(nombres, titulo, cuerpo) {
   }
 }
 
-// Suscribir al iniciar sesión
+// Diagnóstico: enviar notificación de prueba a todas las staff y mostrar resultado
+async function probarNotificaciones() {
+  const staffMap = {
+    'push_maria':'María', 'push_keyla':'Keyla', 'push_lesly':'Lesly', 'push_rosa':'Rosa',
+    'push_yadira':'Yadira', 'push_diana':'Diana', 'push_laura':'Laura'
+  };
+  const keys = Object.keys(staffMap);
+  if (!confirm('Se enviará una notificación de prueba a todas las staff. ¿Continuar?')) return;
+  try {
+    const res = await apiPost('enviarPushStaff', {
+      staffKeys: keys,
+      titulo: '🔔 Prueba NexServ',
+      cuerpo: 'Si ves esto, tus notificaciones funcionan.'
+    });
+    if (!res) { alert('No hubo respuesta del servidor.'); return; }
+    let msg = '📤 Notificaciones entregadas al servicio: ' + (res.enviados || 0) + ' de ' + keys.length + '\n';
+    if (res.errores && res.errores.length) {
+      msg += '\nDetalle por staff:\n';
+      res.errores.forEach(e => {
+        let linea = e;
+        Object.keys(staffMap).forEach(k => { linea = linea.replace(k, staffMap[k]); });
+        msg += '• ' + linea + '\n';
+      });
+      msg += '\n"sin suscripción" = esa staff aún no registró su teléfono (debe abrir la app y aceptar notificaciones).';
+    } else {
+      msg += '\nTodas enviadas sin errores. Si igual no aparecen en el teléfono, el problema está en el service worker (sw.js) o en los permisos del dispositivo.';
+    }
+    alert(msg);
+  } catch(err) {
+    alert('Error al probar notificaciones: ' + err.message);
+  }
+}
 const _origDoLogin = window.doLogin;
 window.doLogin = async function(...args) {
   const result = await _origDoLogin?.apply(this, args);
