@@ -1248,6 +1248,14 @@ body.rol-staff #confirmSvcClientName::after {
                  style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-top:6px;">
         </div>
       </div>
+      <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-top:12px;">¿Cómo se pagó?</label>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button type="button" id="gvMetEfectivo" onclick="setGastoMetodo('efectivo')"
+                style="flex:1;padding:11px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">💵 Efectivo</button>
+        <button type="button" id="gvMetTransfer" onclick="setGastoMetodo('transferencia')"
+                style="flex:1;padding:11px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink-soft);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">🏦 Transferencia</button>
+      </div>
+      <input type="hidden" id="gvMetodo" value="efectivo">
       <button id="gvConfirmBtn" onclick="confirmarGasto()"
               style="width:100%;padding:14px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-top:14px;">Confirmar gasto</button>
       <button onclick="toggleGastosVarios()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>
@@ -14492,7 +14500,7 @@ function computeCajaBreakdown_(servicios, gastos) {
     efectivo:      { total: 0, items: [] },
     transferencia: { total: 0, items: [] },
     tarjeta:       { total: 0, items: [] },
-    gastos:        { total: 0, items: [] }
+    gastos:        { total: 0, totalEfectivo: 0, totalTransfer: 0, items: [] }
   };
   (servicios || []).forEach(s => {
     const partes = parseMetodoPagoCaja_(s.metodoPago, s.total);
@@ -14502,8 +14510,11 @@ function computeCajaBreakdown_(servicios, gastos) {
     });
   });
   (gastos || []).forEach(g => {
-    bd.gastos.total += Number(g.monto) || 0;
-    bd.gastos.items.push({ id: g.id, descripcion: g.descripcion || 'Gasto', monto: Number(g.monto) || 0 });
+    const monto = Number(g.monto) || 0;
+    const met = String(g.metodo || 'efectivo').toLowerCase().indexOf('transf') >= 0 ? 'transferencia' : 'efectivo';
+    bd.gastos.total += monto;
+    if (met === 'transferencia') bd.gastos.totalTransfer += monto; else bd.gastos.totalEfectivo += monto;
+    bd.gastos.items.push({ id: g.id, descripcion: g.descripcion || 'Gasto', monto: monto, metodo: met });
   });
   bd.totalBruto = bd.efectivo.total + bd.transferencia.total + bd.tarjeta.total;
   bd.totalNeto  = bd.totalBruto - bd.gastos.total;
@@ -14524,7 +14535,7 @@ async function loadCajaChica() {
     const servicios = (cobros && cobros.success) ? (cobros.servicios || []) : [];
 
     const bd = cerrada
-      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,items:[]}, totalBruto:0, totalNeto:0 }
+      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,totalEfectivo:0,totalTransfer:0,items:[]}, totalBruto:0, totalNeto:0 }
       : computeCajaBreakdown_(servicios, gastos);
 
     window._cajaData = { bd, apertura, cerrada };
@@ -14578,8 +14589,9 @@ function renderCierreDetalle_() {
     let h = '<div style="font-weight:800;margin-top:10px;' + (color ? 'color:' + color + ';' : '') + '">' + titulo + '</div>';
     obj.items.forEach(it => {
       const signo = color ? '-' : '';
+      const tag = it.metodo ? ' <span style="font-size:11px;color:var(--ink-faint);font-weight:600;">(' + (it.metodo === 'transferencia' ? 'transf.' : 'efec.') + ')</span>' : '';
       h += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
-         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion) + '</span><span>' + signo + '$' + (it.monto).toFixed(2) + '</span></div>';
+         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion) + tag + '</span><span>' + signo + '$' + (it.monto).toFixed(2) + '</span></div>';
     });
     const signoT = color ? '-' : '';
     h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
@@ -14593,9 +14605,9 @@ function renderCierreDetalle_() {
   html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
   html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL VENTAS (neto)</span><span>$' + bd.totalNeto.toFixed(2) + '</span></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Base de apertura</span><span>$' + (Number(apertura)||0).toFixed(2) + '</span></div>';
-  var efectivoEsperado = (Number(apertura)||0) + bd.efectivo.total - bd.gastos.total;
+  var efectivoEsperado = (Number(apertura)||0) + bd.efectivo.total - bd.gastos.totalEfectivo;
   html += '<div style="display:flex;justify-content:space-between;font-weight:800;color:var(--accent-deep);background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px;"><span>Efectivo esperado en caja</span><span>$' + efectivoEsperado.toFixed(2) + '</span></div>';
-  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos. Es el efectivo físico que debe haber en caja al cerrar.</div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos en efectivo. Es el efectivo físico que debe haber en caja al cerrar.</div>';
   html += '<button onclick="confirmarCierreCaja()" style="width:100%;padding:13px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-top:14px;">Confirmar cierre</button>';
   html += '<button onclick="toggleCierreCaja()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>';
   det.innerHTML = html;
@@ -14642,20 +14654,34 @@ function toggleGastosVarios() {
   if (btn) btn.style.borderRadius = open ? 'var(--radius-sm) var(--radius-sm) 0 0' : 'var(--radius-sm)';
 }
 
+function setGastoMetodo(metodo) {
+  const hidden = document.getElementById('gvMetodo');
+  if (hidden) hidden.value = metodo;
+  const ef = document.getElementById('gvMetEfectivo');
+  const tr = document.getElementById('gvMetTransfer');
+  const on  = (b) => { b.style.background = 'var(--accent)'; b.style.color = '#fff'; b.style.borderColor = 'var(--accent)'; };
+  const off = (b) => { b.style.background = 'var(--bg)'; b.style.color = 'var(--ink-soft)'; b.style.borderColor = 'var(--line)'; };
+  if (ef && tr) {
+    if (metodo === 'transferencia') { on(tr); off(ef); } else { on(ef); off(tr); }
+  }
+}
+
 async function confirmarGasto() {
   const desc = (document.getElementById('gvDescripcion').value || '').trim();
   const monto = parseFloat(document.getElementById('gvMonto').value || 0) || 0;
   const resp = (document.getElementById('gvResponsable').value || '').trim();
+  const metodo = (document.getElementById('gvMetodo').value || 'efectivo');
   if (!desc)      { alert('Escribí una descripción del gasto.'); return; }
   if (monto <= 0) { alert('Ingresá un monto válido.'); return; }
   const btn = document.getElementById('gvConfirmBtn');
   btn.disabled = true; btn.textContent = '⏳ Guardando...';
-  const res = await apiPost('addGastoCaja', { descripcion: desc, monto: monto, responsable: resp, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
+  const res = await apiPost('addGastoCaja', { descripcion: desc, monto: monto, responsable: resp, metodoGasto: metodo, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
   btn.disabled = false; btn.textContent = 'Confirmar gasto';
   if (res && res.success) {
     document.getElementById('gvDescripcion').value = '';
     document.getElementById('gvMonto').value = '';
     document.getElementById('gvResponsable').value = '';
+    setGastoMetodo('efectivo');
     toggleGastosVarios();
     alert('Gasto agregado a Caja Chica ✅');
     if (typeof loadCajaChica === 'function') loadCajaChica();
@@ -14688,7 +14714,7 @@ async function loadCajaChicaOwner() {
     const servicios = (cobros && cobros.success) ? (cobros.servicios || []) : [];
 
     const bd = cerrada
-      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,items:[]}, totalBruto:0, totalNeto:0 }
+      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,totalEfectivo:0,totalTransfer:0,items:[]}, totalBruto:0, totalNeto:0 }
       : computeCajaBreakdown_(servicios, gastos);
 
     window._cajaOwnerData = { bd, apertura, cerrada };
@@ -14732,8 +14758,9 @@ function renderCajaOwnerDetalle_() {
     if (!obj.items.length) return '';
     let h = '<div style="font-weight:800;margin-top:10px;' + (color ? 'color:' + color + ';' : '') + '">' + titulo + '</div>';
     obj.items.forEach(it => {
+      const tag = it.metodo ? ' <span style="font-size:11px;color:var(--ink-faint);font-weight:600;">(' + (it.metodo === 'transferencia' ? 'transf.' : 'efec.') + ')</span>' : '';
       h += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
-         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion || '') + '</span><span>' + monto(it.monto, color) + '</span></div>';
+         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion || '') + tag + '</span><span>' + monto(it.monto, color) + '</span></div>';
     });
     h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
        + '<span>&nbsp;&nbsp;Total</span><span>' + monto(obj.total, color) + '</span></div>';
@@ -14747,9 +14774,9 @@ function renderCajaOwnerDetalle_() {
   html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
   html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL VENTAS (neto)</span><span>' + (priv ? '✱✱✱' : '$' + bd.totalNeto.toFixed(2)) + '</span></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Base de apertura</span><span>' + (priv ? '✱✱✱' : '$' + apertura.toFixed(2)) + '</span></div>';
-  const efectivoEsperado = apertura + bd.efectivo.total - bd.gastos.total;
+  const efectivoEsperado = apertura + bd.efectivo.total - bd.gastos.totalEfectivo;
   html += '<div style="display:flex;justify-content:space-between;font-weight:800;color:var(--accent-deep);background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px;"><span>Efectivo esperado en caja</span><span>' + (priv ? '✱✱✱' : '$' + efectivoEsperado.toFixed(2)) + '</span></div>';
-  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos. Es el efectivo físico que debe haber en caja al cerrar.</div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos en efectivo. Es el efectivo físico que debe haber en caja al cerrar.</div>';
   if (!bd.efectivo.items.length && !bd.transferencia.items.length && !bd.tarjeta.items.length && !bd.gastos.items.length && apertura === 0) {
     html = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;">Sin movimientos registrados hoy.</div>';
   }
