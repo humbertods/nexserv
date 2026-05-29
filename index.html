@@ -7518,12 +7518,21 @@ body.rol-staff #confirmSvcClientName::after {
         servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servicios.map(s => {
           const initials = (window.currentUser && window.currentUser.role === 'staff') ? (String(s.codigo||'').replace(/[^0-9]/g,'').slice(-2) || '·') : s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           const comision = Number(s.comision || 0).toFixed(2);
+          // Sanitizar servicio: si viene como JSON crudo, extraer nombre legible
+          let svcDisplay = String(s.servicio || '');
+          if (svcDisplay.trim().startsWith('[') || svcDisplay.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(svcDisplay);
+              if (Array.isArray(parsed)) svcDisplay = parsed.map(p => p.servicio || p.area || p.name || '').filter(Boolean).join(' + ');
+              else svcDisplay = parsed.servicio || parsed.nombre || parsed.name || svcDisplay;
+            } catch(e) { svcDisplay = svcDisplay.substring(0, 40); }
+          }
           return `
             <div class="client-row">
               <div class="client-avatar">${initials}</div>
               <div class="client-info">
                 <div class="client-name">${clienteDisplay(s.nombre, s.codigo)}</div>
-                <div class="client-meta">${s.servicio} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
+                <div class="client-meta">${svcDisplay} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
               </div>
               <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--success);">$${comision}</div>
             </div>`;
