@@ -6754,6 +6754,21 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   // Recarga servicios adicionales (pendientes + aprobados) desde el backend
+  // MANDAMIENTO #3: ¿el servicio pertenece a la MISMA familia de área que la staff?
+  // Si NO, el servicio (enganche) se envía a la lista de espera de la otra área.
+  window.esMismaAreaM3 = function(staffArea, svcRef) {
+    function fam(x) {
+      x = String(x || '').toLowerCase();
+      if (x.indexOf('facial') >= 0 || x.indexOf('hidra') >= 0 || x.indexOf('limpieza') >= 0) return 'facial';
+      if (x.indexOf('pest') >= 0 || x.indexOf('lifting') >= 0 || x.indexOf('retiro') >= 0 ||
+          x.indexOf('volumen') >= 0 || x.indexOf('pelo a pelo') >= 0) return 'pestanas';
+      if (x.indexOf('cej') >= 0 || x.indexOf('depil') >= 0 || x.indexOf('bigote') >= 0 ||
+          x.indexOf('pigment') >= 0 || x.indexOf('brow') >= 0) return 'cejas';
+      return x;
+    }
+    return fam(staffArea) === fam(svcRef);
+  };
+
   async function recargarAutorizacionesStaff(slotNum) {
     const user = window.currentUser;
     if (!user) return;
@@ -6868,6 +6883,8 @@ body.rol-staff #confirmSvcClientName::after {
         // CRÍTICO: Sincronizar al Sheet cuando cambia el estado de una autorización
         // Esto asegura que el Sheet tenga el total correcto antes de finalizar
         syncServiciosBackend(slotNum, totalRecalc);
+        // Re-evaluar los botones de finalizar (la aprobación pudo cambiar el flujo)
+        try { updateFinishButtons(slotNum); } catch(eUFB) {}
       }
 
       // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
