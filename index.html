@@ -3942,23 +3942,27 @@ body.rol-staff #confirmSvcClientName::after {
   async function devolverALista(slot) {
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     if (!clientName) return;
-    if (!confirm('¿Devolver a ' + clientName + ' a la lista de espera?')) return;
+    if (!confirm('¿Devolver a ' + clientName + ' a la lista de espera para que otra staff la tome?')) return;
     try {
       const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
-      await apiPost('devolverALista', {
+      const result = await apiPost('devolverALista', {
         idEspera: idEspera || '',
         clienteNombre: clientName,
         chicaNombre: window.currentUser?.name || ''
       });
-      // Limpiar slot
+      if (!result || !result.success) {
+        alert('No se pudo devolver a la lista: ' + ((result && result.message) || 'intentá de nuevo.'));
+        return;
+      }
+      // Limpiar slot SOLO si el backend confirmó
       slotServices[slot] = [];
       if (window.currentUser && activeClients[window.currentUser.name]) {
         activeClients[window.currentUser.name] = activeClients[window.currentUser.name].filter((_, i) => i !== slot - 1);
       }
       show('staffHome');
-      showToast('✓ ' + clientName + ' devuelta a la lista');
+      showToast('↩️ ' + clientName + ' devuelta a la lista de espera');
     } catch(e) {
-      alert('Error al devolver a lista');
+      alert('Error al devolver a lista. Revisá tu conexión e intentá de nuevo.');
     }
   }
 
