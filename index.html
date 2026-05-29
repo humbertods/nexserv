@@ -2892,7 +2892,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (user && user.name && user.role && user.active !== false) {
           window.currentUser = user;
           document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
-          startHeartbeat();
+          startHeartbeat(false);
           const roleLabelEl = document.getElementById('roleLabel');
           if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
           if (user.role === 'staff') {
@@ -4149,7 +4149,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
     window.currentUser = user;
     document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
-    startHeartbeat();
+    startHeartbeat(true);
     // Persistir sesión para que sobreviva cierre de app
     try { localStorage.setItem('nexserv_session', JSON.stringify(user)); } catch(e) {}
 
@@ -5531,9 +5531,9 @@ body.rol-staff #confirmSvcClientName::after {
       });
     } catch(e) { return null; }
   }
-  function startHeartbeat() {
+  function startHeartbeat(esLogin) {
     if (window._heartbeatTimer) clearInterval(window._heartbeatTimer);
-    pingSesion('login').then(function(res){
+    pingSesion(esLogin ? 'login' : 'reabrir').then(function(res){
       const u = window.currentUser;
       if (u && u.role !== 'owner' && res && (res.aprobacion === 'pendiente' || res.aprobacion === 'bloqueado')) {
         bloquearPorDispositivo(res.aprobacion);
