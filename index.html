@@ -2352,7 +2352,7 @@ body.rol-staff #confirmSvcClientName::after {
       <span>Caja chica</span>
       <span id="ocPrivacyToggle" onclick="toggleCajaOwnerPrivacy()" title="Ocultar / mostrar montos"
             style="cursor:pointer;font-size:16px;color:var(--ink-soft);user-select:none;">✱</span>
-      <span style="margin-left:auto;font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadCajaChicaOwner()">↻ Actualizar</span>
+      <span id="ocRefreshBtn" style="margin-left:auto;font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadCajaChicaOwner()">↻ Actualizar</span>
     </div>
     <div style="font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:500; line-height:1.5;">👁️ Vista de solo lectura. La caja y sus operaciones (cierre, apertura y gastos) las gestiona Mikaela desde su panel.</div>
 
@@ -3996,7 +3996,18 @@ body.rol-staff #confirmSvcClientName::after {
     if (id === 'ownerReports') loadOwnerReports();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'ownerSesiones') loadSesiones();
-    if (id === 'ownerCaja') loadCajaChicaOwner();
+    if (id === 'ownerCaja') {
+      loadCajaChicaOwner();
+      if (window._ownerCajaRefresh) clearInterval(window._ownerCajaRefresh);
+      window._ownerCajaRefresh = setInterval(() => {
+        const el = document.getElementById('ownerCaja');
+        if (el && el.classList.contains('active')) loadCajaChicaOwner();
+        else { clearInterval(window._ownerCajaRefresh); window._ownerCajaRefresh = null; }
+      }, 10000);
+    } else if (window._ownerCajaRefresh) {
+      clearInterval(window._ownerCajaRefresh);
+      window._ownerCajaRefresh = null;
+    }
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
     if (id === 'activeService') {
@@ -14735,6 +14746,11 @@ async function loadCajaChicaOwner() {
 
     const nota = document.getElementById('ocCerradaNota');
     if (nota) nota.style.display = cerrada ? 'block' : 'none';
+    const rb = document.getElementById('ocRefreshBtn');
+    if (rb) {
+      const h = new Date();
+      rb.textContent = '↻ ' + ('0'+h.getHours()).slice(-2) + ':' + ('0'+h.getMinutes()).slice(-2) + ':' + ('0'+h.getSeconds()).slice(-2);
+    }
   } catch (e) {
     console.warn('loadCajaChicaOwner error:', e.message);
     const det = document.getElementById('ocDetalle');
