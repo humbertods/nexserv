@@ -23,6 +23,21 @@ if ('serviceWorker' in navigator) {
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192x192.png">
 <link rel="icon" type="image/png" sizes="96x96" href="icon-96x96.png">
 <link rel="shortcut icon" href="icon-192x192.png">
+<style id="privacy-mask">
+/* Privacidad: la staff (body.rol-staff) ve el código·iniciales (data-mask), no el nombre real */
+body.rol-staff #as1Name,
+body.rol-staff #as2Name,
+body.rol-staff #confirmSvcClientName { font-size: 0 !important; }
+body.rol-staff #as1Name::after,
+body.rol-staff #as2Name::after {
+  content: attr(data-mask);
+  font-size: 22px; font-weight: 800; letter-spacing: -0.03em;
+}
+body.rol-staff #confirmSvcClientName::after {
+  content: attr(data-mask);
+  font-size: 16px; font-weight: 700;
+}
+</style>
 <meta name="theme-color" content="#1a1a1a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2848,6 +2863,7 @@ if ('serviceWorker' in navigator) {
         const user = JSON.parse(saved);
         if (user && user.name && user.role && user.active !== false) {
           window.currentUser = user;
+          document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
           const roleLabelEl = document.getElementById('roleLabel');
           if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
           if (user.role === 'staff') {
@@ -4102,6 +4118,7 @@ if ('serviceWorker' in navigator) {
     const roleLabelEl = document.getElementById('roleLabel');
     if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
     window.currentUser = user;
+    document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
     // Persistir sesión para que sobreviva cierre de app
     try { localStorage.setItem('nexserv_session', JSON.stringify(user)); } catch(e) {}
 
@@ -4149,7 +4166,7 @@ if ('serviceWorker' in navigator) {
           const initials1 = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as1Avatar').textContent = initials1;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
-          document.getElementById('as1Name').textContent = a1.nombre + (a1.esTop ? ' ⭐' : '');
+          pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
           document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
           // NOTA: as1ServiceName y as1ServiceArea ya no existen, ahora usamos slotServices
           // document.getElementById('as1ServiceName').textContent = a1.servicio;
@@ -4164,7 +4181,7 @@ if ('serviceWorker' in navigator) {
               activeClients[user.name].push({ name: a2.nombre, service: a2.servicio });
               const initials2 = a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
               document.getElementById('as2Avatar').textContent = initials2;
-              document.getElementById('as2Name').textContent = a2.nombre + (a2.esTop ? ' ⭐' : '');
+              pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
               document.getElementById('as2Code').textContent = a2.codigo + ' · Llegó ' + a2.horaLlegada;
               // NOTA: as2ServiceName ya no existe, ahora usamos slotServices
               // document.getElementById('as2ServiceName').textContent = a2.servicio;
@@ -4198,6 +4215,7 @@ if ('serviceWorker' in navigator) {
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
     window.currentUser = null;
+    document.body.classList.remove('rol-staff');
     // Limpiar sesión persistida
     try { localStorage.removeItem('nexserv_session'); } catch(e) {}
     commVisible = false;
@@ -4305,7 +4323,7 @@ if ('serviceWorker' in navigator) {
         <div class="waitlist-top">
           <div class="waitlist-client">
             <div class="waitlist-code">${w.code} · llegó ${w.waiting}</div>
-            <div class="waitlist-name">${w.name}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${w.asignadaA ? ' <span style="background: var(--accent-bg); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 700; margin-left: 6px;">Asignada directamente</span>' : ''}</div>
+            <div class="waitlist-name">${clienteDisplay(w.name, w.code)}${w.isTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${w.asignadaA ? ' <span style="background: var(--accent-bg); color: var(--accent); font-size: 10px; padding: 2px 8px; border-radius: 100px; font-weight: 700; margin-left: 6px;">Asignada directamente</span>' : ''}</div>
           </div>
           ${priBadge[w.priority] || priBadge['normal']}
         </div>
@@ -4354,7 +4372,7 @@ if ('serviceWorker' in navigator) {
       try { _svcDisplay4 = JSON.parse(_svcDisplay4).nombre || _svcDisplay4; }
       catch(e) { const m4 = _svcDisplay4.match(/"nombre"\s*:\s*"([^"]+)"/); if (m4) _svcDisplay4 = m4[1]; }
     }
-    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>para <strong>${_svcDisplay4}</strong>.<br>Se registrará la hora automáticamente.`;
+    document.getElementById('takeText').innerHTML = `Vas a tomar a <strong>${clienteDisplay(w.name, w.code)}</strong>${topPart}<br>para <strong>${_svcDisplay4}</strong>.<br>Se registrará la hora automáticamente.`;
 
     const splitEl = document.getElementById('takeDepiSplit');
     const normalEl = document.getElementById('takeNormal');
@@ -4364,7 +4382,7 @@ if ('serviceWorker' in navigator) {
       const areaLabels3 = { cejas:'<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion:'Depilación', pestanas:'Pestañas', facial:'Facial', retiro_lifting:'Lifting/Retiro' };
       const areaLabel3 = areaLabels3[String(w.area||'').toLowerCase()] || w.area || 'Servicio';
       document.getElementById('takeText').innerHTML =
-        `Vas a tomar a <strong>${w.name}</strong>${topPart}<br>`
+        `Vas a tomar a <strong>${clienteDisplay(w.name, w.code)}</strong>${topPart}<br>`
         + `Área: <strong>${areaLabel3}</strong> · <strong>${_svcDisplay4}</strong><br>`
         + `<span style="font-size:12px;color:var(--ink-soft);">Este es tu servicio asignado en el ticket multi.</span>`;
       splitEl.style.display = 'none';
@@ -4614,7 +4632,7 @@ if ('serviceWorker' in navigator) {
           const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as1Avatar').textContent = initials;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
-          document.getElementById('as1Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
+          pintarNombre('as1Name', a.nombre, a.codigo, a.esTop);
           document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText = a.obsGeneral || a.observaciones || '';
@@ -4944,7 +4962,7 @@ if ('serviceWorker' in navigator) {
           const initials2b = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           document.getElementById('as2Avatar').textContent = initials2b;
           document.getElementById('as2Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
-          document.getElementById('as2Name').textContent = a.nombre + (a.esTop ? ' ⭐' : '');
+          pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
           document.getElementById('as2Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
           document.getElementById('obs2Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
           
@@ -5416,6 +5434,31 @@ if ('serviceWorker' in navigator) {
     try { await completarAreaMultiFinal(); } catch(e) { alert('Error: ' + e.message); }
   }
 
+  // ===== PRIVACIDAD: la staff ve "código · iniciales" en vez del nombre completo =====
+  function inicialesCliente(nombre) {
+    const parts = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    const a = (parts[0][0] || '').toUpperCase();
+    const b = parts.length > 1 ? (parts[parts.length - 1][0] || '').toUpperCase() : '';
+    return b ? (a + '. ' + b + '.') : (a + '.');
+  }
+  function clienteDisplay(nombre, codigo) {
+    const role = (window.currentUser && window.currentUser.role) || '';
+    if (role === 'staff') {
+      return codigo || inicialesCliente(nombre) || 'Clienta';
+    }
+    return nombre || codigo || 'Clienta';
+  }
+  // Pinta el nombre: textContent guarda el nombre REAL (lo leen cobros/operaciones);
+  // data-mask guarda el enmascarado, que el CSS muestra solo a la staff.
+  function pintarNombre(elId, nombre, codigo, esTop) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const star = esTop ? ' ⭐' : '';
+    el.textContent = (nombre || '') + star;
+    el.setAttribute('data-mask', clienteDisplay(nombre, codigo) + star);
+  }
+
   function showConfirmServiceModal(slot) {
     const slotStr = String(slot);
     const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
@@ -5425,7 +5468,7 @@ if ('serviceWorker' in navigator) {
     const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
     const esTM = idEspera.startsWith('TM-');
 
-    document.getElementById('confirmSvcClientName').textContent = clientName;
+    pintarNombre('confirmSvcClientName', clientName, (slot === 1 ? window._as1Client : window._as2Client), false);
     window._confirmSvcSlot = slot;
 
     // Si hay desglose previo (promo compartida), mostrarlo en el modal
@@ -7070,7 +7113,7 @@ if ('serviceWorker' in navigator) {
             <div style="display: flex; align-items: center; gap: 12px;">
               <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink: 0;">${initials}</div>
               <div style="flex: 1;">
-                <div style="font-weight: 700; font-size: 16px;">${a.nombre}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}</div>
+                <div style="font-weight: 700; font-size: 16px;">${clienteDisplay(a.nombre, a.codigo)}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}</div>
                 <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${a.servicio} · ${a.area} · desde ${a.horaToma}</div>
               </div>
               <div style="background: var(--accent); color: white; padding: 6px 14px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">Ver →</div>
@@ -7091,7 +7134,7 @@ if ('serviceWorker' in navigator) {
         window._as1Client = a1.codigo;
         document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
-        document.getElementById('as1Name').textContent = a1.nombre + (a1.esTop ? ' ⭐' : '');
+        pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
         document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
         document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
         renderSecuenciaBanner(1, a1.secuencia || []);
@@ -8258,7 +8301,7 @@ if ('serviceWorker' in navigator) {
         const diaSortKey = fechaDate.getDay();
         const staff = String(h.chica || '—');
         const valor = Number(h.precio || 0);
-        const cliente = String(h.nombre || h.clienteNombre || '—');
+        const cliente = clienteDisplay(String(h.nombre || h.clienteNombre || ''), String(h.codigo || h.code || '')) || '—';
         const servicio = String(h.servicio || '—');
         const hora = String(h.hora || '');
         const metodo = String(h.metodoPago || 'Efectivo');
@@ -10431,6 +10474,23 @@ if ('serviceWorker' in navigator) {
       return;
     }
 
+    // Privacidad: la staff ve el directorio solo por CÓDIGO (sin nombre ni teléfono)
+    if (window.currentUser?.role === 'staff') {
+      const porCodigo = [...filtered].sort((a, b) => String(a.code).localeCompare(String(b.code), 'es', { numeric: true }));
+      list.innerHTML = porCodigo.map(c => `
+        <div class="card" style="margin-bottom: 8px; padding: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px; cursor: pointer;" onclick="openClientProfile('${c.key}')">
+            <div class="client-avatar ${c.isTop ? 'is-top' : ''}" style="flex-shrink: 0;">${String(c.code).replace(/[^0-9]/g,'').slice(-2) || '·'}</div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 700; font-size: 15px;">${c.code}${c.isTop ? ' <span class="top-star">⭐</span>' : ''}</div>
+              <div style="font-size: 11px; color: var(--ink-faint); font-weight: 500; margin-top: 2px;">${c.visits} visitas</div>
+            </div>
+            <span style="font-size: 16px; color: var(--ink-faint);">›</span>
+          </div>
+        </div>`).join('');
+      return;
+    }
+
     // Si hay búsqueda activa, mostrar lista plana sin acordeón
     if (search) {
       list.innerHTML = filtered.map(c => {
@@ -11263,6 +11323,11 @@ if ('serviceWorker' in navigator) {
     document.getElementById('profileAvatar').className = 'client-avatar' + (c.isTop ? ' is-top' : '');
     document.getElementById('profileName').textContent = c.name;
     document.getElementById('profileCode').textContent = c.code + ' · ' + c.visits + ' visitas';
+    // Privacidad: la staff ve el código en lugar del nombre en el perfil
+    if (window.currentUser?.role === 'staff') {
+      document.getElementById('profileName').textContent = c.code;
+      document.getElementById('profileAvatar').textContent = String(c.code).replace(/[^0-9]/g,'').slice(-2) || '·';
+    }
     document.getElementById('profileTopBadge').style.display = c.isTop ? 'block' : 'none';
     document.getElementById('profileVisits').textContent = c.visits;
     document.getElementById('profileSpent').textContent = '$' + c.spent;
