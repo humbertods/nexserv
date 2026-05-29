@@ -674,6 +674,17 @@ body.rol-staff #confirmSvcClientName::after {
       </div>
     </div>
 
+    <!-- Modal clientas top del mes (frecuentes: más de 2 visitas) -->
+    <div class="modal-bg" id="clientasFrecuentesModal">
+      <div class="modal" style="max-height: 85%; overflow-y: auto;">
+        <div class="modal-handle"></div>
+        <div class="modal-title">⭐ Clientas top del mes</div>
+        <div style="text-align:center; font-size:12px; color:var(--ink-soft); margin-bottom:14px;">Vienen más de 2 veces este mes</div>
+        <div id="frecuentesList"></div>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cerrar</button>
+      </div>
+    </div>
+
     <div class="modal-bg" id="cobrarModal">
       <div class="modal" style="max-height: 92%; overflow-y: auto;">
         <div class="modal-handle"></div>
@@ -2301,7 +2312,7 @@ body.rol-staff #confirmSvcClientName::after {
     <div class="stat-grid" style="grid-template-columns: 1fr 1fr 1fr;">
       <div class="stat"><div class="label">Comisiones</div><div class="value" style="color: var(--danger); font-size: 18px;" id="ownerComm">$0</div></div>
       <div class="stat"><div class="label">Neto</div><div class="value" style="color: var(--success); font-size: 18px;" id="ownerNeto">$0</div></div>
-      <div class="stat purple"><div class="label">TOP ⭐</div><div class="value" style="font-size: 18px;" id="ownerTop">0</div></div>
+      <div class="stat purple" style="cursor:pointer;" onclick="mostrarClientasFrecuentes()"><div class="label">TOP ⭐ (mes)</div><div class="value" style="font-size: 18px;" id="ownerTop">0</div></div>
     </div>
 
     <div class="section-title">Estado del salón ahora</div>
@@ -3368,11 +3379,11 @@ body.rol-staff #confirmSvcClientName::after {
       document.getElementById('ownerNeto').textContent = '$' + (totalFact - totalComm).toFixed(0);
       document.getElementById('ownerTrend').textContent = totalFact > 0 ? '↑ En curso' : '—';
 
-      // TOP — cargar en paralelo no bloqueante
-      apiGet('getClientas').then(r => {
-        if (r.success && r.clientas) {
-          const topCount = r.clientas.filter(c => String(c.top || '').toLowerCase().includes('sí')).length;
-          document.getElementById('ownerTop').textContent = topCount;
+      // TOP — clientas que vienen más de 2 veces en el mes (frecuentes)
+      apiGet('getClientasFrecuentes').then(r => {
+        if (r && r.success) {
+          window._clientasFrecuentes = r.clientas || [];
+          document.getElementById('ownerTop').textContent = window._clientasFrecuentes.length;
         }
       }).catch(() => {});
 
@@ -13175,6 +13186,27 @@ body.rol-staff #confirmSvcClientName::after {
   function removeService(slot) {
     // Legacy - ya no se usa, reemplazado por removeServiceItem
   }
+  function mostrarClientasFrecuentes() {
+    const lista = window._clientasFrecuentes || [];
+    const cont = document.getElementById('frecuentesList');
+    if (!cont) return;
+    if (lista.length === 0) {
+      cont.innerHTML = '<div style="text-align:center; color:var(--ink-soft); font-size:13px; padding:24px 0;">Aún no hay clientas con más de 2 visitas este mes.</div>';
+    } else {
+      cont.innerHTML = lista.map(function(c, i) {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '⭐';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg);border-radius:12px;margin-bottom:8px;">'
+          + '<span style="font-size:18px;">' + medal + '</span>'
+          + '<div style="flex:1;"><div style="font-size:13px;font-weight:700;color:var(--ink);">' + (c.nombre || c.codigo || 'Clienta') + '</div>'
+          + (c.codigo ? '<div style="font-size:11px;color:var(--ink-soft);">' + c.codigo + '</div>' : '') + '</div>'
+          + '<div style="font-size:12px;font-weight:800;color:var(--purple);">' + c.visitas + ' visitas</div>'
+          + '</div>';
+      }).join('');
+    }
+    document.getElementById('clientasFrecuentesModal').classList.add('active');
+  }
+  window.mostrarClientasFrecuentes = mostrarClientasFrecuentes;
+
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
