@@ -483,6 +483,9 @@ body.rol-staff #confirmSvcClientName::after {
   <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
   <div class="user-menu" id="userMenu">
     <div id="userMenuName" style="padding: 10px 14px 6px; font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em;"></div>
+    <button class="user-menu-item" id="menuCajaBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCaja');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7Zm0 3h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg> Caja chica
+    </button>
     <button class="user-menu-item" id="menuSeguridadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerSesiones');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Zm0 6a2.5 2.5 0 0 1 1 4.78V15a1 1 0 1 1-2 0v-2.22A2.5 2.5 0 0 1 12 8Z"/></svg> Seguridad app
     </button>
@@ -2332,6 +2335,37 @@ body.rol-staff #confirmSvcClientName::after {
     </div>
   </div>
 
+  <!-- OWNER: CAJA CHICA (SOLO LECTURA) -->
+  <div class="screen" id="ownerCaja">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Caja chica</span>
+      <span id="ocPrivacyToggle" onclick="toggleCajaOwnerPrivacy()" title="Ocultar / mostrar montos"
+            style="cursor:pointer;font-size:16px;color:var(--ink-soft);user-select:none;">✱</span>
+      <span style="margin-left:auto;font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadCajaChicaOwner()">↻ Actualizar</span>
+    </div>
+    <div style="font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:500; line-height:1.5;">👁️ Vista de solo lectura. La caja y sus operaciones (cierre, apertura y gastos) las gestiona Mikaela desde su panel.</div>
+
+    <div class="card" style="padding:14px 16px;">
+      <div id="ocResumen" style="font-size:14px;">
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Efectivo</span><span class="ocaja-num" data-k="efectivo">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Transferencia</span><span class="ocaja-num" data-k="transferencia">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;"><span>Tarjeta</span><span class="ocaja-num" data-k="tarjeta">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--danger);"><span>Gastos</span><span class="ocaja-num" data-k="gastos">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid var(--line);margin-top:4px;font-weight:800;"><span>Total</span><span class="ocaja-num" data-k="total" style="color:var(--success);">—</span></div>
+        <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--ink-soft);"><span>Base de apertura</span><span class="ocaja-num" data-k="apertura">—</span></div>
+      </div>
+      <div id="ocCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;">✅ Caja cerrada hoy</div>
+    </div>
+
+    <div class="section-title" style="margin-top:18px;">Desglose del día</div>
+    <div id="ocDetalle" class="card" style="padding:14px 16px;font-size:14px;">
+      <div style="text-align:center;color:var(--ink-faint);font-size:13px;">Cargando…</div>
+    </div>
+  </div>
+
   <!-- OWNER: GESTIÓN DE PROMOS -->
   <div class="screen" id="ownerPromos">
     <div class="header">
@@ -3950,6 +3984,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (id === 'ownerReports') loadOwnerReports();
     if (id === 'ownerPayments') renderPayments();
     if (id === 'ownerSesiones') loadSesiones();
+    if (id === 'ownerCaja') loadCajaChicaOwner();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
     if (id === 'activeService') {
@@ -4261,6 +4296,8 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('userMenuName').textContent = user ? user.name : '';
     const segBtn = document.getElementById('menuSeguridadBtn');
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const cajaBtn = document.getElementById('menuCajaBtn');
+    if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -14624,6 +14661,98 @@ async function confirmarGasto() {
   }
 }
 /* ===================== /CAJA CHICA (frontend) ===================== */
+
+/* ============ CAJA CHICA — VISTA OWNER (solo lectura) ============ */
+window._cajaOwnerData = null;
+window._cajaOwnerPriv = false;
+
+function fmtCajaOwner_(n) {
+  if (window._cajaOwnerPriv) return '✱✱✱';
+  return '$' + (Number(n) || 0).toFixed(2);
+}
+
+async function loadCajaChicaOwner() {
+  const panel = document.getElementById('ownerCaja');
+  if (!panel) return;
+  try {
+    const [caja, cobros] = await Promise.all([
+      apiGet('getCajaChica'),
+      apiGet('getServiciosCobrados', { filtro: 'hoy' })
+    ]);
+    const apertura  = (caja && caja.success) ? (caja.apertura || 0) : 0;
+    const cerrada   = (caja && caja.success) ? !!caja.cerrada : false;
+    const gastos    = (caja && caja.success) ? (caja.gastos || []) : [];
+    const servicios = (cobros && cobros.success) ? (cobros.servicios || []) : [];
+
+    const bd = cerrada
+      ? { efectivo:{total:0,items:[]}, transferencia:{total:0,items:[]}, tarjeta:{total:0,items:[]}, gastos:{total:0,items:[]}, totalBruto:0, totalNeto:0 }
+      : computeCajaBreakdown_(servicios, gastos);
+
+    window._cajaOwnerData = { bd, apertura, cerrada };
+    renderCajaOwner_();
+
+    const nota = document.getElementById('ocCerradaNota');
+    if (nota) nota.style.display = cerrada ? 'block' : 'none';
+  } catch (e) {
+    console.warn('loadCajaChicaOwner error:', e.message);
+    const det = document.getElementById('ocDetalle');
+    if (det) det.innerHTML = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;">No se pudo cargar la caja.</div>';
+  }
+}
+
+function renderCajaOwner_() {
+  if (!window._cajaOwnerData) return;
+  const bd = window._cajaOwnerData.bd;
+  const apertura = window._cajaOwnerData.apertura || 0;
+  const set = (k, v) => { const el = document.querySelector('.ocaja-num[data-k="' + k + '"]'); if (el) el.textContent = v; };
+  set('efectivo',      fmtCajaOwner_(bd.efectivo.total));
+  set('transferencia', fmtCajaOwner_(bd.transferencia.total));
+  set('tarjeta',       fmtCajaOwner_(bd.tarjeta.total));
+  set('gastos',        window._cajaOwnerPriv ? '✱✱✱' : '-$' + (bd.gastos.total).toFixed(2));
+  set('total',         fmtCajaOwner_(bd.totalBruto));
+  set('apertura',      fmtCajaOwner_(apertura));
+  renderCajaOwnerDetalle_();
+}
+
+function renderCajaOwnerDetalle_() {
+  const det = document.getElementById('ocDetalle');
+  if (!det) return;
+  if (!window._cajaOwnerData) { det.innerHTML = ''; return; }
+  if (window._cajaOwnerData.cerrada) {
+    det.innerHTML = '<div style="text-align:center;color:var(--success);font-size:13px;font-weight:700;">✅ La caja del día ya fue cerrada.</div>';
+    return;
+  }
+  const bd = window._cajaOwnerData.bd;
+  const priv = window._cajaOwnerPriv;
+  const monto = (n, color) => priv ? '✱✱✱' : ((color ? '-' : '') + '$' + (Number(n)||0).toFixed(2));
+  const metodoBlock = (titulo, obj, color) => {
+    if (!obj.items.length) return '';
+    let h = '<div style="font-weight:800;margin-top:10px;' + (color ? 'color:' + color + ';' : '') + '">' + titulo + '</div>';
+    obj.items.forEach(it => {
+      h += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
+         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion || '') + '</span><span>' + monto(it.monto, color) + '</span></div>';
+    });
+    h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
+       + '<span>&nbsp;&nbsp;Total</span><span>' + monto(obj.total, color) + '</span></div>';
+    return h;
+  };
+  let html = '';
+  html += metodoBlock('Efectivo', bd.efectivo);
+  html += metodoBlock('Transferencia', bd.transferencia);
+  html += metodoBlock('Tarjeta', bd.tarjeta);
+  html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL NETO</span><span>' + (priv ? '✱✱✱' : '$' + bd.totalNeto.toFixed(2)) + '</span></div>';
+  if (!bd.efectivo.items.length && !bd.transferencia.items.length && !bd.tarjeta.items.length && !bd.gastos.items.length) {
+    html = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;">Sin movimientos registrados hoy.</div>';
+  }
+  det.innerHTML = html;
+}
+
+function toggleCajaOwnerPrivacy() {
+  window._cajaOwnerPriv = !window._cajaOwnerPriv;
+  renderCajaOwner_();
+}
+/* ========== /CAJA CHICA — VISTA OWNER (solo lectura) ========== */
 
 
 </script>
