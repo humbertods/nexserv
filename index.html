@@ -14551,7 +14551,7 @@ function renderCajaCompact_() {
   set('transferencia', fmtCaja_(bd.transferencia.total));
   set('tarjeta',       fmtCaja_(bd.tarjeta.total));
   set('gastos',        window._cajaPriv ? '✱✱✱' : '-$' + (bd.gastos.total).toFixed(2));
-  set('total',         fmtCaja_(bd.totalBruto));
+  set('total',         fmtCaja_(bd.totalNeto));
 }
 
 function toggleCajaPrivacy() {
@@ -14591,8 +14591,11 @@ function renderCierreDetalle_() {
   html += metodoBlock('Transferencia', bd.transferencia);
   html += metodoBlock('Tarjeta', bd.tarjeta);
   html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
-  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL</span><span>$' + bd.totalNeto.toFixed(2) + '</span></div>';
-  html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Apertura de caja</span><span>$' + (Number(apertura)||0).toFixed(2) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL VENTAS (neto)</span><span>$' + bd.totalNeto.toFixed(2) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Base de apertura</span><span>$' + (Number(apertura)||0).toFixed(2) + '</span></div>';
+  var efectivoEsperado = (Number(apertura)||0) + bd.efectivo.total - bd.gastos.total;
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;color:var(--accent-deep);background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px;"><span>Efectivo esperado en caja</span><span>$' + efectivoEsperado.toFixed(2) + '</span></div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos. Es el efectivo físico que debe haber en caja al cerrar.</div>';
   html += '<button onclick="confirmarCierreCaja()" style="width:100%;padding:13px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-top:14px;">Confirmar cierre</button>';
   html += '<button onclick="toggleCierreCaja()" style="width:100%;padding:11px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:4px;">Cancelar</button>';
   det.innerHTML = html;
@@ -14709,7 +14712,7 @@ function renderCajaOwner_() {
   set('transferencia', fmtCajaOwner_(bd.transferencia.total));
   set('tarjeta',       fmtCajaOwner_(bd.tarjeta.total));
   set('gastos',        window._cajaOwnerPriv ? '✱✱✱' : '-$' + (bd.gastos.total).toFixed(2));
-  set('total',         fmtCajaOwner_(bd.totalBruto));
+  set('total',         fmtCajaOwner_(bd.totalNeto));
   set('apertura',      fmtCajaOwner_(apertura));
   renderCajaOwnerDetalle_();
 }
@@ -14736,13 +14739,18 @@ function renderCajaOwnerDetalle_() {
        + '<span>&nbsp;&nbsp;Total</span><span>' + monto(obj.total, color) + '</span></div>';
     return h;
   };
+  const apertura = Number(window._cajaOwnerData.apertura) || 0;
   let html = '';
   html += metodoBlock('Efectivo', bd.efectivo);
   html += metodoBlock('Transferencia', bd.transferencia);
   html += metodoBlock('Tarjeta', bd.tarjeta);
   html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
-  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL NETO</span><span>' + (priv ? '✱✱✱' : '$' + bd.totalNeto.toFixed(2)) + '</span></div>';
-  if (!bd.efectivo.items.length && !bd.transferencia.items.length && !bd.tarjeta.items.length && !bd.gastos.items.length) {
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL VENTAS (neto)</span><span>' + (priv ? '✱✱✱' : '$' + bd.totalNeto.toFixed(2)) + '</span></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Base de apertura</span><span>' + (priv ? '✱✱✱' : '$' + apertura.toFixed(2)) + '</span></div>';
+  const efectivoEsperado = apertura + bd.efectivo.total - bd.gastos.total;
+  html += '<div style="display:flex;justify-content:space-between;font-weight:800;color:var(--accent-deep);background:var(--bg);border-radius:10px;padding:8px 10px;margin-top:8px;"><span>Efectivo esperado en caja</span><span>' + (priv ? '✱✱✱' : '$' + efectivoEsperado.toFixed(2)) + '</span></div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:4px 2px 0;">Base + efectivo de ventas − gastos. Es el efectivo físico que debe haber en caja al cerrar.</div>';
+  if (!bd.efectivo.items.length && !bd.transferencia.items.length && !bd.tarjeta.items.length && !bd.gastos.items.length && apertura === 0) {
     html = '<div style="text-align:center;color:var(--ink-faint);font-size:13px;">Sin movimientos registrados hoy.</div>';
   }
   det.innerHTML = html;
