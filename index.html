@@ -483,6 +483,9 @@ body.rol-staff #confirmSvcClientName::after {
   <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
   <div class="user-menu" id="userMenu">
     <div id="userMenuName" style="padding: 10px 14px 6px; font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em;"></div>
+    <button class="user-menu-item" id="menuSeguridadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerSesiones');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Zm0 6a2.5 2.5 0 0 1 1 4.78V15a1 1 0 1 1-2 0v-2.22A2.5 2.5 0 0 1 12 8Z"/></svg> Seguridad app
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -2304,6 +2307,21 @@ body.rol-staff #confirmSvcClientName::after {
     </nav>
   </div>
 
+  <!-- OWNER: DISPOSITIVOS / SESIONES ACTIVAS -->
+  <div class="screen" id="ownerSesiones">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;">
+      <span>Dispositivos y sesiones</span>
+      <span style="font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadSesiones()">↻ Actualizar</span>
+    </div>
+    <div style="font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:500; line-height:1.5;">🟢 En línea = la app está abierta ahora (vista hace 3 min o menos). ⚪ = última vez que estuvo activa. "App instalada" significa que la agregaron a la pantalla de inicio.</div>
+    <div id="sesionesList">
+      <div class="card" style="text-align:center; padding:20px; color:var(--ink-faint); font-size:13px;">Cargando…</div>
+    </div>
+  </div>
+
   <!-- OWNER: GESTIÓN DE PROMOS -->
   <div class="screen" id="ownerPromos">
     <div class="header">
@@ -2864,6 +2882,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (user && user.name && user.role && user.active !== false) {
           window.currentUser = user;
           document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
+          startHeartbeat();
           const roleLabelEl = document.getElementById('roleLabel');
           if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
           if (user.role === 'staff') {
@@ -3920,6 +3939,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (id === 'assignDirect') { setTimeout(() => renderAssignDirect(), 50); }
     if (id === 'ownerReports') loadOwnerReports();
     if (id === 'ownerPayments') renderPayments();
+    if (id === 'ownerSesiones') loadSesiones();
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
     if (id === 'activeService') {
@@ -4119,6 +4139,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
     window.currentUser = user;
     document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
+    startHeartbeat();
     // Persistir sesión para que sobreviva cierre de app
     try { localStorage.setItem('nexserv_session', JSON.stringify(user)); } catch(e) {}
 
@@ -4214,6 +4235,8 @@ body.rol-staff #confirmSvcClientName::after {
   function logout() {
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
+    pingSesion('logout');
+    stopHeartbeat();
     window.currentUser = null;
     document.body.classList.remove('rol-staff');
     // Limpiar sesión persistida
@@ -4226,6 +4249,8 @@ body.rol-staff #confirmSvcClientName::after {
   function openUserMenu(avatarEl) {
     const user = window.currentUser;
     document.getElementById('userMenuName').textContent = user ? user.name : '';
+    const segBtn = document.getElementById('menuSeguridadBtn');
+    if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -5457,6 +5482,106 @@ body.rol-staff #confirmSvcClientName::after {
     const star = esTop ? ' ⭐' : '';
     el.textContent = (nombre || '') + star;
     el.setAttribute('data-mask', clienteDisplay(nombre, codigo) + star);
+  }
+
+  // ===== SEGURIDAD: monitoreo de sesiones / dispositivos activos =====
+  function getDeviceId() {
+    let id = '';
+    try { id = localStorage.getItem('nexserv_device_id') || ''; } catch(e) {}
+    if (!id) {
+      id = 'dev_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+      try { localStorage.setItem('nexserv_device_id', id); } catch(e) {}
+    }
+    return id;
+  }
+  function getDeviceDesc() {
+    const ua = navigator.userAgent || '';
+    const os = /iPhone|iPad|iPod/i.test(ua) ? 'iPhone'
+             : /Android/i.test(ua) ? 'Android'
+             : /Windows/i.test(ua) ? 'PC Windows'
+             : /Macintosh|Mac OS/i.test(ua) ? 'Mac' : 'Dispositivo';
+    const br = /CriOS/i.test(ua) ? 'Chrome'
+             : /FxiOS|Firefox/i.test(ua) ? 'Firefox'
+             : /Chrome/i.test(ua) ? 'Chrome'
+             : /Safari/i.test(ua) ? 'Safari' : '';
+    let instalada = false;
+    try {
+      instalada = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+    } catch(e) {}
+    return os + (br ? ' · ' + br : '') + ' · ' + (instalada ? 'App instalada' : 'Navegador');
+  }
+  async function pingSesion(evento) {
+    const u = window.currentUser;
+    if (!u || !u.name) return;
+    try {
+      await apiPost('pingSesion', {
+        staffName: u.name, rol: u.role || '',
+        deviceId: getDeviceId(), dispositivo: getDeviceDesc(),
+        evento: evento || 'ping'
+      });
+    } catch(e) {}
+  }
+  function startHeartbeat() {
+    if (window._heartbeatTimer) clearInterval(window._heartbeatTimer);
+    pingSesion('login');
+    window._heartbeatTimer = setInterval(function(){ pingSesion('ping'); }, 45000);
+  }
+  function stopHeartbeat() {
+    if (window._heartbeatTimer) { clearInterval(window._heartbeatTimer); window._heartbeatTimer = null; }
+  }
+
+  function textoUltimaVez(min) {
+    if (min == null || min >= 999999) return 'sin datos';
+    if (min < 1) return 'hace instantes';
+    if (min < 60) return 'hace ' + min + ' min';
+    const h = Math.floor(min / 60);
+    if (h < 24) return 'hace ' + h + ' h';
+    const d = Math.floor(h / 24);
+    return 'hace ' + d + ' día' + (d > 1 ? 's' : '');
+  }
+  async function loadSesiones() {
+    const cont = document.getElementById('sesionesList');
+    if (!cont) return;
+    cont.innerHTML = '<div class="card" style="text-align:center; padding:20px; color:var(--ink-faint); font-size:13px;">Cargando…</div>';
+    try {
+      const r = await apiGet('getSesiones');
+      if (!r.success || !r.sesiones || r.sesiones.length === 0) {
+        cont.innerHTML = '<div class="card" style="text-align:center; padding:24px; color:var(--ink-faint); font-size:13px;">Aún no hay sesiones registradas.<br>Cuando una staff abra la app, aparecerá aquí.</div>';
+        return;
+      }
+      const porStaff = {};
+      r.sesiones.forEach(function(s){
+        const k = s.staff || '—';
+        if (!porStaff[k]) porStaff[k] = [];
+        porStaff[k].push(s);
+      });
+      let html = '';
+      Object.keys(porStaff).forEach(function(staff){
+        const devs = porStaff[staff];
+        const algunoActivo = devs.some(function(d){ return d.activo; });
+        html += '<div class="card" style="margin-bottom:10px; padding:14px;">'
+              + '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">'
+              + '<span style="font-weight:800; font-size:15px;">' + staff + '</span>'
+              + '<span style="font-size:11px; color:var(--ink-faint);">' + (devs[0].rol || '') + '</span>'
+              + (algunoActivo
+                  ? '<span style="margin-left:auto; background:var(--success-bg); color:var(--success); font-size:10px; font-weight:700; padding:3px 8px; border-radius:100px;">🟢 En línea</span>'
+                  : '<span style="margin-left:auto; background:var(--bg); color:var(--ink-faint); font-size:10px; font-weight:700; padding:3px 8px; border-radius:100px;">⚪ Desconectada</span>')
+              + '</div>';
+        devs.forEach(function(d){
+          const estado = d.activo
+            ? '🟢 abierta ahora'
+            : ('⚪ ' + textoUltimaVez(d.minutosDesde) + (d.ultimoPing ? ' · ' + d.ultimoPing : ''));
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--line);">'
+                + '<div style="font-size:12px; color:var(--ink-soft);">' + (d.dispositivo || 'Dispositivo') + '</div>'
+                + '<div style="font-size:11px; font-weight:600; white-space:nowrap; color:' + (d.activo ? 'var(--success)' : 'var(--ink-faint)') + ';">' + estado + '</div>'
+                + '</div>';
+        });
+        html += '</div>';
+      });
+      cont.innerHTML = html;
+    } catch(e) {
+      cont.innerHTML = '<div class="card" style="text-align:center; padding:20px; color:var(--danger); font-size:13px;">Error al cargar sesiones</div>';
+    }
   }
 
   function showConfirmServiceModal(slot) {
