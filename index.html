@@ -5898,11 +5898,13 @@ body.rol-staff #confirmSvcClientName::after {
 
       // Avisar a Mikaela que la staff tomó todos los servicios marcados
       if (_tomadasExtra > 0) {
+        // En el banner que ve la staff: solo el código (privacidad). El nombre solo va al push de Mikaela.
+        const _codCli = (slot_tm === 1 ? (window._as1Client || '') : (window._as2Client || '')) || 'clienta';
         const _nomCli = document.getElementById('as' + slot_tm + 'Name')?.textContent?.replace(' ⭐','') || 'la clienta';
         try {
           simulateNotif('mikaela',
             (user_tm?.name || 'Staff') + ' tomó todos los servicios',
-            _nomCli + ' · ' + _seleccionadas.length + ' servicios', false);
+            _codCli + ' · ' + _seleccionadas.length + ' servicios', false);
         } catch(e) {}
         try { enviarPushStaff(['Mikaela'], '✅ ' + (user_tm?.name || 'Staff') + ' tomó todo', _nomCli + ' · ' + _seleccionadas.length + ' servicios'); } catch(e) {}
       }
