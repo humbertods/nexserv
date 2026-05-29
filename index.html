@@ -13429,11 +13429,16 @@ body.rol-staff #confirmSvcClientName::after {
 
     allStaff.forEach(staff => {
       const clients = staffAvailability[staff.name] || [];
-      const isOccupied = clients.length > 0;
-      const status = isOccupied ? 'Ocupada' : 'Libre';
-      const statusBg = isOccupied ? 'var(--warning-bg)' : 'var(--success-bg)';
-      const statusColor = isOccupied ? 'var(--warning)' : 'var(--success)';
-      const meta = isOccupied ? `${staff.area} · En servicio (${clients[0]})` : `${staff.area} · Disponible`;
+      const cap = staff.area === 'Cejas' ? 2 : 1; // solo cejas atiende 2 a la vez
+      const isFull = clients.length >= cap;
+      const status = isFull ? 'Ocupada' : (clients.length > 0 ? clients.length + '/' + cap : 'Libre');
+      const statusBg = isFull ? 'var(--warning-bg)' : 'var(--success-bg)';
+      const statusColor = isFull ? 'var(--warning)' : 'var(--success)';
+      const meta = isFull
+        ? `${staff.area} · Ocupada (${clients.length}/${cap})`
+        : (clients.length > 0
+            ? `${staff.area} · ${clients.length}/${cap} · puede tomar otra`
+            : `${staff.area} · Disponible`);
       const initials = staff.name[0];
       const html = `
         <div class="client-row" onclick="goAssign('${staff.name}')">
