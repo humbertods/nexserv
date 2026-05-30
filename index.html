@@ -5158,16 +5158,41 @@ body.rol-staff #confirmSvcClientName::after {
           if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
           const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
-          document.getElementById('obs2Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
+          // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
+          const obsText2 = a.obsGeneral || a.observaciones || '';
+          document.getElementById('obs2Display').textContent = obsText2 || 'Sin observaciones';
+          // Destacar si hay servicios previos en las observaciones
+          if (obsText2 && obsText2.includes('✅')) {
+            document.getElementById('obs2Display').style.color = 'var(--success-dark, #2a7a4b)';
+            document.getElementById('obs2Display').style.fontWeight = '600';
+          } else {
+            document.getElementById('obs2Display').style.color = '';
+            document.getElementById('obs2Display').style.fontWeight = '';
+          }
           
           // Limpiar servicios previos
           slotServices[2] = [];
           document.getElementById('as2ServicesList').innerHTML = '';
           document.getElementById('as2SvcCount').textContent = '0';
           document.getElementById('as2Total').textContent = '$0';
+          const prevInfo2 = document.getElementById('promoAssignedInfo2'); if (prevInfo2) prevInfo2.remove();
+
+          // Detectar si viene de enganche (otra área ya completó parte del servicio) — POR SLOT
+          const esEnganche2 = obsText2 && obsText2.includes('✅');
+          window._esEnganche2 = esEnganche2;
+          window._desgloseAcumulado = []; // reset al tomar nueva clienta
+
+          // Si viene como enganche, guardar el historial anterior en desglose acumulado
+          if (esEnganche2) {
+            const partes2 = obsText2.split(' | ').filter(p => p.includes('✅'));
+            window._desgloseAcumulado = partes2.map(p => {
+              const match = p.match(/✅\s*(.*?)\s+completado por\s+(.*?)\s+·/);
+              return match ? { staff: match[2].trim(), servicio: match[1].trim(), area: match[1].trim(), monto: 0, esHistorico: true } : null;
+            }).filter(Boolean);
+          }
           
           // Si viene con servicio normal asignado (NO promo), cargarlo
-          if (a.servicio && a.servicio !== '—' && !a.promoNombre) {
+          if (a.servicio && a.servicio !== '—' && !a.promoNombre && !window._availablePromo) {
             const price = a.total || 0;
             let _svcNom2 = a.servicio;
             if (_svcNom2.trim().startsWith('{')) {
@@ -5178,9 +5203,28 @@ body.rol-staff #confirmSvcClientName::after {
               price: price,
               area: a.area
             });
-            renderServicesForSlot(2);
-            document.getElementById('as2Total').textContent = '$' + price;
-            document.getElementById('as2SvcCount').textContent = '1';
+            // Si tiene serviciosDetalle (mismo área combinado), cargar todos
+            if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
+              slotServices[2] = a.serviciosDetalle.map(sd => ({
+                name: sd.servicio || sd.nombre || sd.name || '',
+                price: Number(sd.precio || sd.price || 0),
+                area: a.area, status: undefined
+              }));
+              const totalCombinado2 = slotServices[2].reduce((s, v) => s + Number(v.price), 0);
+              renderServicesForSlot(2);
+              document.getElementById('as2Total').textContent = '$' + totalCombinado2;
+              document.getElementById('as2SvcCount').textContent = String(slotServices[2].length);
+            } else {
+              renderServicesForSlot(2);
+              document.getElementById('as2Total').textContent = '$' + price;
+              document.getElementById('as2SvcCount').textContent = '1';
+            }
+          }
+
+          // Limpiar promo residual si este servicio no tiene promo
+          if (!window._availablePromo) {
+            const clientKeyClean2 = normalizeClientKey(a.nombre);
+            if (activePromos[clientKeyClean2]) delete activePromos[clientKeyClean2];
           }
           
           // Si viene con promo asignada, guardarla pero permitir cambiarla
@@ -5191,15 +5235,80 @@ body.rol-staff #confirmSvcClientName::after {
             const promoFull = PROMOS.find(p => p.name === promoBasic.name);
             
             if (promoFull) {
+              try { // Wrap promo loading to prevent crashes stopping confirmServiceModal
               // Guardar promo completa
               if (!window._assignedPromo) window._assignedPromo = {};
               window._assignedPromo[2] = promoFull;
-              
+
+              // ✅ AGREGAR: Auto-agregar la promo a slotServices para que el botón "Finalizar" funcione
+              const myArea2 = user?.area || 'cejas';
+
+              // Restaurar completedAreas PRIMERO — necesario para calcular precio correcto
+              var restoredCompletedAreas2 = [];
+              try {
+                var _obsAllFields2 = String(a.observaciones || a.obs || a.obsGeneral || a.obsText || '');
+                var _matchComp2 = _obsAllFields2.match(/_completedAreas:(\[[^\]]*\])/);
+                if (_matchComp2) restoredCompletedAreas2 = JSON.parse(_matchComp2[1]);
+              } catch(eComp2) { console.warn('completedAreas parse error (slot2):', eComp2); }
+
+              // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
+              // Para promo compartida: excluir completedAreas → la 2da staff ve solo su parte
+              const precioMiAreaSP2 = Number(a.precioMiArea || 0);
+              const myPrice2 = precioMiAreaSP2 > 0
+                ? precioMiAreaSP2
+                : getMyPromoPrice(promoFull, myArea2, restoredCompletedAreas2);
+
+              slotServices[2].push({
+                name: promoFull.name,
+                area: myArea2,
+                price: myPrice2
+              });
+
+              // Actualizar UI
+              renderServicesForSlot(2);
+              document.getElementById('as2Total').textContent = '$' + myPrice2;
+              document.getElementById('as2SvcCount').textContent = '1';
+
+              // partes previas (promo compartida) — mostrar como historial readonly
+              if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+                window._desgloseAcumulado = a.serviciosDetalle;
+                const svcListEl2 = document.getElementById('as2ServicesList');
+                if (svcListEl2) {
+                  const histHtml2 = a.serviciosDetalle.map(function(d) {
+                    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                      + '<span style="font-size:16px;">&#x2705;</span>'
+                      + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                      + (d.servicio || d.area || 'Servicio previo') + ' &middot; ' + (d.staff || '&mdash;')
+                      + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                      + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (d.monto || 0) + '</div>'
+                      + '</div>';
+                  }).join('');
+                  svcListEl2.insertAdjacentHTML('afterbegin', histHtml2);
+                }
+              }
+
+              // Registrar promo activa con key normalizada
+              const clientKey2 = normalizeClientKey(a.nombre);
+              activePromos[clientKey2] = {
+                promo: promoFull,
+                startedBy: myArea2,
+                completedAreas: restoredCompletedAreas2,
+                _metadata: {
+                  displayName: a.nombre,
+                  clientCode: a.codigo,
+                  registeredAt: Date.now()
+                }
+              };
+              saveActivePromos(); // persistir
+
+              // Actualizar botones de finalización con las completedAreas restauradas
+              setTimeout(() => updateFinishButtons(2), 400);
+
               // Modificar el botón de promo para mostrar que hay una asignada
               const promoBtn = document.getElementById('promoBtn2');
               if (promoBtn) {
-                promoBtn.innerHTML = '🏷 Aplicar promo<br><span style="font-size: 10px; opacity: 0.9;">Asignada: ' + promoFull.name + '</span>';
-                promoBtn.style.background = 'linear-gradient(135deg, #ff6b9d 0%, #c44569 100())';
+                promoBtn.innerHTML = '✓ Promo aplicada';
+                promoBtn.style.background = 'var(--success)';
               }
               
               // Mostrar info de la promo asignada con servicios incluidos
@@ -5219,6 +5328,18 @@ body.rol-staff #confirmSvcClientName::after {
               if (actionBtns) {
                 actionBtns.parentNode.insertBefore(infoDiv, actionBtns);
               }
+
+              // Mostrar banner de promasExtra si hay mas promos pendientes
+              const promasExtraActuales2 = window._takingPromasExtra || [];
+              if (promasExtraActuales2.length > 0) {
+                const extraDiv2 = document.createElement('div');
+                extraDiv2.id = 'promoExtraInfo2';
+                extraDiv2.style.cssText = 'background: #fff8e1; border: 1.5px solid #f0c040; padding: 10px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 12px;';
+                extraDiv2.innerHTML = '<div style="font-weight:700;color:#8a6d00;margin-bottom:4px;">Despues de esta promo, la clienta tiene:</div>' +
+                  promasExtraActuales2.map(function(p,i){ return '<div style="color:#5a4a00;font-weight:600;">' + (i+1) + '. ' + p.nombre + ' ($' + p.precio + ')</div>'; }).join('');
+                if (actionBtns) actionBtns.parentNode.insertBefore(extraDiv2, actionBtns);
+              }
+              } catch(ePromo2) { console.error('Error cargando promo (slot2):', ePromo2); }
             }
           }
           
@@ -5254,7 +5375,7 @@ body.rol-staff #confirmSvcClientName::after {
             }
           }
 
-          // Si es TM: cargar areas completas para slot 2
+          // Si es TM: cargar areas completas para slot 2 (todas las áreas de esta staff + completadas)
           if (window._as2IdEspera && window._as2IdEspera.startsWith('TM-')) {
             apiGet('getTicketMulti').then(function(tmData2) {
               if (tmData2.success) {
@@ -5262,18 +5383,55 @@ body.rol-staff #confirmSvcClientName::after {
                 if (tm2) {
                   window._tmAreasActuales2 = tm2.areas || [];
                   var user2b = window.currentUser;
-                  var miArea2 = (tm2.areas || []).find(function(ar) {
+                  // Cargar TODOS los servicios de esta staff que están en servicio
+                  var misAreas2 = (tm2.areas || []).filter(function(ar) {
                     return ar.staff === (user2b && user2b.name) && String(ar.estado||'').toLowerCase() === 'en servicio';
                   });
-                  if (miArea2 && slotServices[2].length === 0) {
-                    slotServices[2] = [{ name: miArea2.tentativo || miArea2.confirmado || '', price: miArea2.precio || 0, area: miArea2.area }];
+                  // Áreas ya completadas (de cualquier staff) → mostrar como historial
+                  var areasCompletadas2 = (tm2.areas || []).filter(function(ar) {
+                    var e = String(ar.estado||'').toLowerCase();
+                    return e === 'completado' || e === 'finalizado' || e === 'completada';
+                  });
+
+                  // PASO 1: slotServices + render (borra innerHTML)
+                  if (misAreas2.length > 0) {
+                    slotServices[2] = misAreas2.map(function(ar) {
+                      return { name: ar.tentativo || ar.confirmado || '', price: ar.precio || 0, area: ar.area };
+                    });
                     renderServicesForSlot(2);
-                    document.getElementById('as2Total').textContent = '$' + (miArea2.precio || 0);
                   }
+
+                  // PASO 2: insertar chips completados DESPUÉS del render
+                  var svcListElTM2 = document.getElementById('as2ServicesList');
+                  if (areasCompletadas2.length > 0 && svcListElTM2) {
+                    [...svcListElTM2.querySelectorAll('.tm-completado-chip')].forEach(function(el){ el.remove(); });
+                    var histHtmlTM2 = areasCompletadas2.map(function(ar) {
+                      return '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
+                        + '<span style="font-size:16px;">✅</span>'
+                        + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
+                        + (ar.tentativo || ar.area || 'Servicio previo')
+                        + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
+                        + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
+                        + '</div>';
+                    }).join('');
+                    svcListElTM2.insertAdjacentHTML('afterbegin', histHtmlTM2);
+                  }
+
+                  // PASO 3: total y contador
+                  var totalActivosTM2 = (slotServices[2] || []).reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+                  var totalCompTM2 = areasCompletadas2.reduce(function(s,ar){ return s + Number(ar.precio||0); }, 0);
+                  document.getElementById('as2Total').textContent = '$' + (totalActivosTM2 + totalCompTM2);
+                  document.getElementById('as2SvcCount').textContent = String((slotServices[2]||[]).length + areasCompletadas2.length);
+
+                  // Mostrar botones TM correctos en el panel desde el inicio
+                  setTimeout(function() { updateFinishButtons(2); }, 600);
                 }
               }
               window.confirmarServicioObligatorio(2);
-            }).catch(function() { window.confirmarServicioObligatorio(2); });
+            }).catch(function() {
+              window.confirmarServicioObligatorio(2);
+              updateFinishButtons(2);
+            });
           } else {
             window.confirmarServicioObligatorio(2);
           }
@@ -5379,8 +5537,9 @@ body.rol-staff #confirmSvcClientName::after {
       const isPending = s.status === 'pendiente';
       const isApproved = s.status === 'aprobado';
       const isRejected = s.status === 'rechazado';
-      // Enganche: primer servicio de slot1 cuando viene de otra área, editable directamente
-      const isEngancheEditable = slot === 1 && idx === 0 && window._esEnganche && !isPending && !isApproved;
+      // Enganche: primer servicio cuando viene de otra área, editable directamente (slot 1 Y slot 2)
+      const _engancheActivoSlot = slot === 1 ? window._esEnganche : window._esEnganche2;
+      const isEngancheEditable = idx === 0 && _engancheActivoSlot && !isPending && !isApproved;
       
       const bgColor = isPending ? '#fff3cd' : isRejected ? '#f8d7da' : isEngancheEditable ? '#f0f9ff' : 'var(--bg-card)';
       const borderStyle = isPending ? 'border: 2px solid #ffc107;' : isRejected ? 'border: 2px solid #dc3545;' : isEngancheEditable ? 'border: 2px solid #3b82f6;' : '';
