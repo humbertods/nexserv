@@ -4167,9 +4167,32 @@ body.rol-staff #confirmSvcClientName::after {
           } catch(e) { console.error('Error recargando promo:', e); }
         }
         if (activePromos[clientKey]) updateFinishButtons(1);
+        // Restaurar servicios normales (no promo/no TM) si el slot quedó vacío tras refrescar
+        await restaurarServiciosNormalesSlot(1);
       }, 500);
     }
-    if (id === 'activeService2') { restoreActivePromos(); recargarAutorizacionesStaff(2); setTimeout(() => updateFinishButtons(2), 500); }
+    if (id === 'activeService2') {
+      restoreActivePromos();
+      recargarAutorizacionesStaff(2);
+      setTimeout(async () => {
+        const user2 = window.currentUser;
+        const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
+        const clientKey2 = normalizeClientKey(clientName2);
+        const idEspera2 = window._as2IdEspera || '';
+        // PROMO: restaurar desde activePromos si el slot quedó vacío
+        if (!idEspera2.startsWith('TM-') && clientName2 && activePromos[clientKey2] && (!slotServices[2] || slotServices[2].length === 0)) {
+          const _promo2 = activePromos[clientKey2].promo;
+          const _price2 = getMyPromoPrice(_promo2, user2?.area || 'cejas', activePromos[clientKey2].completedAreas || []);
+          slotServices[2] = [{ name: _promo2.name, price: _price2, area: user2?.area || 'cejas' }];
+          renderServicesForSlot(2);
+          document.getElementById('as2Total').textContent = '$' + _price2;
+          document.getElementById('as2SvcCount').textContent = '1';
+        }
+        // NORMAL: restaurar desde backend si sigue vacío
+        await restaurarServiciosNormalesSlot(2);
+        updateFinishButtons(2);
+      }, 500);
+    }
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
     if (id === 'serviciosHistory') { loadServiciosHistory(); }
@@ -4184,6 +4207,49 @@ body.rol-staff #confirmSvcClientName::after {
       resetArrivalExtras();
       document.getElementById('arrService').value = '';
     }
+  }
+
+  // Restaura servicios NORMALES (no promo, no TM) desde el backend cuando el slot
+  // quedó vacío (ej. tras refrescar la PWA). No pisa lo que ya hay en memoria, así
+  // los servicios permanecen visibles hasta que la staff toque un botón de acción.
+  async function restaurarServiciosNormalesSlot(slot) {
+    try {
+      const user = window.currentUser;
+      if (!user) return;
+      if ((slotServices[slot] || []).length > 0) return; // ya hay servicios → no tocar
+      const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      if (idEspera.startsWith('TM-')) return; // TM se restaura por otra ruta
+      const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
+      const clientKey = normalizeClientKey(clientName);
+      if (activePromos[clientKey]) return; // promo se restaura por otra ruta
+      const res = await apiGet('getAtenciones', { chica: user.name });
+      if (!res.success || !res.atenciones || !res.atenciones.length) return;
+      // Localizar la atención de este slot (por idEspera, por código, o por orden)
+      let a = null;
+      if (idEspera) a = res.atenciones.find(x => (x.idEspera || '') === idEspera);
+      if (!a) {
+        const code = slot === 1 ? window._as1Client : window._as2Client;
+        if (code) a = res.atenciones.find(x => x.codigo === code);
+      }
+      if (!a) a = res.atenciones[slot === 1 ? 0 : 1];
+      if (!a || a.promoNombre) return; // promo → otra ruta
+      if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+        slotServices[slot] = a.serviciosDetalle.map(sd => ({
+          name: sd.servicio || sd.nombre || sd.name || '',
+          price: Number(sd.monto || sd.precio || sd.price || 0),
+          area: sd.area || a.area || ''
+        }));
+      } else if (a.servicio && a.servicio !== '—') {
+        let nom = a.servicio;
+        if (String(nom).trim().startsWith('{')) { try { const p = JSON.parse(nom); nom = p.nombre || p.name || nom; } catch (e) {} }
+        slotServices[slot] = [{ name: nom, price: Number(a.total || 0), area: a.area || '' }];
+      } else { return; }
+      renderServicesForSlot(slot);
+      const total = (slotServices[slot] || []).reduce((s, v) => s + Number(v.price || 0), 0);
+      const t = document.getElementById('as' + slot + 'Total'); if (t) t.textContent = '$' + total;
+      const c = document.getElementById('as' + slot + 'SvcCount'); if (c) c.textContent = String((slotServices[slot] || []).length);
+      updateFinishButtons(slot);
+    } catch (e) { console.error('restaurarServiciosNormalesSlot error:', e); }
   }
 
   // Inicializar pestañas una sola vez por sesión
@@ -4322,6 +4388,21 @@ body.rol-staff #confirmSvcClientName::after {
           // document.getElementById('as1ServiceName').textContent = a1.servicio;
           // document.getElementById('as1ServiceArea').textContent = a1.area + ' · precio regular';
           document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+
+          // Restaurar servicios de la 1ª clienta desde el ticket (no solo slot 2)
+          if (!String(a1.idEspera||'').startsWith('TM-') && !a1.promoNombre) {
+            if (a1.serviciosDetalle && a1.serviciosDetalle.length > 0) {
+              slotServices[1] = a1.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.nombre || sd.name, price: Number(sd.monto || sd.precio || sd.price || 0), area: sd.area || a1.area || '' }; });
+            } else if (a1.servicio && a1.servicio !== '—') {
+              let _n1 = a1.servicio;
+              if (String(_n1).trim().startsWith('{')) { try { const _p1 = JSON.parse(_n1); _n1 = _p1.nombre || _p1.name || _n1; } catch(e){} }
+              slotServices[1] = [{ name: _n1, price: Number(a1.total || 0), area: a1.area || '' }];
+            }
+            try { renderServicesForSlot(1); } catch(e1) {}
+            const _t1 = (slotServices[1]||[]).reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+            const _as1t = document.getElementById('as1Total'); if (_as1t) _as1t.textContent = '$' + _t1;
+            const _as1sc = document.getElementById('as1SvcCount'); if (_as1sc) _as1sc.textContent = String((slotServices[1]||[]).length);
+          }
           
           // Doble atención: registrar en activeClients
           if (user.maxClients === 2) {
