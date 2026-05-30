@@ -2352,6 +2352,12 @@ body.rol-staff #confirmSvcClientName::after {
       <span style="font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadSesiones()">↻ Actualizar</span>
     </div>
     <div style="font-size:12px; color:var(--ink-soft); margin-bottom:14px; font-weight:500; line-height:1.5;">🟢 En línea = la app está abierta ahora (vista hace 3 min o menos). ⚪ = última vez que estuvo activa. "App instalada" significa que la agregaron a la pantalla de inicio.</div>
+    <div id="descansoWrap" style="margin-bottom:16px;">
+      <button id="descansoToggleBtn" onclick="toggleDescansoPanel()" style="width:100%;padding:14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        🌙 Activar modo de descanso <span id="descansoCaret" style="font-size:11px;">▼</span>
+      </button>
+      <div id="descansoPanel" style="display:none;margin-top:10px;"></div>
+    </div>
     <div id="sesionesList">
       <div class="card" style="text-align:center; padding:20px; color:var(--ink-faint); font-size:13px;">Cargando…</div>
     </div>
@@ -4208,6 +4214,10 @@ body.rol-staff #confirmSvcClientName::after {
       } else if (result.blocked) {
         btn.textContent = oldText; btn.disabled = false;
         show('blocked'); return;
+      } else if (result.descanso) {
+        btn.textContent = oldText; btn.disabled = false;
+        alert(result.message || 'Estás en tu tiempo de descanso, disfrútalo en familia 💛');
+        return;
       } else {
         console.warn('[doLogin] API sin success — result:', JSON.stringify(result).substring(0, 200));
         if (localUser && (localUser.pass === p || localUser.pass === u)) {
@@ -5684,6 +5694,56 @@ body.rol-staff #confirmSvcClientName::after {
     const d = Math.floor(h / 24);
     return 'hace ' + d + ' día' + (d > 1 ? 's' : '');
   }
+  // ── Modo de descanso: bloquear/permitir acceso por staff ──────────────
+  function toggleDescansoPanel() {
+    const panel = document.getElementById('descansoPanel');
+    const caret = document.getElementById('descansoCaret');
+    if (!panel) return;
+    const abierto = panel.style.display !== 'none';
+    if (abierto) {
+      panel.style.display = 'none';
+      if (caret) caret.textContent = '▼';
+    } else {
+      panel.style.display = 'block';
+      if (caret) caret.textContent = '▲';
+      loadDescansoPanel();
+    }
+  }
+  async function loadDescansoPanel() {
+    const panel = document.getElementById('descansoPanel');
+    if (!panel) return;
+    panel.innerHTML = '<div style="text-align:center;padding:14px;color:var(--ink-faint);font-size:13px;">Cargando…</div>';
+    let cfg = {};
+    try { const r = await apiGet('getDescanso'); if (r && r.success) cfg = r.config || {}; } catch(e) {}
+    window._descansoCfg = cfg;
+    const staff = ['Mikaela','Diana','Yadira','Keyla','Maria','Lesly','Laura','Rosa'];
+    let html = '<div class="card" style="padding:14px 16px;">'
+      + '<div style="text-align:center;font-weight:700;font-size:13px;margin-bottom:4px;">🌙 Modo de descanso</div>'
+      + '<div style="text-align:center;font-size:11px;color:var(--ink-soft);margin-bottom:10px;line-height:1.4;">Si una staff está bloqueada y abre la app, verá:<br>"Estás en tu tiempo de descanso, disfrútalo en familia"</div>'
+      + '<div style="display:flex;justify-content:flex-end;gap:10px;font-size:10px;color:var(--ink-soft);margin-bottom:4px;padding-right:6px;"><span style="width:38px;text-align:center;">Bloqueado</span><span style="width:38px;text-align:center;">Disponible</span></div>';
+    staff.forEach(function(n) {
+      const blocked = cfg[n] === true;
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);">'
+        + '<div style="flex:1;font-size:14px;font-weight:600;color:var(--ink);">' + n + '</div>'
+        + '<button onclick="setDescansoStaff(\'' + n + '\',true)" title="Bloquear acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (blocked ? '#e5484d' : 'var(--bg)') + ';color:' + (blocked ? '#fff' : 'var(--ink-faint)') + ';">🔒</button>'
+        + '<button onclick="setDescansoStaff(\'' + n + '\',false)" title="Permitir acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (!blocked ? '#2d9d5a' : 'var(--bg)') + ';color:' + (!blocked ? '#fff' : 'var(--ink-faint)') + ';">🔓</button>'
+        + '</div>';
+    });
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+  async function setDescansoStaff(staff, bloqueado) {
+    try {
+      await apiPost('setDescanso', { staff: staff, bloqueado: bloqueado });
+      if (!window._descansoCfg) window._descansoCfg = {};
+      if (bloqueado) window._descansoCfg[staff] = true; else delete window._descansoCfg[staff];
+      showToast(bloqueado ? ('🔒 ' + staff + ' en descanso') : ('🔓 ' + staff + ' habilitada'));
+      loadDescansoPanel();
+    } catch(e) { alert('No se pudo actualizar: ' + e.message); }
+  }
+  window.toggleDescansoPanel = toggleDescansoPanel;
+  window.setDescansoStaff = setDescansoStaff;
+
   async function loadSesiones() {
     const cont = document.getElementById('sesionesList');
     if (!cont) return;
