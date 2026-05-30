@@ -2967,6 +2967,8 @@ body.rol-staff #confirmSvcClientName::after {
           }
           show(user.screen || 'staffHome');
           console.log('[Sesión] Restaurada para:', user.name);
+          // Modo de descanso: si quedó bloqueada con la sesión abierta, cerrarla
+          setTimeout(() => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); }, 1200);
           // Re-suscribir push sin pedir permiso (ya lo dio antes)
           setTimeout(() => {
             if (!window._pushSuscrito && typeof suscribirPushActual === 'function') {
@@ -2978,6 +2980,11 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e) {
       console.warn('[Sesión] Error al restaurar:', e.message);
     }
+    // Modo de descanso: revisar al volver la app al frente y cada 90s
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && typeof verificarDescansoActivo === 'function') verificarDescansoActivo();
+    });
+    setInterval(() => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); }, 90000);
     // ────────────────────────────────────────────────────────
   });
 
@@ -4339,6 +4346,26 @@ body.rol-staff #confirmSvcClientName::after {
     ensureCatalogoLoaded(); // Pre-cargar catalogo en background
     show(user.screen);
   }
+
+  // Modo de descanso: si la staff (con sesión abierta) quedó bloqueada, cerrar su sesión
+  async function verificarDescansoActivo() {
+    const u = window.currentUser;
+    if (!u || u.role !== 'staff') return;
+    try {
+      const r = await apiGet('getDescanso');
+      if (r && r.success && r.config && r.config[u.name] === true) {
+        try { localStorage.removeItem('nexserv_session'); } catch(e) {}
+        pingSesion('logout');
+        stopHeartbeat();
+        window.currentUser = null;
+        document.body.classList.remove('rol-staff');
+        closeUserMenu();
+        show('login');
+        alert('Estás en tu tiempo de descanso, disfrútalo en familia 💛');
+      }
+    } catch(e) {}
+  }
+  window.verificarDescansoActivo = verificarDescansoActivo;
 
   function logout() {
     document.getElementById('loginUser').value = '';
