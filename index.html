@@ -9762,6 +9762,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON) {
     window._cobrarId = idEspera;
+    window._cobrarAjustes = []; // registro de correcciones/quitados que hace Mikaela en este cobro
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
     window._cobrarTotalRegular = Number(precioRegular) || Number(total) || 0;
@@ -9809,15 +9810,7 @@ body.rol-staff #confirmSvcClientName::after {
       window._cobrarDesglose = desglose;
       desgloseEl.style.display = 'block';
       simpleEl.style.display = 'none';
-      itemsEl.innerHTML = desglose.map(d => `
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
-          <div>
-            <div style="font-size:13px;font-weight:700;">${d.servicio}${d.congelado?' <span style=\"font-size:9px;background:var(--success);color:white;padding:2px 5px;border-radius:6px;font-weight:700;margin-left:4px;\">✅ LISTO</span>':''}</div>
-            <div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ${d.staff} · ${d.area || ''}</div>
-          </div>
-          <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${Number(d.monto).toFixed(2)}</div>
-        </div>
-      `).join('');
+      itemsEl.innerHTML = desglose.map((d, i) => _cobrarLineaHTML(d, i, d.congelado?'var(--success)':'var(--accent-deep)', Number(d.monto||0))).join('');
       const subtotalNum = desglose.reduce((s, d) => s + Number(d.monto || 0), 0);
       subtotalEl.textContent = '$' + subtotalNum.toFixed(2);
       window._cobrarTotalPromo = subtotalNum;
@@ -9925,6 +9918,65 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
 
+  // ── Edición de servicios al cobrar (solo Mikaela/owner) ──────────────
+  function _cobrarPuedeEditar() {
+    const r = window.currentUser && window.currentUser.role;
+    return r === 'admin' || r === 'owner';
+  }
+  function _cobrarLineaHTML(d, idx, color, monto) {
+    const puede = _cobrarPuedeEditar();
+    const btns = puede
+      ? '<div style="display:flex;gap:4px;margin-left:8px;flex-shrink:0;">'
+        + '<button onclick="cobrarEditarMonto(' + idx + ')" title="Corregir valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;">✏️</button>'
+        + '<button onclick="cobrarQuitarServicio(' + idx + ')" title="Quitar servicio" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;font-weight:800;padding:2px 4px;">✕</button>'
+        + '</div>'
+      : '';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px ' + (d.congelado?'10px':'0') + ';border-bottom:1px solid var(--line);' + (d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':'') + '">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + d.servicio + (d.congelado?' <span style="font-size:9px;background:var(--success);color:white;padding:2px 5px;border-radius:6px;font-weight:700;margin-left:4px;">✅ LISTO</span>':'') + '</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-top:1px;">por ' + (d.staff||'—') + ' · ' + (d.area||'') + '</div></div>'
+      + '<div style="font-size:15px;font-weight:800;color:' + color + ';margin-left:10px;">$' + Number(monto).toFixed(2) + '</div>'
+      + btns
+      + '</div>';
+  }
+  function cobrarQuitarServicio(idx) {
+    if (!_cobrarPuedeEditar()) return;
+    const d = (window._cobrarDesglose || [])[idx];
+    if (!d) return;
+    if (!confirm('¿Quitar "' + d.servicio + '" ($' + Number(d.monto||0).toFixed(2) + ') de ' + (d.staff||'') + '?\n\nTambién se quita su comisión de este cobro.')) return;
+    const _quien = (window.currentUser && window.currentUser.name) || 'Admin';
+    window._cobrarAjustes = window._cobrarAjustes || [];
+    window._cobrarAjustes.push(_quien + ' quitó "' + d.servicio + '" $' + Number(d.monto||0).toFixed(2) + (d.staff ? ' (' + d.staff + ')' : ''));
+    window._cobrarDesglose.splice(idx, 1);
+    cobrarAplicarDesgloseEditado();
+  }
+  function cobrarEditarMonto(idx) {
+    if (!_cobrarPuedeEditar()) return;
+    const d = (window._cobrarDesglose || [])[idx];
+    if (!d) return;
+    const actual = Number(d.monto) || 0;
+    const val = prompt('Nuevo valor para "' + d.servicio + '" (de ' + (d.staff||'') + '):', actual);
+    if (val === null) return;
+    const nuevo = Number(String(val).replace(',', '.').replace('$', '').trim());
+    if (isNaN(nuevo) || nuevo < 0) { alert('Valor inválido'); return; }
+    const _quienE = (window.currentUser && window.currentUser.name) || 'Admin';
+    window._cobrarAjustes = window._cobrarAjustes || [];
+    window._cobrarAjustes.push(_quienE + ' corrigió "' + d.servicio + '" $' + actual.toFixed(2) + '→$' + nuevo.toFixed(2) + (d.staff ? ' (' + d.staff + ')' : ''));
+    d.monto = nuevo;
+    // Si el monto normal (sin promo) era menor al nuevo, subirlo para no cobrar menos con tarjeta
+    if (d.montoNormal === undefined || Number(d.montoNormal) < nuevo) d.montoNormal = nuevo;
+    cobrarAplicarDesgloseEditado();
+  }
+  function cobrarAplicarDesgloseEditado() {
+    const desg = window._cobrarDesglose || [];
+    window._cobrarTotalPromo   = desg.reduce((s,d) => s + Number(d.monto||0), 0);
+    window._cobrarTotalRegular = desg.reduce((s,d) => s + Number(d.montoNormal||d.monto||0), 0);
+    // Si quitaron todos los servicios, todavía pueden quedar productos
+    refreshCobrarTotal();
+    showToast('✓ Servicios actualizados');
+  }
+  window.cobrarQuitarServicio = cobrarQuitarServicio;
+  window.cobrarEditarMonto = cobrarEditarMonto;
+
   function selectPago(metodo, btn) {
     // Unificar ambas variables de pago (cobro individual y grupal usan la misma)
     window._cobrarPago = metodo;
@@ -9932,15 +9984,15 @@ body.rol-staff #confirmSvcClientName::after {
 
     document.querySelectorAll('#cobrarModal .pago-btn').forEach(b => {
       b.style.background = 'var(--bg-card)'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line)';
+      b.classList.remove('selected');
     });
-    btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)';
+    if (btn) { btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)'; btn.classList.add('selected'); }
 
     // Mostrar/ocultar panel mixto
     const mixtoPanel = document.getElementById('mixtoPanel');
     if (mixtoPanel) {
       mixtoPanel.style.display = metodo === 'Pago mixto' ? 'block' : 'none';
       if (metodo === 'Pago mixto') {
-        // Resetear inputs
         const m1 = document.getElementById('mixtoMonto1');
         const m2 = document.getElementById('mixtoMonto2');
         if (m1) m1.value = '';
@@ -9950,11 +10002,18 @@ body.rol-staff #confirmSvcClientName::after {
         setTimeout(() => m1?.focus(), 100);
       }
     }
+    refreshCobrarTotal();
+  }
 
+  // Recalcula total + desglose según el método de pago actual y el desglose (editable) en memoria
+  function refreshCobrarTotal() {
+    const metodo     = window._cobrarPago || 'Efectivo';
     const aviso      = document.getElementById('cobrarTarjetaAviso');
     const totalEl    = document.getElementById('cobrarTotal');
     const promoBanner= document.getElementById('cobrarPromoBanner');
     const subtotalEl = document.getElementById('cobrarSubtotal');
+    const itemsEl2   = document.getElementById('cobrarDesgloseItems');
+    const totalProductos = window._cobrarTotalProductos || 0;
 
     // ── MANDAMIENTO #4: tarjeta siempre cobra precio normal en promos ──
     const resultado = window.aplicarReglaPagoM4(metodo, {
@@ -9965,45 +10024,30 @@ body.rol-staff #confirmSvcClientName::after {
     });
 
     if (resultado.usaPrecioNormal) {
-      aviso.style.display = 'block';
-      const promoDisp   = Number(window._cobrarTotalPromo  || 0).toFixed(2);
-      const normalDisp  = resultado.totalFinal.toFixed(2);
-      document.getElementById('cobrarPrecioPromo').textContent   = '$' + promoDisp;
-      document.getElementById('cobrarPrecioRegular').textContent = '$' + normalDisp;
-      totalEl.textContent = '$' + normalDisp;
-      totalEl.style.color = 'var(--danger)';
-      promoBanner.style.display = 'none';
+      if (aviso) aviso.style.display = 'block';
+      const promoDisp  = Number(window._cobrarTotalPromo || 0).toFixed(2);
+      const normalDisp = resultado.totalFinal.toFixed(2);
+      const pp = document.getElementById('cobrarPrecioPromo'); if (pp) pp.textContent = '$' + promoDisp;
+      const pr = document.getElementById('cobrarPrecioRegular'); if (pr) pr.textContent = '$' + normalDisp;
+      if (totalEl) { totalEl.textContent = '$' + (resultado.totalFinal + totalProductos).toFixed(2); totalEl.style.color = 'var(--danger)'; }
+      if (promoBanner) promoBanner.style.display = 'none';
       if (subtotalEl) { subtotalEl.textContent = '$' + normalDisp; subtotalEl.style.color = 'var(--danger)'; }
-      if (resultado.desglose) {
-        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
-        if (itemsEl2) {
-          itemsEl2.innerHTML = resultado.desglose.map(d => `
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
-              <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
-              <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
-              <div style="font-size:15px;font-weight:800;color:var(--danger);margin-left:12px;">$${d.montoFinal.toFixed(2)}</div></div>`
-          ).join('');
-        }
+      if (resultado.desglose && itemsEl2) {
+        itemsEl2.innerHTML = resultado.desglose.map((d, i) => _cobrarLineaHTML(d, i, 'var(--danger)', d.montoFinal)).join('');
       }
+      window._cobrarTotalConProductos = resultado.totalFinal + totalProductos;
     } else {
-      aviso.style.display = 'none';
-      totalEl.textContent = '$' + resultado.totalFinal.toFixed(2);
-      totalEl.style.color = 'var(--accent-deep)';
-      if (window._cobrarTienePromo) promoBanner.style.display = 'block';
-      if (resultado.desglose) {
-        const itemsEl2 = document.getElementById('cobrarDesgloseItems');
-        if (itemsEl2) {
-          itemsEl2.innerHTML = resultado.desglose.map(d => `
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px ${d.congelado?'10px':'0'};border-bottom:1px solid var(--line);${d.congelado?'background:var(--success-bg);border-radius:8px;margin-bottom:2px;':''}">
-              <div><div style="font-size:13px;font-weight:700;">${d.servicio}</div>
-              <div style="font-size:11px;color:var(--ink-soft);">por ${d.staff} · ${d.area||''}</div></div>
-              <div style="font-size:15px;font-weight:800;color:${d.congelado?'var(--success)':'var(--accent-deep)'};margin-left:12px;">$${d.montoFinal.toFixed(2)}</div></div>`
-          ).join('');
-        }
+      if (aviso) aviso.style.display = 'none';
+      if (totalEl) { totalEl.textContent = '$' + (resultado.totalFinal + totalProductos).toFixed(2); totalEl.style.color = 'var(--accent-deep)'; }
+      if (promoBanner && window._cobrarTienePromo) promoBanner.style.display = 'block';
+      if (resultado.desglose && itemsEl2) {
+        itemsEl2.innerHTML = resultado.desglose.map((d, i) => _cobrarLineaHTML(d, i, d.congelado?'var(--success)':'var(--accent-deep)', d.montoFinal)).join('');
       }
       if (subtotalEl) { subtotalEl.textContent = '$' + resultado.totalFinal.toFixed(2); subtotalEl.style.color = ''; }
+      window._cobrarTotalConProductos = resultado.totalFinal + totalProductos;
     }
   }
+  window.refreshCobrarTotal = refreshCobrarTotal;
 
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
@@ -10103,6 +10147,10 @@ body.rol-staff #confirmSvcClientName::after {
     });
     _payloadM5.totalServicios = totalServicios;
     _payloadM5.totalProductos = totalProductos;
+    // Nota de auditoría: correcciones/quitados que hizo Mikaela en este cobro (queda en HistorialOwner)
+    if (window._cobrarAjustes && window._cobrarAjustes.length > 0) {
+      _payloadM5.notaAjuste = window._cobrarAjustes.join(' · ');
+    }
 
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
@@ -12790,6 +12838,7 @@ body.rol-staff #confirmSvcClientName::after {
           valor, comision,
           hora: h.hora || '',
           metodo: h.metodoPago || 'Efectivo',
+          notaAjuste: h.notaAjuste || '',
           itemIdx
         });
         porDia[diaN].staff[staff].total += valor;
@@ -12866,6 +12915,7 @@ body.rol-staff #confirmSvcClientName::after {
                         <div style="font-size:13px;font-weight:600;">${sv.cliente}</div>
                         <div style="font-size:11px;color:var(--ink-soft);">${sv.servicio} · ${sv.hora} · ${sv.metodo}</div>
                         <div style="font-size:10px;color:var(--danger);margin-top:2px;">Com. $${sv.comision.toFixed(2)}</div>
+                        ${sv.notaAjuste ? '<div style="font-size:10px;color:#8a6d00;background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:3px 7px;margin-top:4px;display:inline-block;">✏️ ' + sv.notaAjuste + '</div>' : ''}
                       </div>
                       <div style="display:flex;align-items:center;gap:8px;">
                         <div style="font-size:14px;font-weight:800;color:var(--success);">$${sv.valor.toFixed(0)}</div>
