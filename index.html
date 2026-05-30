@@ -10814,7 +10814,11 @@ body.rol-staff #confirmSvcClientName::after {
     let s = String(raw || '');
     try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch(e) {}
     s = s.replace(/[^a-zA-Z0-9 ]/g, ' ').toLowerCase().trim();
-    if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma')) return 'facial';
+    // Si ya es una clave de área exacta, devolverla directo
+    if (s === 'facial' || s === 'cejas' || s === 'depilacion' || s === 'pestanas' || s === 'retiro_lifting') return s;
+    if (s.includes('facial') || s.includes('hidra') || s.includes('limpiez') || s.includes('derma') ||
+        s.includes('skin') || s.includes('peeling') || s.includes('glow') || s.includes('dermapla') ||
+        s.includes('microneedl') || s.includes('punto de rubi')) return 'facial';
     if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
     if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
     return 'cejas';
@@ -10886,7 +10890,7 @@ body.rol-staff #confirmSvcClientName::after {
     getServiciosAdicionalesData().forEach(function(a) {
       areas.push({
         tentativo:    a.nombre,
-        area:         String(a.area || 'cejas').toLowerCase(),
+        area:         String(a.area || AREA_KEY_FROM_DIV(a.nombre) || 'cejas').toLowerCase(),
         precio:       Number(a.precio || 0),
         precioNormal: Number(a.regular || a.precio || 0),
         tipo:         a.tipo || 'normal'
