@@ -3375,7 +3375,7 @@ body.rol-staff #confirmSvcClientName::after {
       // Cargar todo en paralelo
       const [commResult, listaResult, histResult] = await Promise.all([
         apiGet('getComisiones').catch(() => ({ success: false })),
-        apiGet('getListaEspera').catch(() => ({ success: false })),
+        apiGet('getListaCompleta').catch(() => ({ success: false })),
         apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
       ]);
 
@@ -3400,11 +3400,11 @@ body.rol-staff #confirmSvcClientName::after {
         }
       }).catch(() => {});
 
-      // Estado del salón
-      if (listaResult.success && listaResult.lista) {
-        const esperando  = listaResult.lista.filter(l => l.estado?.toLowerCase() === 'esperando').length;
-        const enServicio = listaResult.lista.filter(l => ['tomada','en servicio'].includes(l.estado?.toLowerCase())).length;
-        const listas     = listaResult.lista.filter(l => l.estado?.toLowerCase() === 'por cobrar').length;
+      // Estado del salón (usa getListaCompleta: esperando + en servicio + por cobrar)
+      if (listaResult.success) {
+        const esperando  = (listaResult.esperando  || []).length;
+        const enServicio = (listaResult.enServicio || []).length;
+        const listas     = (listaResult.porCobrar  || []).length;
         document.getElementById('ownerEsperando').textContent = esperando;
         document.getElementById('ownerServicio').textContent  = enServicio;
         document.getElementById('ownerListas').textContent    = listas;
@@ -4027,7 +4027,17 @@ body.rol-staff #confirmSvcClientName::after {
     console.log('[show] → ' + id);
     if (id === 'waitList') renderWaitList();
     if (id === 'staffHome') loadStaffHome();
-    if (id === 'ownerHome') loadOwnerHome();
+    if (id === 'ownerHome') {
+      loadOwnerHome();
+      if (window._ownerHomeRefresh) clearInterval(window._ownerHomeRefresh);
+      window._ownerHomeRefresh = setInterval(() => {
+        const el = document.getElementById('ownerHome');
+        if (el && el.classList.contains('active')) loadOwnerHome();
+        else { clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null; }
+      }, 12000);
+    } else if (window._ownerHomeRefresh) {
+      clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null;
+    }
     if (id === 'ownerPromos') renderPromos();
     if (id === 'staffPromos') await renderStaffPromos();
     if (id === 'assignDirect') { setTimeout(() => renderAssignDirect(), 50); }
