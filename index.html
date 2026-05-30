@@ -6130,6 +6130,10 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
 
+  // Alias: confirmarServicioObligatorio se llama en varios sitios pero la función real
+  // es showConfirmServiceModal (abre el modal de confirmación con sus botones).
+  window.confirmarServicioObligatorio = showConfirmServiceModal;
+
   function changeServiceFromModal() {
     closeModal();
     const slot = window._confirmSvcSlot || 1;
