@@ -2230,7 +2230,7 @@ body.rol-staff #confirmSvcClientName::after {
     <div id="cejasQuick2" style="display: none; margin-bottom: 14px;"></div>
 
     <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-      <button onclick="openAddService()" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">+ Agregar servicio</button>
+      <button onclick="openAddService(2)" style="flex: 1; padding: 16px; background: var(--bg-card); border: 2px dashed var(--line); border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">+ Agregar servicio</button>
       <button onclick="openPromoSelect(2)" style="flex: 1; padding: 16px; background: var(--accent); color: white; border: none; border-radius: 20px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;" id="promoBtn2">🏷 Aplicar promo</button>
     </div>
 
@@ -6325,9 +6325,8 @@ body.rol-staff #confirmSvcClientName::after {
     const slot = window._confirmSvcSlot || 1;
     // Abrir el selector de servicio/promo en modo enganche (sin necesitar autorización)
     window._addServiceSlot = slot;
-    window._modoEnganche = true; // no requiere autorización de Mikaela
     window._editEngancheIdx = 0; // reemplazar el servicio en posición 0
-    openAddService(slot);
+    openAddService(slot, true); // true = modo enganche explícito
     // Cambiar título y ocultar nota
     setTimeout(() => {
       const modalTitle = document.querySelector('#addServiceModal .modal-title');
@@ -13399,11 +13398,17 @@ body.rol-staff #confirmSvcClientName::after {
     showToast('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
   }
 
-  function openAddService(slot) {
+  function openAddService(slot, modoEnganche) {
     window._addServiceSlot = slot || 1;
-    const esEnganche = window._modoEnganche === true;
-    if (!esEnganche) {
+    // El modo enganche SOLO se activa cuando el llamador lo pide explícitamente
+    // (changeServiceFromModal / editEngancheService). El botón "+ Agregar servicio"
+    // nunca pasa este parámetro → siempre fuerza modo normal y limpia banderas pegadas.
+    const esEnganche = modoEnganche === true;
+    if (esEnganche) {
+      window._modoEnganche = true;
+    } else {
       window._modoEnganche = false;
+      window._editEngancheIdx = undefined;
       // Resetear al tab Servicio y título solo en modo normal
       switchAddSvcTab('servicio');
       const titleEl = document.getElementById('addSvcModalTitle');
@@ -13626,6 +13631,11 @@ body.rol-staff #confirmSvcClientName::after {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
     window._cobroGrupal = null;
+    // Red de seguridad: limpiar modo enganche al cerrar cualquier modal, para que
+    // un "Cambiar servicio" abandonado no convierta el siguiente "Agregar servicio"
+    // en un reemplazo dentro del mismo ticket (debe ir SIEMPRE a autorización de Mikaela).
+    window._modoEnganche = false;
+    window._editEngancheIdx = undefined;
     // Limpiar botones dinámicos del modal de finalización para evitar duplicados
     // Restaurar título del cobrarModal por si fue cobro grupal
     const modalTitleEl = document.querySelector('#cobrarModal .modal-title');
