@@ -3361,6 +3361,22 @@ body.rol-staff #confirmSvcClientName::after {
   // ej: { 'Keyla': [{ name: 'Isabella Vera', service: '...', since: '10:52' }] }
 
   // === CARGAR DATOS DEL OWNER HOME ===
+  // Refresco liviano del estado del salón (solo los 3 números, sin recargar el resto)
+  async function refreshEstadoSalon() {
+    try {
+      const r = await apiGet('getListaCompleta');
+      if (r && r.success) {
+        const e = document.getElementById('ownerEsperando');
+        const s = document.getElementById('ownerServicio');
+        const l = document.getElementById('ownerListas');
+        if (e) e.textContent = (r.esperando  || []).length;
+        if (s) s.textContent = (r.enServicio || []).length;
+        if (l) l.textContent = (r.porCobrar  || []).length;
+      }
+    } catch(e) {}
+  }
+  window.refreshEstadoSalon = refreshEstadoSalon;
+
   async function loadOwnerHome() {
     // Mostrar estado de carga inmediatamente
     const histContainer = document.getElementById('ownerHistorial');
@@ -4032,9 +4048,9 @@ body.rol-staff #confirmSvcClientName::after {
       if (window._ownerHomeRefresh) clearInterval(window._ownerHomeRefresh);
       window._ownerHomeRefresh = setInterval(() => {
         const el = document.getElementById('ownerHome');
-        if (el && el.classList.contains('active')) loadOwnerHome();
+        if (el && el.classList.contains('active')) refreshEstadoSalon();
         else { clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null; }
-      }, 12000);
+      }, 15000);
     } else if (window._ownerHomeRefresh) {
       clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null;
     }
