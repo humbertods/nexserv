@@ -4436,15 +4436,14 @@ body.rol-staff #confirmSvcClientName::after {
           const a1 = aten[0];
           window._as1Client = a1.codigo;
           window._as1IdEspera = a1.idEspera || ''; // ID del ticket LE-XXXX
-          const initials1 = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          document.getElementById('as1Avatar').textContent = initials1;
-          document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
+          const initials1 = (a1.nombre || '').split(' ').map(n=>n[0]).join('').slice(0,2);
+          const _as1av = document.getElementById('as1Avatar');
+          if (_as1av) { _as1av.textContent = initials1; _as1av.className = 'client-avatar' + (a1.esTop ? ' is-top' : ''); }
           pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
-          document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
-          // NOTA: as1ServiceName y as1ServiceArea ya no existen, ahora usamos slotServices
-          // document.getElementById('as1ServiceName').textContent = a1.servicio;
-          // document.getElementById('as1ServiceArea').textContent = a1.area + ' · precio regular';
-          document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+          const _as1cd = document.getElementById('as1Code');
+          if (_as1cd) _as1cd.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
+          const _obs1 = document.getElementById('obs1Display');
+          if (_obs1) _obs1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
 
           // Restaurar servicios de la 1ª clienta desde el ticket (no solo slot 2)
           if (!String(a1.idEspera||'').startsWith('TM-') && !a1.promoNombre) {
@@ -4483,6 +4482,16 @@ body.rol-staff #confirmSvcClientName::after {
               const _t2 = (slotServices[2]||[]).reduce(function(s,v){ return s + Number(v.price||0); }, 0);
               const _as2t = document.getElementById('as2Total'); if (_as2t) _as2t.textContent = '$' + _t2;
               const _as2sc = document.getElementById('as2SvcCount'); if (_as2sc) _as2sc.textContent = String((slotServices[2]||[]).length);
+            } else {
+              // No hay 2ª clienta → limpiar slot 2 para no arrastrar datos de una sesión anterior
+              window._as2Client = '';
+              window._as2IdEspera = '';
+              slotServices[2] = [];
+              const _as2nm = document.getElementById('as2Name'); if (_as2nm) _as2nm.textContent = '';
+              const _as2cd2 = document.getElementById('as2Code'); if (_as2cd2) _as2cd2.textContent = '';
+              const _as2sl = document.getElementById('as2ServicesList'); if (_as2sl) _as2sl.innerHTML = '';
+              const _as2t2 = document.getElementById('as2Total'); if (_as2t2) _as2t2.textContent = '$0';
+              const _as2sc2 = document.getElementById('as2SvcCount'); if (_as2sc2) _as2sc2.textContent = '0';
             }
             updateCapacityUI(user.name);
           }
@@ -4960,14 +4969,16 @@ body.rol-staff #confirmSvcClientName::after {
         if (slot === 0) {
           window._as1Client = a.codigo;
           window._as1IdEspera = a.idEspera || window._takingId || ''; // ID ticket LE-XXXX
-          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          document.getElementById('as1Avatar').textContent = initials;
-          document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
+          const initials = (a.nombre || '').split(' ').map(n=>n[0]).join('').slice(0,2);
+          const _as1av0 = document.getElementById('as1Avatar');
+          if (_as1av0) { _as1av0.textContent = initials; _as1av0.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as1Name', a.nombre, a.codigo, a.esTop);
-          document.getElementById('as1Code').textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
+          const _as1cd0 = document.getElementById('as1Code');
+          if (_as1cd0) _as1cd0.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText = a.obsGeneral || a.observaciones || '';
-          document.getElementById('obs1Display').textContent = obsText || 'Sin observaciones';
+          const _obs1d = document.getElementById('obs1Display');
+          if (_obs1d) _obs1d.textContent = obsText || 'Sin observaciones';
           // Destacar si hay servicios previos en las observaciones
           if (obsText && obsText.includes('✅')) {
             document.getElementById('obs1Display').style.color = 'var(--success-dark, #2a7a4b)';
