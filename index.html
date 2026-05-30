@@ -9447,6 +9447,23 @@ body.rol-staff #confirmSvcClientName::after {
     const subtotalEl = document.getElementById('cobrarSubtotal');
 
     if (desglose && desglose.length > 0) {
+      // ── SEGURO ANTI-DUPLICADO ──────────────────────────────────────────
+      // Quitar una línea suelta cuyo servicio YA está incluido dentro de otra
+      // línea combinada de la MISMA área (ej. "nariz" suelta cuando ya está en
+      // "Combo + nariz"). Evita cobrar dos veces el mismo servicio.
+      desglose = desglose.filter(function(d, idx) {
+        const nombre = String(d.servicio || '').trim();
+        const area = String(d.area || '').toLowerCase();
+        if (!nombre) return true;
+        const incluidoEnOtra = desglose.some(function(otro, j) {
+          if (j === idx) return false;
+          const partes = String(otro.servicio || '').split(' + ').map(function(s){ return s.trim(); });
+          return partes.length > 1
+            && partes.indexOf(nombre) >= 0
+            && String(otro.area || '').toLowerCase() === area;
+        });
+        return !incluidoEnOtra;
+      });
       // Modo ticket detallado
       window._cobrarDesglose = desglose;
       desgloseEl.style.display = 'block';
