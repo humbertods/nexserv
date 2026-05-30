@@ -4179,8 +4179,65 @@ body.rol-staff #confirmSvcClientName::after {
         const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
         const clientKey2 = normalizeClientKey(clientName2);
         const idEspera2 = window._as2IdEspera || '';
+
+        // ── TICKET MULTI (TM): restaurar desde el backend (igual que slot 1) ──
+        if (idEspera2.startsWith('TM-')) {
+          try {
+            const tmR2 = await apiGet('getTicketMulti');
+            if (tmR2.success) {
+              const tm2 = (tmR2.activos || []).find(t => t.idEspera === idEspera2);
+              if (tm2) {
+                window._tmAreasActuales2 = tm2.areas || [];
+                const miNombre2 = user2?.name || '';
+                const svcListEl2 = document.getElementById('as2ServicesList');
+                // Mis áreas en servicio → servicios editables
+                const misAreasActivas2 = (tm2.areas || []).filter(a =>
+                  String(a.staff||'') === miNombre2 && String(a.estado||'').toLowerCase() === 'en servicio'
+                );
+                if (misAreasActivas2.length > 0) {
+                  slotServices[2] = misAreasActivas2.map(ar => ({
+                    name: ar.tentativo || ar.confirmado || '',
+                    price: ar.precio || 0,
+                    area: ar.area || user2?.area || 'cejas'
+                  }));
+                  renderServicesForSlot(2);
+                }
+                // El RESTO del ticket (otras áreas: completadas o en espera) → chips de contexto
+                const otrasAreas2 = (tm2.areas || []).filter(a => {
+                  const esMiaActiva = String(a.staff||'') === miNombre2 && String(a.estado||'').toLowerCase() === 'en servicio';
+                  return !esMiaActiva;
+                });
+                if (otrasAreas2.length > 0 && svcListEl2) {
+                  [...svcListEl2.querySelectorAll('.tm-contexto-chip')].forEach(el => el.remove());
+                  const chipsHtml2 = otrasAreas2.map(ar => {
+                    const est = String(ar.estado||'').toLowerCase();
+                    const completado = est === 'completado' || est === 'finalizado' || est === 'completada';
+                    const bg = completado ? 'var(--success-bg)' : 'var(--bg)';
+                    const col = completado ? 'var(--success)' : 'var(--ink-soft)';
+                    const badge = completado ? '✅ Completado' : '⏳ En espera';
+                    return '<div class="tm-contexto-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:'+bg+';border-radius:12px;margin-bottom:8px;opacity:'+(completado?'1':'0.6')+';">'
+                      + '<span style="font-size:16px;">'+(completado?'✅':'⏳')+'</span>'
+                      + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:'+col+';">'
+                      + (ar.tentativo || ar.area || 'Servicio') + (ar.staff ? ' · ' + ar.staff : '')
+                      + '</div><div style="font-size:11px;color:'+col+';">'+badge+'</div></div>'
+                      + '<div style="font-size:13px;font-weight:800;color:'+col+';">$' + (ar.precio || 0) + '</div>'
+                      + '</div>';
+                  }).join('');
+                  svcListEl2.insertAdjacentHTML('beforeend', chipsHtml2);
+                }
+                // Total y contador (solo lo que cobra María)
+                const totalMias2 = (slotServices[2] || []).reduce((s,v) => s + Number(v.price||0), 0);
+                document.getElementById('as2Total').textContent = '$' + totalMias2;
+                document.getElementById('as2SvcCount').textContent = String((slotServices[2]||[]).length);
+                updateFinishButtons(2);
+              }
+            }
+          } catch(eTM2) { console.error('Error restaurando TM slot 2:', eTM2); }
+          return; // TM procesado
+        }
+
         // PROMO: restaurar desde activePromos si el slot quedó vacío
-        if (!idEspera2.startsWith('TM-') && clientName2 && activePromos[clientKey2] && (!slotServices[2] || slotServices[2].length === 0)) {
+        if (clientName2 && activePromos[clientKey2] && (!slotServices[2] || slotServices[2].length === 0)) {
           const _promo2 = activePromos[clientKey2].promo;
           const _price2 = getMyPromoPrice(_promo2, user2?.area || 'cejas', activePromos[clientKey2].completedAreas || []);
           slotServices[2] = [{ name: _promo2.name, price: _price2, area: user2?.area || 'cejas' }];
@@ -4383,7 +4440,7 @@ body.rol-staff #confirmSvcClientName::after {
           document.getElementById('as1Avatar').textContent = initials1;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
           pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
-          document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
+          document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
           // NOTA: as1ServiceName y as1ServiceArea ya no existen, ahora usamos slotServices
           // document.getElementById('as1ServiceName').textContent = a1.servicio;
           // document.getElementById('as1ServiceArea').textContent = a1.area + ' · precio regular';
@@ -4406,16 +4463,16 @@ body.rol-staff #confirmSvcClientName::after {
           
           // Doble atención: registrar en activeClients
           if (user.maxClients === 2) {
-            activeClients[user.name] = [{ name: a1.nombre, service: a1.servicio }];
+            activeClients[user.name] = [{ name: a1.nombre, code: a1.codigo, service: a1.servicio }];
             if (aten.length > 1) {
               const a2 = aten[1];
               window._as2Client = a2.codigo;
               window._as2IdEspera = a2.idEspera || ''; // ID del ticket de la 2ª clienta
-              activeClients[user.name].push({ name: a2.nombre, service: a2.servicio });
+              activeClients[user.name].push({ name: a2.nombre, code: a2.codigo, service: a2.servicio });
               const initials2 = a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
               const _as2av = document.getElementById('as2Avatar'); if (_as2av) _as2av.textContent = initials2;
               pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
-              const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + ' · Llegó ' + a2.horaLlegada;
+              const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + (a2.horaLlegada ? ' · Llegó ' + a2.horaLlegada : '');
               // Cargar servicios de la 2ª clienta si vienen del ticket
               if (a2.serviciosDetalle && a2.serviciosDetalle.length > 0) {
                 slotServices[2] = a2.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.name, price: Number(sd.monto || sd.price || 0), area: sd.area || '' }; });
@@ -4907,7 +4964,7 @@ body.rol-staff #confirmSvcClientName::after {
           document.getElementById('as1Avatar').textContent = initials;
           document.getElementById('as1Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
           pintarNombre('as1Name', a.nombre, a.codigo, a.esTop);
-          document.getElementById('as1Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
+          document.getElementById('as1Code').textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText = a.obsGeneral || a.observaciones || '';
           document.getElementById('obs1Display').textContent = obsText || 'Sin observaciones';
@@ -5238,7 +5295,7 @@ body.rol-staff #confirmSvcClientName::after {
           const _as2avb = document.getElementById('as2Avatar');
           if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
-          const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
+          const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText2 = a.obsGeneral || a.observaciones || '';
           document.getElementById('obs2Display').textContent = obsText2 || 'Sin observaciones';
@@ -5520,7 +5577,7 @@ body.rol-staff #confirmSvcClientName::after {
         
         if (user && user.maxClients === 2) {
           if (!activeClients[name]) activeClients[name] = [];
-          activeClients[name] = aten.map(at => ({ name: at.nombre, service: at.servicio }));
+          activeClients[name] = aten.map(at => ({ name: at.nombre, code: at.codigo, service: at.servicio }));
           updateCapacityUI(name);
         }
         
@@ -5537,7 +5594,7 @@ body.rol-staff #confirmSvcClientName::after {
           alert('Ya tenés 2 clientas en atención. Finalizá una para tomar otra.');
           return;
         }
-        activeClients[name].push({ name: window._takingClient || 'Clienta', service: window._takingService || 'Servicio' });
+        activeClients[name].push({ name: window._takingClient || 'Clienta', code: window._takingClientCode || window._as1Client || window._as2Client || '', service: window._takingService || 'Servicio' });
         updateCapacityUI(name);
         setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
       } else {
@@ -7123,7 +7180,7 @@ body.rol-staff #confirmSvcClientName::after {
     badge.style.color = count === 2 ? 'var(--danger)' : count === 1 ? 'var(--warning)' : 'var(--success)';
     
     if (clients[0]) {
-      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clients[0].name + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + (clients[0].code || clients[0].name) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
       slot1.style.border = '2px solid var(--success)';
       slot1.style.background = 'var(--success-bg)';
       slot1.dataset.active = 'true';
@@ -7135,7 +7192,7 @@ body.rol-staff #confirmSvcClientName::after {
     }
     
     if (clients[1]) {
-      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clients[1].name + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + (clients[1].code || clients[1].name) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
       slot2.style.border = '2px solid var(--info)';
       slot2.style.background = 'var(--info-bg)';
       slot2.dataset.active = 'true';
@@ -7916,7 +7973,7 @@ body.rol-staff #confirmSvcClientName::after {
         document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
-        document.getElementById('as1Code').textContent = a1.codigo + ' · Llegó ' + a1.horaLlegada;
+        document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
         document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
         renderSecuenciaBanner(1, a1.secuencia || []);
 
