@@ -5931,16 +5931,32 @@ body.rol-staff #confirmSvcClientName::after {
             <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
           </label>`;
         } else if (esEsperando) {
-          // Áreas disponibles — la staff puede elegir tomarlas también
-          areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;border:1.5px solid var(--line);cursor:pointer;">
-            <input type="checkbox" data-area-idx="${ar.idx}" style="width:18px;height:18px;accent-color:var(--accent);">
-            <span style="font-size:16px;">${icon}</span>
-            <div style="flex:1;">
-              <div style="font-size:12px;font-weight:700;color:var(--ink);">${label}</div>
-              <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
-            </div>
-            <div style="font-size:13px;font-weight:800;color:var(--ink);">$${ar.precio||0}</div>
-          </label>`;
+          // ¿Esta área es de la especialidad de la staff? Si no, se muestra bloqueada.
+          const _puedeArea = window.esMismaAreaM3
+            ? window.esMismaAreaM3(user && user.area, ar.area || label)
+            : true;
+          if (_puedeArea) {
+            // Áreas disponibles que SÍ puede hacer — puede elegir tomarlas
+            areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;border:1.5px solid var(--line);cursor:pointer;">
+              <input type="checkbox" data-area-idx="${ar.idx}" style="width:18px;height:18px;accent-color:var(--accent);">
+              <span style="font-size:16px;">${icon}</span>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:700;color:var(--ink);">${label}</div>
+                <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:var(--ink);">$${ar.precio||0}</div>
+            </label>`;
+          } else {
+            // Área de OTRA especialidad — bloqueada, queda para otra staff
+            areasHTML += `<div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;border:1.5px dashed var(--line);opacity:0.6;">
+              <span style="font-size:16px;">🔒</span>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label}</div>
+                <div style="font-size:11px;color:var(--ink-faint);">Para otra staff</div>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:var(--ink-faint);">$${ar.precio||0}</div>
+            </div>`;
+          }
         }
       });
 
