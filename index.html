@@ -2183,10 +2183,10 @@ body.rol-staff #confirmSvcClientName::after {
     
     <div style="text-align: center; margin-bottom: 24px;">
       <div style="display: inline-flex; align-items: center; gap: 6px; background: var(--info-bg); color: var(--info); padding: 4px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; margin-bottom: 12px;">Clienta 2 de 2</div>
-      <div class="client-avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile('lucia')">LP</div>
-      <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">Lucía Paredes</div>
-      <div style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">C-0009 · Llegó 11:05</div>
-      <button onclick="openClientProfile('lucia')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
+      <div class="client-avatar" id="as2Avatar" style="width: 64px; height: 64px; font-size: 20px; margin: 0 auto 12px; cursor: pointer;" onclick="openClientProfile(window._as2Client || '')">LP</div>
+      <div id="as2Name" style="font-size: 22px; font-weight: 800; letter-spacing: -0.03em;">—</div>
+      <div id="as2Code" style="font-size: 13px; color: var(--ink-soft); font-weight: 500; margin-top: 4px;">—</div>
+      <button onclick="openClientProfile(window._as2Client || '')" style="margin-top: 10px; padding: 8px 20px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft);">📋 Ver perfil completo</button>
     </div>
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
@@ -2206,20 +2206,8 @@ body.rol-staff #confirmSvcClientName::after {
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
     </div>
 
-    <div class="section-title">Servicios registrados</div>
-    <div class="card" style="margin-bottom: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-        <div>
-          <div style="font-weight: 700; font-size: 15px;">Depilación cejas + pigmento</div>
-          <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">Cejas · precio regular</div>
-        </div>
-        <div style="font-size: 18px; font-weight: 800; letter-spacing: -0.02em;">$17</div>
-      </div>
-      <div style="border-top: 1px solid var(--line); padding-top: 12px; display: flex; gap: 8px;">
-        <button onclick="openEditService()" style="flex: 1; padding: 12px; background: var(--bg); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--ink);">✏️ Modificar</button>
-        <button onclick="removeService(2)" style="flex: 1; padding: 12px; background: var(--danger-bg); border: 1.5px solid transparent; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--danger);">🗑 Quitar</button>
-      </div>
-    </div>
+    <div class="section-title">Servicios registrados <span class="count" id="as2SvcCount">0</span></div>
+    <div id="as2ServicesList"></div>
 
     <!-- Banner promo activa (oculto por defecto) -->
     <div id="promoBanner2" style="display: none; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); color: white; border-radius: 20px; padding: 16px 18px; margin-bottom: 14px;">
@@ -4342,9 +4330,9 @@ body.rol-staff #confirmSvcClientName::after {
               const a2 = aten[1];
               activeClients[user.name].push({ name: a2.nombre, service: a2.servicio });
               const initials2 = a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-              document.getElementById('as2Avatar').textContent = initials2;
+              const _as2av = document.getElementById('as2Avatar'); if (_as2av) _as2av.textContent = initials2;
               pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
-              document.getElementById('as2Code').textContent = a2.codigo + ' · Llegó ' + a2.horaLlegada;
+              const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + ' · Llegó ' + a2.horaLlegada;
               // NOTA: as2ServiceName ya no existe, ahora usamos slotServices
               // document.getElementById('as2ServiceName').textContent = a2.servicio;
             }
@@ -5155,10 +5143,10 @@ body.rol-staff #confirmSvcClientName::after {
         } else {
           window._as2Client = a.codigo;
           const initials2b = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
-          document.getElementById('as2Avatar').textContent = initials2b;
-          document.getElementById('as2Avatar').className = 'client-avatar' + (a.esTop ? ' is-top' : '');
+          const _as2avb = document.getElementById('as2Avatar');
+          if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
-          document.getElementById('as2Code').textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
+          const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + ' · Llegó ' + a.horaLlegada;
           document.getElementById('obs2Display').textContent = a.obsGeneral || a.observaciones || 'Sin observaciones';
           
           // Limpiar servicios previos
