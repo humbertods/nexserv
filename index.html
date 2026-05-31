@@ -15703,12 +15703,16 @@ async function loadCierreMes() {
       body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">No se pudo cargar el cierre.' + (r && r.error ? '<br><span style="font-size:11px;color:var(--ink-faint);">' + r.error + '</span>' : '') + '</div>';
       return;
     }
-    // Conservar SIRA previamente ingresado para este mes/año (si lo hay)
+    // SIRA: prioridad => edición manual de esta sesión > valor automático de SIRA > valor guardado > 0
     const key = mes + '-' + anio;
     window._cmSiraPorMes = window._cmSiraPorMes || {};
     window._cmData = r;
-    const siraGuardado = (r.guardado && r.guardado.gastoSIRA) ? r.guardado.gastoSIRA : 0;
-    const siraInicial = (window._cmSiraPorMes[key] != null) ? window._cmSiraPorMes[key] : siraGuardado;
+    const siraAuto     = (r.siraOk && r.gastoSIRA != null) ? Number(r.gastoSIRA) : null;
+    const siraGuardado = (r.guardado && r.guardado.gastoSIRA != null) ? Number(r.guardado.gastoSIRA) : null;
+    let siraInicial = 0;
+    if (window._cmSiraPorMes[key] != null)      siraInicial = window._cmSiraPorMes[key];
+    else if (siraAuto != null)                  siraInicial = siraAuto;
+    else if (siraGuardado != null)              siraInicial = siraGuardado;
     renderCierreMes(r, siraInicial);
 
     const rb = document.getElementById('cmRefreshBtn');
@@ -15779,7 +15783,11 @@ function renderCierreMes(d, siraInicial) {
         +     '<span>Caja chica (interno)<br><span style="font-size:11px;color:var(--ink-faint);">' + d.numGastosCaja + ' gastos registrados</span></span>'
         +     '<span style="color:var(--danger);font-weight:700;">-' + money(d.gastoCajaChica) + '</span></div>';
   html +=   '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;border-top:1px solid var(--line);margin-top:6px;">'
-        +     '<span>SIRA (mes)<br><span style="font-size:11px;color:var(--ink-faint);">Total registrado en SIRA</span></span>'
+        +     '<span>SIRA (mes)<br><span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">'
+        +       (d.siraOk
+                  ? '✓ Traído de SIRA · ' + (d.siraCount || 0) + ' gasto' + ((d.siraCount === 1) ? '' : 's') + ' del mes'
+                  : '⚠ No se pudo leer SIRA, ingrésalo manual')
+        +       '</span></span>'
         +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
         +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
         +       'style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
@@ -15797,7 +15805,7 @@ function renderCierreMes(d, siraInicial) {
         +     '<span>TOTAL GENERAL</span><span id="cmTotalGeneral" style="color:' + (totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + money(totalGeneral) + '</span></div>';
   html += '</div>';
 
-  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos (caja chica + SIRA). El valor de SIRA se ingresa manualmente porque es un sistema externo.</div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos (caja chica + SIRA). El valor de SIRA se trae automáticamente desde su sistema; puedes ajustarlo a mano si algún mes hace falta.</div>';
 
   // ---- Estado guardado + botón Guardar ----
   const g = d.guardado;
