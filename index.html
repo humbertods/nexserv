@@ -486,6 +486,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuCajaBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCaja');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7Zm0 3h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg> Caja chica
     </button>
+    <button class="user-menu-item" id="menuCierreMesBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCierreMes');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1Zm12 7H5v10h14V9Zm-9 2v2H8v-2h2Zm4 0v2h-2v-2h2Zm4 0v2h-2v-2h2Z"/></svg> Cierre mes
+    </button>
     <button class="user-menu-item" id="menuSeguridadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerSesiones');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Zm0 6a2.5 2.5 0 0 1 1 4.78V15a1 1 0 1 1-2 0v-2.22A2.5 2.5 0 0 1 12 8Z"/></svg> Seguridad app
     </button>
@@ -2396,6 +2399,27 @@ body.rol-staff #confirmSvcClientName::after {
     </div>
   </div>
 
+  <!-- OWNER: CIERRE DE MES -->
+  <div class="screen" id="ownerCierreMes">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Cierre de mes</span>
+      <span id="cmRefreshBtn" style="margin-left:auto;font-size:10px; color:var(--ink-faint); letter-spacing:0; text-transform:none; cursor:pointer;" onclick="loadCierreMes()">↻ Actualizar</span>
+    </div>
+
+    <!-- Selector de mes / año -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <select id="cmMes" onchange="loadCierreMes()" style="flex:1;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:14px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+      <select id="cmAnio" onchange="loadCierreMes()" style="width:110px;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:14px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+    </div>
+
+    <div id="cmBody">
+      <div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando cierre…</div>
+    </div>
+  </div>
+
   <!-- OWNER: GESTIÓN DE PROMOS -->
   <div class="screen" id="ownerPromos">
     <div class="header">
@@ -4074,6 +4098,7 @@ body.rol-staff #confirmSvcClientName::after {
       clearInterval(window._ownerCajaRefresh);
       window._ownerCajaRefresh = null;
     }
+    if (id === 'ownerCierreMes') { initCierreMesSelectors(); loadCierreMes(); }
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') { loadMikaelaHome(); }
     if (id === 'activeService') {
@@ -4573,6 +4598,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cajaBtn = document.getElementById('menuCajaBtn');
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const cierreMesBtn = document.getElementById('menuCierreMesBtn');
+    if (cierreMesBtn) cierreMesBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const pushBtn = document.getElementById('menuPushTestBtn');
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
@@ -15635,6 +15662,279 @@ function toggleCajaOwnerPrivacy() {
   renderCajaOwner_();
 }
 /* ========== /CAJA CHICA — VISTA OWNER (solo lectura) ========== */
+
+
+/* ========== CIERRE DE MES (Owner) ========== */
+const CM_MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function initCierreMesSelectors() {
+  const selMes  = document.getElementById('cmMes');
+  const selAnio = document.getElementById('cmAnio');
+  if (!selMes || !selAnio) return;
+  // Solo poblar una vez
+  if (selMes.options.length && selAnio.options.length) return;
+
+  const now = new Date();
+  const mesActual  = now.getMonth() + 1;
+  const anioActual = now.getFullYear();
+
+  selMes.innerHTML = CM_MESES.map((m, i) =>
+    '<option value="' + (i + 1) + '"' + ((i + 1) === mesActual ? ' selected' : '') + '>' + m + '</option>'
+  ).join('');
+
+  let aniosHtml = '';
+  for (let a = anioActual; a >= 2024; a--) {
+    aniosHtml += '<option value="' + a + '"' + (a === anioActual ? ' selected' : '') + '>' + a + '</option>';
+  }
+  selAnio.innerHTML = aniosHtml;
+}
+
+async function loadCierreMes() {
+  const body = document.getElementById('cmBody');
+  if (!body) return;
+  const mes  = Number(document.getElementById('cmMes')?.value)  || (new Date().getMonth() + 1);
+  const anio = Number(document.getElementById('cmAnio')?.value) || new Date().getFullYear();
+
+  body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando cierre de ' + CM_MESES[mes - 1] + ' ' + anio + '…</div>';
+
+  try {
+    const r = await apiGet('getCierreMes', { mes: mes, anio: anio });
+    if (!r || !r.success) {
+      body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">No se pudo cargar el cierre.' + (r && r.error ? '<br><span style="font-size:11px;color:var(--ink-faint);">' + r.error + '</span>' : '') + '</div>';
+      return;
+    }
+    // Conservar SIRA previamente ingresado para este mes/año (si lo hay)
+    const key = mes + '-' + anio;
+    window._cmSiraPorMes = window._cmSiraPorMes || {};
+    window._cmData = r;
+    const siraGuardado = (r.guardado && r.guardado.gastoSIRA) ? r.guardado.gastoSIRA : 0;
+    const siraInicial = (window._cmSiraPorMes[key] != null) ? window._cmSiraPorMes[key] : siraGuardado;
+    renderCierreMes(r, siraInicial);
+
+    const rb = document.getElementById('cmRefreshBtn');
+    if (rb) {
+      const h = new Date();
+      rb.textContent = '↻ ' + ('0' + h.getHours()).slice(-2) + ':' + ('0' + h.getMinutes()).slice(-2);
+    }
+  } catch (e) {
+    body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderCierreMes(d, siraInicial) {
+  const body = document.getElementById('cmBody');
+  if (!body) return;
+  const money = n => '$' + (Number(n) || 0).toFixed(2);
+  const sira = Number(siraInicial) || 0;
+
+  // ---- Tarjeta principal: generado del mes ----
+  let html = '';
+  html += '<div style="background:linear-gradient(135deg,#1a1a1a 0%,#3d2f1f 100%);color:white;padding:22px;border-radius:22px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:var(--shadow-soft);">';
+  html +=   '<div style="position:absolute;top:-50%;right:-20%;width:200px;height:200px;background:radial-gradient(circle,rgba(212,165,116,0.3) 0%,transparent 70%);"></div>';
+  html +=   '<div style="font-size:11px;font-weight:600;opacity:0.7;margin-bottom:6px;position:relative;">Generado en ' + CM_MESES[d.mes - 1] + ' ' + d.anio + '</div>';
+  html +=   '<div style="font-size:42px;font-weight:800;letter-spacing:-0.04em;line-height:1;position:relative;">' + money(d.generadoTotal) + '</div>';
+  html +=   '<div style="font-size:12px;opacity:0.65;margin-top:8px;position:relative;font-weight:500;">' + d.numClientas + ' clientas · ' + d.numServicios + ' servicios' + (d.numProductos ? ' · ' + d.numProductos + ' productos' : '') + '</div>';
+  html += '</div>';
+
+  // ---- Mini stats ----
+  html += '<div class="stat-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:18px;">';
+  html +=   '<div class="stat"><div class="label">Clientas</div><div class="value" style="font-size:18px;">' + d.numClientas + '</div></div>';
+  html +=   '<div class="stat"><div class="label">Comisiones</div><div class="value" style="color:var(--danger);font-size:18px;">' + money(d.comisionTotal) + '</div></div>';
+  html +=   '<div class="stat"><div class="label">Servicios</div><div class="value" style="font-size:18px;">' + d.numServicios + '</div></div>';
+  html += '</div>';
+
+  // ---- Por staff ----
+  html += '<div class="section-title">Por staff</div>';
+  if (!d.staff || !d.staff.length) {
+    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin servicios registrados este mes.</div>';
+  } else {
+    html += '<div class="card" style="padding:6px 14px;">';
+    html += '<div style="display:flex;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-faint);padding:8px 0 6px;border-bottom:1px solid var(--line);">'
+          + '<span style="flex:1.4;">Staff</span><span style="flex:0.6;text-align:center;">Serv.</span><span style="flex:1;text-align:right;">Generado</span><span style="flex:1;text-align:right;">Comisión</span></div>';
+    d.staff.forEach(s => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="flex:1.4;font-weight:700;">' + s.chica + '</span>'
+            + '<span style="flex:0.6;text-align:center;color:var(--ink-soft);">' + s.servicios + '</span>'
+            + '<span style="flex:1;text-align:right;font-weight:600;">' + money(s.generado) + '</span>'
+            + '<span style="flex:1;text-align:right;color:var(--danger);font-weight:600;">' + money(s.comision) + '</span></div>';
+    });
+    html += '<div style="display:flex;align-items:center;font-size:13px;padding:10px 0 8px;font-weight:800;">'
+          + '<span style="flex:1.4;">Total</span>'
+          + '<span style="flex:0.6;text-align:center;">' + d.numServicios + '</span>'
+          + '<span style="flex:1;text-align:right;">' + money(d.generadoServicios) + '</span>'
+          + '<span style="flex:1;text-align:right;color:var(--danger);">' + money(d.comisionTotal) + '</span></div>';
+    html += '</div>';
+  }
+
+  // ---- Productos (marca) si hay ----
+  if (d.numProductos) {
+    html += '<div class="card" style="padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;font-size:14px;">'
+          + '<span>🛍 Productos vendidos (' + d.numProductos + ')</span><span style="font-weight:700;">' + money(d.generadoProductos) + '</span></div>';
+  }
+
+  // ---- Gastos ----
+  html += '<div class="section-title" style="margin-top:18px;">Gastos del mes</div>';
+  html += '<div class="card" style="padding:14px 16px;font-size:14px;">';
+  html +=   '<div style="display:flex;justify-content:space-between;padding:4px 0;">'
+        +     '<span>Caja chica (interno)<br><span style="font-size:11px;color:var(--ink-faint);">' + d.numGastosCaja + ' gastos registrados</span></span>'
+        +     '<span style="color:var(--danger);font-weight:700;">-' + money(d.gastoCajaChica) + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;border-top:1px solid var(--line);margin-top:6px;">'
+        +     '<span>SIRA (mes)<br><span style="font-size:11px;color:var(--ink-faint);">Total registrado en SIRA</span></span>'
+        +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
+        +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
+        +       'style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;border-top:1.5px solid var(--line);margin-top:6px;font-weight:800;">'
+        +     '<span>Total gastos</span><span id="cmTotalGastos" style="color:var(--danger);">-' + money(d.gastoCajaChica + sira) + '</span></div>';
+  html += '</div>';
+
+  // ---- TOTAL GENERAL ----
+  const totalGeneral = d.generadoTotal - d.comisionTotal - d.gastoCajaChica - sira;
+  html += '<div id="cmTotalGeneralCard" style="background:var(--bg);border:2px solid var(--accent-deep);border-radius:18px;padding:16px 18px;margin-top:16px;">';
+  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Gastos (caja + SIRA)</span><span id="cmTotalGastosResumen">-' + money(d.gastoCajaChica + sira) + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;border-top:1.5px solid var(--accent-deep);margin-top:8px;padding-top:10px;">'
+        +     '<span>TOTAL GENERAL</span><span id="cmTotalGeneral" style="color:' + (totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + money(totalGeneral) + '</span></div>';
+  html += '</div>';
+
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos (caja chica + SIRA). El valor de SIRA se ingresa manualmente porque es un sistema externo.</div>';
+
+  // ---- Estado guardado + botón Guardar ----
+  const g = d.guardado;
+  html += '<div style="margin-top:14px;">';
+  if (g && g.fechaCierre) {
+    html += '<div id="cmGuardadoBadge" style="font-size:12px;color:var(--success);font-weight:700;text-align:center;margin-bottom:8px;">✅ Guardado el ' + g.fechaCierre + (g.registradoPor ? ' · ' + g.registradoPor : '') + '</div>';
+  }
+  html += '<button onclick="guardarCierreMes()" id="cmGuardarBtn" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">'
+        + (g && g.fechaCierre ? '↻ Actualizar cierre guardado' : '💾 Guardar cierre del mes') + '</button>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);text-align:center;padding:6px 8px 0;line-height:1.5;">Queda registrado de forma permanente en tu hoja de cálculo como respaldo verificable.</div>';
+  html += '</div>';
+
+  // ---- Historial de cierres guardados ----
+  html += '<div style="margin-top:18px;">';
+  html += '<button onclick="toggleHistorialCierres()" id="cmHistToggle" style="width:100%;padding:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">📚 Historial de cierres guardados <span id="cmHistCaret" style="font-size:11px;">▼</span></button>';
+  html += '<div id="cmHistList" style="display:none;margin-top:10px;"></div>';
+  html += '</div>';
+
+  body.innerHTML = html;
+}
+
+function onCierreSiraInput() {
+  const d = window._cmData;
+  if (!d) return;
+  const inp = document.getElementById('cmSiraInput');
+  const sira = Number(inp && inp.value) || 0;
+  // Guardar el SIRA por mes/año para que no se pierda al actualizar
+  const key = d.mes + '-' + d.anio;
+  window._cmSiraPorMes = window._cmSiraPorMes || {};
+  window._cmSiraPorMes[key] = sira;
+
+  const money = n => '$' + (Number(n) || 0).toFixed(2);
+  const totalGastos = d.gastoCajaChica + sira;
+  const totalGeneral = d.generadoTotal - d.comisionTotal - totalGastos;
+
+  const tg  = document.getElementById('cmTotalGastos');
+  const tgr = document.getElementById('cmTotalGastosResumen');
+  const tge = document.getElementById('cmTotalGeneral');
+  if (tg)  tg.textContent  = '-' + money(totalGastos);
+  if (tgr) tgr.textContent = '-' + money(totalGastos);
+  if (tge) {
+    tge.textContent = money(totalGeneral);
+    tge.style.color = totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)';
+  }
+}
+
+async function guardarCierreMes() {
+  const d = window._cmData;
+  if (!d) return;
+  const inp = document.getElementById('cmSiraInput');
+  const sira = Number(inp && inp.value) || 0;
+  const totalGeneral = d.generadoTotal - d.comisionTotal - d.gastoCajaChica - sira;
+  const btn = document.getElementById('cmGuardarBtn');
+  const txtOrig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando…'; }
+  try {
+    const r = await apiPost('guardarCierreMes', {
+      mes: d.mes, anio: d.anio,
+      numClientas: d.numClientas, numServicios: d.numServicios,
+      generadoServicios: d.generadoServicios, generadoProductos: d.generadoProductos,
+      generadoTotal: d.generadoTotal, comisionTotal: d.comisionTotal,
+      gastoCajaChica: d.gastoCajaChica, gastoSIRA: sira,
+      totalGeneral: totalGeneral, staff: d.staff,
+      registradoPor: (window.currentUser && window.currentUser.name) || 'Owner'
+    });
+    if (r && r.success) {
+      const key = d.mes + '-' + d.anio;
+      window._cmSiraPorMes = window._cmSiraPorMes || {};
+      window._cmSiraPorMes[key] = sira;
+      const histAbierto = (() => { const hl = document.getElementById('cmHistList'); return hl && hl.style.display !== 'none'; })();
+      await loadCierreMes();
+      if (histAbierto) { const hl = document.getElementById('cmHistList'); if (hl) { hl.style.display = 'block'; const c = document.getElementById('cmHistCaret'); if (c) c.textContent = '▲'; } loadHistorialCierres(); }
+    } else {
+      alert('No se pudo guardar: ' + ((r && r.error) || 'error desconocido'));
+      if (btn) { btn.disabled = false; btn.innerHTML = txtOrig; }
+    }
+  } catch (e) {
+    alert('Error al guardar: ' + e.message);
+    if (btn) { btn.disabled = false; btn.innerHTML = txtOrig; }
+  }
+}
+
+function toggleHistorialCierres() {
+  const list = document.getElementById('cmHistList');
+  const caret = document.getElementById('cmHistCaret');
+  if (!list) return;
+  const abrir = list.style.display === 'none';
+  list.style.display = abrir ? 'block' : 'none';
+  if (caret) caret.textContent = abrir ? '▲' : '▼';
+  if (abrir) loadHistorialCierres();
+}
+
+async function loadHistorialCierres() {
+  const list = document.getElementById('cmHistList');
+  if (!list) return;
+  list.innerHTML = '<div class="card" style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Cargando historial…</div>';
+  try {
+    const r = await apiGet('getCierresMesHistorico');
+    if (!r || !r.success || !r.cierres || !r.cierres.length) {
+      list.innerHTML = '<div class="card" style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Aún no hay cierres guardados.</div>';
+      return;
+    }
+    const money = n => '$' + (Number(n) || 0).toFixed(2);
+    let h = '';
+    r.cierres.forEach(c => {
+      const nombreMes = CM_MESES[(c.mes - 1)] || c.periodo;
+      h += '<div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;" onclick="irACierre(' + c.mes + ',' + c.anio + ')">';
+      h +=   '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      h +=     '<span style="font-weight:800;font-size:14px;">' + nombreMes + ' ' + c.anio + '</span>';
+      h +=     '<span style="font-weight:800;font-size:15px;color:' + (c.totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + money(c.totalGeneral) + '</span>';
+      h +=   '</div>';
+      h +=   '<div style="font-size:11px;color:var(--ink-soft);margin-top:4px;">Generó ' + money(c.generadoTotal) + ' · ' + c.numClientas + ' clientas · ' + c.numServicios + ' servicios</div>';
+      h +=   '<div style="font-size:10px;color:var(--ink-faint);margin-top:3px;">Comisiones ' + money(c.comisionTotal) + ' · Caja ' + money(c.gastoCajaChica) + ' · SIRA ' + money(c.gastoSIRA) + '</div>';
+      if (c.fechaCierre) h += '<div style="font-size:10px;color:var(--ink-faint);margin-top:3px;">Guardado: ' + c.fechaCierre + (c.registradoPor ? ' · ' + c.registradoPor : '') + '</div>';
+      h += '</div>';
+    });
+    list.innerHTML = h;
+  } catch (e) {
+    list.innerHTML = '<div class="card" style="text-align:center;padding:16px;color:var(--danger);font-size:13px;">Error: ' + e.message + '</div>';
+  }
+}
+
+function irACierre(mes, anio) {
+  const selMes  = document.getElementById('cmMes');
+  const selAnio = document.getElementById('cmAnio');
+  if (selMes)  selMes.value = String(mes);
+  if (selAnio) {
+    if (!Array.from(selAnio.options).some(o => o.value === String(anio))) {
+      const opt = document.createElement('option'); opt.value = String(anio); opt.textContent = anio; selAnio.appendChild(opt);
+    }
+    selAnio.value = String(anio);
+  }
+  loadCierreMes();
+  const scr = document.getElementById('ownerCierreMes');
+  if (scr) window.scrollTo(0, 0);
+}
+/* ========== /CIERRE DE MES ========== */
 
 
 </script>
