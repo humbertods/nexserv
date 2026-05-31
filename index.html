@@ -8864,8 +8864,58 @@ body.rol-staff #confirmSvcClientName::after {
           esperaList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">✨ No hay clientas esperando</div>';
         } else {
           esperaList.innerHTML = esperando.map(w => {
-            const initials = w.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
             const pri = String(w.prioridad || 'normal').toLowerCase();
+            const obs = String(w.observaciones || '');
+            const esContinuacion = obs.indexOf('✅') !== -1;
+            const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
+            // Partes ya hechas, parseadas de las observaciones
+            const sigueMatch = obs.match(/Sigue:\s*([^|]+)/i);
+            const sigueTxt = sigueMatch ? sigueMatch[1].trim() : '';
+            const hechas = obs.split('|').map(s => s.trim()).filter(s => s.indexOf('✅') !== -1)
+              .map(s => s.replace(/·?\s*Sigue:.*/i, '').trim());
+            const hechasHTML = hechas.length
+              ? '<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">'
+                + hechas.map(h => '<div style="font-size:11px;color:var(--success);font-weight:600;">' + h + '</div>').join('')
+                + (sigueTxt ? '<div style="font-size:11px;color:var(--accent-deep);font-weight:700;margin-top:2px;">⏳ Falta: ' + sigueTxt + '</div>' : '')
+                + '</div>'
+              : '';
+
+            // Ya asignada a una staff: esperando que la tome (sin botones)
+            if (estaAsignada) {
+              return `
+              <div class="waitlist-card" style="opacity:.75;">
+                <div class="waitlist-top">
+                  <div class="waitlist-client">
+                    <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                    <div class="waitlist-name">${w.nombre}</div>
+                  </div>
+                  <span style="background:var(--accent-bg);color:var(--accent-deep);font-size:10px;padding:3px 10px;border-radius:100px;font-weight:700;">→ ${w.tomadaPor}</span>
+                </div>
+                <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
+                <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Asignada · esperando que ${w.tomadaPor} la tome</div>
+                ${hechasHTML}
+              </div>`;
+            }
+
+            // Continuación: terminó una parte y vuelve para redirigir a la siguiente staff
+            if (esContinuacion) {
+              return `
+              <div class="waitlist-card" style="border:2px solid var(--accent);">
+                <div class="waitlist-top">
+                  <div class="waitlist-client">
+                    <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                    <div class="waitlist-name">${w.nombre} <span style="background:var(--accent);color:white;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">🔄 Para redirigir</span></div>
+                  </div>
+                </div>
+                ${hechasHTML}
+                <div style="display:flex;gap:6px;margin-top:10px;">
+                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
+                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
+                </div>
+              </div>`;
+            }
+
+            // Nueva clienta por asignar
             return `
             <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}">
               <div class="waitlist-top">
