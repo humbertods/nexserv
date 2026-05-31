@@ -794,6 +794,13 @@ body.rol-staff #confirmSvcClientName::after {
             <option value="">Primero seleccioná el área</option>
           </select>
         </div>
+
+        <div class="input-group">
+          <label>Staff que la atiende</label>
+          <select id="assignSvcStaff">
+            <option value="">Primero seleccioná el área</option>
+          </select>
+        </div>
         
         <div id="assignSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
           <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
@@ -812,6 +819,13 @@ body.rol-staff #confirmSvcClientName::after {
         <div class="modal-title">Asignar promo</div>
         <div style="text-align: center; margin-bottom: 16px;">
           <div id="assignPromoClientName" style="font-size: 16px; font-weight: 700;"></div>
+        </div>
+
+        <div class="input-group">
+          <label>Staff que arranca la promo</label>
+          <select id="assignPromoStaff">
+            <option value="">¿Qué staff la atiende primero?</option>
+          </select>
         </div>
         
         <div id="assignPromoList"></div>
@@ -4622,15 +4636,14 @@ body.rol-staff #confirmSvcClientName::after {
     window._listaEsperaCache = lista;
 
     const myList = lista.filter(w => {
-      // Si tiene asignación directa, SOLO la ve y puede tomar la chica asignada
+      const estado = String(w.estado || w.status || '').toLowerCase();
+      if (estado === 'en servicio' || estado === 'completada') return false;
+      // MODELO CENTRALIZADO: la staff ve SOLO las clientas que Mikaela le asignó.
+      // Las no asignadas viven únicamente en la lista de Mikaela.
       if (w.asignadaA && w.asignadaA.trim() !== '') {
         return w.asignadaA === user.name;
       }
-      // Si NO tiene asignación directa, filtrar por área
-      // También excluir las que están ya en servicio o completadas
-      const estado = String(w.estado || w.status || '').toLowerCase();
-      if (estado === 'en servicio' || estado === 'completada') return false;
-      return allowed.includes(w.area);
+      return false;
     });
     
     document.getElementById('waitCountMy').textContent = myList.length;
@@ -8698,6 +8711,8 @@ body.rol-staff #confirmSvcClientName::after {
     const sel = document.getElementById('assignSvcService');
     sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
     document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    const staffSel = document.getElementById('assignSvcStaff');
+    if (staffSel) staffSel.innerHTML = opcionesStaff(area);
     
     if (!area) return;
     
@@ -8733,18 +8748,20 @@ body.rol-staff #confirmSvcClientName::after {
     
     const svc = JSON.parse(val);
     const client = window._assigningClient;
+    const chica = (document.getElementById('assignSvcStaff') || {}).value || '';
+    if (!chica) { alert('Elegí qué staff la atiende'); return; }
     
-    // TODO: Llamar al backend para actualizar la lista de espera con el servicio asignado
     try {
       const result = await apiPost('asignarServicioNormal', {
         codigo: client.code,
         servicio: svc.name,
         area: svc.area,
-        precio: svc.price
+        precio: svc.price,
+        chica: chica
       });
       
       if (result.success) {
-        alert('✓ Servicio asignado a ' + client.name);
+        alert('✓ ' + client.name + ' asignada a ' + chica);
         closeModal();
         loadMikaelaHome();
       } else {
@@ -8759,6 +8776,8 @@ body.rol-staff #confirmSvcClientName::after {
   function openAssignPromoModal(clientCode, clientName) {
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignPromoClientName').textContent = clientName;
+    const pStaff = document.getElementById('assignPromoStaff');
+    if (pStaff) pStaff.innerHTML = opcionesStaff(null); // todas las staff (la promo puede arrancar en cualquier área)
     
     // Renderizar lista de promos activas
     const active = PROMOS.filter(p => p.active);
@@ -8787,18 +8806,20 @@ body.rol-staff #confirmSvcClientName::after {
   async function confirmAssignPromo(promoIdx) {
     const promo = PROMOS[promoIdx];
     const client = window._assigningClient;
+    const chica = (document.getElementById('assignPromoStaff') || {}).value || '';
+    if (!chica) { alert('Elegí qué staff arranca la promo'); return; }
     
-    // TODO: Llamar al backend para actualizar la lista de espera con la promo asignada
     try {
       const result = await apiPost('asignarPromo', {
         codigo: client.code,
         promoNombre: promo.name,
         precioPromo: promo.price,
-        precioRegular: promo.regular
+        precioRegular: promo.regular,
+        chica: chica
       });
       
       if (result.success) {
-        alert('✓ Promo "' + promo.name + '" asignada a ' + client.name);
+        alert('✓ Promo "' + promo.name + '" asignada a ' + chica);
         closeModal();
         loadMikaelaHome();
       } else {
@@ -12683,6 +12704,39 @@ body.rol-staff #confirmSvcClientName::after {
 
   function emptyPeriodData() {
     return { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] };
+  }
+
+  // Staff disponibles por área (para que Mikaela asigne). Se arma desde STAFF_META,
+  // deduplicando por persona y prefiriendo el nombre con tilde (igual al login).
+  function buildStaffPorArea() {
+    const prefNombre = {}, areaDe = {};
+    Object.entries(STAFF_META).forEach(([nombre, meta]) => {
+      const cur = prefNombre[meta.key];
+      const tieneTilde = /[áéíóúñ]/i.test(nombre);
+      const curTilde = cur ? /[áéíóúñ]/i.test(cur) : false;
+      if (!cur || (tieneTilde && !curTilde)) prefNombre[meta.key] = nombre;
+      areaDe[meta.key] = (meta.area || '').toLowerCase();
+    });
+    const map = { cejas: [], depilacion: [], pestanas: [], retiro_lifting: [], facial: [] };
+    const todos = [];
+    Object.keys(prefNombre).forEach(key => {
+      const nombre = prefNombre[key];
+      const a = areaDe[key];
+      todos.push(nombre);
+      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); }
+      if (a.includes('pestan')) { map.pestanas.push(nombre); }
+      if (a.includes('lifting') || a.includes('retiro')) { map.retiro_lifting.push(nombre); }
+      if (a.includes('facial')) { map.facial.push(nombre); }
+    });
+    map._todos = todos;
+    return map;
+  }
+  const STAFF_POR_AREA = buildStaffPorArea();
+  function opcionesStaff(area) {
+    const lista = (area && STAFF_POR_AREA[area] && STAFF_POR_AREA[area].length)
+      ? STAFF_POR_AREA[area] : STAFF_POR_AREA._todos;
+    return '<option value="">¿Qué staff la atiende?</option>' +
+      lista.map(n => '<option value="' + n + '">' + n + '</option>').join('');
   }
 
   function buildEmptyReportData() {
