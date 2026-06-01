@@ -8882,6 +8882,7 @@ body.rol-staff #confirmSvcClientName::after {
         const esperando = result.esperando || [];
         const enServicio = result.enServicio || [];
         const porCobrar = result.porCobrar || [];
+        const completadas = result.completadas || [];
 
         // Set de staff ocupadas ahora mismo (para marcar Disponible/Ocupada al reasignar)
         const busyStaff = new Set();
@@ -8900,17 +8901,18 @@ body.rol-staff #confirmSvcClientName::after {
         });
 
         // Stats
-        document.getElementById('mkStatEspera').textContent = esperando.length;
+        document.getElementById('mkStatEspera').textContent = (esperando.length + completadas.length);
         document.getElementById('mkStatServicio').textContent = enServicio.length;
         document.getElementById('mkStatCobrar').textContent = porCobrar.length;
 
-        // Lista de espera
-        document.getElementById('mkEsperaCount').textContent = esperando.length;
+        // Lista de espera (clientas completadas para verificar van primero)
+        document.getElementById('mkEsperaCount').textContent = (esperando.length + completadas.length);
         const esperaList = document.getElementById('mkEsperaList');
-        if (esperando.length === 0) {
+        const completadasHTML = completadas.map(c => buildCompletadaCard(c)).join('');
+        if (esperando.length === 0 && completadas.length === 0) {
           esperaList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">✨ No hay clientas esperando</div>';
         } else {
-          esperaList.innerHTML = esperando.map(w => {
+          esperaList.innerHTML = completadasHTML + esperando.map(w => {
             const pri = String(w.prioridad || 'normal').toLowerCase();
             const obs = String(w.observaciones || '');
             const esContinuacion = obs.indexOf('✅') !== -1;
@@ -12878,6 +12880,75 @@ body.rol-staff #confirmSvcClientName::after {
         alert('Error: ' + ((r && r.message) || 'No se pudo reasignar'));
       }
     } catch(e){ console.error(e); alert('Error al reasignar'); }
+  }
+
+  // ── Desglose + acciones de "clienta completada" (verificación de Mikaela) ──
+  function buildDesgloseHTML(c){
+    let filas = [];
+    if (Array.isArray(c.areas) && c.areas.length) {
+      c.areas.forEach(function(a){
+        const est = String(a.estado||'').toLowerCase();
+        if (est === 'cancelado') return;
+        filas.push({ label: (a.confirmado || a.tentativo || a.area || 'Servicio'), staff: a.staff||'—', monto: Number(a.precio||0), done: est === 'completado' });
+      });
+    } else if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length) {
+      c.serviciosDetalle.forEach(function(d){
+        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true });
+      });
+    } else {
+      const obs = String(c.observaciones||'');
+      obs.split('|').forEach(function(p){
+        const m = p.match(/✅\s*([\wáéíóúñ\/ ]+?)\s+completad[ao] por\s+([^·|]+)/i);
+        if (m) filas.push({ label: m[1].trim(), staff: m[2].trim(), monto: 0, done: true });
+      });
+      if (c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
+    }
+    if (!filas.length && c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
+    return filas.map(function(r){
+      const ic = r.done ? '✅' : '⏳';
+      const col = r.done ? 'var(--success)' : 'var(--ink-soft)';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;">'
+        + '<span style="color:'+col+';font-weight:700;">'+ic+' '+r.label+'</span>'
+        + '<span style="color:var(--ink-soft);white-space:nowrap;">'+r.staff+(r.monto?(' · $'+r.monto):'')+'</span></div>';
+    }).join('');
+  }
+  function buildCompletadaCard(c){
+    const nombreSafe = String(c.nombre||'').replace(/'/g, "\\'");
+    const total = Number(c.total||0);
+    const totalStr = total > 0
+      ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:700;">TOTAL</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$'+total.toFixed(2)+'</span></div>'
+      : '';
+    return `
+      <div class="waitlist-card" style="border:2px solid var(--success);">
+        <div class="waitlist-top">
+          <div class="waitlist-client">
+            <div class="waitlist-code">${c.codigo||''} · llegó ${c.horaLlegada||''}</div>
+            <div class="waitlist-name">${c.nombre||''} <span style="background:var(--success);color:white;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">✅ Completada</span></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin:8px 0 6px;">Verificá lo realizado:</div>
+        <div style="background:var(--bg);border-radius:12px;padding:8px 12px;">${buildDesgloseHTML(c)}</div>
+        ${totalStr}
+        <div style="display:flex;gap:6px;margin-top:10px;">
+          <button onclick="agregarServicioExtra('${c.idEspera}','${c.codigo||''}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
+          <button onclick="mandarACobro('${c.idEspera}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
+        </div>
+      </div>`;
+  }
+  async function mandarACobro(idEspera, nombre){
+    if (!confirm('¿Mandar a cobro a ' + (nombre || 'esta clienta') + '?')) return;
+    try {
+      const r = await apiPost('mandarACobro', { idEspera: idEspera });
+      if (r && r.success) {
+        if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' enviada a cobro');
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + ((r && r.message) || 'No se pudo enviar a cobro'));
+      }
+    } catch(e){ console.error(e); alert('Error al mandar a cobro'); }
+  }
+  function agregarServicioExtra(idEspera, codigo, nombre){
+    alert('“+ Servicio Extra” para ' + (nombre||'') + ' se conecta en el siguiente paso (ajuste de total y comisión del servicio extra).');
   }
 
   function opcionesStaff(area) {
