@@ -5005,9 +5005,13 @@ body.rol-staff #confirmSvcClientName::after {
       if (atenResult.success && atenResult.atenciones && atenResult.atenciones.length > 0) {
         const aten = atenResult.atenciones;
         const slot = user && user.maxClients === 2 ? aten.length - 1 : 0;
-        
-        // Cargar datos de la atención recién tomada
-        const a = aten[slot];
+
+        // Cargar la atención que REALMENTE se acaba de tomar (no por índice ingenuo).
+        // Clave en tickets TM con varias áreas: evita cargar el área/promo de otra staff.
+        const _takenId = String(window._takingId || '');
+        let a = null;
+        if (_takenId) a = aten.find(function(x){ return String(x.idEspera || '') === _takenId; }) || null;
+        if (!a) a = aten[slot];
         if (slot === 0) {
           window._as1Client = a.codigo;
           window._as1IdEspera = a.idEspera || window._takingId || ''; // ID ticket LE-XXXX
