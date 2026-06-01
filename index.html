@@ -8883,6 +8883,22 @@ body.rol-staff #confirmSvcClientName::after {
         const enServicio = result.enServicio || [];
         const porCobrar = result.porCobrar || [];
 
+        // Set de staff ocupadas ahora mismo (para marcar Disponible/Ocupada al reasignar)
+        const busyStaff = new Set();
+        enServicio.forEach(function(a){
+          if (a.fuente === 'TicketMulti' && Array.isArray(a.areas)) {
+            a.areas.forEach(function(ar){
+              if (String(ar.estado||'').toLowerCase() === 'en servicio' && ar.staff)
+                busyStaff.add(String(ar.staff).trim().toLowerCase());
+            });
+          } else if (a.tomadaPor) {
+            String(a.tomadaPor).split(',').forEach(function(s){
+              const t = String(s).trim().toLowerCase();
+              if (t && t !== '—') busyStaff.add(t);
+            });
+          }
+        });
+
         // Stats
         document.getElementById('mkStatEspera').textContent = esperando.length;
         document.getElementById('mkStatServicio').textContent = enServicio.length;
@@ -8924,6 +8940,21 @@ body.rol-staff #confirmSvcClientName::after {
             }
             const estadoHTML = '<div style="font-size:15px;margin:8px 0;"><span style="color:var(--ink);font-weight:800;">Estado:</span> ' + estadoLabel + '</div>';
 
+            // ── Control de reasignación (multi-servicio / promo-dúo) ──
+            const _fuente = w.fuente || '';
+            const _esMultiPromo = _fuente === 'TicketMulti' || _fuente === 'ServicioPromo';
+            const _pendKey = _normAreaKey(esContinuacion ? (sigueTxt || w.area) : w.area);
+            const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
+            const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
+            const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
+            const reassignHTML = `
+              <div style="margin-top:8px;">
+                <select id="reSel_${_uid}" onchange="document.getElementById('reBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
+                  ${_staffOpcionesReasignar(_pendKey, busyStaff)}
+                </select>
+                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
+              </div>`;
+
             // Continuación: terminó una parte y vuelve para redirigir a la siguiente staff
             if (esContinuacion) {
               return `
@@ -8936,6 +8967,7 @@ body.rol-staff #confirmSvcClientName::after {
                 </div>
                 ${estadoHTML}
                 ${hechasHTML}
+                ${reassignHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
                   <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
                   <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
@@ -8955,10 +8987,10 @@ body.rol-staff #confirmSvcClientName::after {
               </div>
               ${estadoHTML}
               <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
-              <div style="display: flex; gap: 6px; margin-top: 10px;">
+              ${_esMultiPromo ? reassignHTML : `<div style="display: flex; gap: 6px; margin-top: 10px;">
                 <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
                 <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
-              </div>
+              </div>`}
             </div>`;
           }).join('');
         }
@@ -12811,6 +12843,43 @@ body.rol-staff #confirmSvcClientName::after {
     return map;
   }
   const STAFF_POR_AREA = buildStaffPorArea();
+
+  // ── Reasignación de staff por Mikaela (multi-servicio / promo-dúo) ──
+  function _normAreaKey(a){
+    const x = String(a||'').toLowerCase()
+      .replace(/[óòö]/g,'o').replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
+      .replace(/[íìï]/g,'i').replace(/[úùü]/g,'u').replace(/ñ/g,'n').trim();
+    if (x.indexOf('cej')>=0) return 'cejas';
+    if (x.indexOf('depil')>=0) return 'depilacion';
+    if (x.indexOf('pest')>=0) return 'pestanas';
+    if (x.indexOf('lifting')>=0 || x.indexOf('retiro')>=0) return 'retiro_lifting';
+    if (x.indexOf('facial')>=0 || x.indexOf('hidra')>=0 || x.indexOf('limpieza')>=0) return 'facial';
+    return x;
+  }
+  function _staffOpcionesReasignar(areaKey, busySet){
+    const lista = (areaKey && STAFF_POR_AREA[areaKey] && STAFF_POR_AREA[areaKey].length)
+      ? STAFF_POR_AREA[areaKey] : STAFF_POR_AREA._todos;
+    const busy = busySet || new Set();
+    return '<option value="">Elegí staff…</option>' + lista.map(function(n){
+      const ocup = busy.has(String(n).toLowerCase());
+      return '<option value="'+n+'">'+n+(ocup?' (Ocupada)':' (Disponible)')+'</option>';
+    }).join('');
+  }
+  async function reasignarStaff(idEspera, areaIdx, selId, nombre){
+    const sel = document.getElementById(selId);
+    const chica = sel ? sel.value : '';
+    if (!chica) { alert('Elegí una staff'); return; }
+    try {
+      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica });
+      if (r && r.success) {
+        if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + ((r && r.message) || 'No se pudo reasignar'));
+      }
+    } catch(e){ console.error(e); alert('Error al reasignar'); }
+  }
+
   function opcionesStaff(area) {
     const lista = (area && STAFF_POR_AREA[area] && STAFF_POR_AREA[area].length)
       ? STAFF_POR_AREA[area] : STAFF_POR_AREA._todos;
