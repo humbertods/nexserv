@@ -2461,9 +2461,21 @@ body.rol-staff #confirmSvcClientName::after {
         <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px; font-weight: 500;">Seleccioná un servicio de cada área que aplique. Dejá en "—" las que no van.</div>
 
         <div class="input-group">
-          <label>Cejas</label>
-          <select id="promoCejas" onchange="updatePromoTotal()">
+          <label>Cejas <span style="font-size: 10px; color: var(--ink-faint); font-weight: 500;">(hasta 5 servicios)</span></label>
+          <select id="promoCejas1" onchange="updatePromoTotal()">
             <option value="">— No incluir —</option>
+          </select>
+          <select id="promoCejas2" onchange="updatePromoTotal()" style="margin-top: 6px;">
+            <option value="">— Agregar 2do servicio —</option>
+          </select>
+          <select id="promoCejas3" onchange="updatePromoTotal()" style="margin-top: 6px;">
+            <option value="">— Agregar 3er servicio —</option>
+          </select>
+          <select id="promoCejas4" onchange="updatePromoTotal()" style="margin-top: 6px;">
+            <option value="">— Agregar 4to servicio —</option>
+          </select>
+          <select id="promoCejas5" onchange="updatePromoTotal()" style="margin-top: 6px;">
+            <option value="">— Agregar 5to servicio —</option>
           </select>
         </div>
         <div class="input-group">
@@ -2794,11 +2806,11 @@ body.rol-staff #confirmSvcClientName::after {
   async function initPromoSelects() {
     await ensureCatalogoLoaded();
     const areas = ['cejas', 'depilacion', 'pestanas', 'facial'];
-    const ids = ['promoCejas', 'promoPestanas', 'promoFacial'];
+    const cejaIds = ['promoCejas1', 'promoCejas2', 'promoCejas3', 'promoCejas4', 'promoCejas5'];
     const depIds = ['promoDepilacion1', 'promoDepilacion2', 'promoDepilacion3'];
-    
-    // Cejas, Pestañas, Facial (1 cada uno)
-    const singleMap = { cejas: 'promoCejas', pestanas: 'promoPestanas', facial: 'promoFacial' };
+
+    // Pestañas, Facial (1 cada uno)
+    const singleMap = { pestanas: 'promoPestanas', facial: 'promoFacial' };
     Object.keys(singleMap).forEach(area => {
       const sel = document.getElementById(singleMap[area]);
       sel.innerHTML = '<option value="">— No incluir —</option>';
@@ -2809,7 +2821,20 @@ body.rol-staff #confirmSvcClientName::after {
         sel.appendChild(opt);
       });
     });
-    
+
+    // Cejas: 5 selectores (cada servicio con su propio monto, igual que depilación)
+    const cejaLabels = ['— No incluir —', '— Agregar 2do servicio —', '— Agregar 3er servicio —', '— Agregar 4to servicio —', '— Agregar 5to servicio —'];
+    cejaIds.forEach((id, idx) => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">' + cejaLabels[idx] + '</option>';
+      CATALOGO.cejas.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify({ code: s.code, name: s.name, price: s.price, area: 'cejas' });
+        opt.textContent = s.name + ' — $' + s.price;
+        sel.appendChild(opt);
+      });
+    });
+
     // Depilación: 3 selectores
     const depLabels = ['— No incluir —', '— Agregar 2do servicio —', '— Agregar 3er servicio —'];
     depIds.forEach((id, idx) => {
@@ -2825,7 +2850,8 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   function getSelectedServices() {
-    const singleIds = ['promoCejas', 'promoPestanas', 'promoFacial'];
+    const singleIds = ['promoPestanas', 'promoFacial'];
+    const cejaIds = ['promoCejas1', 'promoCejas2', 'promoCejas3', 'promoCejas4', 'promoCejas5'];
     const depIds = ['promoDepilacion1', 'promoDepilacion2', 'promoDepilacion3'];
     const selected = [];
     
@@ -2833,7 +2859,12 @@ body.rol-staff #confirmSvcClientName::after {
       const val = document.getElementById(id).value;
       if (val) { try { selected.push(JSON.parse(val)); } catch(e) {} }
     });
-    
+
+    cejaIds.forEach(id => {
+      const val = document.getElementById(id).value;
+      if (val) { try { selected.push(JSON.parse(val)); } catch(e) {} }
+    });
+
     depIds.forEach(id => {
       const val = document.getElementById(id).value;
       if (val) { try { selected.push(JSON.parse(val)); } catch(e) {} }
@@ -2865,6 +2896,10 @@ body.rol-staff #confirmSvcClientName::after {
         // Cada servicio de depilación es un ítem individual con su propio monto
         const key = 'depi__' + s.name;
         areaGroups[key] = [s];
+      } else if (s.area === 'cejas') {
+        // Cada servicio de cejas también es individual (hasta 5)
+        const key = 'cejas__' + s.name;
+        areaGroups[key] = [s];
       } else {
         const groupKey = s.area;
         if (!areaGroups[groupKey]) areaGroups[groupKey] = [];
@@ -2883,8 +2918,9 @@ body.rol-staff #confirmSvcClientName::after {
     Object.keys(areaGroups).forEach(key => {
       const services = areaGroups[key];
       const isDepiItem = key.startsWith('depi__');
-      const area = isDepiItem ? 'depilacion' : key;
-      const itemName = isDepiItem ? services[0].name : services.map(s => s.name).join(' + ');
+      const isCejaItem = key.startsWith('cejas__');
+      const area = isDepiItem ? 'depilacion' : (isCejaItem ? 'cejas' : key);
+      const itemName = (isDepiItem || isCejaItem) ? services[0].name : services.map(s => s.name).join(' + ');
       const suggestedPrice = prevValues[key] || '';
       
       const row = document.createElement('div');
@@ -3149,7 +3185,7 @@ body.rol-staff #confirmSvcClientName::after {
   function openNewPromo() {
     document.getElementById('promoModalTitle').textContent = 'Nueva promo';
     document.getElementById('promoName').value = '';
-    document.getElementById('promoCejas').value = '';
+    ['promoCejas1','promoCejas2','promoCejas3','promoCejas4','promoCejas5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('promoDepilacion1').value = '';
     document.getElementById('promoDepilacion2').value = '';
     document.getElementById('promoDepilacion3').value = '';
@@ -3175,7 +3211,7 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('promoTo').value = p.to;
     
     // Resetear selects
-    document.getElementById('promoCejas').value = '';
+    ['promoCejas1','promoCejas2','promoCejas3','promoCejas4','promoCejas5'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     document.getElementById('promoDepilacion1').value = '';
     document.getElementById('promoDepilacion2').value = '';
     document.getElementById('promoDepilacion3').value = '';
@@ -3185,13 +3221,17 @@ body.rol-staff #confirmSvcClientName::after {
     // Preseleccionar servicios guardados
     if (p._selectedServices) {
       let depCount = 0;
+      let cejaCount = 0;
       p._selectedServices.forEach(s => {
         let selId;
         if (s.area === 'depilacion') {
           depCount++;
           selId = 'promoDepilacion' + Math.min(depCount, 3);
+        } else if (s.area === 'cejas') {
+          cejaCount++;
+          selId = 'promoCejas' + Math.min(cejaCount, 5);
         } else {
-          const areaMap = { cejas: 'promoCejas', pestanas: 'promoPestanas', facial: 'promoFacial' };
+          const areaMap = { pestanas: 'promoPestanas', facial: 'promoFacial' };
           selId = areaMap[s.area];
         }
         if (selId) {
@@ -3215,7 +3255,7 @@ body.rol-staff #confirmSvcClientName::after {
           const key = row.dataset.area;
           const servicio = row.dataset.servicio;
           let match;
-          if (key.startsWith('depi__')) {
+          if (key.startsWith('depi__') || key.startsWith('cejas__')) {
             // Buscar por nombre de servicio
             match = p.division.find(d => d.servicio === servicio || d.area === servicio);
           } else {
@@ -3267,6 +3307,16 @@ body.rol-staff #confirmSvcClientName::after {
             staff: AREA_STAFF['depilacion'] || AREA_STAFF['cejas'],
             monto: monto,
             comm: AREA_COMM['depilacion']
+          });
+        } else if (key.startsWith('cejas__')) {
+          // Ítem individual de cejas: guardar con nombre del servicio
+          division.push({
+            area: servicio,
+            servicio: servicio,
+            realArea: 'cejas',
+            staff: AREA_STAFF['cejas'],
+            monto: monto,
+            comm: AREA_COMM['cejas']
           });
         } else {
           division.push({
