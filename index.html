@@ -8956,6 +8956,10 @@ body.rol-staff #confirmSvcClientName::after {
                 </select>
                 <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
               </div>`;
+            // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
+            const _desgloseMultiHTML = _esMultiPromo
+              ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
+              : `<div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>`;
 
             // Continuación: terminó una parte y vuelve para redirigir a la siguiente staff
             if (esContinuacion) {
@@ -8988,7 +8992,7 @@ body.rol-staff #confirmSvcClientName::after {
                 ${priBadge[pri] || priBadge['normal']}
               </div>
               ${estadoHTML}
-              <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
+              ${_desgloseMultiHTML}
               ${_esMultiPromo ? reassignHTML : `<div style="display: flex; gap: 6px; margin-top: 10px;">
                 <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
                 <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
@@ -12906,10 +12910,13 @@ body.rol-staff #confirmSvcClientName::after {
     if (!filas.length && c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
     return filas.map(function(r){
       const ic = r.done ? '✅' : '⏳';
-      const col = r.done ? 'var(--success)' : 'var(--ink-soft)';
+      const col = r.done ? 'var(--success)' : 'var(--accent-deep)';
+      const right = r.done
+        ? (r.staff + (r.monto ? (' · $'+r.monto) : ''))
+        : ((r.staff && r.staff !== '—') ? (r.staff + ' · por confirmar') : 'falta asignar staff');
       return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;">'
         + '<span style="color:'+col+';font-weight:700;">'+ic+' '+r.label+'</span>'
-        + '<span style="color:var(--ink-soft);white-space:nowrap;">'+r.staff+(r.monto?(' · $'+r.monto):'')+'</span></div>';
+        + '<span style="color:var(--ink-soft);white-space:nowrap;">'+right+'</span></div>';
     }).join('');
   }
   function buildCompletadaCard(c){
