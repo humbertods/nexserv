@@ -8723,6 +8723,7 @@ body.rol-staff #confirmSvcClientName::after {
   // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
   
   function openAssignServiceModal(clientCode, clientName) {
+    window._extraTicketId = null;
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignSvcClientName').textContent = clientName;
     document.getElementById('assignSvcArea').value = '';
@@ -8785,7 +8786,30 @@ body.rol-staff #confirmSvcClientName::after {
     const client = window._assigningClient;
     const chica = (document.getElementById('assignSvcStaff') || {}).value || '';
     if (!chica) { alert('Elegí qué staff la atiende'); return; }
-    
+
+    // ── Modo "+ Servicio Extra": agregar al ticket existente y reabrir a la lista ──
+    if (window._extraTicketId) {
+      const idEx = window._extraTicketId;
+      try {
+        const rEx = await apiPost('agregarServicioExtra', {
+          idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
+        });
+        window._extraTicketId = null;
+        if (rEx && rEx.success) {
+          if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
+          closeModal();
+          loadMikaelaHome();
+        } else {
+          alert(((rEx && rEx.message) || 'No se pudo agregar el servicio extra'));
+        }
+      } catch (err) {
+        window._extraTicketId = null;
+        console.error(err);
+        alert('Error al agregar servicio extra');
+      }
+      return;
+    }
+
     try {
       const result = await apiPost('asignarServicioNormal', {
         codigo: client.code,
@@ -9856,19 +9880,13 @@ body.rol-staff #confirmSvcClientName::after {
       `;
     }
 
-    // Descontar stock
+    // Solo se ADJUNTAN al ticket; se registran UNA sola vez al confirmar el cobro
+    // (handleRegistrarVentaProductos desde el flujo de cobro). Esto evita el doble
+    // registro en el reporte. El stock en la UI sí se refleja al instante.
     descontarStockVenta(items);
-    try {
-      await apiPost('registrarVentaProductos', {
-        idEspera: id,
-        clienteNombre: window._apClienteNombre || '',
-        productos: items,
-        total: items.reduce((s, i) => s + (i.precio * i.cantidad), 0)
-      });
-    } catch(e) { console.error('Error registrando productos:', e); }
 
     closeModal();
-    showToast('✓ Productos registrados para ' + (window._apClienteNombre || 'la clienta'));
+    showToast('✓ Productos agregados al cobro de ' + (window._apClienteNombre || 'la clienta'));
     window._productosMarca = null;
     cargarProductosMarca();
   }
@@ -12959,7 +12977,10 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e){ console.error(e); alert('Error al mandar a cobro'); }
   }
   function agregarServicioExtra(idEspera, codigo, nombre){
-    alert('“+ Servicio Extra” para ' + (nombre||'') + ' se conecta en el siguiente paso (ajuste de total y comisión del servicio extra).');
+    // Reusa el modal de asignar servicio (área + servicio + staff) en "modo extra":
+    // al confirmar, agrega el servicio al MISMO ticket y lo reabre a la lista.
+    openAssignServiceModal(codigo, nombre);
+    window._extraTicketId = idEspera;
   }
 
   function opcionesStaff(area) {
