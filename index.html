@@ -4450,7 +4450,7 @@ body.rol-staff #confirmSvcClientName::after {
       const myCount = WAITLIST.filter(w => {
         const est = String(w.estado || w.status || '').toLowerCase();
         if (est === 'en servicio' || est === 'completada') return false;
-        return w.asignadaA && String(w.asignadaA).trim() !== '' && w.asignadaA === user.name;
+        const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
       }).length;
       document.getElementById('navBadge').textContent = myCount;
       document.getElementById('navBadge2').textContent = myCount;
@@ -4666,12 +4666,13 @@ body.rol-staff #confirmSvcClientName::after {
     const myList = lista.filter(w => {
       const estado = String(w.estado || w.status || '').toLowerCase();
       if (estado === 'en servicio' || estado === 'completada') return false;
-      // MODELO CENTRALIZADO: la staff ve SOLO las clientas que Mikaela le asignó.
-      // Las no asignadas viven únicamente en la lista de Mikaela.
-      if (w.asignadaA && w.asignadaA.trim() !== '') {
-        return w.asignadaA === user.name;
-      }
-      return false;
+      // MODELO CENTRALIZADO: la staff ve SOLO sus clientas asignadas.
+      // Robusto: la columna J (tomadaPor) siempre guarda la staff asignada,
+      // aunque el estado quede en 'Esperando'. Así no depende de que el backend
+      // ya esté redeployado escribiendo 'Asignada'.
+      const quien = (w.asignadaA && String(w.asignadaA).trim())
+                 || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
+      return quien !== '' && quien === user.name;
     });
     
     document.getElementById('waitCountMy').textContent = myList.length;
@@ -8124,7 +8125,7 @@ body.rol-staff #confirmSvcClientName::after {
         const myCount = waitResult.lista.filter(w => {
           const est = String(w.estado || w.status || '').toLowerCase();
           if (est === 'en servicio' || est === 'completada') return false;
-          return w.asignadaA && String(w.asignadaA).trim() !== '' && w.asignadaA === user.name;
+          const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
         }).length;
         document.getElementById('navBadge').textContent = myCount;
         document.getElementById('navBadge2').textContent = myCount;
@@ -8910,6 +8911,19 @@ body.rol-staff #confirmSvcClientName::after {
                 + '</div>'
               : '';
 
+            // ESTADO de la clienta (3 estados): Asignada a X · Por asignar · Mandar a cobro
+            let estadoLabel;
+            if (esContinuacion) {
+              estadoLabel = sigueTxt
+                ? '<strong style="color:var(--accent-deep);">Por asignar</strong> <span style="color:var(--ink-soft);">· falta pasar a la siguiente staff</span>'
+                : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
+            } else if (estaAsignada) {
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + w.tomadaPor;
+            } else {
+              estadoLabel = '<strong style="color:var(--ink-soft);">Por asignar</strong>';
+            }
+            const estadoHTML = '<div style="font-size:12px;margin-top:6px;"><span style="color:var(--ink-soft);font-weight:600;">Estado:</span> ' + estadoLabel + '</div>';
+
             // Continuación: terminó una parte y vuelve para redirigir a la siguiente staff
             if (esContinuacion) {
               return `
@@ -8920,6 +8934,7 @@ body.rol-staff #confirmSvcClientName::after {
                     <div class="waitlist-name">${w.nombre} <span style="background:var(--accent);color:white;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">🔄 Para redirigir</span></div>
                   </div>
                 </div>
+                ${estadoHTML}
                 ${hechasHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
                   <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
@@ -8928,19 +8943,17 @@ body.rol-staff #confirmSvcClientName::after {
               </div>`;
             }
 
-            // Nueva o ya asignada: misma tarjeta con botones; si está asignada, etiqueta inline
-            const asignadaLabel = estaAsignada
-              ? ' <span style="font-weight:800;color:var(--accent-deep);">(Asignada a ' + w.tomadaPor + ')</span>'
-              : '';
+            // Nueva o ya asignada: misma tarjeta con botones; el estado va en la línea "Estado:"
             return `
             <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}"${estaAsignada ? ' style="border-left:4px solid var(--accent);"' : ''}>
               <div class="waitlist-top">
                 <div class="waitlist-client">
-                  <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}${asignadaLabel}</div>
+                  <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
                   <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
                 </div>
                 ${priBadge[pri] || priBadge['normal']}
               </div>
+              ${estadoHTML}
               <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
               <div style="display: flex; gap: 6px; margin-top: 10px;">
                 <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
