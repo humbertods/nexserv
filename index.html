@@ -8910,16 +8910,19 @@ body.rol-staff #confirmSvcClientName::after {
             // Ya asignada a una staff: esperando que la tome (sin botones)
             if (estaAsignada) {
               return `
-              <div class="waitlist-card" style="opacity:.75;">
+              <div class="waitlist-card" style="opacity:.9; border-left:4px solid var(--accent);">
                 <div class="waitlist-top">
                   <div class="waitlist-client">
                     <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
                     <div class="waitlist-name">${w.nombre}</div>
                   </div>
-                  <span style="background:var(--accent-bg);color:var(--accent-deep);font-size:10px;padding:3px 10px;border-radius:100px;font-weight:700;">→ ${w.tomadaPor}</span>
                 </div>
                 <div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>
-                <div style="font-size:11px;color:var(--ink-soft);margin-top:6px;">Asignada · esperando que ${w.tomadaPor} la tome</div>
+                <div style="margin-top:8px;background:var(--accent-bg);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:15px;">👤</span>
+                  <div><div style="font-size:12px;font-weight:800;color:var(--accent-deep);">Clienta asignada a ${w.tomadaPor}</div>
+                  <div style="font-size:10px;color:var(--ink-soft);">esperando que la tome</div></div>
+                </div>
                 ${hechasHTML}
               </div>`;
             }
@@ -16101,8 +16104,23 @@ async function suscribirPushActual() {
     console.warn('[Push] No soportado en este navegador');
     return;
   }
+  if (window._pushSuscrito) return; // ya suscrito en esta sesión, no reintentar
   try {
-    const reg = await navigator.serviceWorker.ready;
+    let reg = await navigator.serviceWorker.ready;
+    // Esperar a que el SW esté ACTIVO (tras una actualización puede estar instalándose)
+    if (!reg.active) {
+      const sw = reg.installing || reg.waiting;
+      if (sw) {
+        await new Promise(res => {
+          const t = setTimeout(res, 4000); // no colgar
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'activated') { clearTimeout(t); res(); }
+          });
+        });
+      }
+      reg = (await navigator.serviceWorker.getRegistration()) || reg;
+    }
+    if (!reg.active) { console.log('[Push] SW aún no activo, se reintenta luego'); return; }
     const perm = await Notification.requestPermission();
     if (perm !== 'granted') { console.log('[Push] Permiso denegado'); return; }
 
