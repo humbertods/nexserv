@@ -12973,7 +12973,7 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   // ── Desglose + acciones de "clienta completada" (verificación de Mikaela) ──
-  function buildDesgloseHTML(c){
+  function _desgloseFilas(c){
     let filas = [];
     if (Array.isArray(c.areas) && c.areas.length) {
       c.areas.forEach(function(a){
@@ -12994,7 +12994,13 @@ body.rol-staff #confirmSvcClientName::after {
       if (c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
     }
     if (!filas.length && c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
-    return filas.map(function(r){
+    return filas;
+  }
+  function _desgloseTotal(c){
+    return _desgloseFilas(c).reduce(function(s,r){ return s + Number(r.monto||0); }, 0);
+  }
+  function buildDesgloseHTML(c){
+    return _desgloseFilas(c).map(function(r){
       const ic = r.done ? '✅' : '⏳';
       const col = r.done ? 'var(--success)' : 'var(--accent-deep)';
       const right = r.done
@@ -13007,7 +13013,8 @@ body.rol-staff #confirmSvcClientName::after {
   }
   function buildCompletadaCard(c){
     const nombreSafe = String(c.nombre||'').replace(/'/g, "\\'");
-    const total = Number(c.total||0);
+    // Total visible = suma de los servicios mostrados (agendados + extras)
+    const total = _desgloseTotal(c) || Number(c.total||0);
     const totalStr = total > 0
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:700;">TOTAL</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$'+total.toFixed(2)+'</span></div>'
       : '';
