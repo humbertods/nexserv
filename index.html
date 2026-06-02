@@ -10417,6 +10417,12 @@ body.rol-staff #confirmSvcClientName::after {
     });
     _payloadM5.totalServicios = totalServicios;
     _payloadM5.totalProductos = totalProductos;
+    // FIX: forzar que el desglose EDITADO por Mikaela (montos corregidos) sea el que use
+    // el backend para repartir comisiones — antes podía quedar el guardado (viejo).
+    if (window._cobrarDesglose && window._cobrarDesglose.length) {
+      _payloadM5.serviciosDetalle = window._cobrarDesglose;
+      _payloadM5.desglose = window._cobrarDesglose;
+    }
     // Nota de auditoría: correcciones/quitados que hizo Mikaela en este cobro (queda en HistorialOwner)
     if (window._cobrarAjustes && window._cobrarAjustes.length > 0) {
       _payloadM5.notaAjuste = window._cobrarAjustes.join(' · ');
@@ -15168,6 +15174,7 @@ body.rol-staff #confirmSvcClientName::after {
         idEspera,
         chicaNombre: user?.name || '',
         esUltima: true,
+        absorberPendientes: true,
         desgloseCompleto: desgloseCompleto
       });
       if (r.success) {
