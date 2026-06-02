@@ -4721,6 +4721,7 @@ body.rol-staff #confirmSvcClientName::after {
   }
   window.toggleDescansoGlobal = toggleDescansoGlobal;
 
+
   function logout() {
     document.getElementById('loginUser').value = '';
     document.getElementById('loginPass').value = '';
@@ -16689,7 +16690,27 @@ async function probarNotificaciones() {
     'push_yadira':'Yadira', 'push_diana':'Diana', 'push_laura':'Laura'
   };
   const keys = Object.keys(staffMap);
-  if (!confirm('Se enviará una notificación de prueba a todas las staff. ¿Continuar?')) return;
+
+  // 1) Estado de conexión: ¿quién tiene la app/notificaciones activas?
+  let estadoMsg = '';
+  try {
+    const est = await apiGet('listarPushSubs');
+    if (est && est.estado) {
+      estadoMsg = '🔔 ESTADO DE NOTIFICACIONES\n\n';
+      Object.keys(est.estado).forEach(n => {
+        estadoMsg += (est.estado[n] ? '✅ ' : '❌ ') + n + (est.estado[n] ? ' — activa' : ' — sin activar') + '\n';
+      });
+      const faltan = Object.keys(est.estado).filter(n => !est.estado[n]);
+      estadoMsg += faltan.length
+        ? ('\nFaltan activar: ' + faltan.join(', ') + '.\n(Deben abrir la app instalada en su inicio y aceptar el permiso de notificaciones.)\n')
+        : '\nTodas activas 🎉\n';
+    } else {
+      estadoMsg = '⚠️ No se pudo consultar el estado (' + ((est && (est.error || est.message)) || 'sin respuesta') + ').\n\n';
+    }
+  } catch (e) { estadoMsg = '⚠️ No se pudo consultar el estado: ' + e.message + '\n\n'; }
+
+  // 2) Ofrecer enviar una notificación de prueba
+  if (!confirm(estadoMsg + '\n¿Enviar una notificación de PRUEBA a todas las staff ahora?')) return;
   try {
     const res = await apiPost('enviarPushStaff', {
       staffKeys: keys,
