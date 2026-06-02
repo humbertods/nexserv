@@ -16606,6 +16606,22 @@ async function suscribirPushActual() {
     let fcmReg = reg;
     try {
       fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
+      // Esperar a que el SW de Firebase esté ACTIVO antes de suscribir
+      // (recién registrado puede estar instalándose → "no active Service Worker")
+      if (!fcmReg.active) {
+        const sw2 = fcmReg.installing || fcmReg.waiting;
+        if (sw2) {
+          await new Promise(res => {
+            const t = setTimeout(res, 5000); // no colgar
+            sw2.addEventListener('statechange', () => {
+              if (sw2.state === 'activated') { clearTimeout(t); res(); }
+            });
+          });
+        }
+        fcmReg = (await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope')) || fcmReg;
+      }
+      // Si todavía no quedó activo, usar el SW principal (que sí lo está)
+      if (!fcmReg.active) { console.log('[Push] FCM SW aún no activo, uso SW principal'); fcmReg = reg; }
     } catch (eReg) {
       console.warn('[Push] FCM SW no disponible, uso SW principal:', eReg.message);
       fcmReg = reg;
@@ -16620,7 +16636,7 @@ async function suscribirPushActual() {
         try {
           (fcmReg || reg).showNotification(n.title, {
             body: n.body || '',
-            icon: 'https://humbertods.github.io/nexserv/icon-192.png',
+            icon: 'https://humbertods.github.io/nexserv/icon-192x192.png',
             tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
           });
         } catch (e) {}
