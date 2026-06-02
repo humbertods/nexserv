@@ -1,49 +1,52 @@
 /* ════════════════════════════════════════════════════════════════
-   NexServ — Service Worker de Firebase Cloud Messaging
-   Muestra las notificaciones aunque la app esté CERRADA (tipo WhatsApp).
-   IMPORTANTE: este archivo debe subirse a la RAÍZ del sitio, en:
+   NexServ — Service Worker de notificaciones push
+   Versión ROBUSTA: NO descarga la librería de Firebase por internet
+   (eso fallaba con importScripts y rompía el SW). Maneja el evento
+   'push' nativo directamente, así no puede fallar por ese motivo.
+   Subir a la RAÍZ del sitio:
      https://humbertods.github.io/nexserv/firebase-messaging-sw.js
    ════════════════════════════════════════════════════════════════ */
 
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js');
+const NEX_URL  = 'https://humbertods.github.io/nexserv/';
+const NEX_ICON = 'https://humbertods.github.io/nexserv/icon-192x192.png';
 
-firebase.initializeApp({
-  apiKey: 'AIzaSyCEFhAeGjy9IJy7uIYLDrUb4OglpeTIaRo',
-  authDomain: 'nexserv-7e1bb.firebaseapp.com',
-  projectId: 'nexserv-7e1bb',
-  storageBucket: 'nexserv-7e1bb.firebasestorage.app',
-  messagingSenderId: '916241480118',
-  appId: '1:916241480118:web:cdf7aae6e823e08b22e917'
-});
+self.addEventListener('install', function () { self.skipWaiting(); });
+self.addEventListener('activate', function (event) { event.waitUntil(self.clients.claim()); });
 
-const messaging = firebase.messaging();
+// Llega un push de FCM (app cerrada o en segundo plano) → mostrar notificación
+self.addEventListener('push', function (event) {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    try { payload = { notification: { title: 'NexServ', body: event.data ? event.data.text() : '' } }; }
+    catch (e2) { payload = {}; }
+  }
 
-// Notificación en segundo plano para mensajes de SOLO datos.
-// (Si el backend manda bloque "notification", el navegador la muestra solo;
-//  este handler es respaldo y no duplica.)
-messaging.onBackgroundMessage(function (payload) {
-  const n = (payload && payload.notification) || (payload && payload.data) || {};
-  const titulo = n.title || 'NexServ';
-  const link = (payload && payload.fcmOptions && payload.fcmOptions.link)
-            || (payload && payload.data && payload.data.link)
-            || 'https://humbertods.github.io/nexserv/';
-  self.registration.showNotification(titulo, {
-    body: n.body || '',
-    icon: 'https://humbertods.github.io/nexserv/icon-192.png',
-    badge: 'https://humbertods.github.io/nexserv/icon-192.png',
-    tag: 'nexserv-cita',
-    renotify: true,
-    vibrate: [200, 100, 200],
-    data: { link: link }
-  });
+  const n = payload.notification || payload.data || {};
+  const title = n.title || 'NexServ';
+  const link = (payload.fcmOptions && payload.fcmOptions.link)
+            || (payload.data && payload.data.link)
+            || n.click_action || NEX_URL;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: n.body || '',
+      icon: n.icon || NEX_ICON,
+      badge: NEX_ICON,
+      tag: 'nexserv-' + (n.tag || 'aviso'),
+      renotify: true,
+      requireInteraction: false,
+      vibrate: [200, 100, 200],
+      data: { link: link }
+    })
+  );
 });
 
 // Al tocar la notificación: abrir/enfocar la app
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
-  const link = (event.notification.data && event.notification.data.link)
-            || 'https://humbertods.github.io/nexserv/';
+  const link = (event.notification.data && event.notification.data.link) || NEX_URL;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (lista) {
       for (const c of lista) {
