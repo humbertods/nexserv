@@ -10275,6 +10275,30 @@ body.rol-staff #confirmSvcClientName::after {
     refreshCobrarTotal();
   }
 
+  // Regla de pago (local, no depende de archivos externos):
+  //  • Con promo y pago EFECTIVO o TRANSFERENCIA → se respeta el precio promo.
+  //  • Con promo y pago TARJETA → TODO se recalcula a precio NORMAL (sin promo).
+  function _reglaPagoLocal(metodo, ctx) {
+    const tienePromo = !!ctx.tienePromo;
+    const esTarjeta  = String(metodo || '') === 'Tarjeta';
+    const usaNormal  = tienePromo && esTarjeta;
+    const desg = Array.isArray(ctx.desglose) ? ctx.desglose : [];
+    const out = desg.map(function(d){
+      const promo  = Number(d.monto || 0);
+      const normal = Number(d.montoNormal != null ? d.montoNormal : promo) || promo;
+      // En tarjeta nunca por debajo del promo
+      const montoFinal = usaNormal ? Math.max(normal, promo) : promo;
+      return Object.assign({}, d, { montoFinal: montoFinal });
+    });
+    let totalFinal;
+    if (out.length) {
+      totalFinal = out.reduce(function(s,d){ return s + Number(d.montoFinal || 0); }, 0);
+    } else {
+      totalFinal = usaNormal ? Number(ctx.totalNormal || 0) : Number(ctx.totalPromo || 0);
+    }
+    return { usaPrecioNormal: usaNormal, totalFinal: totalFinal, desglose: out };
+  }
+
   // Recalcula total + desglose según el método de pago actual y el desglose (editable) en memoria
   function refreshCobrarTotal() {
     const metodo     = window._cobrarPago || 'Efectivo';
@@ -10285,8 +10309,8 @@ body.rol-staff #confirmSvcClientName::after {
     const itemsEl2   = document.getElementById('cobrarDesgloseItems');
     const totalProductos = window._cobrarTotalProductos || 0;
 
-    // ── MANDAMIENTO #4: tarjeta siempre cobra precio normal en promos ──
-    const resultado = window.aplicarReglaPagoM4(metodo, {
+    // ── Regla tarjeta = precio normal (promos solo válidas en efectivo/transferencia) ──
+    const resultado = _reglaPagoLocal(metodo, {
       tienePromo:  window._cobrarTienePromo,
       totalPromo:  window._cobrarTotalPromo  || 0,
       totalNormal: window._cobrarTotalRegular || window._cobrarTotalPromo || 0,
