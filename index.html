@@ -8772,8 +8772,8 @@ body.rol-staff #confirmSvcClientName::after {
 
   // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
   
-  function openAssignServiceModal(clientCode, clientName) {
-    window._extraTicketId = null;
+  function openAssignServiceModal(clientCode, clientName, extraTicketId) {
+    window._extraTicketId = extraTicketId || null;
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignSvcClientName').textContent = clientName;
     document.getElementById('assignSvcArea').value = '';
@@ -8837,6 +8837,7 @@ body.rol-staff #confirmSvcClientName::after {
     const chica = (document.getElementById('assignSvcStaff') || {}).value || '';
     if (!chica) { alert('Elegí qué staff la atiende'); return; }
 
+    console.log('[ServicioExtra] modo extra:', !!window._extraTicketId, '| ticket:', window._extraTicketId || '(ninguno)');
     // ── Modo "+ Servicio Extra": agregar al ticket existente y reabrir a la lista ──
     if (window._extraTicketId) {
       const idEx = window._extraTicketId;
@@ -13042,8 +13043,7 @@ body.rol-staff #confirmSvcClientName::after {
   function agregarServicioExtra(idEspera, codigo, nombre){
     // Reusa el modal de asignar servicio (área + servicio + staff) en "modo extra":
     // al confirmar, agrega el servicio al MISMO ticket y lo reabre a la lista.
-    openAssignServiceModal(codigo, nombre);
-    window._extraTicketId = idEspera;
+    openAssignServiceModal(codigo, nombre, idEspera);
   }
 
   function opcionesStaff(area) {
