@@ -10385,6 +10385,32 @@ body.rol-staff #confirmSvcClientName::after {
     const itemsEl2   = document.getElementById('cobrarDesgloseItems');
     const totalProductos = window._cobrarTotalProductos || 0;
 
+    // ── COBRO GRUPAL: recalcular sobre los totales del grupo (no las vars individuales) ──
+    if (window._cobroGrupal && window._cobroGrupal.clientas) {
+      const g = window._cobroGrupal;
+      const hayPromo = g.clientas.some(c => c.promoNombre);
+      const esTarjeta = metodo === 'Tarjeta';
+      const usaRegular = esTarjeta && hayPromo;
+      const totalPromoG   = Number(g.totalPromo || 0);
+      const totalRegularG = Number(g.totalRegular || totalPromoG);
+      const totalFinalG   = usaRegular ? totalRegularG : totalPromoG;
+      if (usaRegular) {
+        if (aviso) aviso.style.display = 'block';
+        const pp = document.getElementById('cobrarPrecioPromo');   if (pp) pp.textContent = '$' + totalPromoG.toFixed(2);
+        const pr = document.getElementById('cobrarPrecioRegular'); if (pr) pr.textContent = '$' + totalRegularG.toFixed(2);
+        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductos).toFixed(2); totalEl.style.color = 'var(--danger)'; }
+        if (subtotalEl) { subtotalEl.textContent = '$' + totalFinalG.toFixed(2); subtotalEl.style.color = 'var(--danger)'; }
+        if (promoBanner) promoBanner.style.display = 'none';
+      } else {
+        if (aviso) aviso.style.display = 'none';
+        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductos).toFixed(2); totalEl.style.color = 'var(--accent-deep)'; }
+        if (subtotalEl) { subtotalEl.textContent = '$' + totalFinalG.toFixed(2); subtotalEl.style.color = ''; }
+        if (promoBanner && hayPromo) promoBanner.style.display = 'block';
+      }
+      window._cobrarTotalConProductos = totalFinalG + totalProductos;
+      return;
+    }
+
     // ── Regla tarjeta = precio normal (promos solo válidas en efectivo/transferencia) ──
     const resultado = _reglaPagoLocal(metodo, {
       tienePromo:  window._cobrarTienePromo,
@@ -10418,6 +10444,25 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
   window.refreshCobrarTotal = refreshCobrarTotal;
+
+  // Respaldo local por si el archivo externo (nexserv-mandamientos.js) no cargó:
+  // evita que el botón de cobro quede trabado si construirPayloadDistribucionM5 no existe.
+  function _payloadDistribucionLocal(o) {
+    return {
+      idEspera:        o.idEspera,
+      metodoPago:      o.metodoPago,
+      metodo:          o.metodoPago,
+      totalCobrado:    o.totalCobrado,
+      total:           o.totalCobrado,
+      tienePromo:      !!o.tienePromo,
+      usaPrecioNormal: !!o.usaPrecioNormal,
+      serviciosDetalle: o.desglose || null,
+      desglose:        o.desglose || null
+    };
+  }
+  const _construirPayload = (typeof window.construirPayloadDistribucionM5 === 'function')
+    ? window.construirPayloadDistribucionM5
+    : _payloadDistribucionLocal;
 
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
@@ -10463,7 +10508,7 @@ body.rol-staff #confirmSvcClientName::after {
             ? String(c.precioRegular || c.total || '0')
             : String(c.total || '0');
           // ── MANDAMIENTO #5: payload completo para distribución a staff/Mikaela/Owner ──
-          const _payloadGrupal = window.construirPayloadDistribucionM5({
+          const _payloadGrupal = _construirPayload({
             idEspera:        c.idEspera,
             metodoPago:      metodoPago,
             totalCobrado:    Number(totalCobrado),
@@ -10507,7 +10552,7 @@ body.rol-staff #confirmSvcClientName::after {
 
     // ── MANDAMIENTO #5: construir payload completo para distribución a los 3 destinos ──
     // staff (comisiones) + Mikaela (CierresPagos) + Owner (HistorialOwner)
-    const _payloadM5 = window.construirPayloadDistribucionM5({
+    const _payloadM5 = _construirPayload({
       idEspera:        window._cobrarId,
       metodoPago:      window._cobrarPago,
       totalCobrado:    totalFinal,
