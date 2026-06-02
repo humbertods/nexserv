@@ -16718,6 +16718,15 @@ async function probarNotificaciones() {
       cuerpo: 'Si ves esto, tus notificaciones funcionan.'
     });
     if (!res) { alert('No hubo respuesta del servidor.'); return; }
+    // Si el backend falló ANTES de enviar (ej: no pudo autenticarse contra FCM),
+    // devuelve { success:false, error:... } sin contar envíos. Mostrar la causa real.
+    if (res.success === false || (res.error && res.enviados == null)) {
+      alert('❌ El servidor NO pudo enviar las notificaciones.\n\n'
+          + 'CAUSA REAL:\n' + (res.error || 'desconocida') + '\n\n'
+          + 'Esto casi siempre es la credencial de FCM (el token de acceso del servidor). '
+          + 'Copiame este texto y te digo el arreglo exacto.');
+      return;
+    }
     let msg = '📤 Notificaciones entregadas al servicio: ' + (res.enviados || 0) + ' de ' + keys.length + '\n';
     if (res.errores && res.errores.length) {
       msg += '\nDetalle por staff:\n';
