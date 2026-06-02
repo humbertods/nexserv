@@ -9033,7 +9033,8 @@ body.rol-staff #confirmSvcClientName::after {
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
                 <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
-              </div>`;
+              </div>
+              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe}')" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
               ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
@@ -12956,6 +12957,18 @@ body.rol-staff #confirmSvcClientName::after {
         alert('Error: ' + ((r && r.message) || 'No se pudo reasignar'));
       }
     } catch(e){ console.error(e); alert('Error al reasignar'); }
+  }
+  async function retirarYCobrar(idEspera, nombre){
+    if (!confirm('¿' + (nombre || 'La clienta') + ' se retira?\n\nSe anularán los servicios pendientes y se cobrará SOLO lo ya realizado.')) return;
+    try {
+      const r = await apiPost('retirarYCobrar', { idEspera: idEspera });
+      if (r && r.success) {
+        if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' a cobro (solo lo realizado)');
+        loadMikaelaHome();
+      } else {
+        alert(((r && r.message) || 'No se pudo procesar el retiro'));
+      }
+    } catch(e){ console.error(e); alert('Error al procesar el retiro'); }
   }
 
   // ── Desglose + acciones de "clienta completada" (verificación de Mikaela) ──
