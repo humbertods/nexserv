@@ -9188,7 +9188,7 @@ body.rol-staff #confirmSvcClientName::after {
 
             // Nueva o ya asignada: misma tarjeta con botones; el estado va en la línea "Estado:"
             return `
-            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}"${estaAsignada ? ' style="border-left:4px solid var(--accent);"' : ''}>
+            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}" data-tid="${w.idEspera || ''}" data-tname="${String(w.nombre || '').replace(/"/g,'')}"${estaAsignada ? ' style="border-left:4px solid var(--accent);"' : ''}>
               <div class="waitlist-top">
                 <div class="waitlist-client">
                   <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
@@ -16744,6 +16744,62 @@ async function probarNotificaciones() {
     alert('Error al probar notificaciones: ' + err.message);
   }
 }
+// ── Borrar ticket de la lista de espera con long-press (solo Mikaela) ──
+const LONGPRESS_DELETE_MS = 900; // tiempo que hay que mantener presionado (ajustable)
+async function eliminarTicketEspera(id, name) {
+  if (!id) return;
+  if (!confirm('¿Borrar el ticket de ' + (name || 'esta clienta') + ' de la lista de espera?\n\nVa a desaparecer de la lista.')) return;
+  try {
+    const r = await apiPost('eliminarTicketEspera', { id: id });
+    if (r && r.success) {
+      showToast('🗑 Ticket de ' + (name || 'la clienta') + ' borrado');
+      if (typeof loadMikaelaHome === 'function') loadMikaelaHome();
+    } else {
+      alert('No se pudo borrar: ' + ((r && (r.error || r.message)) || 'error desconocido'));
+    }
+  } catch (e) { alert('Error al borrar: ' + e.message); }
+}
+window.eliminarTicketEspera = eliminarTicketEspera;
+
+(function setupLongPressDelete() {
+  let timer = null, pressedCard = null;
+  function esMikaela() {
+    const u = window.currentUser;
+    if (!u) return false;
+    return /mikaela/i.test(u.name || '') || u.role === 'admin' || u.area === 'admin';
+  }
+  function start(e) {
+    const t = e.target;
+    const card = (t && t.closest) ? t.closest('.waitlist-card[data-tid]') : null;
+    if (!card || !card.getAttribute('data-tid')) return;
+    if (!esMikaela()) return;
+    if (t.closest('button')) return; // no disparar si tocó un botón de la tarjeta
+    pressedCard = card;
+    card.style.transition = 'transform .2s, opacity .2s';
+    card.style.transform = 'scale(0.98)';
+    card.style.opacity = '0.8';
+    timer = setTimeout(function () {
+      timer = null;
+      const id = card.getAttribute('data-tid');
+      const name = card.getAttribute('data-tname') || 'esta clienta';
+      reset();
+      try { if (navigator.vibrate) navigator.vibrate(40); } catch (e) {}
+      eliminarTicketEspera(id, name);
+    }, LONGPRESS_DELETE_MS);
+  }
+  function reset() {
+    if (pressedCard) { pressedCard.style.transform = ''; pressedCard.style.opacity = ''; }
+    pressedCard = null;
+  }
+  function cancel() { if (timer) { clearTimeout(timer); timer = null; } reset(); }
+  document.addEventListener('touchstart', start, { passive: true });
+  document.addEventListener('touchend', cancel);
+  document.addEventListener('touchmove', cancel, { passive: true });
+  document.addEventListener('mousedown', start);
+  document.addEventListener('mouseup', cancel);
+  document.addEventListener('mouseleave', cancel);
+})();
+
 const _origDoLogin = window.doLogin;
 window.doLogin = async function(...args) {
   const result = await _origDoLogin?.apply(this, args);
