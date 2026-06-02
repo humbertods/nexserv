@@ -10349,9 +10349,18 @@ body.rol-staff #confirmSvcClientName::after {
     const esTarjeta  = String(metodo || '') === 'Tarjeta';
     const usaNormal  = tienePromo && esTarjeta;
     const desg = Array.isArray(ctx.desglose) ? ctx.desglose : [];
+    const sumPromo = desg.reduce(function(s,d){ return s + Number(d.monto || 0); }, 0);
+    const sumNormalLineas = desg.reduce(function(s,d){
+      return s + (Number(d.montoNormal != null ? d.montoNormal : d.monto) || Number(d.monto || 0));
+    }, 0);
+    const totalNormalCtx = Number(ctx.totalNormal || 0);
+    // Si las líneas NO traen un regular por parte (montoNormal) pero SÍ se conoce el
+    // regular total (> promo), repartir ese regular proporcionalmente entre las líneas.
+    const usarTotalNormal = usaNormal && sumPromo > 0 && sumNormalLineas <= sumPromo && totalNormalCtx > sumPromo;
     const out = desg.map(function(d){
       const promo  = Number(d.monto || 0);
-      const normal = Number(d.montoNormal != null ? d.montoNormal : promo) || promo;
+      let normal = Number(d.montoNormal != null ? d.montoNormal : promo) || promo;
+      if (usarTotalNormal) normal = promo / sumPromo * totalNormalCtx; // reparto proporcional
       // En tarjeta nunca por debajo del promo
       const montoFinal = usaNormal ? Math.max(normal, promo) : promo;
       return Object.assign({}, d, { montoFinal: montoFinal });
