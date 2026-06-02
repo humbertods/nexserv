@@ -3637,6 +3637,36 @@ body.rol-staff #confirmSvcClientName::after {
   // Si el staff puede hacer TODAS las partes de la promo, recibe el total completo
   // Si solo puede hacer algunas partes, recibe la suma de esas partes
   // ============================================
+  // Áreas de la promo que NO puede hacer esta staff (las que hay que asignar a otra chica)
+  function getOtherPromoAreas(promo, myArea) {
+    if (!promo || !Array.isArray(promo.division)) return [];
+    const AREA_FILTER_MAP = {
+      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
+                   'retiro de lifting', 'retiro de pestañas', 'retiro_lifting', 'retiro'],
+      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen',
+                   'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura', 'brasil'],
+      'facial':   ['facial', 'hidra', 'limpieza']
+    };
+    const myCaps = AREA_FILTER_MAP[myArea] || [myArea];
+    function catDe(areaTxt) {
+      const a = String(areaTxt || '').toLowerCase();
+      for (const cat of Object.keys(AREA_FILTER_MAP)) {
+        if (AREA_FILTER_MAP[cat].some(k => a.includes(k))) return cat;
+      }
+      return '';
+    }
+    const otras = [];
+    promo.division.forEach(d => {
+      const a = String(d.area || '').toLowerCase();
+      const esMia = myCaps.some(c => a.includes(c.toLowerCase()));
+      if (!esMia) {
+        const cat = catDe(d.area);
+        if (cat && cat !== myArea && otras.indexOf(cat) === -1) otras.push(cat);
+      }
+    });
+    return otras;
+  }
+
   function getMyPromoPrice(promo, myArea, completedAreas) {
     if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
 
@@ -13808,6 +13838,19 @@ body.rol-staff #confirmSvcClientName::after {
     
     closeModal();
     alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
+
+    // Si la promo incluye áreas que esta staff NO hace, avisar a Mikaela del cambio
+    // (ej: Yadira cambia a "brasilero + cejas" → la parte de cejas debe asignarla Mikaela)
+    try {
+      const _otras = getOtherPromoAreas(promo, myArea);
+      if (_otras.length > 0) {
+        const _LBL = { cejas: 'Cejas', pestanas: 'Pestañas', facial: 'Facial' };
+        const _faltan = _otras.map(a => _LBL[a] || a).join(', ');
+        enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
+          (user?.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promo.name + '". Falta asignar a otra chica: ' + _faltan + '.');
+        showToast('🔄 Avisado a Mikaela: falta asignar ' + _faltan);
+      }
+    } catch (e) { console.warn('[applyPromo] aviso Mikaela:', e); }
   }
 
   // Tomar promo completa: la staff cobra el precio total aunque solo haga su parte
@@ -14105,6 +14148,18 @@ body.rol-staff #confirmSvcClientName::after {
 
     closeModal();
     showToast('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
+
+    // Avisar a Mikaela si la promo incluye áreas que esta staff no hace
+    try {
+      const _otras = getOtherPromoAreas(promoData, myArea);
+      if (_otras.length > 0) {
+        const _LBL = { cejas: 'Cejas', pestanas: 'Pestañas', facial: 'Facial' };
+        const _faltan = _otras.map(a => _LBL[a] || a).join(', ');
+        enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
+          (user?.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promoData.name + '". Falta asignar a otra chica: ' + _faltan + '.');
+        showToast('🔄 Avisado a Mikaela: falta asignar ' + _faltan);
+      }
+    } catch (e) { console.warn('[applyPromoFromAddSvc] aviso Mikaela:', e); }
   }
 
   function openAddService(slot, modoEnganche) {
