@@ -10861,13 +10861,22 @@ body.rol-staff #confirmSvcClientName::after {
       });
 
       svc._isComboMultiArea = true;
-      svc._comboAreas = divsOrdenadas.map(dv => ({
-        area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
-        tentativo: d.nombre,
-        precio: Number(dv.monto || 0),
-        precioNormal: Number(dv.monto || 0),
-        tipo: 'promo'
-      }));
+      // Precio regular por área: proporcional al regular del combo (para que tarjeta cobre sin promo)
+      const _promoPrecio  = Number(d.precio || 0);
+      const _promoRegular = Number(d.regular || d.precio || 0);
+      svc._comboAreas = divsOrdenadas.map(dv => {
+        const _m = Number(dv.monto || 0);
+        const _reg = (_promoPrecio > 0 && _promoRegular > _promoPrecio)
+          ? Math.round((_m / _promoPrecio) * _promoRegular * 100) / 100
+          : _m;
+        return {
+          area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
+          tentativo: d.nombre,
+          precio: _m,
+          precioNormal: _reg,
+          tipo: 'promo'
+        };
+      });
 
       const divAreas = svc._comboAreas.map(ca => ca.area);
       const uniqAreas = [...new Set(divAreas)];
