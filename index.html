@@ -2357,6 +2357,9 @@ body.rol-staff #confirmSvcClientName::after {
       <button id="descansoToggleBtn" onclick="toggleDescansoPanel()" style="width:100%;padding:14px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
         🌙 Activar modo de descanso <span id="descansoCaret" style="font-size:11px;">▼</span>
       </button>
+      <button id="descansoGlobalBtn" onclick="toggleDescansoGlobal()" style="width:100%;padding:14px;margin-top:10px;background:#2a1f4d;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+        🌙 Poner a TODO el equipo en descanso
+      </button>
       <div id="descansoPanel" style="display:none;margin-top:10px;"></div>
     </div>
     <div id="sesionesList">
@@ -3038,11 +3041,19 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e) {
       console.warn('[Sesión] Error al restaurar:', e.message);
     }
-    // Modo de descanso: revisar al volver la app al frente y cada 90s
+    // Modo de descanso: revisar al volver la app al frente, al enfocar, por actividad y cada 25s
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && typeof verificarDescansoActivo === 'function') verificarDescansoActivo();
     });
-    setInterval(() => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); }, 90000);
+    window.addEventListener('focus', () => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); });
+    // Al detectar movimiento/actividad (con throttle de 5s) revalidar el bloqueo
+    ['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, () => {
+      const ahora = Date.now();
+      if (ahora - (window._ultimoChequeoDescanso || 0) < 5000) return;
+      window._ultimoChequeoDescanso = ahora;
+      if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo();
+    }, { passive: true, capture: true }));
+    setInterval(() => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); }, 25000);
     // ────────────────────────────────────────────────────────
   });
 
@@ -4608,25 +4619,72 @@ body.rol-staff #confirmSvcClientName::after {
     show(user.screen);
   }
 
-  // Modo de descanso: si la staff (con sesión abierta) quedó bloqueada, cerrar su sesión
+  // Modo de descanso: bloquea staff si está en descanso individual O si el descanso GLOBAL está activo.
+  // El Owner es el "llavero": nunca se bloquea; solo refresca el estado de su botón.
   async function verificarDescansoActivo() {
     const u = window.currentUser;
-    if (!u || u.role !== 'staff') return;
-    try {
-      const r = await apiGet('getDescanso');
-      if (r && r.success && r.config && r.config[u.name] === true) {
-        try { localStorage.removeItem('nexserv_session'); } catch(e) {}
-        pingSesion('logout');
-        stopHeartbeat();
-        window.currentUser = null;
-        document.body.classList.remove('rol-staff');
-        closeUserMenu();
-        show('login');
-        alert('Estás en tu tiempo de descanso, disfrútalo en familia 💛');
+    if (!u) return;
+    let r;
+    try { r = await apiGet('getDescanso'); } catch(e) { return; }
+    if (!r || !r.success) return;
+    window._descansoGlobalOn = (r.global === true);
+
+    if (u.role === 'owner') {
+      refreshDescansoGlobalBtn();
+      return;
+    }
+    // No-owner: bloquear si hay descanso global o descanso individual de esta staff
+    const bloqueada = window._descansoGlobalOn || (r.config && r.config[u.name] === true);
+    if (bloqueada) {
+      try { localStorage.removeItem('nexserv_session'); } catch(e) {}
+      pingSesion('logout');
+      stopHeartbeat();
+      window.currentUser = null;
+      document.body.classList.remove('rol-staff');
+      closeUserMenu();
+      show('login');
+      if (!window._descansoAvisado) {
+        window._descansoAvisado = true;
+        alert(window._descansoGlobalOn
+          ? 'El salón está en modo descanso. La app se reactiva cuando la dueña la desbloquee 💛'
+          : 'Estás en tu tiempo de descanso, disfrútalo en familia 💛');
       }
-    } catch(e) {}
+    } else {
+      window._descansoAvisado = false;
+    }
   }
   window.verificarDescansoActivo = verificarDescansoActivo;
+
+  function refreshDescansoGlobalBtn() {
+    const b = document.getElementById('descansoGlobalBtn');
+    if (!b) return;
+    if (window._descansoGlobalOn) {
+      b.innerHTML = '☀️ Quitar descanso — desbloquear equipo';
+      b.style.background = '#2d9d5a';
+    } else {
+      b.innerHTML = '🌙 Poner a TODO el equipo en descanso';
+      b.style.background = '#2a1f4d';
+    }
+  }
+  window.refreshDescansoGlobalBtn = refreshDescansoGlobalBtn;
+
+  async function toggleDescansoGlobal() {
+    const activar = !window._descansoGlobalOn;
+    const u = window.currentUser;
+    if (activar && !confirm('¿Poner a TODO el equipo en descanso?\n\nNadie podrá abrir ni usar la app hasta que vos la desbloquees.')) return;
+    if (!activar && !confirm('¿Desbloquear y quitar el modo descanso del equipo?')) return;
+    try {
+      const r = await apiPost('setDescansoGlobal', { activar: activar, por: (u && u.name) || '' });
+      if (r && r.success) {
+        window._descansoGlobalOn = (r.global === true);
+        refreshDescansoGlobalBtn();
+        if (typeof showToast === 'function') showToast(window._descansoGlobalOn ? '🌙 Equipo en descanso — app bloqueada' : '☀️ Equipo desbloqueado');
+      } else {
+        alert((r && (r.message || r.error)) || 'No se pudo cambiar el modo descanso');
+      }
+    } catch(e) { alert('Error: ' + e.message); }
+  }
+  window.toggleDescansoGlobal = toggleDescansoGlobal;
 
   function logout() {
     document.getElementById('loginUser').value = '';
