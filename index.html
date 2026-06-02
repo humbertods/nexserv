@@ -16764,7 +16764,7 @@ async function probarNotificaciones() {
 const LONGPRESS_DELETE_MS = 900; // tiempo que hay que mantener presionado (ajustable)
 async function eliminarTicketEspera(id, name) {
   if (!id) return;
-  if (!confirm('¿Borrar el ticket de ' + (name || 'esta clienta') + ' de la lista de espera?\n\nVa a desaparecer de la lista.')) return;
+  if (!confirm('¿Borrar el ticket de ' + (name || 'esta clienta') + ' de la lista de espera?\n\n⚠️ Se elimina del sistema de forma permanente (no se puede deshacer).')) return;
   try {
     const r = await apiPost('eliminarTicketEspera', { id: id });
     if (r && r.success) {
