@@ -8850,7 +8850,7 @@ body.rol-staff #confirmSvcClientName::after {
           closeModal();
           loadMikaelaHome();
         } else {
-          alert(((rEx && rEx.message) || 'No se pudo agregar el servicio extra'));
+          alert(((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar el servicio extra'));
         }
       } catch (err) {
         window._extraTicketId = null;
@@ -12954,7 +12954,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         loadMikaelaHome();
       } else {
-        alert('Error: ' + ((r && r.message) || 'No se pudo reasignar'));
+        alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo reasignar'));
       }
     } catch(e){ console.error(e); alert('Error al reasignar'); }
   }
@@ -12966,7 +12966,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' a cobro (solo lo realizado)');
         loadMikaelaHome();
       } else {
-        alert(((r && r.message) || 'No se pudo procesar el retiro'));
+        alert(((r && (r.message || r.error)) || 'No se pudo procesar el retiro'));
       }
     } catch(e){ console.error(e); alert('Error al procesar el retiro'); }
   }
@@ -13035,7 +13035,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' enviada a cobro');
         loadMikaelaHome();
       } else {
-        alert('Error: ' + ((r && r.message) || 'No se pudo enviar a cobro'));
+        alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo enviar a cobro'));
       }
     } catch(e){ console.error(e); alert('Error al mandar a cobro'); }
   }
