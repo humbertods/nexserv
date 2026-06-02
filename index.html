@@ -5840,6 +5840,28 @@ body.rol-staff #confirmSvcClientName::after {
     const services = slotServices[slot] || [];
     const listEl = document.getElementById('as' + slot + 'ServicesList');
     if (!listEl) return;
+
+    // Buscar la promo activa de esta clienta para mostrar el nombre ESPECÍFICO de cada parte
+    let _divPartes = [];
+    try {
+      const _cn = (document.getElementById('as' + slot + 'Name')?.textContent || '').replace(' ⭐', '').trim();
+      const _ck = (typeof normalizeClientKey === 'function') ? normalizeClientKey(_cn) : _cn.toLowerCase();
+      const _ap = window.activePromos && (activePromos[_ck] || activePromos[_cn]);
+      if (_ap && _ap.promo && Array.isArray(_ap.promo.division)) _divPartes = _ap.promo.division;
+    } catch (e) {}
+    const _esCombo = _divPartes.length > 0;
+    // Devuelve el nombre específico de la parte según el área del servicio (ej: "Depilacion de cejas")
+    function _nombreParte(s) {
+      if (s.subtitulo) return s.subtitulo;
+      const areaN = String(s.area || '').toLowerCase().replace(/[^a-z]/g, '');
+      const kw = ({ cejas: ['ceja', 'depil'], depilacion: ['ceja', 'depil'], pestanas: ['pesta', 'lifting', 'lash'], retiro_lifting: ['lifting', 'retiro', 'pesta'], facial: ['facial', 'limpieza'] })[areaN] || [areaN];
+      const match = _divPartes.find(function (d) {
+        const dn = String(d.servicio || d.area || '').toLowerCase();
+        return kw.some(function (k) { return dn.includes(k); });
+      });
+      if (match) return match.servicio || match.area;
+      return String(s.area || '').charAt(0).toUpperCase() + String(s.area || '').slice(1);
+    }
     
     listEl.innerHTML = services.map((s, idx) => {
       const isPending = s.status === 'pendiente';
@@ -5864,6 +5886,15 @@ body.rol-staff #confirmSvcClientName::after {
       
       const noteInfo = (isPending || isApproved) && s.note ? 
         `<div style="font-size: 10px; color: var(--ink-soft); margin-top: 4px; font-style: italic;">Por: ${s.requestedBy || 'Staff'} - "${s.note}"</div>` : '';
+
+      // Estado de progreso para partes de un combo: ✅ Listo / 🟢 En curso
+      const _esParteCombo = _esCombo && !isPending && !isRejected;
+      const _parteCompletada = s.status === 'completado' || s.completada === true;
+      const progresoBadge = _esParteCombo
+        ? (_parteCompletada
+            ? '<div style="background:#e8f6ee; color:#1b7a3e; font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; margin-top:5px; display:inline-block;">✅ Listo</div>'
+            : '<div style="background:#fff4e6; color:#b45309; font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; margin-top:5px; display:inline-block;">🟢 En curso</div>')
+        : '';
       
       // Botón de editar para enganche directo (sin autorización)
       const editBtn = isEngancheEditable
@@ -5871,10 +5902,11 @@ body.rol-staff #confirmSvcClientName::after {
         : (!isPending ? `<button onclick="removeServiceItem(${slot}, ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px;">✕</button>` : '');
 
       return `
-      <div class="service-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${bgColor}; ${borderStyle} border-radius: 12px; margin-bottom: 8px;">
+      <div class="service-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${bgColor}; ${borderStyle} border-radius: 12px; margin-bottom: 8px; ${_parteCompletada ? 'opacity:0.85;' : ''}">
         <div style="flex: 1;">
           <div style="font-weight: 700; font-size: 14px;">${s.name}</div>
-          <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${String(s.area || '').charAt(0).toUpperCase() + String(s.area || '').slice(1)}</div>
+          <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${_nombreParte(s)}</div>
+          ${progresoBadge}
           ${statusBadge}
           ${noteInfo}
         </div>
