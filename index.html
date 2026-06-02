@@ -6527,7 +6527,7 @@ body.rol-staff #confirmSvcClientName::after {
             (user_tm?.name || 'Staff') + ' tomó todos los servicios',
             _codCli + ' · ' + _seleccionadas.length + ' servicios', false);
         } catch(e) {}
-        try { enviarPushStaff(['Mikaela'], '✅ ' + (user_tm?.name || 'Staff') + ' tomó todo', _nomCli + ' · ' + _seleccionadas.length + ' servicios'); } catch(e) {}
+        // (El aviso a Mikaela ahora lo manda el backend al pasar a "Por verificar" — evita duplicado)
       }
 
       // Resetear panel para la próxima vez
@@ -10499,11 +10499,13 @@ body.rol-staff #confirmSvcClientName::after {
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
     if (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta') msg += '\n(Precio regular — promo no aplica con tarjeta)';
-    // Notificar al owner del cobro
+    // Notificar al owner del cobro: "Clienta X pagó <método> $Y por <servicios>"
     const _clienteCobro = document.getElementById('cobrarClientName')?.textContent || 'Clienta';
+    const _servCobro = (window._cobrarDesglose || []).map(d => d.servicio).filter(Boolean).join(', ')
+                      || (window._cobrarPromoNombre || 'servicio');
     enviarPushOwner(
       '💰 Pago recibido — $' + totalFinal.toFixed(2),
-      _clienteCobro + ' · ' + window._cobrarPago + (totalProductos > 0 ? ' (inc. productos)' : '')
+      _clienteCobro + ' pagó ' + window._cobrarPago + ' $' + totalFinal.toFixed(2) + ' por ' + _servCobro + (totalProductos > 0 ? ' (inc. productos)' : '')
     );
     alert(msg);
   }
@@ -16436,6 +16438,31 @@ const STAFF_PUSH_MAP = {
   'Owner':    'push_owner'
 };
 
+// Sonido de notificación (primer plano) — dos notas cortas tipo "ding-ding"
+function _sonarNotif() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!window._audioCtx) window._audioCtx = new Ctx();
+    const ctx = window._audioCtx;
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch(e) {} }
+    const now = ctx.currentTime;
+    [[880, 0], [1320, 0.12]].forEach(function (par) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = par[0];
+      const t = now + par[1];
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.2);
+    });
+  } catch (e) {}
+}
+window._sonarNotif = _sonarNotif;
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -16492,6 +16519,7 @@ async function suscribirPushActual() {
       messaging.onMessage(function (payload) {
         const n = (payload && payload.notification) || {};
         if (!n.title) return;
+        try { _sonarNotif(); } catch (e) {}
         try {
           (fcmReg || reg).showNotification(n.title, {
             body: n.body || '',
