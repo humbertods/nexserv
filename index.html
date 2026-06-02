@@ -16477,10 +16477,35 @@ async function suscribirPushActual() {
     }
     const messaging = firebase.messaging();
 
+    // SW DEDICADO de Firebase Messaging → notificaciones con la app CERRADA (tipo WhatsApp).
+    // Si el archivo aún no está subido, cae al SW principal y sigue andando en primer plano.
+    let fcmReg = reg;
+    try {
+      fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
+    } catch (eReg) {
+      console.warn('[Push] FCM SW no disponible, uso SW principal:', eReg.message);
+      fcmReg = reg;
+    }
+
+    // Notificación cuando la app está ABIERTA en primer plano (FCM no la muestra sola)
+    try {
+      messaging.onMessage(function (payload) {
+        const n = (payload && payload.notification) || {};
+        if (!n.title) return;
+        try {
+          (fcmReg || reg).showNotification(n.title, {
+            body: n.body || '',
+            icon: 'https://humbertods.github.io/nexserv/icon-192.png',
+            tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
+          });
+        } catch (e) {}
+      });
+    } catch (e) {}
+
     // Obtener un token FCM real (compatible con FCM v1)
     const token = await messaging.getToken({
       vapidKey: FCM_VAPID_KEY,
-      serviceWorkerRegistration: reg
+      serviceWorkerRegistration: fcmReg
     });
     if (!token) { console.warn('[Push] getToken devolvió vacío'); return; }
 
