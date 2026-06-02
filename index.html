@@ -10299,8 +10299,9 @@ body.rol-staff #confirmSvcClientName::after {
     window._cobrarAjustes = window._cobrarAjustes || [];
     window._cobrarAjustes.push(_quienE + ' corrigió "' + d.servicio + '" $' + actual.toFixed(2) + '→$' + nuevo.toFixed(2) + (d.staff ? ' (' + d.staff + ')' : ''));
     d.monto = nuevo;
-    // Si el monto normal (sin promo) era menor al nuevo, subirlo para no cobrar menos con tarjeta
-    if (d.montoNormal === undefined || Number(d.montoNormal) < nuevo) d.montoNormal = nuevo;
+    // Edición manual de Mikaela = valor FINAL exacto (igual en efectivo y tarjeta)
+    d.montoNormal = nuevo;
+    d._editado = true;
     cobrarAplicarDesgloseEditado();
   }
   function cobrarAplicarDesgloseEditado() {
@@ -10350,22 +10351,28 @@ body.rol-staff #confirmSvcClientName::after {
     const esTarjeta  = String(metodo || '') === 'Tarjeta';
     const usaNormal  = tienePromo && esTarjeta;
     const desg = Array.isArray(ctx.desglose) ? ctx.desglose : [];
-    const sumPromo = desg.reduce(function(s,d){ return s + Number(d.monto || 0); }, 0);
-    const sumNormalLineas = desg.reduce(function(s,d){
-      return s + (Number(d.montoNormal != null ? d.montoNormal : d.monto) || Number(d.monto || 0));
-    }, 0);
-    const totalNormalCtx = Number(ctx.totalNormal || 0);
-    // Si las líneas NO traen un regular por parte (montoNormal) pero SÍ se conoce el
-    // regular total (> promo), repartir ese regular proporcionalmente entre las líneas.
-    const usarTotalNormal = usaNormal && sumPromo > 0 && sumNormalLineas <= sumPromo && totalNormalCtx > sumPromo;
+
+    // Líneas editadas a mano por Mikaela = valor FINAL fijo (no se recalculan)
+    const sumEditFinal    = desg.reduce(function(s,d){ return s + (d._editado ? Number(d.monto||0) : 0); }, 0);
+    const sumPromoNoEdit  = desg.reduce(function(s,d){ return s + (d._editado ? 0 : Number(d.monto||0)); }, 0);
+    const sumNormalNoEdit = desg.reduce(function(s,d){ return s + (d._editado ? 0 : (Number(d.montoNormal != null ? d.montoNormal : d.monto) || Number(d.monto||0))); }, 0);
+    const totalNormalCtx  = Number(ctx.totalNormal || 0);
+    const regularNoEdit   = Math.max(0, totalNormalCtx - sumEditFinal);
+    // Repartir el regular (sólo entre las NO editadas) si esas no traen su normal por línea
+    const usarRedistrib   = usaNormal && sumPromoNoEdit > 0 && sumNormalNoEdit <= sumPromoNoEdit && regularNoEdit > sumPromoNoEdit;
+
     const out = desg.map(function(d){
-      const promo  = Number(d.monto || 0);
+      const promo = Number(d.monto || 0);
+      if (d._editado) {
+        // Valor editado manualmente → final exacto, sin recálculo (efectivo o tarjeta)
+        return Object.assign({}, d, { montoFinal: promo });
+      }
       let normal = Number(d.montoNormal != null ? d.montoNormal : promo) || promo;
-      if (usarTotalNormal) normal = promo / sumPromo * totalNormalCtx; // reparto proporcional
-      // En tarjeta nunca por debajo del promo
+      if (usarRedistrib) normal = promo / sumPromoNoEdit * regularNoEdit; // reparto proporcional
       const montoFinal = usaNormal ? Math.max(normal, promo) : promo;
       return Object.assign({}, d, { montoFinal: montoFinal });
     });
+
     let totalFinal;
     if (out.length) {
       totalFinal = out.reduce(function(s,d){ return s + Number(d.montoFinal || 0); }, 0);
