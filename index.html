@@ -10471,6 +10471,30 @@ body.rol-staff #confirmSvcClientName::after {
     ? window.construirPayloadDistribucionM5
     : _payloadDistribucionLocal;
 
+  // Precio REGULAR (sin promo) de una clienta — robusto para cobro grupal.
+  // Usa precioRegular si viene bien; si no, lo deriva del desglose o del catálogo de promos.
+  function _regularClienta(c) {
+    const total = Number(c.total) || 0;
+    const reg = Number(c.precioRegular) || 0;
+    if (reg > total) return reg;
+    if (Array.isArray(c.serviciosDetalle)) {
+      const sumN = c.serviciosDetalle.reduce(function(s,d){ return s + (Number(d.montoNormal != null ? d.montoNormal : d.monto) || 0); }, 0);
+      if (sumN > total) return sumN;
+    }
+    if (c.promoNombre && typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
+      try {
+        let r = 0;
+        String(c.promoNombre).split(',').map(function(s){ return s.trim(); }).forEach(function(nm){
+          const p = PROMOS.find(function(p){ return String(p.name || '').trim() === nm; });
+          if (p) r += Number(p.regular || p.price) || 0;
+        });
+        if (r > total) return r;
+      } catch(e) {}
+    }
+    return total;
+  }
+  window._regularClienta = _regularClienta;
+
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
 
@@ -10512,7 +10536,7 @@ body.rol-staff #confirmSvcClientName::after {
         for (const c of clientas) {
           // ── MANDAMIENTO #4: tarjeta invalida promo ──
           const totalCobrado = (esTarjetaGrupal && c.promoNombre)
-            ? String(c.precioRegular || c.total || '0')
+            ? String(_regularClienta(c))
             : String(c.total || '0');
           // ── MANDAMIENTO #5: payload completo para distribución a staff/Mikaela/Owner ──
           const _payloadGrupal = _construirPayload({
@@ -10523,7 +10547,7 @@ body.rol-staff #confirmSvcClientName::after {
             usaPrecioNormal: esTarjetaGrupal && !!(c.promoNombre),
             desglose:        c.serviciosDetalle || null
           });
-          _payloadGrupal.precioRegular  = String(c.precioRegular || c.total || '0');
+          _payloadGrupal.precioRegular  = String(_regularClienta(c));
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           await apiPost('confirmarCobro', _payloadGrupal);
@@ -15226,7 +15250,7 @@ body.rol-staff #confirmSvcClientName::after {
 
     // Calcular totales grupales considerando promos (ANTES de usarlos)
     const totalGrupalPromo    = clientas.reduce((s, c) => s + (Number(c.total)||0), 0);
-    const totalGrupalRegular  = clientas.reduce((s, c) => s + (Number(c.precioRegular || c.total)||0), 0);
+    const totalGrupalRegular  = clientas.reduce((s, c) => s + (Number(_regularClienta(c))||0), 0);
     const hayPromoGrupal      = clientas.some(c => c.promoNombre && c.promoNombre.trim() !== '');
 
     window._cobrarTotalPromo   = totalGrupalPromo.toFixed(2);
