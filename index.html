@@ -3749,6 +3749,11 @@ body.rol-staff #confirmSvcClientName::after {
           var miPrecioNormalTM = miAreaTM ? Number(miAreaTM.precioNormal || miAreaTM.precio || 0) : 0;
           var miPrecioPromoTM  = miAreaTM ? Number(miAreaTM.precio || 0) : 0;
           var tienePromoEnTM   = miPrecioNormalTM > miPrecioPromoTM && miPrecioPromoTM > 0;
+          // Valor COMPLETO de la promo = suma de TODAS las áreas a precio promo (no canceladas)
+          var totalPromoComboTM = (tm.areas || []).reduce(function(s, a){
+            if (!a || String(a.estado||'').toLowerCase() === 'cancelado') return s;
+            return s + Number(a.precio || 0);
+          }, 0);
 
           // ── 3 botones conector de capa (diagrama TM) ──────────────────────────
           // BTN A: yo sigo con el siguiente servicio del TM
@@ -3759,7 +3764,7 @@ body.rol-staff #confirmSvcClientName::after {
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           if (tienePromoEnTM) {
-            btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — tomar todo el valor ($' + miPrecioNormalTM + ')</button>'
+            btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — todo el valor a mi nombre ($' + Number(totalPromoComboTM).toFixed(2) + ')</button>'
               + btnsBaseTM;
           }
           btnContainer.innerHTML = btnsBaseTM;
@@ -6048,45 +6053,44 @@ body.rol-staff #confirmSvcClientName::after {
     if (!idEspera.startsWith('TM-')) return;
 
     let miAreaTM = null;
+    let totalPromoCombo = 0;
     try {
       const tmData = await apiGet('getTicketMulti');
       if (tmData.success) {
         const tm = (tmData.activos || []).find(t => t.idEspera === idEspera);
-        if (tm) miAreaTM = (tm.areas || []).find(a => a.staff === user.name && String(a.estado||'').toLowerCase() === 'en servicio');
+        if (tm) {
+          miAreaTM = (tm.areas || []).find(a => a.staff === user.name && String(a.estado||'').toLowerCase() === 'en servicio');
+          totalPromoCombo = (tm.areas || []).reduce(function(s, a){
+            if (!a || String(a.estado||'').toLowerCase() === 'cancelado') return s;
+            return s + Number(a.precio || 0);
+          }, 0);
+        }
       }
     } catch(e) {}
 
     if (!miAreaTM) { alert('No se encontraron datos del área en servicio.'); return; }
 
-    const precioNormal = Number(miAreaTM.precioNormal || miAreaTM.precio || 0);
-    const precioPromo  = Number(miAreaTM.precio || 0);
+    const precioPromoArea = Number(miAreaTM.precio || 0);
+    if (!totalPromoCombo || totalPromoCombo <= 0) totalPromoCombo = precioPromoArea;
     const clientName   = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
 
-    const msg = `¿Cobrar precio normal "$${precioNormal}" a nombre de ${user.name}?\n\n• Precio promo de esta área: $${precioPromo}\n• Precio normal (sin promo): $${precioNormal}\n• La clienta va directamente a cobro\n\nUsar cuando la clienta quiere pagar la promo pero no realizó todas las áreas.`;
+    const msg = `¿Asignar la PROMO COMPLETA a nombre de ${user.name}?\n\n• Valor completo de la promo: $${totalPromoCombo.toFixed(2)}\n• Todo el valor se le asigna a ${user.name}\n• La clienta va directamente a cobro\n\nUsar cuando la clienta paga la promo completa pero no realiza todas las áreas (ej: promo "pestañas y depilación de cejas" y solo se hace pestañas).`;
     if (!confirm(msg)) return;
 
-    // ── Usar calcularPrecioPromoCompletaM6 para consistencia ──
-    const resultado = window.calcularPrecioPromoCompletaM6({
-      promo:         { price: precioPromo, regular: precioNormal, name: miAreaTM.tentativo || miAreaTM.area || 'Servicio' },
-      staffArea:     user.area || 'cejas',
-      tomarCompleto: true,
-      metodoPago:    'Efectivo'  // En este punto no sabemos el método; se aplica M4 al cobrar
-    });
-
-    // Actualizar slotServices con el precio normal
-    slotServices[slot] = [{ name: miAreaTM.tentativo || miAreaTM.confirmado || miAreaTM.area, price: precioNormal, area: user.area || '', status: 'aprobado', _promoCompleta: true }];
+    // Mostrar el valor COMPLETO de la promo a nombre de esta staff (no el precio normal)
+    slotServices[slot] = [{ name: miAreaTM.tentativo || miAreaTM.confirmado || miAreaTM.area, price: totalPromoCombo, area: user.area || '', status: 'aprobado', _promoCompleta: true }];
     renderServicesForSlot(slot);
-    document.getElementById('as' + slot + 'Total').textContent = '$' + precioNormal;
+    document.getElementById('as' + slot + 'Total').textContent = '$' + totalPromoCombo.toFixed(2);
 
     window._finishingSlot = slot;
     window._finishingData = {
       clientKey: normalizeClientKey(clientName), clientName,
       svcNames: miAreaTM.tentativo || miAreaTM.area || 'Servicio',
-      total: String(precioNormal), promoNombre: '', precioRegular: String(precioNormal),
+      total: String(totalPromoCombo), promoNombre: miAreaTM.tentativo || '', precioRegular: String(totalPromoCombo),
       idEspera, areasExtras: [], promasExtraPendientes: [], _promoCompleta: true
     };
     window._finishFullPromo = true;
-    showToast('⏳ Enviando a cobro con precio normal...');
+    showToast('⏳ Enviando promo completa a cobro...');
     try { await completarAreaMultiFinal(); } catch(e) { alert('Error: ' + e.message); }
   }
 
