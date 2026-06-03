@@ -10153,6 +10153,11 @@ body.rol-staff #confirmSvcClientName::after {
       window._cobrarTotalPromo = subtotalNum;
       const subtotalNormal = desglose.reduce((s, d) => s + Number(d.montoNormal || d.monto || 0), 0);
       window._cobrarTotalRegular = subtotalNormal > subtotalNum ? subtotalNormal : (Number(precioRegular) || subtotalNum);
+      // Si es promo/combo pero no hay regular conocido (> promo), derivarlo del catálogo de promos
+      if (window._cobrarTotalRegular <= subtotalNum) {
+        const _regCat = _regularDesdeCatalogo(promoNombre, desglose);
+        if (_regCat > subtotalNum) window._cobrarTotalRegular = _regCat;
+      }
       // ── MANDAMIENTO #4: detectar promo dentro de TM via tmTienePromoM4 ──
       window._cobrarTienePromo = window._cobrarTienePromo
         || (window._cobrarTotalRegular > window._cobrarTotalPromo)
@@ -10494,6 +10499,26 @@ body.rol-staff #confirmSvcClientName::after {
     return total;
   }
   window._regularClienta = _regularClienta;
+
+  // Suma el precio REGULAR (sin promo) buscando en el catálogo de promos por nombre.
+  // Sirve cuando un combo/promo no trae su precio regular (ej: tickets TM).
+  function _regularDesdeCatalogo(promoNombre, desglose) {
+    if (typeof PROMOS === 'undefined' || !Array.isArray(PROMOS)) return 0;
+    const nombres = new Set();
+    if (promoNombre) String(promoNombre).split(',').forEach(n => nombres.add(n.trim()));
+    (desglose || []).forEach(d => {
+      if (d.servicio)    nombres.add(String(d.servicio).trim());
+      if (d.name)        nombres.add(String(d.name).trim());
+      if (d.promoNombre) nombres.add(String(d.promoNombre).trim());
+    });
+    let r = 0;
+    nombres.forEach(nm => {
+      const p = PROMOS.find(p => String(p.name || '').trim() === nm);
+      if (p) r += Number(p.regular || p.price) || 0;
+    });
+    return r;
+  }
+  window._regularDesdeCatalogo = _regularDesdeCatalogo;
 
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
