@@ -14898,9 +14898,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (tmResult && tmResult.success) {
         initFormTM();
         simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
-        const _areasKeysGA = [...new Set(areasMultiGA.map(a=>a.area))];
-        const _staffGA = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeysGA.some(k=>m[n].includes(k));});
-        enviarPushStaff(_staffGA, '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+nombre+' · '+areasMultiGA.length+' servicios');
+        enviarPushStaff([chica], '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+nombre+' · '+areasMultiGA.length+' servicios');
         alert('✅ Ticket creado (' + tmResult.id + ')');
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
