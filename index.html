@@ -4689,6 +4689,7 @@ body.rol-staff #confirmSvcClientName::after {
                 if (!CLIENT_PROFILES[_pk3]) CLIENT_PROFILES[_pk3] = { name: a1.nombre, code: a1.codigo, pestanas: { fichas: [], history: [] } };
                 if (!CLIENT_PROFILES[_pk3].pestanas) CLIENT_PROFILES[_pk3].pestanas = { fichas: [], history: [] };
                 CLIENT_PROFILES[_pk3].pestanas.fichas = pr3.fichas;
+                CLIENT_PROFILES[_pk3].pestanas.ultimaVisita = pr3.ultimaVisita;
               }
               loadPestFichaQuick(_pk3, 1);
             }).catch(() => loadPestFichaQuick(_pk3, 1));
@@ -5606,6 +5607,7 @@ body.rol-staff #confirmSvcClientName::after {
                 if (!CLIENT_PROFILES[_pestKey1]) CLIENT_PROFILES[_pestKey1] = { name: a.nombre, code: _pestCodigo1, pestanas: { fichas: [], history: [] } };
                 if (!CLIENT_PROFILES[_pestKey1].pestanas) CLIENT_PROFILES[_pestKey1].pestanas = { fichas: [], history: [] };
                 CLIENT_PROFILES[_pestKey1].pestanas.fichas = pr.fichas;
+                CLIENT_PROFILES[_pestKey1].pestanas.ultimaVisita = pr.ultimaVisita;
               }
               loadPestFichaQuick(_pestKey1, 1);
             }).catch(() => loadPestFichaQuick(_pestKey1, 1));
@@ -5893,6 +5895,7 @@ body.rol-staff #confirmSvcClientName::after {
                 if (!CLIENT_PROFILES[_pk2]) CLIENT_PROFILES[_pk2] = { name: a.nombre, code: a.codigo, pestanas: { fichas: [], history: [] } };
                 if (!CLIENT_PROFILES[_pk2].pestanas) CLIENT_PROFILES[_pk2].pestanas = { fichas: [], history: [] };
                 CLIENT_PROFILES[_pk2].pestanas.fichas = pr2.fichas;
+                CLIENT_PROFILES[_pk2].pestanas.ultimaVisita = pr2.ultimaVisita;
               }
               loadPestFichaQuick(_pk2, 2);
             }).catch(() => loadPestFichaQuick(_pk2, 2));
@@ -8491,6 +8494,7 @@ body.rol-staff #confirmSvcClientName::after {
               if (!CLIENT_PROFILES[_pk4]) CLIENT_PROFILES[_pk4] = { name: a1.nombre, code: a1.codigo, pestanas: { fichas: [], history: [] } };
               if (!CLIENT_PROFILES[_pk4].pestanas) CLIENT_PROFILES[_pk4].pestanas = { fichas: [], history: [] };
               CLIENT_PROFILES[_pk4].pestanas.fichas = pr4.fichas;
+              CLIENT_PROFILES[_pk4].pestanas.ultimaVisita = pr4.ultimaVisita;
             }
             loadPestFichaQuick(_pk4, 1);
           }).catch(() => loadPestFichaQuick(_pk4, 1));
@@ -8612,6 +8616,39 @@ body.rol-staff #confirmSvcClientName::after {
     return fichas.find(f => f.activa) || fichas[0];
   }
 
+  // Abrevia el tipo de pestaña a partir del nombre del servicio. Retoque => "R. ..."
+  function _abrevPestTipo(servicio) {
+    if (!servicio) return '—';
+    var s = String(servicio).trim();
+    var ret = /retoque/i.test(s);
+    s = s.replace(/retoque\s*(de\s*)?/i, '')
+         .replace(/pesta(ñ|n)as?/i, '')
+         .replace(/^\s*de\s+/i, '')
+         .replace(/efecto\s+/i, '')
+         .replace(/volumen\s+/i, '')
+         .replace(/pelo a pelo\s*/i, '')
+         .replace(/\s+/g, ' ')
+         .trim();
+    if (!s) s = 'Pestañas';
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    return (ret ? 'R. ' : '') + s;
+  }
+
+  // Barra "Última visita": tipo de pestaña (abreviado) · staff · fecha
+  function _ultVisitaBarHTML(client) {
+    var uv = client && client.pestanas ? client.pestanas.ultimaVisita : null;
+    if (!uv || !uv.servicio) return '';
+    var tipo = _abrevPestTipo(uv.servicio);
+    var staff = uv.staff || '—';
+    var fecha = uv.fecha || '—';
+    return '<div style="display:flex; align-items:center; gap:10px; background: var(--bg-card); border:1.5px solid var(--line); border-radius:14px; padding:10px 12px; margin-bottom:10px;">'
+      + '<div style="font-size:11px; font-weight:700; color:var(--ink-soft); white-space:nowrap;">Última visita</div>'
+      + '<div style="flex:1; text-align:center; font-size:12px; font-weight:800; color:var(--top-purple);">' + tipo + '</div>'
+      + '<div style="flex:1; text-align:center; font-size:12px; font-weight:600; color:var(--ink);">' + staff + '</div>'
+      + '<div style="font-size:11px; font-weight:600; color:var(--ink-faint); white-space:nowrap;">' + fecha + '</div>'
+      + '</div>';
+  }
+
   function loadPestFichaQuick(clientKey, slot) {
     const el = document.getElementById('pestFichaQuick' + slot);
     const client = CLIENT_PROFILES[clientKey];
@@ -8643,6 +8680,7 @@ body.rol-staff #confirmSvcClientName::after {
           </div>
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
+        ${_ultVisitaBarHTML(client)}
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
           <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.')" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
