@@ -1596,6 +1596,7 @@ body.rol-staff #confirmSvcClientName::after {
       <div class="stat purple"><div class="label">Total</div><div class="value" id="historyTotalAmount">$0</div></div>
       <div class="stat info"><div class="label">Promedio</div><div class="value" id="historyAvgAmount">$0</div></div>
     </div>
+    <div id="historyStatScope" style="text-align:center;font-size:11px;color:var(--ink-faint);margin:-8px 0 14px;font-weight:700;">Esta semana</div>
 
     <!-- Lista jerárquica: Días → Staff → Servicios -->
     <div class="section-title">Servicios cobrados <span class="count" id="historyCount">0</span></div>
@@ -9709,20 +9710,25 @@ body.rol-staff #confirmSvcClientName::after {
         const itemIdx = window._historialItems.length;
         window._historialItems.push({ ...h, _idx: itemIdx });
 
-        if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, staff: {} };
+        if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, count: 0, staff: {} };
         if (!porDia[diaN].staff[staff]) porDia[diaN].staff[staff] = { nombre: staff, total: 0, servicios: [] };
         porDia[diaN].staff[staff].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
         porDia[diaN].staff[staff].total += valor;
         porDia[diaN].total += valor;
+        porDia[diaN].count++;
         totalSemana += valor;
         totalServicios++;
       });
 
-      // Stats
+      // Stats de la SEMANA (por defecto). Al desplegar un día, las tarjetas muestran ese día.
+      window._histSemana = { count: totalServicios, total: totalSemana };
+      window._histDias = {};
       document.getElementById('historyTotalCount').textContent = totalServicios;
       document.getElementById('historyTotalAmount').textContent = '$' + totalSemana.toFixed(0);
       document.getElementById('historyAvgAmount').textContent = totalServicios > 0 ? '$' + (totalSemana/totalServicios).toFixed(0) : '$0';
       document.getElementById('historyCount').textContent = totalServicios;
+      var _scopeEl0 = document.getElementById('historyStatScope');
+      if (_scopeEl0) _scopeEl0.textContent = 'Esta semana';
 
       const dias = Object.values(porDia).sort(function(a,b){ return a.sortKey - b.sortKey; });
 
@@ -9740,7 +9746,10 @@ body.rol-staff #confirmSvcClientName::after {
         const esHoy = diaNombre === hoyNombre && semanaOffset === 0;
         const label = diaNombre + (esHoy ? ' (HOY)' : '');
         const totalDia = diaData ? diaData.total : 0;
+        const countDia = diaData ? diaData.count : 0;
         const staffList = diaData ? Object.values(diaData.staff) : [];
+        // Guardar el cuadre de cada día para mostrarlo en las tarjetas de arriba al desplegarlo
+        window._histDias[di] = { count: countDia, total: totalDia, label: label };
 
         return '<div style="margin-bottom:6px;">' +
           '<div onclick="toggleHistDia(' + di + ')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
@@ -9790,13 +9799,51 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
 
+  // Refresca las 3 tarjetas de arriba según el día desplegado (o la semana si no hay ninguno)
+  function _histRefrescarTarjetas() {
+    var diAbierto = -1;
+    for (var di = 0; di < 6; di++) {
+      var dd = document.getElementById('dia-hist-' + di);
+      if (dd && dd.style.display !== 'none') { diAbierto = di; break; }
+    }
+    var c  = document.getElementById('historyTotalCount');
+    var t  = document.getElementById('historyTotalAmount');
+    var av = document.getElementById('historyAvgAmount');
+    var sc = document.getElementById('historyStatScope');
+    var data, scope;
+    if (diAbierto >= 0 && window._histDias && window._histDias[diAbierto]) {
+      data  = window._histDias[diAbierto];
+      scope = data.label || 'Día';
+    } else {
+      data  = window._histSemana || { count: 0, total: 0 };
+      scope = 'Esta semana';
+    }
+    if (c)  c.textContent  = data.count || 0;
+    if (t)  t.textContent  = '$' + Number(data.total || 0).toFixed(0);
+    if (av) av.textContent = (data.count > 0) ? '$' + (data.total / data.count).toFixed(0) : '$0';
+    if (sc) sc.textContent = scope;
+  }
+  window._histRefrescarTarjetas = _histRefrescarTarjetas;
+
   function toggleHistDia(di) {
     var d = document.getElementById('dia-hist-' + di);
     var a = document.getElementById('arrow-dia-' + di);
     if (!d) return;
     var open = d.style.display !== 'none';
+    // Acordeón: al abrir un día se cierran los demás, para que las tarjetas de arriba
+    // muestren el cuadre SOLO de ese día. Al cerrarlo, vuelven al total de la semana.
+    if (!open) {
+      for (var od = 0; od < 6; od++) {
+        if (od === di) continue;
+        var odd = document.getElementById('dia-hist-' + od);
+        var oarr = document.getElementById('arrow-dia-' + od);
+        if (odd) odd.style.display = 'none';
+        if (oarr) oarr.style.transform = '';
+      }
+    }
     d.style.display = open ? 'none' : 'block';
     if (a) a.style.transform = open ? '' : 'rotate(180deg)';
+    _histRefrescarTarjetas();
   }
 
   function toggleHistStaff(di, si) {
