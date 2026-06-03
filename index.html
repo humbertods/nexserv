@@ -16403,6 +16403,12 @@ function renderCierreMes(d, siraInicial) {
   html += '<div style="font-size:11px;color:var(--ink-faint);text-align:center;padding:6px 8px 0;line-height:1.5;">Queda registrado de forma permanente en tu hoja de cálculo como respaldo verificable.</div>';
   html += '</div>';
 
+  // ---- Exportar (PDF / Excel) ----
+  html += '<div style="display:flex;gap:10px;margin-top:12px;">';
+  html +=   '<button onclick="exportarCierrePDF()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">📄 Exportar PDF</button>';
+  html +=   '<button onclick="exportarCierreExcel()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">📊 Exportar Excel</button>';
+  html += '</div>';
+
   // ---- Historial de cierres guardados ----
   html += '<div style="margin-top:18px;">';
   html += '<button onclick="toggleHistorialCierres()" id="cmHistToggle" style="width:100%;padding:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">📚 Historial de cierres guardados <span id="cmHistCaret" style="font-size:11px;">▼</span></button>';
@@ -16526,6 +16532,167 @@ function irACierre(mes, anio) {
   loadCierreMes();
   const scr = document.getElementById('ownerCierreMes');
   if (scr) window.scrollTo(0, 0);
+}
+
+/* ---- EXPORTACIÓN DEL CIERRE (PDF / Excel) ---- */
+// Reúne los datos del cierre que se está viendo + el valor de SIRA actual del input.
+function _cierreMesExport() {
+  const d = window._cmData;
+  if (!d) { alert('Primero cargá el cierre del mes.'); return null; }
+  const inp = document.getElementById('cmSiraInput');
+  const sira = Number(inp && inp.value) || 0;
+  const cajaChica = Number(d.gastoCajaChica) || 0;
+  const totalGastos = cajaChica + sira;
+  const generadoTotal = Number(d.generadoTotal) || 0;
+  const comisionTotal = Number(d.comisionTotal) || 0;
+  const totalGeneral = generadoTotal - comisionTotal - totalGastos;
+  const periodo = CM_MESES[d.mes - 1] + ' ' + d.anio;
+  const registradoPor = (window.currentUser && window.currentUser.name) || 'Owner';
+  return { d, sira, cajaChica, totalGastos, generadoTotal, comisionTotal, totalGeneral, periodo, registradoPor };
+}
+
+function _escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// PDF: abre una vista de impresión limpia → el navegador permite "Guardar como PDF" / compartir.
+function exportarCierrePDF() {
+  const x = _cierreMesExport();
+  if (!x) return;
+  const d = x.d;
+  const money = n => '$' + (Number(n) || 0).toFixed(2);
+  const fechaImp = new Date().toLocaleString('es-EC');
+
+  let filas = '';
+  (d.staff || []).forEach(s => {
+    filas += '<tr><td>' + _escHtml(s.chica) + '</td><td class="c">' + s.servicios +
+             '</td><td class="r">' + money(s.generado) + '</td><td class="r">' + money(s.comision) + '</td></tr>';
+  });
+  if (!filas) filas = '<tr><td colspan="4" class="c muted">Sin servicios registrados este mes.</td></tr>';
+
+  const prodRow = d.numProductos
+    ? '<div class="grow"><span>Productos vendidos (' + d.numProductos + ')</span><span>' + money(d.generadoProductos) + '</span></div>'
+    : '';
+
+  const docHtml =
+'<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
+'<meta name="viewport" content="width=device-width, initial-scale=1">' +
+'<title>Cierre de mes — ' + _escHtml(x.periodo) + '</title><style>' +
+'*{box-sizing:border-box;margin:0;padding:0}' +
+'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;padding:28px 24px;max-width:720px;margin:0 auto;}' +
+'.brand{font-size:26px;font-weight:800;letter-spacing:-.03em}' +
+'.brand b{color:#c79a5b}' +
+'.sub{color:#666;font-size:12px;margin-top:2px}' +
+'.hero{background:#1a1a1a;color:#fff;border-radius:16px;padding:20px 22px;margin:18px 0}' +
+'.hero .lbl{font-size:11px;opacity:.7}' +
+'.hero .big{font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:4px}' +
+'.hero .meta{font-size:12px;opacity:.7;margin-top:6px}' +
+'h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#444;margin:22px 0 8px;border-bottom:1px solid #e5e5e5;padding-bottom:6px}' +
+'table{width:100%;border-collapse:collapse;font-size:13px}' +
+'th,td{padding:8px 6px;border-bottom:1px solid #eee;text-align:left}' +
+'th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#888}' +
+'.r{text-align:right}.c{text-align:center}.muted{color:#999}' +
+'tr.tot td{font-weight:800;border-top:2px solid #1a1a1a;border-bottom:none}' +
+'.grow{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid #eee}' +
+'.gtot{display:flex;justify-content:space-between;font-size:13px;padding:8px 0;font-weight:800;border-top:1px solid #ccc;margin-top:4px}' +
+'.danger{color:#c0392b}' +
+'.totalbox{border:2px solid #c79a5b;border-radius:14px;padding:14px 16px;margin-top:18px}' +
+'.totalbox .row{display:flex;justify-content:space-between;font-size:13px;color:#555;padding:2px 0}' +
+'.totalbox .fin{display:flex;justify-content:space-between;font-size:18px;font-weight:800;border-top:1.5px solid #c79a5b;margin-top:8px;padding-top:10px}' +
+'.foot{margin-top:26px;font-size:11px;color:#999;border-top:1px solid #eee;padding-top:10px}' +
+'@media print{body{padding:0}.noprint{display:none}}' +
+'.noprint{margin-top:24px;text-align:center}' +
+'.noprint button{background:#1a1a1a;color:#fff;border:none;border-radius:30px;padding:11px 26px;font-size:14px;font-weight:700;cursor:pointer}' +
+'</style></head><body>' +
+'<div class="brand">Nex<b>Serv</b></div><div class="sub">Cierre de mes · ' + _escHtml(x.periodo) + '</div>' +
+'<div class="hero"><div class="lbl">Generado en ' + _escHtml(x.periodo) + '</div>' +
+'<div class="big">' + money(x.generadoTotal) + '</div>' +
+'<div class="meta">' + d.numClientas + ' clientas · ' + d.numServicios + ' servicios' +
+(d.numProductos ? ' · ' + d.numProductos + ' productos' : '') + '</div></div>' +
+'<h2>Por staff</h2><table><thead><tr><th>Staff</th><th class="c">Serv.</th><th class="r">Generado</th><th class="r">Comisión</th></tr></thead><tbody>' +
+filas +
+'<tr class="tot"><td>Total</td><td class="c">' + d.numServicios + '</td><td class="r">' + money(d.generadoServicios) +
+'</td><td class="r">' + money(x.comisionTotal) + '</td></tr></tbody></table>' +
+(prodRow ? '<h2>Productos</h2>' + prodRow : '') +
+'<h2>Gastos del mes</h2>' +
+'<div class="grow"><span>Caja chica (interno) · ' + d.numGastosCaja + ' gastos</span><span class="danger">-' + money(x.cajaChica) + '</span></div>' +
+'<div class="grow"><span>SIRA (mes)' + (d.siraOk ? ' · traído de SIRA' : '') + '</span><span class="danger">-' + money(x.sira) + '</span></div>' +
+'<div class="gtot"><span>Total gastos</span><span class="danger">-' + money(x.totalGastos) + '</span></div>' +
+'<div class="totalbox">' +
+'<div class="row"><span>Generado</span><span>' + money(x.generadoTotal) + '</span></div>' +
+'<div class="row"><span>− Comisiones</span><span>-' + money(x.comisionTotal) + '</span></div>' +
+'<div class="row"><span>− Gastos (caja + SIRA)</span><span>-' + money(x.totalGastos) + '</span></div>' +
+'<div class="fin"><span>TOTAL GENERAL</span><span style="color:' + (x.totalGeneral >= 0 ? '#1e7d3a' : '#c0392b') + '">' + money(x.totalGeneral) + '</span></div>' +
+'</div>' +
+'<div class="foot">Documento generado por NexServ el ' + _escHtml(fechaImp) + ' · ' + _escHtml(x.registradoPor) + '</div>' +
+'<div class="noprint"><button onclick="window.print()">Imprimir / Guardar PDF</button></div>' +
+'</body></html>';
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    alert('Tu navegador bloqueó la ventana. Permití las ventanas emergentes para este sitio e intentá de nuevo.');
+    return;
+  }
+  w.document.open();
+  w.document.write(docHtml);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch (e) {} }, 500);
+}
+
+// Excel: genera un archivo .xls (tabla HTML compatible con Excel/Sheets) descargable.
+function exportarCierreExcel() {
+  const x = _cierreMesExport();
+  if (!x) return;
+  const d = x.d;
+  const num = n => (Number(n) || 0).toFixed(2);
+
+  let filas = '';
+  (d.staff || []).forEach(s => {
+    filas += '<tr><td>' + _escHtml(s.chica) + '</td><td>' + s.servicios + '</td><td>' + num(s.generado) + '</td><td>' + num(s.comision) + '</td></tr>';
+  });
+  if (!filas) filas = '<tr><td colspan="4">Sin servicios registrados</td></tr>';
+
+  const hdr = 'background:#1a1a1a;color:#fff;font-weight:bold;';
+  const tabla =
+'<table border="1" cellspacing="0" cellpadding="4">' +
+'<tr><td colspan="4" style="font-size:16px;font-weight:bold;">NexServ — Cierre de mes ' + _escHtml(x.periodo) + '</td></tr>' +
+'<tr><td colspan="4"></td></tr>' +
+'<tr><td>Clientas</td><td>' + d.numClientas + '</td><td>Servicios</td><td>' + d.numServicios + '</td></tr>' +
+'<tr><td>Generado servicios</td><td>' + num(d.generadoServicios) + '</td><td>Generado productos</td><td>' + num(d.generadoProductos) + '</td></tr>' +
+'<tr><td>Generado total</td><td>' + num(x.generadoTotal) + '</td><td>Comisiones</td><td>' + num(x.comisionTotal) + '</td></tr>' +
+'<tr><td colspan="4"></td></tr>' +
+'<tr><td colspan="4" style="' + hdr + '">DETALLE POR STAFF</td></tr>' +
+'<tr style="font-weight:bold;"><td>Staff</td><td>Servicios</td><td>Generado</td><td>Comisión</td></tr>' +
+filas +
+'<tr style="font-weight:bold;"><td>TOTAL</td><td>' + d.numServicios + '</td><td>' + num(d.generadoServicios) + '</td><td>' + num(x.comisionTotal) + '</td></tr>' +
+'<tr><td colspan="4"></td></tr>' +
+'<tr><td colspan="4" style="' + hdr + '">GASTOS DEL MES</td></tr>' +
+'<tr><td>Caja chica (interno)</td><td>' + num(x.cajaChica) + '</td><td>Gastos registrados</td><td>' + d.numGastosCaja + '</td></tr>' +
+'<tr><td>SIRA (mes)</td><td>' + num(x.sira) + '</td><td>' + (d.siraOk ? 'Traído de SIRA' : 'Manual') + '</td><td></td></tr>' +
+'<tr style="font-weight:bold;"><td>Total gastos</td><td>' + num(x.totalGastos) + '</td><td></td><td></td></tr>' +
+'<tr><td colspan="4"></td></tr>' +
+'<tr style="font-weight:bold;font-size:14px;"><td>TOTAL GENERAL</td><td>' + num(x.totalGeneral) + '</td><td colspan="2">(Generado − Comisiones − Gastos)</td></tr>' +
+'<tr><td colspan="4"></td></tr>' +
+'<tr><td colspan="4">Generado por NexServ · ' + _escHtml(new Date().toLocaleString('es-EC')) + ' · ' + _escHtml(x.registradoPor) + '</td></tr>' +
+'</table>';
+
+  const html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">' +
+               '<head><meta charset="utf-8"></head><body>' + tabla + '</body></html>';
+
+  try {
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Cierre_' + CM_MESES[d.mes - 1] + '_' + d.anio + '.xls';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    if (typeof showToast === 'function') showToast('✓ Excel generado');
+  } catch (e) {
+    alert('No se pudo generar el Excel: ' + e.message);
+  }
 }
 /* ========== /CIERRE DE MES ========== */
 
