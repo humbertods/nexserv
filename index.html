@@ -2323,7 +2323,7 @@ body.rol-staff #confirmSvcClientName::after {
     <div class="stat-grid">
       <div class="stat warning"><div class="label">Esperando</div><div class="value" id="ownerEsperando">0</div></div>
       <div class="stat info"><div class="label">Servicio</div><div class="value" id="ownerServicio">0</div></div>
-      <div class="stat success"><div class="label">Listas</div><div class="value" id="ownerListas">0</div></div>
+      <div class="stat success"><div class="label">Atendidas</div><div class="value" id="ownerListas">0</div></div>
     </div>
 
     <div class="section-title">
@@ -3462,17 +3462,37 @@ body.rol-staff #confirmSvcClientName::after {
 
   // === CARGAR DATOS DEL OWNER HOME ===
   // Refresco liviano del estado del salón (solo los 3 números, sin recargar el resto)
+  // Cuenta CLIENTAS atendidas y ya pagadas hoy (únicas). Se acumulan a medida que se
+  // cobran. Excluye productos y las partes aún no cobradas ('Pendiente cobro final').
+  function _contarAtendidasHoy(histResult) {
+    try {
+      if (!histResult || !histResult.success || !Array.isArray(histResult.historial)) return 0;
+      const pagadas = {};
+      histResult.historial.forEach(function(h) {
+        const mp = String(h.metodoPago || '').toLowerCase();
+        if (!mp || mp === 'producto' || mp.indexOf('pendiente') >= 0) return; // aún no pagada / producto
+        const clave = String(h.codigo || h.nombre || '').trim();
+        if (clave) pagadas[clave] = true;
+      });
+      return Object.keys(pagadas).length;
+    } catch (e) { return 0; }
+  }
+  window._contarAtendidasHoy = _contarAtendidasHoy;
+
   async function refreshEstadoSalon() {
     try {
-      const r = await apiGet('getListaCompleta');
+      const [r, h] = await Promise.all([
+        apiGet('getListaCompleta'),
+        apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
+      ]);
       if (r && r.success) {
         const e = document.getElementById('ownerEsperando');
         const s = document.getElementById('ownerServicio');
-        const l = document.getElementById('ownerListas');
         if (e) e.textContent = (r.esperando  || []).length;
         if (s) s.textContent = (r.enServicio || []).length;
-        if (l) l.textContent = (r.porCobrar  || []).length;
       }
+      const l = document.getElementById('ownerListas');
+      if (l) l.textContent = _contarAtendidasHoy(h);
     } catch(e) {}
   }
   window.refreshEstadoSalon = refreshEstadoSalon;
@@ -3516,15 +3536,15 @@ body.rol-staff #confirmSvcClientName::after {
         }
       }).catch(() => {});
 
-      // Estado del salón (usa getListaCompleta: esperando + en servicio + por cobrar)
+      // Estado del salón: Esperando + En servicio (ahora) desde getListaCompleta;
+      // "Atendidas" = clientas ya cobradas hoy (acumulado) desde el historial de hoy.
       if (listaResult.success) {
         const esperando  = (listaResult.esperando  || []).length;
         const enServicio = (listaResult.enServicio || []).length;
-        const listas     = (listaResult.porCobrar  || []).length;
         document.getElementById('ownerEsperando').textContent = esperando;
         document.getElementById('ownerServicio').textContent  = enServicio;
-        document.getElementById('ownerListas').textContent    = listas;
       }
+      document.getElementById('ownerListas').textContent = _contarAtendidasHoy(histResult);
 
       // Historial
       if (histResult.success && histResult.porStaff && histResult.porStaff.length > 0) {
