@@ -495,6 +495,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuPushTestBtn" style="display:none;" onclick="closeUserMenu(); probarNotificaciones();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a6 6 0 0 0-6 6c0 3.5-1.5 5-2 6h16c-.5-1-2-2.5-2-6a6 6 0 0 0-6-6Zm0 20a3 3 0 0 0 3-3H9a3 3 0 0 0 3 3Z"/></svg> Probar notificaciones
     </button>
+    <button class="user-menu-item" id="menuHistorialBtn" style="display:none;" onclick="closeUserMenu(); abrirHistorialServicios();">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a9 9 0 1 0 8.94 10H19.9A7 7 0 1 1 13 5v4l4-4-4-4v2Zm-1 5v5l4 2 .75-1.23L13.5 12.2V8H12Z"/></svg> Historial de servicios
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -2367,8 +2370,21 @@ body.rol-staff #confirmSvcClientName::after {
     </div>
   </div>
 
-  <!-- OWNER: CAJA CHICA (SOLO LECTURA) -->
-  <div class="screen" id="ownerCaja">
+  <!-- MIKAELA: HISTORIAL DE SERVICIOS POR CLIENTA -->
+  <div class="screen" id="historialClienta">
+    <div class="header">
+      <button class="back-btn" onclick="show('mikaelaHome')">← Inicio</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;"><span>📋 Historial de servicios</span></div>
+    <div style="padding:0 4px;">
+      <input id="histBuscarInput" type="text" placeholder="Buscar clienta por nombre o código…" oninput="histFiltrarClientas(this.value)"
+        style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;box-sizing:border-box;" />
+      <div id="histResultados" style="margin-top:10px;"></div>
+    </div>
+    <div id="histPerfil" style="display:none;padding:0 4px;margin-top:10px;"></div>
+  </div>
+
+
     <div class="header">
       <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
     </div>
@@ -4747,6 +4763,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (cierreMesBtn) cierreMesBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const pushBtn = document.getElementById('menuPushTestBtn');
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const histBtn = document.getElementById('menuHistorialBtn');
+    if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -4755,6 +4773,140 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('userMenu').classList.remove('active');
     document.getElementById('userMenuOverlay').classList.remove('active');
   }
+
+  // ── HISTORIAL DE SERVICIOS POR CLIENTA (Mikaela) ──────────────
+  function _histFecha(v) {
+    if (!v) return '—';
+    try { const d = new Date(v); if (!isNaN(d.getTime())) return d.toLocaleDateString('es-EC'); } catch(e) {}
+    return String(v);
+  }
+  function _histLabel(k){ return String(k).replace(/([A-Z])/g,' $1').replace(/^./,function(c){return c.toUpperCase();}); }
+  function _histKV(label, val) {
+    if (val === undefined || val === null || val === '') return '';
+    return '<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);">'
+      + '<span style="font-size:12px;color:var(--ink-soft);">' + label + '</span>'
+      + '<span style="font-size:13px;font-weight:600;text-align:right;max-width:62%;">' + val + '</span></div>';
+  }
+  let _histAccId = 0;
+  function _histAcordeon(titulo, contenidoHTML, icono) {
+    const id = 'histAcc_' + (_histAccId++);
+    return '<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden;">'
+      + '<div onclick="histToggle(\'' + id + '\')" style="padding:13px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;">'
+      + '<span style="font-size:16px;">' + (icono||'') + '</span>'
+      + '<span style="font-weight:700;font-size:14px;flex:1;">' + titulo + '</span>'
+      + '<span style="color:var(--ink-faint);">▾</span></div>'
+      + '<div id="' + id + '" style="display:none;padding:0 14px 12px;">' + contenidoHTML + '</div></div>';
+  }
+  function histToggle(id) {
+    const e = document.getElementById(id);
+    if (e) e.style.display = (e.style.display === 'none' || !e.style.display) ? 'block' : 'none';
+  }
+  window.histToggle = histToggle;
+
+  function _histGenericFicha(f) {
+    if (!f || typeof f !== 'object') return '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin datos.</div>';
+    const keys = Object.keys(f).filter(function(k){ return f[k] !== '' && f[k] !== null && f[k] !== undefined && typeof f[k] !== 'object'; });
+    if (!keys.length) return '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin datos.</div>';
+    return keys.map(function(k){ return _histKV(_histLabel(k), (/fecha/i.test(k) ? _histFecha(f[k]) : f[k])); }).join('');
+  }
+  function _histFichaPestHTML(f) {
+    const badge = f.activa ? ' · <span style="color:var(--success);">activa</span>' : '';
+    return '<div style="border-bottom:1px solid var(--line);padding:8px 0;">'
+      + '<div style="font-weight:700;font-size:12px;margin-bottom:4px;">Ficha ' + (f.nroFicha||'') + badge + '</div>'
+      + _histKV('Modelo', f.modelo) + _histKV('Diseño', f.diseno) + _histKV('Tallas', f.tallas)
+      + _histKV('Observaciones', f.obs) + _histKV('Fecha', _histFecha(f.fecha)) + '</div>';
+  }
+
+  function _histRenderPerfil(r) {
+    const c = r.cliente || {};
+    const facial = (r.fichaFacial && r.fichaFacial.ficha) ? r.fichaFacial.ficha : null;
+    const pest   = (r.fichaPestanas && Array.isArray(r.fichaPestanas.fichas)) ? r.fichaPestanas.fichas : [];
+    const pig    = (r.fichaPigmento && (r.fichaPigmento.ficha || (Array.isArray(r.fichaPigmento.fichas) && r.fichaPigmento.fichas[0]))) ? (r.fichaPigmento.ficha || r.fichaPigmento.fichas[0]) : null;
+    const hist   = Array.isArray(r.historial) ? r.historial : [];
+
+    let html = '';
+    html += '<div class="card" style="padding:16px;margin-bottom:12px;">'
+      + '<div style="font-weight:800;font-size:18px;">' + (c.nombre || '—') + '</div>'
+      + '<div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">Código ' + (c.codigo || '—') + '</div>'
+      + '<div style="display:flex;gap:22px;margin-top:12px;">'
+      + '<div><div style="font-size:11px;color:var(--ink-faint);">Última visita</div><div style="font-weight:700;font-size:14px;">' + _histFecha(c.ultimaVisita) + '</div></div>'
+      + '<div><div style="font-size:11px;color:var(--ink-faint);">Total visitas</div><div style="font-weight:700;font-size:14px;">' + (c.totalVisitas || 0) + '</div></div>'
+      + '</div></div>';
+
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:6px 4px;">Fichas</div>';
+    html += _histAcordeon('Ficha facial', facial ? _histGenericFicha(facial) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha facial.</div>', '🧖');
+    html += _histAcordeon('Ficha pestañas', pest.length ? pest.map(_histFichaPestHTML).join('') : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pestañas.</div>', '👁️');
+    html += _histAcordeon('Ficha pigmento / cejas', pig ? _histGenericFicha(pig) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pigmento.</div>', '✏️');
+
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:14px 4px 6px;">Historial de visitas</div>';
+    if (!hist.length) {
+      html += '<div class="card" style="padding:14px;color:var(--ink-faint);font-size:13px;">Sin registros de servicios.</div>';
+    } else {
+      html += '<div class="card" style="padding:6px 14px;">' + hist.map(function(h){
+        const val = h.valor ? '$' + (Number(h.valor)||0).toFixed(2) : '';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);">'
+          + '<div><div style="font-weight:700;font-size:13px;">' + (h.servicio || h.area || 'Servicio') + '</div>'
+          + '<div style="font-size:11px;color:var(--ink-soft);">' + _histFecha(h.fecha) + (h.staff ? ' · ' + h.staff : '') + '</div></div>'
+          + '<div style="font-weight:700;font-size:13px;">' + val + '</div></div>';
+      }).join('') + '</div>';
+    }
+    return html;
+  }
+
+  async function abrirHistorialServicios() {
+    show('historialClienta');
+    const inp = document.getElementById('histBuscarInput');
+    if (inp) inp.value = '';
+    const perfil = document.getElementById('histPerfil');
+    perfil.style.display = 'none'; perfil.innerHTML = '';
+    const res = document.getElementById('histResultados');
+    res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">⏳ Cargando clientas…</div>';
+    try {
+      const r = await apiGet('getClientas');
+      window._histClientas = (r && r.clientas) ? r.clientas : [];
+      res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Escribí un nombre para buscar.</div>';
+    } catch(e) {
+      res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--danger,#e53);font-size:13px;">Error al cargar clientas.</div>';
+    }
+  }
+  window.abrirHistorialServicios = abrirHistorialServicios;
+
+  function histFiltrarClientas(q) {
+    const res = document.getElementById('histResultados');
+    const lista = window._histClientas || [];
+    q = String(q || '').trim().toLowerCase();
+    document.getElementById('histPerfil').style.display = 'none';
+    if (!q) { res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Escribí un nombre para buscar.</div>'; return; }
+    const m = lista.filter(function(c){ return String(c.nombre||'').toLowerCase().includes(q) || String(c.codigo||'').toLowerCase().includes(q); }).slice(0, 25);
+    if (!m.length) { res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Sin resultados.</div>'; return; }
+    res.innerHTML = m.map(function(c){
+      const ini = String(c.nombre||'?').split(' ').map(function(n){return n[0];}).join('').slice(0,2);
+      const cod = String(c.codigo||'').replace(/'/g,'');
+      return '<div onclick="histSeleccionarClienta(\'' + cod + '\')" class="card" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;">'
+        + '<div class="client-avatar" style="flex-shrink:0;">' + ini + '</div>'
+        + '<div style="flex:1;"><div style="font-weight:700;font-size:14px;">' + (c.nombre||'') + '</div>'
+        + '<div style="font-size:11px;color:var(--ink-soft);">' + (c.codigo||'') + (c.ultimaVisita ? ' · última: ' + _histFecha(c.ultimaVisita) : '') + '</div></div>'
+        + '<div style="color:var(--ink-faint);">›</div></div>';
+    }).join('');
+  }
+  window.histFiltrarClientas = histFiltrarClientas;
+
+  async function histSeleccionarClienta(codigo) {
+    const perfil = document.getElementById('histPerfil');
+    document.getElementById('histResultados').innerHTML = '';
+    const inp = document.getElementById('histBuscarInput');
+    if (inp) inp.value = '';
+    perfil.style.display = 'block';
+    perfil.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">⏳ Cargando historial…</div>';
+    try {
+      const r = await apiGet('getHistorialClienta', { codigo: codigo });
+      if (!r || !r.success) { perfil.innerHTML = '<div class="card" style="padding:16px;color:var(--danger,#e53);">No se pudo cargar el historial.</div>'; return; }
+      perfil.innerHTML = _histRenderPerfil(r);
+    } catch(e) {
+      perfil.innerHTML = '<div class="card" style="padding:16px;color:var(--danger,#e53);">Error de conexión.</div>';
+    }
+  }
+  window.histSeleccionarClienta = histSeleccionarClienta;
 
   async function renderWaitList() {
     const user = window.currentUser;
