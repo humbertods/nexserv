@@ -5983,8 +5983,8 @@ body.rol-staff #confirmSvcClientName::after {
       price: promo.price
     };
     
-    if (!slotServices[slot]) slotServices[slot] = [];
-    slotServices[slot].push(servicioPromo);
+    // Reemplazar (no sumar): la clienta cambia al servicio de la promo.
+    slotServices[slot] = [servicioPromo];
     
     // Actualizar UI de servicios
     renderServicesForSlot(slot);
@@ -14081,8 +14081,10 @@ body.rol-staff #confirmSvcClientName::after {
       price: myPrice
     };
     
-    if (!slotServices[slot]) slotServices[slot] = [];
-    slotServices[slot].push(servicioPromo);
+    // Aplicar promo = REEMPLAZAR el servicio que tenía la clienta (cambió de opinión),
+    // no sumarlo. Antes se hacía push() y el servicio que asignó Mikaela quedaba sumado
+    // en vez de reemplazado — por eso "no cambiaba".
+    slotServices[slot] = [servicioPromo];
     
     // Actualizar UI
     renderServicesForSlot(slot);
@@ -14140,16 +14142,14 @@ body.rol-staff #confirmSvcClientName::after {
     // Precio TOTAL de la promo (no solo la parte del área)
     const precioTotal = Number(promo.price);
 
-    // Reemplazar slotServices con la promo al precio total
-    if (!slotServices[slot]) slotServices[slot] = [];
-    // Limpiar servicios previos de esta promo si existen
-    slotServices[slot] = slotServices[slot].filter(s => s.name !== promo.name);
-    slotServices[slot].push({
+    // Reemplazar slotServices con la promo al precio total (la clienta cambió a la promo
+    // completa: se reemplaza el servicio asignado, no se suma).
+    slotServices[slot] = [{
       name: promo.name,
       area: myArea,
       price: precioTotal,
       _promoCompleta: true  // flag para saber que es precio de promo completa
-    });
+    }];
 
     // Actualizar UI
     renderServicesForSlot(slot);
