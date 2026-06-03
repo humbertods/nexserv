@@ -4868,6 +4868,25 @@ body.rol-staff #confirmSvcClientName::after {
     html += _histAcordeon('Ficha pestañas', pest.length ? pest.map(_histFichaPestHTML).join('') : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pestañas.</div>', '👁️');
     html += _histAcordeon('Ficha pigmento / cejas', pig ? _histGenericFicha(pig) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pigmento.</div>', '✏️');
 
+    // ── Observaciones que dejan las staff (general + por área) ──
+    const _obsItems = [
+      ['General',    c.observaciones],
+      ['Cejas',      c.obsCejas],
+      ['Depilación', c.obsDepilacion],
+      ['Pestañas',   c.obsPestanas],
+      ['Facial',     c.obsFacial]
+    ].filter(function(o){ return o[1] && String(o[1]).trim(); });
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:14px 4px 6px;">Observaciones</div>';
+    if (!_obsItems.length) {
+      html += '<div class="card" style="padding:14px;color:var(--ink-faint);font-size:13px;">Sin observaciones registradas.</div>';
+    } else {
+      html += '<div class="card" style="padding:10px 14px;">' + _obsItems.map(function(o){
+        return '<div style="padding:7px 0;border-bottom:1px solid var(--line);">'
+          + '<div style="font-size:11px;font-weight:700;color:var(--accent-deep);">' + o[0] + '</div>'
+          + '<div style="font-size:13px;margin-top:2px;white-space:pre-wrap;">' + String(o[1]) + '</div></div>';
+      }).join('') + '</div>';
+    }
+
     html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:14px 4px 6px;">Historial de visitas</div>';
     if (!hist.length) {
       html += '<div class="card" style="padding:14px;color:var(--ink-faint);font-size:13px;">Sin registros de servicios.</div>';
@@ -10786,16 +10805,20 @@ body.rol-staff #confirmSvcClientName::after {
       ? window._cobrarTotalRegular
       : window._cobrarTotalPromo;
 
-    // Sumar productos si hay
+    // Sumar productos si hay (solo para mostrar el total que paga la clienta)
     const totalProductos = window._cobrarTotalProductos || 0;
     const totalFinal = totalServicios + totalProductos;
 
     // ── MANDAMIENTO #5: construir payload completo para distribución a los 3 destinos ──
     // staff (comisiones) + Mikaela (CierresPagos) + Owner (HistorialOwner)
+    // IMPORTANTE: el totalCobrado del SERVICIO debe ser SOLO los servicios, NO los
+    // productos. El producto se registra aparte con registrarVentaProductos (va a la
+    // caja de Mikaela, SIN comisión). Antes se mandaba servicio+producto y la staff
+    // cobraba comisión también sobre el producto (ej: lápiz sumado a su depilación).
     const _payloadM5 = _construirPayload({
       idEspera:        window._cobrarId,
       metodoPago:      window._cobrarPago,
-      totalCobrado:    totalFinal,
+      totalCobrado:    totalServicios,
       tienePromo:      window._cobrarTienePromo,
       usaPrecioNormal: window._cobrarTienePromo && window._cobrarPago === 'Tarjeta',
       desglose:        window._cobrarDesglose
