@@ -10403,8 +10403,8 @@ body.rol-staff #confirmSvcClientName::after {
       const hayPromo = g.clientas.some(c => c.promoNombre);
       const esTarjeta = metodo === 'Tarjeta';
       const usaRegular = esTarjeta && hayPromo;
-      const totalPromoG   = Number(g.totalPromo || 0);
-      const totalRegularG = Number(g.totalRegular || totalPromoG);
+      const totalPromoG   = g.clientas.reduce((s,c)=> s + (Number(c.total)||0), 0);
+      const totalRegularG = g.clientas.reduce((s,c)=> s + (c._editado ? (Number(c.total)||0) : (Number(_regularClienta(c))||0)), 0);
       const totalFinalG   = usaRegular ? totalRegularG : totalPromoG;
       if (usaRegular) {
         if (aviso) aviso.style.display = 'block';
@@ -10560,9 +10560,11 @@ body.rol-staff #confirmSvcClientName::after {
         const esTarjetaGrupal = metodoPago === 'Tarjeta';
         for (const c of clientas) {
           // ── MANDAMIENTO #4: tarjeta invalida promo ──
-          const totalCobrado = (esTarjetaGrupal && c.promoNombre)
-            ? String(_regularClienta(c))
-            : String(c.total || '0');
+          // Clienta editada a mano = valor FINAL; si no, promo invalida con tarjeta → regular
+          const totalCobrado = c._editado
+            ? String(c.total || '0')
+            : ((esTarjetaGrupal && c.promoNombre) ? String(_regularClienta(c)) : String(c.total || '0'));
+          const _regClienta = c._editado ? String(c.total || '0') : String(_regularClienta(c));
           // ── MANDAMIENTO #5: payload completo para distribución a staff/Mikaela/Owner ──
           const _payloadGrupal = _construirPayload({
             idEspera:        c.idEspera,
@@ -10572,7 +10574,7 @@ body.rol-staff #confirmSvcClientName::after {
             usaPrecioNormal: esTarjetaGrupal && !!(c.promoNombre),
             desglose:        c.serviciosDetalle || null
           });
-          _payloadGrupal.precioRegular  = String(_regularClienta(c));
+          _payloadGrupal.precioRegular  = _regClienta;
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           await apiPost('confirmarCobro', _payloadGrupal);
@@ -15238,6 +15240,41 @@ body.rol-staff #confirmSvcClientName::after {
     mkAsignarAlCobro(idEsperaPrincipal, idxEsperando);
   }
 
+  // Editar el valor de una clienta en el cobro grupal → queda como valor FINAL
+  function cobrarEditarMontoGrupal(idx) {
+    const g = window._cobroGrupal;
+    if (!g || !g.clientas || !g.clientas[idx]) return;
+    const c = g.clientas[idx];
+    const actual = Number(c.total) || 0;
+    const txt = prompt('Nuevo valor para "' + (c.nombre || 'clienta') + '" ($' + actual.toFixed(2) + '):', actual);
+    if (txt === null) return;
+    const nuevo = Number(String(txt).replace(',', '.'));
+    if (isNaN(nuevo) || nuevo < 0) { showToast('Valor inválido'); return; }
+    c.total = nuevo;
+    c._editado = true; // valor FINAL fijado por Mikaela (igual en efectivo y tarjeta)
+    g.totalPromo   = g.clientas.reduce((s, x) => s + (Number(x.total)||0), 0);
+    g.totalRegular = g.clientas.reduce((s, x) => s + (x._editado ? (Number(x.total)||0) : (Number(_regularClienta(x))||0)), 0);
+    window._cobrarTotalPromo   = g.totalPromo;
+    window._cobrarTotalRegular = g.totalRegular;
+    const desgloseItems = document.getElementById('cobrarDesgloseItems');
+    if (desgloseItems) {
+      desgloseItems.innerHTML = g.clientas.map((x, i) => `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line);">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${x.nombre}</div>
+            <div style="font-size:11px;color:var(--ink-soft);">${x.servicio} · ${x.tomadaPor}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:14px;font-weight:800;${x._editado ? 'color:var(--accent-deep);' : ''}">$${(Number(x.total)||0).toFixed(2)}</div>
+            <button onclick="cobrarEditarMontoGrupal(${i})" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+    refreshCobrarTotal();
+  }
+  window.cobrarEditarMontoGrupal = cobrarEditarMontoGrupal;
+
   function mkAsignarAlCobro(idEsperaPrincipal, idxEsperando) {
     const principal = window._mkPorCobrarData?.find(p => p.idEspera === idEsperaPrincipal);
     const asignada  = window._mkEsperandoCobro[idxEsperando];
@@ -15263,19 +15300,22 @@ body.rol-staff #confirmSvcClientName::after {
     const simpleEl = document.getElementById('cobrarSimple');
     desgloseEl.style.display = 'block';
     simpleEl.style.display = 'none';
-    desgloseItems.innerHTML = clientas.map(c => `
+    desgloseItems.innerHTML = clientas.map((c, idx) => `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--line);">
         <div>
           <div style="font-size:13px;font-weight:700;">${c.nombre}</div>
           <div style="font-size:11px;color:var(--ink-soft);">${c.servicio} · ${c.tomadaPor}</div>
         </div>
-        <div style="font-size:14px;font-weight:800;">$${(Number(c.total)||0).toFixed(2)}</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="font-size:14px;font-weight:800;${c._editado ? 'color:var(--accent-deep);' : ''}">$${(Number(c.total)||0).toFixed(2)}</div>
+          <button onclick="cobrarEditarMontoGrupal(${idx})" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
+        </div>
       </div>
     `).join('');
 
     // Calcular totales grupales considerando promos (ANTES de usarlos)
     const totalGrupalPromo    = clientas.reduce((s, c) => s + (Number(c.total)||0), 0);
-    const totalGrupalRegular  = clientas.reduce((s, c) => s + (Number(_regularClienta(c))||0), 0);
+    const totalGrupalRegular  = clientas.reduce((s, c) => s + (c._editado ? (Number(c.total)||0) : (Number(_regularClienta(c))||0)), 0);
     const hayPromoGrupal      = clientas.some(c => c.promoNombre && c.promoNombre.trim() !== '');
 
     window._cobrarTotalPromo   = totalGrupalPromo.toFixed(2);
