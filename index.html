@@ -2376,7 +2376,7 @@ body.rol-staff #confirmSvcClientName::after {
   <!-- MIKAELA: HISTORIAL DE SERVICIOS POR CLIENTA -->
   <div class="screen" id="historialClienta">
     <div class="header">
-      <button class="back-btn" onclick="show('mikaelaHome')">← Inicio</button>
+      <button class="back-btn" onclick="volverInicioDesdeHistorial()">← Inicio</button>
     </div>
     <div class="section-title" style="margin-top:8px;"><span>📋 Historial de servicios</span></div>
     <div style="padding:0 4px;">
@@ -4905,6 +4905,14 @@ body.rol-staff #confirmSvcClientName::after {
     }
     return html;
   }
+
+  // Vuelve a la pantalla de inicio correcta según el rol (owner→ownerHome, admin→mikaelaHome, staff→staffHome)
+  function volverInicioDesdeHistorial() {
+    var rol = String((window.currentUser && window.currentUser.role) || '').toLowerCase();
+    var map = { 'owner':'ownerHome','dueño':'ownerHome','dueno':'ownerHome','admin':'mikaelaHome','staff':'staffHome' };
+    show(map[rol] || 'mikaelaHome');
+  }
+  window.volverInicioDesdeHistorial = volverInicioDesdeHistorial;
 
   async function abrirHistorialServicios() {
     show('historialClienta');
