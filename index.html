@@ -15329,13 +15329,12 @@ body.rol-staff #confirmSvcClientName::after {
       if (!window._productosMarca || window._productosMarca.length === 0) {
         cargarProductosMarca().then(() => vdRenderLineas());
       }
-      if (!window.CLIENT_DIRECTORY_CACHE || window.CLIENT_DIRECTORY_CACHE.length === 0) {
-        apiGet('getClientas').then(r => {
-          if (r.success) window.CLIENT_DIRECTORY_CACHE = r.clientas
-            .filter(c => c.codigo && c.nombre)
-            .map(c => ({ code: String(c.codigo), name: String(c.nombre) }));
-        }).catch(()=>{});
-      }
+      // Recargar SIEMPRE la lista de clientas al abrir, para que aparezcan las recién agregadas
+      apiGet('getClientas').then(r => {
+        if (r.success && r.clientas) window.CLIENT_DIRECTORY_CACHE = r.clientas
+          .filter(c => c.codigo && String(c.codigo).trim() && c.nombre && String(c.nombre).trim())
+          .map(c => ({ code: String(c.codigo), name: String(c.nombre) }));
+      }).catch(()=>{});
       window._vdLineas = [{ producto: '', precio: 0 }];
       window._vdClienteSeleccionado = '';
       vdRenderLineas();
@@ -15361,7 +15360,7 @@ body.rol-staff #confirmSvcClientName::after {
     const sug = document.getElementById('vdClienteSuggestions');
     if (!q || q.length < 2) { sug.style.display = 'none'; return; }
     const lista = window.CLIENT_DIRECTORY_CACHE || [];
-    const found = lista.filter(c => (c.name||'').toLowerCase().includes(q.toLowerCase())).slice(0, 6);
+    const found = lista.filter(c => (c.name||'').toLowerCase().includes(q.toLowerCase())).slice(0, 8);
     if (found.length === 0) { sug.style.display = 'none'; return; }
     sug.innerHTML = found.map(c =>
       `<div onclick="vdSeleccionarCliente('${(c.name||'').replace(/'/g,"\\'")}',this)"
