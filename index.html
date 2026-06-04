@@ -16047,7 +16047,7 @@ body.rol-staff #confirmSvcClientName::after {
       .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
     const esCejasPolvo  = (n.includes('cejas') || n.includes('ceja')) && n.includes('polvo');
     const esRetoque     = n.includes('retoque') && (n.includes('polvo') || n.includes('efecto'));
-    const esEfectoPolvo = n.includes('efecto') && n.includes('polvo') && !n.includes('solo') && !n.includes('combo');
+    const esEfectoPolvo = n.includes('efecto') && n.includes('polvo');
     const esMicropig    = n.includes('micropigment');
     return esCejasPolvo || esRetoque || esEfectoPolvo || esMicropig;
   }
