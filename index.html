@@ -13545,6 +13545,8 @@ body.rol-staff #confirmSvcClientName::after {
       const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica });
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
+        // Notificar SOLO a la staff asignada (no a toda el área)
+        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (nombre || 'Clienta')); } catch(ePush) {}
         loadMikaelaHome();
       } else {
         alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo reasignar'));
@@ -16531,14 +16533,20 @@ function renderCajaOwnerDetalle_() {
   }
   const bd = window._cajaOwnerData.bd;
   const priv = window._cajaOwnerPriv;
+  const esOwnerCaja = window.currentUser && window.currentUser.role === 'owner';
   const monto = (n, color) => priv ? '✱✱✱' : ((color ? '-' : '') + '$' + (Number(n)||0).toFixed(2));
-  const metodoBlock = (titulo, obj, color) => {
+  const metodoBlock = (titulo, obj, color, borrable) => {
     if (!obj.items.length) return '';
     let h = '<div style="font-weight:800;margin-top:10px;' + (color ? 'color:' + color + ';' : '') + '">' + titulo + '</div>';
     obj.items.forEach(it => {
       const tag = it.metodo ? ' <span style="font-size:11px;color:var(--ink-faint);font-weight:600;">(' + (it.metodo === 'transferencia' ? 'transf.' : 'efec.') + ')</span>' : '';
+      // Solo el Owner puede borrar un gasto cargado por error (no aplica a ventas)
+      const descSafe = String(it.descripcion || 'Gasto').replace(/['"\\]/g, '');
+      const btnBorrar = (borrable && esOwnerCaja && it.id && !priv)
+        ? ' <span onclick="borrarGastoCaja(' + it.id + ', \'' + descSafe + '\')" title="Borrar gasto cargado por error" style="cursor:pointer;color:var(--danger);font-weight:800;padding:0 6px;">✕</span>'
+        : '';
       h += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
-         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion || '') + tag + '</span><span>' + monto(it.monto, color) + '</span></div>';
+         + '<span>&nbsp;&nbsp;' + (it.cliente || it.descripcion || '') + tag + btnBorrar + '</span><span>' + monto(it.monto, color) + '</span></div>';
     });
     h += '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;padding:2px 0;' + (color ? 'color:' + color + ';' : '') + '">'
        + '<span>&nbsp;&nbsp;Total</span><span>' + monto(obj.total, color) + '</span></div>';
@@ -16549,7 +16557,7 @@ function renderCajaOwnerDetalle_() {
   html += metodoBlock('Efectivo', bd.efectivo);
   html += metodoBlock('Transferencia', bd.transferencia);
   html += metodoBlock('Tarjeta', bd.tarjeta);
-  html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)');
+  html += metodoBlock('Gastos Varios', bd.gastos, 'var(--danger)', true);
   html += '<div style="display:flex;justify-content:space-between;font-weight:800;border-top:1.5px solid var(--line);margin-top:8px;padding-top:8px;"><span>TOTAL VENTAS (neto)</span><span>' + (priv ? '✱✱✱' : '$' + bd.totalNeto.toFixed(2)) + '</span></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding-top:2px;"><span>Base de apertura</span><span>' + (priv ? '✱✱✱' : '$' + apertura.toFixed(2)) + '</span></div>';
   const efectivoEsperado = apertura + bd.efectivo.total - bd.gastos.totalEfectivo;
@@ -16565,6 +16573,26 @@ function toggleCajaOwnerPrivacy() {
   window._cajaOwnerPriv = !window._cajaOwnerPriv;
   renderCajaOwner_();
 }
+
+// Borrar (anular) un gasto de caja chica cargado por error — SOLO Owner
+async function borrarGastoCaja(id, desc) {
+  if (!(window.currentUser && window.currentUser.role === 'owner')) {
+    alert('Solo el dueño puede borrar gastos de la caja.');
+    return;
+  }
+  if (!id) return;
+  if (!confirm('¿Borrar este gasto cargado por error?\n\n"' + (desc || 'Gasto') + '"\n\nSe quitará de la caja y de los totales. Esta acción no se puede deshacer desde la app.')) return;
+  try {
+    const r = await apiPost('anularGastoCaja', { id: id });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('🗑️ Gasto borrado');
+      loadCajaChicaOwner();
+    } else {
+      alert((r && (r.error || r.message)) || 'No se pudo borrar el gasto');
+    }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+window.borrarGastoCaja = borrarGastoCaja;
 /* ========== /CAJA CHICA — VISTA OWNER (solo lectura) ========== */
 
 
