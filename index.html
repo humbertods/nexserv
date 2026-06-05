@@ -10895,6 +10895,21 @@ body.rol-staff #confirmSvcClientName::after {
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           await apiPost('confirmarCobro', _payloadGrupal);
+          // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
+          // (van a la caja, SIN comisión), igual que en el cobro individual.
+          const _prodsC = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
+          if (_prodsC.length > 0) {
+            const _totProdC = _prodsC.reduce(function(s,p){ return s + (Number(p.precio) * Number(p.cantidad || 1)); }, 0);
+            try {
+              await apiPost('registrarVentaProductos', {
+                idEspera: c.idEspera,
+                clienteNombre: c.nombre || '',
+                productos: _prodsC,
+                total: _totProdC
+              });
+            } catch(eProd) { console.error(eProd); }
+            delete window._apProductosEnTicket[c.idEspera];
+          }
         }
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
@@ -15572,6 +15587,26 @@ body.rol-staff #confirmSvcClientName::after {
     if (isNaN(nuevo) || nuevo < 0) { showToast('Valor inválido'); return; }
     c.total = nuevo;
     c._editado = true; // valor FINAL fijado por Mikaela (igual en efectivo y tarjeta)
+    // Repartir el valor editado proporcionalmente en el desglose, para que la COMISIÓN
+    // de cada staff salga sobre el valor final (no sobre el original). monto = montoNormal
+    // = valor final, así no se vuelve a recalcular en tarjeta.
+    if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length > 0) {
+      const sumOrig = c.serviciosDetalle.reduce(function(s,d){ return s + (Number(d.monto)||0); }, 0);
+      let acum = 0;
+      c.serviciosDetalle.forEach(function(d, di){
+        let parte;
+        if (di === c.serviciosDetalle.length - 1) {
+          parte = Math.round((nuevo - acum) * 100) / 100; // la última línea absorbe el redondeo
+        } else {
+          const prop = sumOrig > 0 ? ((Number(d.monto)||0) / sumOrig) : (1 / c.serviciosDetalle.length);
+          parte = Math.round(nuevo * prop * 100) / 100;
+          acum += parte;
+        }
+        d.monto = parte;
+        d.montoNormal = parte;
+        d._editado = true;
+      });
+    }
     g.totalPromo   = g.clientas.reduce((s, x) => s + (Number(x.total)||0), 0);
     g.totalRegular = g.clientas.reduce((s, x) => s + (x._editado ? (Number(x.total)||0) : (Number(_regularClienta(x))||0)), 0);
     window._cobrarTotalPromo   = g.totalPromo;
