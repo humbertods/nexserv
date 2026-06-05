@@ -10480,6 +10480,13 @@ body.rol-staff #confirmSvcClientName::after {
       document.getElementById('cobrarChica').textContent = 'Atendida por ' + chica;
     }
 
+    // Si hay promo pero NO se conoce un precio regular mayor al promo, derivarlo del catálogo.
+    // Cubre el modo SIMPLE (promo de una sola staff sin desglose), que antes no recalculaba en tarjeta.
+    if (window._cobrarTienePromo && window._cobrarTotalRegular <= window._cobrarTotalPromo) {
+      const _regCat = _regularDesdeCatalogo(promoNombre, window._cobrarDesglose);
+      if (_regCat > window._cobrarTotalPromo) window._cobrarTotalRegular = _regCat;
+    }
+
     // Banner promo (efectivo/transferencia)
     const promoBanner = document.getElementById('cobrarPromoBanner');
     if (window._cobrarTienePromo) {
