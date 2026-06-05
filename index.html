@@ -498,9 +498,71 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuHistorialBtn" style="display:none;" onclick="closeUserMenu(); abrirHistorialServicios();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a9 9 0 1 0 8.94 10H19.9A7 7 0 1 1 13 5v4l4-4-4-4v2Zm-1 5v5l4 2 .75-1.23L13.5 12.2V8H12Z"/></svg> Historial de servicios
     </button>
+    <button class="user-menu-item" id="menuSolucionesBtn" style="display:none;" onclick="closeUserMenu(); openSoluciones();">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.71 18.29 13.4 9.98a5.5 5.5 0 0 0-7.04-7.05l3.2 3.2a1.5 1.5 0 0 1-2.12 2.12l-3.2-3.2A5.5 5.5 0 0 0 11.3 12l8.3 8.3a1 1 0 0 0 1.42 0l.69-.69a1 1 0 0 0 0-1.32Z"/></svg> Soluciones
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
+  </div>
+
+  <!-- PANEL DE SOLUCIONES (owner / admin / Mikaela) — Capa 1 -->
+  <div class="screen" id="solucionesPanel">
+    <button class="back-btn" onclick="show(_solVolver())">← Volver</button>
+    <div style="padding: 0 4px 90px;">
+      <div style="display:flex;align-items:center;gap:10px;margin:8px 0 4px;">
+        <div style="font-size:26px;">🛠️</div>
+        <div>
+          <div style="font-size:22px;font-weight:800;">Soluciones</div>
+          <div style="font-size:12px;color:var(--ink-soft);">Revisá y arreglá tickets con problemas</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin:16px 0;">
+        <button id="solTabInspector" onclick="solTab('inspector')" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:var(--accent-deep);color:#fff;">🔍 Inspector</button>
+        <button id="solTabGuia" onclick="solTab('guia')" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg-card);color:var(--ink-soft);">📖 Guía</button>
+        <button id="solTabHistorial" onclick="solTab('historial')" style="display:none;flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg-card);color:var(--ink-soft);">📋 Historial</button>
+      </div>
+
+      <!-- INSPECTOR: lista de tickets activos -->
+      <div id="solInspectorView">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Tickets activos ahora</div>
+          <button onclick="loadSolucionesTickets()" style="padding:6px 12px;border:1px solid var(--line);border-radius:18px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);">↻ Actualizar</button>
+        </div>
+        <div id="solTicketsList"><div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando…</div></div>
+      </div>
+
+      <!-- INSPECTOR: detalle de un ticket -->
+      <div id="solDetalleView" style="display:none;">
+        <button onclick="solCerrarDetalle()" style="background:none;border:none;color:var(--accent-deep);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:0;margin-bottom:10px;">← Volver a la lista</button>
+        <div id="solDetalleBody"></div>
+      </div>
+
+      <!-- GUÍA de problemas frecuentes (estática) -->
+      <div id="solGuiaView" style="display:none;">
+        <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Tocá un problema para ver los pasos.</div>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">↩️ Una clienta quedó trabada o en el lugar equivocado</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Abrí el <b>Inspector</b>, tocá la clienta y usá <b>“Devolver a la lista de espera”</b>. Vuelve a quedar disponible para asignarla de nuevo.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">🔄 Asigné mal a la staff / quiero cambiarla</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Inspector → tocá la clienta → <b>“Reasignar a otra staff”</b> → elegí el nombre correcto. Le llega la notificación a la nueva staff.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">🚪 La clienta se retira a mitad de servicio</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Inspector → tocá la clienta → <b>“Retirar y cobrar lo realizado”</b>. Se anula lo pendiente y queda lista para cobrar solo lo que se hizo.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">💵 Una clienta no desaparece de “Por cobrar”</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">En cobros grupales (paga por otra) queda una copia temporal. Cobrala directo desde <b>“Por cobrar”</b>; si quedó duplicada, tocá la <b>✕</b> de la copia o recargá la app.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">🏷️ Una promo no tomó el precio normal con tarjeta</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Al cobrar, confirmá que el método sea <b>“Tarjeta”</b>: el sistema usa el precio regular automáticamente. Si sigue mal, la promo puede no tener precio regular configurado — avisale al dueño.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">🗑️ Quiero deshacer un servicio que YA se cobró</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Eso no se hace desde acá. Andá al menú <b>“M” → “Historial de servicios”</b>, buscá el servicio y eliminálo. Se revierte la comisión de la staff.</div></details>
+        <details class="card" style="padding:0;margin-bottom:8px;"><summary style="padding:13px;font-weight:700;font-size:14px;cursor:pointer;">👯 Una clienta aparece dos veces en la lista</summary><div style="padding:0 13px 13px;font-size:13px;color:var(--ink-soft);line-height:1.6;">Devolvé una de las dos a la lista o retirala, y recargá la app para confirmar que quedó una sola.</div></details>
+      </div>
+
+      <!-- HISTORIAL de acciones (solo Owner) -->
+      <div id="solHistorialView" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Acciones realizadas</div>
+          <div style="display:flex;gap:6px;">
+            <button onclick="loadSolucionesHistorial()" style="padding:6px 12px;border:1px solid var(--line);border-radius:18px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);">↻ Actualizar</button>
+            <button onclick="borrarSolucionesHistorial()" style="padding:6px 12px;border:1px solid var(--danger-bg);border-radius:18px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--danger);">🗑️ Borrar</button>
+          </div>
+        </div>
+        <div id="solHistorialList"><div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando…</div></div>
+      </div>
+    </div>
   </div>
 
   <!-- BLOQUEO PREVENTIVO POR DISPOSITIVO -->
@@ -4806,6 +4868,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const histBtn = document.getElementById('menuHistorialBtn');
     if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    const solBtn = document.getElementById('menuSolucionesBtn');
+    if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -4813,6 +4877,266 @@ body.rol-staff #confirmSvcClientName::after {
   function closeUserMenu() {
     document.getElementById('userMenu').classList.remove('active');
     document.getElementById('userMenuOverlay').classList.remove('active');
+  }
+
+  // ═══════════════ PANEL DE SOLUCIONES (Capa 1) ═══════════════
+  window._solTickets = {};
+  function _solVolver(){
+    const u = window.currentUser;
+    return (u && u.role === 'owner') ? 'ownerHome' : 'mikaelaHome';
+  }
+  function _solEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function _solTipo(f){
+    f = String(f||'');
+    if (f === 'TicketMulti') return 'Combo / Ticket Multi (TM)';
+    if (f === 'ServicioPromo') return 'Promo (SP)';
+    if (f === 'ServicioNormal') return 'Servicio normal (SN)';
+    if (f === 'ListaEspera') return 'Lista de espera (LE)';
+    return f || '—';
+  }
+  function openSoluciones(){
+    show('solucionesPanel');
+    const u = window.currentUser;
+    const histTab = document.getElementById('solTabHistorial');
+    if (histTab) histTab.style.display = (u && u.role === 'owner') ? 'block' : 'none';
+    solTab('inspector');
+    solCerrarDetalle();
+    loadSolucionesTickets();
+  }
+  function solTab(which){
+    const inspBtn = document.getElementById('solTabInspector');
+    const guiaBtn = document.getElementById('solTabGuia');
+    const histBtn = document.getElementById('solTabHistorial');
+    const inspView = document.getElementById('solInspectorView');
+    const detView  = document.getElementById('solDetalleView');
+    const guiaView = document.getElementById('solGuiaView');
+    const histView = document.getElementById('solHistorialView');
+    if (!inspBtn || !guiaBtn) return;
+    const base = 'flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;';
+    const on   = 'background:var(--accent-deep);color:#fff;';
+    const off  = 'background:var(--bg-card);color:var(--ink-soft);';
+    const histVisible = histBtn && histBtn.style.display !== 'none';
+    inspView.style.display = 'none';
+    detView.style.display = 'none';
+    guiaView.style.display = 'none';
+    if (histView) histView.style.display = 'none';
+    inspBtn.setAttribute('style', base + off);
+    guiaBtn.setAttribute('style', base + off);
+    if (histBtn) histBtn.setAttribute('style', (histVisible ? '' : 'display:none;') + base + off);
+    if (which === 'guia'){
+      guiaView.style.display = 'block';
+      guiaBtn.setAttribute('style', base + on);
+    } else if (which === 'historial'){
+      if (histView) histView.style.display = 'block';
+      if (histBtn) histBtn.setAttribute('style', base + on);
+      loadSolucionesHistorial();
+    } else {
+      inspView.style.display = 'block';
+      inspBtn.setAttribute('style', base + on);
+    }
+  }
+  async function loadSolucionesTickets(){
+    const list = document.getElementById('solTicketsList');
+    if (!list) return;
+    list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando tickets…</div>';
+    try {
+      const r = await apiGet('getListaCompleta');
+      if (!r || !r.success){
+        list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--danger);font-size:13px;">No se pudo cargar. Tocá Actualizar.</div>';
+        return;
+      }
+      window._solTickets = {};
+      const grupos = [
+        { titulo:'⏳ En espera',   items: r.esperando  || [], grupo:'espera'  },
+        { titulo:'✂️ En servicio', items: r.enServicio || [], grupo:'servicio'},
+        { titulo:'💵 Por cobrar',  items: r.porCobrar  || [], grupo:'cobrar'  },
+      ];
+      let html = '', total = 0;
+      grupos.forEach(function(g){
+        if (!g.items.length) return;
+        total += g.items.length;
+        html += '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:16px 0 6px;">' + g.titulo + ' (' + g.items.length + ')</div>';
+        g.items.forEach(function(t){
+          const id = String(t.idEspera || t.codigo || ('x' + Math.floor(Math.random()*1e6)));
+          window._solTickets[id] = { t:t, grupo:g.grupo };
+          html += solTicketRow(id, t, g.grupo);
+        });
+      });
+      if (!total) html = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">✨ No hay tickets activos en este momento.</div>';
+      list.innerHTML = html;
+    } catch(e){
+      console.error(e);
+      list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--danger);font-size:13px;">Error de conexión. Tocá Actualizar.</div>';
+    }
+  }
+  function solTicketRow(id, t, grupo){
+    const nombre = _solEsc(t.nombre || t.cliente || 'Clienta');
+    const area   = _solEsc(t.area || (Array.isArray(t.areas) ? t.areas.map(function(a){return a.area;}).join(' + ') : '') || '—');
+    const staff  = _solEsc(t.tomadaPor || '');
+    const cod    = _solEsc(t.codigo || id);
+    const total  = (grupo === 'cobrar' && t.total != null) ? ('<span style="font-weight:800;color:var(--success);">$' + Number(t.total).toFixed(2) + '</span>') : '';
+    const idJs   = id.replace(/'/g, "\\'");
+    return '<div class="card" onclick="solVerDetalle(\'' + idJs + '\')" style="cursor:pointer;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      + '<div style="min-width:0;">'
+      +   '<div style="font-weight:800;font-size:15px;">' + nombre + '</div>'
+      +   '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + area + ' · ' + (staff ? ('👩 ' + staff) : 'sin asignar') + '</div>'
+      +   '<div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">' + cod + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;white-space:nowrap;">' + total + '<div style="font-size:18px;color:var(--ink-faint);line-height:1;">›</div></div>'
+      + '</div>';
+  }
+  function solVerDetalle(id){
+    const entry = window._solTickets[id];
+    if (!entry) return;
+    const t = entry.t, grupo = entry.grupo;
+    const body = document.getElementById('solDetalleBody');
+    const idEspera = String(t.idEspera || t.codigo || '');
+    const nombre   = t.nombre || t.cliente || 'Clienta';
+    const staff    = t.tomadaPor || '';
+    const areaIdx  = (t.fuente === 'TicketMulti' && t.areaIdx) ? t.areaIdx : '';
+
+    function kv(l,v){
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;">'
+        + '<span style="color:var(--ink-soft);">' + l + '</span>'
+        + '<span style="font-weight:700;text-align:right;">' + _solEsc(v || '—') + '</span></div>';
+    }
+    let info = '';
+    info += kv('Cliente', nombre);
+    info += kv('Código', t.codigo || idEspera);
+    info += kv('Estado', grupo === 'espera' ? 'En espera' : grupo === 'servicio' ? 'En servicio' : 'Por cobrar');
+    info += kv('Área', t.area || (Array.isArray(t.areas) ? t.areas.map(function(a){return a.area + (a.estado ? (' [' + a.estado + ']') : '');}).join(' + ') : '—'));
+    info += kv('Staff asignada', staff || 'sin asignar');
+    info += kv('Tipo de ticket', _solTipo(t.fuente));
+    if (t.prioridad) info += kv('Prioridad', t.prioridad);
+    if (grupo === 'cobrar' && t.total != null) info += kv('Total a cobrar', '$' + Number(t.total).toFixed(2));
+    if (t.observaciones) info += kv('Observaciones', t.observaciones);
+
+    let desg = '';
+    const det = t.serviciosDetalle || t.desglose;
+    if (Array.isArray(det) && det.length){
+      desg = '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:14px 0 6px;">Servicios</div>';
+      det.forEach(function(d){
+        const m = d.monto != null ? d.monto : (d.precio || 0);
+        desg += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px dashed var(--line);">'
+          + '<span>' + _solEsc(d.servicio || d.nombre || 'Servicio') + (d.staff ? (' · ' + _solEsc(d.staff)) : '') + '</span>'
+          + '<span style="font-weight:700;">$' + Number(m).toFixed(2) + '</span></div>';
+      });
+    }
+
+    const idJs    = idEspera.replace(/'/g, "\\'");
+    const nomJs   = String(nombre).replace(/'/g, "\\'");
+    const staffJs = String(staff).replace(/'/g, "\\'");
+    const aIdxJs  = String(areaIdx).replace(/'/g, "\\'");
+
+    const staffAll = ['María','Keyla','Lesly','Rosa','Yadira','Diana','Laura'];
+    const picker = staffAll.map(function(s){
+      return '<button onclick="solReasignar(\'' + idJs + '\',\'' + aIdxJs + '\',\'' + s + '\',\'' + nomJs + '\')" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
+    }).join('');
+
+    let acc = '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:18px 0 8px;">Acciones</div>';
+    acc += '<button onclick="solDevolver(\'' + idJs + '\',\'' + nomJs + '\',\'' + staffJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">↩️ Devolver a la lista de espera<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Para que otra staff la tome desde cero</div></button>';
+    acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">🚪 Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
+    acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">🔄 Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
+
+    body.innerHTML = '<div class="card" style="padding:14px;">' + info + desg + acc + '</div>'
+      + '<div style="font-size:11px;color:var(--ink-faint);text-align:center;margin-top:10px;line-height:1.5;">Para cobrar normalmente usá la pantalla “Por cobrar”. Para deshacer un servicio ya cobrado usá “Historial de servicios”.</div>';
+
+    document.getElementById('solInspectorView').style.display = 'none';
+    document.getElementById('solGuiaView').style.display = 'none';
+    document.getElementById('solDetalleView').style.display = 'block';
+  }
+  function solCerrarDetalle(){
+    const d = document.getElementById('solDetalleView');
+    const g = document.getElementById('solGuiaView');
+    const i = document.getElementById('solInspectorView');
+    if (d) d.style.display = 'none';
+    if (g) g.style.display = 'none';
+    if (i) i.style.display = 'block';
+  }
+  async function solDevolver(idEspera, nombre, staff){
+    if (!confirm('¿Devolver a ' + (nombre || 'la clienta') + ' a la lista de espera?\n\nQuedará disponible para que otra staff la tome.')) return;
+    try {
+      const r = await apiPost('devolverALista', { idEspera: idEspera || '', clienteNombre: nombre || '', chicaNombre: staff || (window.currentUser && window.currentUser.name) || '' });
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('↩️ ' + (nombre || 'Clienta') + ' devuelta a la lista');
+        _solLog('Devolver a lista', nombre, idEspera, '');
+        solCerrarDetalle(); loadSolucionesTickets();
+      } else alert('No se pudo devolver: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+  async function solReasignar(idEspera, areaIdx, chica, nombre){
+    if (!confirm('¿Asignar a ' + (nombre || 'la clienta') + ' con ' + chica + '?')) return;
+    try {
+      const r = await apiPost('asignarStaff', { idEspera: idEspera || '', areaIdx: areaIdx || '', chicaNombre: chica });
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('✓ ' + (nombre || 'Clienta') + ' asignada a ' + chica);
+        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (nombre || 'Clienta')); } catch(eP){}
+        _solLog('Reasignar staff', nombre, idEspera, 'A: ' + chica);
+        solCerrarDetalle(); loadSolucionesTickets();
+      } else alert('No se pudo reasignar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+  async function solRetirarCobrar(idEspera, nombre){
+    if (!confirm('¿' + (nombre || 'La clienta') + ' se retira?\n\nSe anularán los servicios pendientes y se cobrará SOLO lo ya realizado.')) return;
+    try {
+      const r = await apiPost('retirarYCobrar', { idEspera: idEspera || '' });
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('🚪 ' + (nombre || 'Clienta') + ' a cobro (solo lo realizado)');
+        _solLog('Retirar y cobrar', nombre, idEspera, '');
+        solCerrarDetalle(); loadSolucionesTickets();
+      } else alert('No se pudo procesar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+
+  function _solLog(accion, cliente, idEspera, detalle){
+    try {
+      apiPost('registrarSolucion', {
+        usuario:  (window.currentUser && window.currentUser.name) || '',
+        accion:   accion || '',
+        cliente:  cliente || '',
+        idEspera: idEspera || '',
+        detalle:  detalle || ''
+      });
+    } catch(e){}
+  }
+  async function loadSolucionesHistorial(){
+    const list = document.getElementById('solHistorialList');
+    if (!list) return;
+    list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando…</div>';
+    try {
+      const r = await apiGet('getSolucionesLog');
+      if (!r || !r.success){
+        list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--danger);font-size:13px;">No se pudo cargar.</div>';
+        return;
+      }
+      const regs = r.registros || [];
+      if (!regs.length){
+        list.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Todavía no hay acciones registradas.</div>';
+        return;
+      }
+      list.innerHTML = regs.map(function(x){
+        return '<div class="card" style="padding:12px;margin-bottom:8px;">'
+          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><span style="font-weight:800;font-size:14px;">' + _solEsc(x.accion) + '</span><span style="font-size:11px;color:var(--ink-faint);white-space:nowrap;">' + _solEsc(x.fecha) + ' · ' + _solEsc(x.hora) + '</span></div>'
+          + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:3px;">👤 ' + _solEsc(x.cliente) + '</div>') : '')
+          + '<div style="font-size:12px;color:var(--ink-faint);margin-top:3px;">Por: ' + _solEsc(x.usuario || '—') + (x.detalle ? (' · ' + _solEsc(x.detalle)) : '') + '</div>'
+          + '</div>';
+      }).join('');
+    } catch(e){
+      console.error(e);
+      list.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:var(--danger);font-size:13px;">Error de conexión.</div>';
+    }
+  }
+  async function borrarSolucionesHistorial(){
+    const u = window.currentUser;
+    if (!u || u.role !== 'owner'){ alert('Solo el dueño puede borrar el historial.'); return; }
+    if (!confirm('¿Borrar TODO el historial de acciones?\n\nEsto no se puede deshacer.')) return;
+    try {
+      const r = await apiPost('borrarSolucionesLog', {});
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('🗑️ Historial borrado');
+        loadSolucionesHistorial();
+      } else alert('No se pudo borrar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
   }
 
   // ── HISTORIAL DE SERVICIOS POR CLIENTA (Mikaela) ──────────────
@@ -14174,6 +14498,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (id === 'ownerHome') await loadOwnerHome();
       if (id === 'clientDirectory') await renderClientDirectory();
       if (id === 'mikaelaHome') await loadMikaelaHome();
+      if (id === 'solucionesPanel') await loadSolucionesTickets();
       if (id === 'ownerPromos') renderPromos();
       if (id === 'staffPromos') await renderStaffPromos();
     }
