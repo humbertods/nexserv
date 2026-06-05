@@ -10453,6 +10453,14 @@ body.rol-staff #confirmSvcClientName::after {
         });
         return !incluidoEnOtra;
       });
+      // Recalcular el precio REGULAR por línea (montoNormal) con el catálogo de promos,
+      // para que la tarjeta recalcule aunque el ticket no haya guardado el regular por área
+      // (caso TM con servicio cambiado a promo o líneas combinadas normal + promo).
+      desglose.forEach(function(d){
+        const _regLn = _regularLineaDesc(d);
+        if (_regLn > (Number(d.montoNormal) || 0)) d.montoNormal = _regLn;
+        if ((Number(d.montoNormal) || 0) < (Number(d.monto) || 0)) d.montoNormal = Number(d.monto) || 0;
+      });
       // Modo ticket detallado
       window._cobrarDesglose = desglose;
       desgloseEl.style.display = 'block';
@@ -10836,6 +10844,33 @@ body.rol-staff #confirmSvcClientName::after {
     return r;
   }
   window._regularDesdeCatalogo = _regularDesdeCatalogo;
+
+  // Precio REGULAR de UNA línea del desglose, robusto para TM con servicios cambiados a promo
+  // o líneas combinadas (normal + promo). Idea: regular = monto + el DESCUENTO de la(s)
+  // promo(s) presentes en la línea (regular_catálogo − precio_catálogo). Así una promo pura
+  // sube a su regular, y una línea combinada solo le suma el descuento de su parte promo.
+  function _regularLineaDesc(d) {
+    const m = Number(d.monto) || 0;
+    let reg = Number(d.montoNormal != null ? d.montoNormal : 0) || 0;
+    let uplift = 0;
+    if (typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
+      const nombres = [];
+      if (d.promoNombre) String(d.promoNombre).split(',').forEach(n => nombres.push(n.trim()));
+      if (d.servicio)    String(d.servicio).split('+').forEach(n => nombres.push(n.trim()));
+      const vistos = new Set();
+      nombres.forEach(function(nm){
+        const k = nm.toLowerCase();
+        if (!nm || vistos.has(k)) return;
+        const p = PROMOS.find(function(p){ return String(p.name || '').trim().toLowerCase() === k; });
+        if (p) {
+          const pr = Number(p.regular || 0), pp = Number(p.price || 0);
+          if (pr > pp) { uplift += (pr - pp); vistos.add(k); }
+        }
+      });
+    }
+    return Math.max(reg, m + uplift, m);
+  }
+  window._regularLineaDesc = _regularLineaDesc;
 
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
