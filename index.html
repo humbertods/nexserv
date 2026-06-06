@@ -4908,7 +4908,8 @@ body.rol-staff #confirmSvcClientName::after {
       undo:    'M9 14 4 9l5-5v3h6a5 5 0 0 1 0 10h-3v-2h3a3 3 0 0 0 0-6H9v3Z',
       exit:    'M14 3a2 2 0 0 1 2 2v2h-2V5H6v14h8v-2h2v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8Zm3 6 4 3-4 3v-2h-6v-2h6V9Z',
       refresh: 'M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8Z',
-      chat:    'M4 4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3v3l4-3h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm8 3a2.5 2.5 0 0 1 1 4.79V12a1 1 0 0 1-2 0v-1a1 1 0 0 1 1-1 .5.5 0 1 0-.5-.5 1 1 0 0 1-2 0A2.5 2.5 0 0 1 12 7Zm0 7a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z'
+      chat:    'M4 4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h3v3l4-3h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm8 3a2.5 2.5 0 0 1 1 4.79V12a1 1 0 0 1-2 0v-1a1 1 0 0 1 1-1 .5.5 0 1 0-.5-.5 1 1 0 0 1-2 0A2.5 2.5 0 0 1 12 7Zm0 7a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z',
+      trash:   'M6 7h12l-1 14H7L6 7Zm3-3h6l1 2h4v2H2V6h4l1-2Z'
     };
     const d = P[name] || '';
     return '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="currentColor" style="vertical-align:middle;flex-shrink:0;"><path d="' + d + '"/></svg>';
@@ -5072,6 +5073,7 @@ body.rol-staff #confirmSvcClientName::after {
     acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
     acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">' + _solIcon('refresh',16) + ' Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
     acc += '<button onclick="solAbrirConsulta(\'' + nomJs + '\',\'' + idJs + '\')" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
+    acc += '<button onclick="solEliminarTicket(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;margin-top:14px;padding:13px;border:1px solid var(--danger-bg);border-radius:12px;background:var(--bg-card);color:var(--danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('trash',16) + ' Eliminar ticket (permanente)<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Solo si está roto y no se puede mover ni cobrar</div></button>';
 
     body.innerHTML = '<div class="card" style="padding:14px;">' + info + desg + acc + '</div>'
       + '<div style="font-size:11px;color:var(--ink-faint);text-align:center;margin-top:10px;line-height:1.5;">Para cobrar normalmente usá la pantalla “Por cobrar”. Para deshacer un servicio ya cobrado usá “Historial de servicios”.</div>';
@@ -5122,6 +5124,18 @@ body.rol-staff #confirmSvcClientName::after {
       } else alert('No se pudo procesar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
     } catch(e){ console.error(e); alert('Error de conexión.'); }
   }
+  async function solEliminarTicket(idEspera, nombre){
+    if (!confirm('⚠️ Vas a ELIMINAR el ticket de ' + (nombre || 'esta clienta') + ' de forma PERMANENTE.\n\nNo se cobra nada y no se puede deshacer. Usalo solo si el ticket está roto y no se puede mover ni cobrar.\n\n¿Continuar?')) return;
+    if (!confirm('Confirmá una vez más: ¿eliminar definitivamente este ticket?')) return;
+    try {
+      const r = await apiPost('eliminarTicketEspera', { id: idEspera || '' });
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('🗑️ Ticket eliminado');
+        _solLog('Eliminar ticket', nombre, idEspera, '');
+        solCerrarDetalle(); loadSolucionesTickets();
+      } else alert('No se pudo eliminar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
 
   function _solLog(accion, cliente, idEspera, detalle){
     try {
@@ -5157,6 +5171,7 @@ body.rol-staff #confirmSvcClientName::after {
         else if (acc.indexOf('Devolver') !== -1) ic = 'undo';
         else if (acc.indexOf('Reasignar') !== -1) ic = 'refresh';
         else if (acc.indexOf('Retirar') !== -1) ic = 'exit';
+        else if (acc.indexOf('Eliminar') !== -1) ic = 'trash';
         return '<div class="card" style="padding:12px;margin-bottom:8px;' + (esConsulta ? 'border-left:3px solid var(--accent-deep);' : '') + '">'
           + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><span style="font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;">' + _solIcon(ic,15) + _solEsc(acc) + '</span><span style="font-size:11px;color:var(--ink-faint);white-space:nowrap;">' + _solEsc(x.fecha) + ' · ' + _solEsc(x.hora) + '</span></div>'
           + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:3px;display:flex;align-items:center;gap:5px;">' + _solIcon('person',13) + _solEsc(x.cliente) + '</div>') : '')
@@ -10827,6 +10842,10 @@ body.rol-staff #confirmSvcClientName::after {
     window._cobrarTienePromo   = _promoNombreValida || _tienePrecioDistinto;
     window._cobrarDesglose = null;
 
+    // Reactivar el botón por si quedó trabado en "Procesando" en un cobro anterior
+    const _cb = document.getElementById('cobrarBtn');
+    if (_cb) { _cb.disabled = false; _cb.textContent = '✓ Confirmar cobro'; }
+
     document.getElementById('cobrarClientName').textContent = nombre;
     document.getElementById('cobrarTarjetaAviso').style.display = 'none';
 
@@ -11312,6 +11331,7 @@ body.rol-staff #confirmSvcClientName::after {
     btn.textContent = '⏳ Procesando...';
     btn.disabled = true;
 
+    try {
     // Cobro grupal: confirmar múltiples tickets a la vez
     if (window._cobroGrupal && window._cobroGrupal.clientas) {
       const metodoPago = window._cobroPago || 'Efectivo';
@@ -11462,6 +11482,11 @@ body.rol-staff #confirmSvcClientName::after {
       _clienteCobro + ' pagó ' + window._cobrarPago + ' $' + totalFinal.toFixed(2) + ' por ' + _servCobro + (totalProductos > 0 ? ' (inc. productos)' : '')
     );
     alert(msg);
+    } finally {
+      // Garantía: el botón SIEMPRE se reactiva al terminar, pase lo que pase
+      // (evita que quede trabado en "Procesando" y haya que recargar la app).
+      if (btn) { btn.disabled = false; btn.textContent = '✓ Confirmar cobro'; }
+    }
   }
   async function filterArrivalClients() {
     const search = (document.getElementById('arrivalSearch')?.value || '').toLowerCase();
