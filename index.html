@@ -1856,6 +1856,12 @@ body.rol-staff #confirmSvcClientName::after {
       <div id="as1SecuenciaItems" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
     </div>
 
+    <!-- Nota Especial de Mikaela para ESTA visita (privada: el asterisco la oculta/muestra) -->
+    <div id="as1NotaMikaela" style="display:none; background:#e4c6a0; border-radius:18px; padding:14px 16px 16px; margin-bottom:16px;">
+      <div style="text-align:center; font-size:15px; font-weight:700; color:#6b4f2a; margin-bottom:10px;">Nota Especial <span id="as1NotaToggle" onclick="toggleNotaRecepcion(1)" style="cursor:pointer; color:#9a6b3a; font-weight:800; font-size:17px; padding:2px 8px; user-select:none;" title="Tocá para ocultar o mostrar la nota">✱</span></div>
+      <div id="as1NotaMikaelaTxt" style="background:#fffaf3; border-radius:12px; padding:13px 15px; font-size:14px; color:#4a3a22; line-height:1.5; font-weight:500;"></div>
+    </div>
+
     <!-- Observaciones de la clienta -->
     <div style="background: #fffbf2; border: 1.5px solid #f0e5c8; border-radius: 20px; padding: 16px 18px; margin-bottom: 20px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -2285,6 +2291,12 @@ body.rol-staff #confirmSvcClientName::after {
 
     <div style="background: var(--success-bg); color: var(--success); padding: 12px 16px; border-radius: var(--radius-pill); text-align: center; font-weight: 700; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
       <span style="animation: pulse 2s infinite;">●</span> En atención · 6 min
+    </div>
+
+    <!-- Nota Especial de Mikaela para ESTA visita (privada: el asterisco la oculta/muestra) -->
+    <div id="as2NotaMikaela" style="display:none; background:#e4c6a0; border-radius:18px; padding:14px 16px 16px; margin-bottom:16px;">
+      <div style="text-align:center; font-size:15px; font-weight:700; color:#6b4f2a; margin-bottom:10px;">Nota Especial <span id="as2NotaToggle" onclick="toggleNotaRecepcion(2)" style="cursor:pointer; color:#9a6b3a; font-weight:800; font-size:17px; padding:2px 8px; user-select:none;" title="Tocá para ocultar o mostrar la nota">✱</span></div>
+      <div id="as2NotaMikaelaTxt" style="background:#fffaf3; border-radius:12px; padding:13px 15px; font-size:14px; color:#4a3a22; line-height:1.5; font-weight:500;"></div>
     </div>
 
     <!-- Observaciones de la clienta -->
@@ -4704,6 +4716,7 @@ body.rol-staff #confirmSvcClientName::after {
           if (_as1cd) _as1cd.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
           const _obs1 = document.getElementById('obs1Display');
           if (_obs1) _obs1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+          _setNotaRecepcion(1, a1.observaciones);
 
           // Restaurar servicios de la 1ª clienta desde el ticket (no solo slot 2)
           if (!String(a1.idEspera||'').startsWith('TM-') && !a1.promoNombre) {
@@ -5782,6 +5795,42 @@ body.rol-staff #confirmSvcClientName::after {
     await loadClientAfterTake();
   }
   
+  // ── Nota directa de Mikaela/recepción para la staff (cartel amarillo) ──
+  // Separa la nota humana de la visita del texto que agrega el sistema (enganche ✅, "Pasado por…", etc.)
+  function _extraerNotaRecepcion(obsRaw){
+    var s = String(obsRaw == null ? '' : obsRaw).trim();
+    if (!s) return '';
+    var partes = s.split(/\s*\|\s*|\n+/);
+    var sys = [/^✅/, /^Continuaci/i, /^Pasad[oa] por/i, /^Servicio adicional/i, /^Devuelt[oa]/i, /durante atenci/i, /termin[oó] su parte/i];
+    var humanas = [];
+    for (var i = 0; i < partes.length; i++){
+      var p = partes[i].trim();
+      if (!p) continue;
+      var esSys = false;
+      for (var j = 0; j < sys.length; j++){ if (sys[j].test(p)) { esSys = true; break; } }
+      if (!esSys) humanas.push(p);
+    }
+    return humanas.join(' · ').trim();
+  }
+  function _setNotaRecepcion(panel, obsRaw){
+    var el = document.getElementById('as' + panel + 'NotaMikaela');
+    if (!el) return;
+    var nota = _extraerNotaRecepcion(obsRaw);
+    var txt = document.getElementById('as' + panel + 'NotaMikaelaTxt');
+    if (nota){
+      if (txt) { txt.textContent = nota; txt.style.display = 'block'; } // arranca visible en cada clienta
+      el.style.display = 'block';
+    } else {
+      el.style.display = 'none';
+    }
+  }
+  // El asterisco oculta/muestra el texto de la nota (privacidad: que la clienta no lo vea)
+  function toggleNotaRecepcion(panel){
+    var t = document.getElementById('as' + panel + 'NotaMikaelaTxt');
+    if (!t) return;
+    t.style.display = (t.style.display === 'none') ? 'block' : 'none';
+  }
+
   async function loadClientAfterTake() {
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
@@ -5812,6 +5861,7 @@ body.rol-staff #confirmSvcClientName::after {
           const obsText = a.obsGeneral || a.observaciones || '';
           const _obs1d = document.getElementById('obs1Display');
           if (_obs1d) _obs1d.textContent = obsText || 'Sin observaciones';
+          _setNotaRecepcion(1, a.observaciones);
           // Destacar si hay servicios previos en las observaciones
           if (obsText && obsText.includes('✅')) {
             document.getElementById('obs1Display').style.color = 'var(--success-dark, #2a7a4b)';
@@ -6144,6 +6194,7 @@ body.rol-staff #confirmSvcClientName::after {
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText2 = a.obsGeneral || a.observaciones || '';
           document.getElementById('obs2Display').textContent = obsText2 || 'Sin observaciones';
+          _setNotaRecepcion(2, a.observaciones);
           // Destacar si hay servicios previos en las observaciones
           if (obsText2 && obsText2.includes('✅')) {
             document.getElementById('obs2Display').style.color = 'var(--success-dark, #2a7a4b)';
@@ -8859,6 +8910,7 @@ body.rol-staff #confirmSvcClientName::after {
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
         document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
         document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+        _setNotaRecepcion(1, a1.observaciones);
         renderSecuenciaBanner(1, a1.secuencia || []);
 
         // Solo resetear slotServices si cambio la clienta o si esta completamente vacia
