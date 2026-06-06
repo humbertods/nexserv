@@ -7612,12 +7612,16 @@ body.rol-staff #confirmSvcClientName::after {
     try {
       if (esTicketSP || esEngancheSN) {
         const idParaFinalizar = esEngancheSN ? miTicketSheet.idEspera : idEsperaActual;
+        const _spInfo = (typeof PROMOS !== 'undefined' ? PROMOS : []).find(function(p){ return p && p.name === data.promoNombre; });
         await apiPost('finalizarServicioPromo', {
           idEspera: idParaFinalizar,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
           servicio: svcNamesFresh,
           total: totalFresh,
+          promoNombre: data.promoNombre || '',
+          precioPromo: _spInfo ? String(_spInfo.price) : '',
+          precioRegular: _spInfo ? String(_spInfo.regular || _spInfo.price) : '',
           serviciosDetalle: desgloseAcumulado
         });
       } else {
@@ -8823,6 +8827,9 @@ body.rol-staff #confirmSvcClientName::after {
           clienteNombre: clientName,
           servicio: svcNames,
           total: String(total),
+          promoNombre: promoData ? promoData.promo.name : '',
+          precioPromo: promoData ? String(promoData.promo.price) : '',
+          precioRegular: promoData ? String(promoData.promo.regular || promoData.promo.price) : '',
           serviciosDetalle: desgloseAcumulado2
         });
       } else {
