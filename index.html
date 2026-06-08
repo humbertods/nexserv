@@ -9945,6 +9945,13 @@ body.rol-staff #confirmSvcClientName::after {
             const obs = String(w.observaciones || '');
             const esContinuacion = obs.indexOf('✅') !== -1;
             const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
+            // Cita confirmada que vino agendada por SYNA (solo le falta asignar staff)
+            const esSyna = obs.indexOf('SYNA') !== -1;
+            const _citaMatch = obs.match(/cita\s+([0-9]{1,2}:[0-9]{2})/i);
+            const _citaHora = _citaMatch ? _citaMatch[1] : '';
+            const synaBadge = esSyna
+              ? ' <span style="background:var(--warning);color:#fff;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">📅 Cita' + (_citaHora ? ' ' + _citaHora : '') + '</span>'
+              : '';
             // Partes ya hechas, parseadas de las observaciones
             const sigueMatch = obs.match(/Sigue:\s*([^|]+)/i);
             const sigueTxt = sigueMatch ? sigueMatch[1].trim() : '';
@@ -10016,7 +10023,7 @@ body.rol-staff #confirmSvcClientName::after {
               <div class="waitlist-top">
                 <div class="waitlist-client">
                   <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
-                  <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}</div>
+                  <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${synaBadge}</div>
                 </div>
                 ${priBadge[pri] || priBadge['normal']}
               </div>
