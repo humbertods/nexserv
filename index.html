@@ -696,6 +696,12 @@ body.rol-staff #confirmSvcClientName::after {
       <div id="authorizationsList"></div>
     </div>
 
+    <!-- PRELISTA DE ESPERA — citas agendadas por SYNA, pendientes de confirmar llegada -->
+    <div id="prelistaSection" style="display:none;">
+      <div class="section-title">📅 Prelista de espera <span class="count" id="mkPrelistaCount">0</span></div>
+      <div id="mkPrelistaList"></div>
+    </div>
+
     <div class="section-title">Lista de espera <span class="count" id="mkEsperaCount">0</span></div>
     <div id="mkEsperaList"><div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando...</div></div>
 
@@ -9814,8 +9820,80 @@ body.rol-staff #confirmSvcClientName::after {
 
   // === POR COBRAR (Mikaela) ===
 
+  // ── PRELISTA DE ESPERA (citas agendadas por SYNA) ──────────────────────────
+  async function loadPrelista() {
+    const section = document.getElementById('prelistaSection');
+    const list    = document.getElementById('mkPrelistaList');
+    const countEl = document.getElementById('mkPrelistaCount');
+    if (!section || !list) return;
+    try {
+      const r = await apiGet('getPrelista');
+      const arr = (r && r.success && r.prelista) ? r.prelista : [];
+      if (countEl) countEl.textContent = arr.length;
+      if (arr.length === 0) { section.style.display = 'none'; list.innerHTML = ''; return; }
+      section.style.display = 'block';
+      list.innerHTML = arr.map(c => {
+        const ini = String(c.nombre || '?').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
+        const citaTxt = c.horaCita ? ('Cita ' + c.horaCita) : 'Cita agendada';
+        const servTxt = [c.servicio, c.area].filter(Boolean).join(' · ');
+        const nombreSafe = String(c.nombre || '').replace(/['"\\]/g, '');
+        return '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--warning);">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
+            '<div style="width:40px;height:40px;border-radius:50%;background:var(--warning-bg);color:var(--warning);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0;">' + ini + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:15px;font-weight:700;">' + (c.nombre || '—') + '</div>' +
+              '<div style="font-size:12px;color:var(--ink-soft);">' + (servTxt || 'Servicio por definir') + '</div>' +
+              '<div style="font-size:11px;color:var(--warning);font-weight:700;margin-top:2px;">🕐 ' + citaTxt + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button onclick="confirmarLlegadaCita(\'' + c.id + '\')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó</button>' +
+            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + '\')" style="flex:1;padding:11px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗ Cancelar cita</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      section.style.display = 'none';
+    }
+  }
+
+  async function confirmarLlegadaCita(id) {
+    try {
+      showToast('⏳ Confirmando llegada...');
+      const r = await apiPost('confirmarLlegada', { idEspera: id });
+      if (r && r.success) {
+        showToast('✓ Clienta pasó a Lista de espera');
+        loadPrelista();
+        loadMikaelaHome();
+      } else {
+        alert('No se pudo confirmar: ' + ((r && r.message) || 'error'));
+        loadPrelista();
+      }
+    } catch (e) {
+      alert('Error de conexión al confirmar');
+    }
+  }
+
+  async function cancelarCitaSyna(id, nombre) {
+    if (!confirm('¿Cancelar la cita de ' + (nombre || 'esta clienta') + '?\nSe marcará como "clienta no llegó".')) return;
+    try {
+      showToast('⏳ Cancelando cita...');
+      const r = await apiPost('cancelarCita', { idEspera: id });
+      if (r && r.success) {
+        showToast('Cita cancelada');
+        loadPrelista();
+      } else {
+        alert('No se pudo cancelar: ' + ((r && r.message) || 'error'));
+        loadPrelista();
+      }
+    } catch (e) {
+      alert('Error de conexión al cancelar');
+    }
+  }
+
   async function loadMikaelaHome() {
     loadCajaChica();
+    loadPrelista();
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
       'tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
