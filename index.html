@@ -16889,11 +16889,19 @@ body.rol-staff #confirmSvcClientName::after {
     const n = String(svcName || '').toLowerCase()
       .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
       .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
-    const esCejasPolvo  = (n.includes('cejas') || n.includes('ceja')) && n.includes('polvo');
-    const esRetoque     = n.includes('retoque') && (n.includes('polvo') || n.includes('efecto'));
-    const esEfectoPolvo = n.includes('efecto') && n.includes('polvo');
-    const esMicropig    = n.includes('micropigment');
-    return esCejasPolvo || esRetoque || esEfectoPolvo || esMicropig;
+    const esCeja = n.includes('ceja');
+    // Pestañas / lifting / lashes NUNCA llevan ficha de pigmento de cejas.
+    // (Antes "Retoque de pestañas efecto Aura" disparaba la ficha por la palabra "efecto".)
+    const esPestanaOLash = n.includes('pestana') || n.includes('lash') || n.includes('lifting') || n.includes('rizado') || n.includes('extension');
+    if (esPestanaOLash && !esCeja) return false;
+    // Señales reales de pigmento de cejas (efecto polvo / permanente / micropigmentación)
+    const esCejasPolvo     = esCeja && n.includes('polvo');
+    const esEfectoPolvo    = n.includes('efecto') && n.includes('polvo'); // "efecto polvo" como frase
+    const esMicroblading   = n.includes('microblading') || n.includes('micro blading');
+    const esMicropig       = n.includes('micropigment') || n.includes('micro pigment');
+    const esCejaPermanente = esCeja && n.includes('permanente');
+    const esRetoqueCejas   = n.includes('retoque') && esCeja; // retoque SOLO si es de cejas
+    return esCejasPolvo || esEfectoPolvo || esMicroblading || esMicropig || esCejaPermanente || esRetoqueCejas;
   }
 
   async function loadCejasQuick(clientKey, slot, clientCodigo, clientNombre) {
