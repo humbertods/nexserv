@@ -5102,6 +5102,19 @@ body.rol-staff #confirmSvcClientName::after {
     acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
     acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">' + _solIcon('refresh',16) + ' Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
     acc += '<button onclick="solAbrirConsulta(\'' + nomJs + '\',\'' + idJs + '\')" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
+    var _solAreaToCat = { 'cejas':'cejas','ceja':'cejas','depilacion':'depilacion','depilación':'depilacion','pestanas':'pestanas','pestañas':'pestanas','pestana':'pestanas','retiro lifting':'retiro_lifting','retiro_lifting':'retiro_lifting','lifting':'retiro_lifting','retiro':'retiro_lifting','facial':'facial' };
+    var _solCurCat = _solAreaToCat[String(t.area || '').toLowerCase().trim()] || '';
+    function _solAreaOpt(v, l){ return '<option value="' + v + '"' + (v === _solCurCat ? ' selected' : '') + '>' + l + '</option>'; }
+    acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:8px;">'
+      + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">' + _solIcon('scissors',16) + ' Cambiar el servicio</div>'
+      + '<div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px;">Corregís el servicio y su precio. La staff lo verá actualizado; ella no puede cambiarlo.</div>'
+      + '<select id="solCambioArea" onchange="solCambioLoadServicios()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:8px;background:var(--bg-card);color:var(--ink);">'
+      +   '<option value="">Elegí el área…</option>'
+      +   _solAreaOpt('cejas','Cejas') + _solAreaOpt('depilacion','Depilación') + _solAreaOpt('pestanas','Pestañas') + _solAreaOpt('retiro_lifting','Retiro / Lifting') + _solAreaOpt('facial','Facial')
+      + '</select>'
+      + '<select id="solCambioServicio" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:10px;background:var(--bg-card);color:var(--ink);"><option value="">Elegí primero el área…</option></select>'
+      + '<button onclick="solConfirmarCambioServicio(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent-deep);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Cambiar servicio</button>'
+      + '</div>';
     acc += '<button onclick="solEliminarTicket(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;margin-top:14px;padding:13px;border:1px solid var(--danger-bg);border-radius:12px;background:var(--bg-card);color:var(--danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('trash',16) + ' Eliminar ticket (permanente)<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Solo si está roto y no se puede mover ni cobrar</div></button>';
 
     body.innerHTML = '<div class="card" style="padding:14px;">' + info + desg + acc + '</div>'
@@ -5110,6 +5123,7 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('solInspectorView').style.display = 'none';
     document.getElementById('solGuiaView').style.display = 'none';
     document.getElementById('solDetalleView').style.display = 'block';
+    try { solCambioLoadServicios(); } catch(e){}
   }
   function solCerrarDetalle(){
     const d = document.getElementById('solDetalleView');
@@ -5163,6 +5177,41 @@ body.rol-staff #confirmSvcClientName::after {
         _solLog('Eliminar ticket', nombre, idEspera, '');
         solCerrarDetalle(); loadSolucionesTickets();
       } else alert('No se pudo eliminar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
+    } catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+
+  async function solCambioLoadServicios(){
+    const selA = document.getElementById('solCambioArea');
+    const selS = document.getElementById('solCambioServicio');
+    if (!selA || !selS) return;
+    const area = selA.value;
+    selS.innerHTML = '<option value="">Cargando…</option>';
+    try { if (typeof ensureCatalogoLoaded === 'function') await ensureCatalogoLoaded(); } catch(e){}
+    if (!area){ selS.innerHTML = '<option value="">Elegí primero el área…</option>'; return; }
+    const lista = (typeof CATALOGO !== 'undefined' && CATALOGO[area]) ? CATALOGO[area] : [];
+    if (!lista.length){ selS.innerHTML = '<option value="">Sin servicios en esta área</option>'; return; }
+    selS.innerHTML = '<option value="">Elegí el servicio…</option>';
+    lista.forEach(function(s){
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ name: s.name, price: s.price, area: area });
+      opt.textContent = s.name + ' — $' + s.price;
+      selS.appendChild(opt);
+    });
+  }
+
+  async function solConfirmarCambioServicio(idEspera, nombre){
+    const selS = document.getElementById('solCambioServicio');
+    const val = selS ? selS.value : '';
+    if (!val){ alert('Elegí el servicio correcto.'); return; }
+    let svc; try { svc = JSON.parse(val); } catch(e){ alert('Servicio inválido.'); return; }
+    if (!confirm('Vas a corregir el servicio de ' + (nombre || 'la clienta') + ':\n\n→ ' + svc.name + '   ($' + svc.price + ')\n\nQuedará como servicio puntual (sin promo) y la staff lo verá actualizado. ¿Confirmás?')) return;
+    try {
+      const r = await apiPost('cambiarServicioTicket', { idEspera: idEspera || '', servicio: svc.name, area: svc.area, precio: svc.price });
+      if (r && r.success){
+        if (typeof showToast === 'function') showToast('✓ Servicio corregido: ' + svc.name);
+        _solLog('Cambiar servicio', nombre, idEspera, svc.name + ' ($' + svc.price + ')');
+        solCerrarDetalle(); loadSolucionesTickets();
+      } else alert('No se pudo cambiar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
     } catch(e){ console.error(e); alert('Error de conexión.'); }
   }
 
