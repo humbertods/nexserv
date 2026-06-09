@@ -888,6 +888,11 @@ body.rol-staff #confirmSvcClientName::after {
             <option value="">Primero seleccioná el área</option>
           </select>
         </div>
+
+        <div class="input-group">
+          <label>Nota para la chica (esta visita)</label>
+          <textarea id="assignSvcNota" placeholder="Ej: quiere las cejas más finas, alérgica al pegamento..."></textarea>
+        </div>
         
         <div id="assignSvcPriceDisplay" style="display: none; background: var(--bg); border-radius: 14px; padding: 12px 16px; margin-bottom: 14px; text-align: center;">
           <span style="font-size: 12px; color: var(--ink-soft); font-weight: 600;">Precio: </span>
@@ -913,6 +918,11 @@ body.rol-staff #confirmSvcClientName::after {
           <select id="assignPromoStaff">
             <option value="">¿Qué staff la atiende primero?</option>
           </select>
+        </div>
+
+        <div class="input-group">
+          <label>Nota para la chica (esta visita)</label>
+          <textarea id="assignPromoNota" placeholder="Ej: quiere las cejas más finas, alérgica al pegamento..."></textarea>
         </div>
         
         <div id="assignPromoList"></div>
@@ -9655,6 +9665,7 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('assignSvcClientName').textContent = clientName;
     document.getElementById('assignSvcArea').value = '';
     document.getElementById('assignSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
+    var _svcNota = document.getElementById('assignSvcNota'); if (_svcNota) _svcNota.value = '';
     document.getElementById('assignSvcPriceDisplay').style.display = 'none';
     document.getElementById('assignServiceModal').classList.add('active');
   }
@@ -9744,7 +9755,8 @@ body.rol-staff #confirmSvcClientName::after {
         servicio: svc.name,
         area: svc.area,
         precio: svc.price,
-        chica: chica
+        chica: chica,
+        observaciones: (document.getElementById('assignSvcNota') || {}).value || ''
       });
       
       if (result.success) {
@@ -9787,6 +9799,7 @@ body.rol-staff #confirmSvcClientName::after {
       </div>
     `).join('');
     
+    var _promoNota = document.getElementById('assignPromoNota'); if (_promoNota) _promoNota.value = '';
     document.getElementById('assignPromoModal').classList.add('active');
   }
   
@@ -9802,7 +9815,8 @@ body.rol-staff #confirmSvcClientName::after {
         promoNombre: promo.name,
         precioPromo: promo.price,
         precioRegular: promo.regular,
-        chica: chica
+        chica: chica,
+        observaciones: (document.getElementById('assignPromoNota') || {}).value || ''
       });
       
       if (result.success) {
@@ -11524,7 +11538,8 @@ body.rol-staff #confirmSvcClientName::after {
                 idEspera: c.idEspera,
                 clienteNombre: c.nombre || '',
                 productos: _prodsC,
-                total: _totProdC
+                total: _totProdC,
+                metodoPago: metodoPago
               });
             } catch(eProd) { console.error(eProd); }
             delete window._apProductosEnTicket[c.idEspera];
@@ -11605,7 +11620,8 @@ body.rol-staff #confirmSvcClientName::after {
           idEspera: window._cobrarId,
           clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
           productos: productosTicket,
-          total: totalProductos
+          total: totalProductos,
+          metodoPago: window._cobrarPago
         });
       } catch(e) { console.error(e); }
       delete window._apProductosEnTicket[window._cobrarId];
