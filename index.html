@@ -501,6 +501,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuSolucionesBtn" style="display:none;" onclick="closeUserMenu(); openSoluciones();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.71 18.29 13.4 9.98a5.5 5.5 0 0 0-7.04-7.05l3.2 3.2a1.5 1.5 0 0 1-2.12 2.12l-3.2-3.2A5.5 5.5 0 0 0 11.3 12l8.3 8.3a1 1 0 0 0 1.42 0l.69-.69a1 1 0 0 0 0-1.32Z"/></svg> Soluciones
     </button>
+    <button class="user-menu-item" id="menuAuditClientasBtn" style="display:none;" onclick="closeUserMenu(); auditarClientasUI();">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg> Auditar clientas
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -4915,6 +4918,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     const solBtn = document.getElementById('menuSolucionesBtn');
     if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    const audBtn = document.getElementById('menuAuditClientasBtn');
+    if (audBtn) audBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
