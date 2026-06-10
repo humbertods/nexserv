@@ -5102,19 +5102,6 @@ body.rol-staff #confirmSvcClientName::after {
     acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
     acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">' + _solIcon('refresh',16) + ' Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
     acc += '<button onclick="solAbrirConsulta(\'' + nomJs + '\',\'' + idJs + '\')" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
-    var _solAreaToCat = { 'cejas':'cejas','ceja':'cejas','depilacion':'depilacion','depilación':'depilacion','pestanas':'pestanas','pestañas':'pestanas','pestana':'pestanas','retiro lifting':'retiro_lifting','retiro_lifting':'retiro_lifting','lifting':'retiro_lifting','retiro':'retiro_lifting','facial':'facial' };
-    var _solCurCat = _solAreaToCat[String(t.area || '').toLowerCase().trim()] || '';
-    function _solAreaOpt(v, l){ return '<option value="' + v + '"' + (v === _solCurCat ? ' selected' : '') + '>' + l + '</option>'; }
-    acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:8px;">'
-      + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">' + _solIcon('scissors',16) + ' Cambiar el servicio</div>'
-      + '<div style="font-size:11px;color:var(--ink-faint);margin-bottom:10px;">Corregís el servicio y su precio. La staff lo verá actualizado; ella no puede cambiarlo.</div>'
-      + '<select id="solCambioArea" onchange="solCambioLoadServicios()" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:8px;background:var(--bg-card);color:var(--ink);">'
-      +   '<option value="">Elegí el área…</option>'
-      +   _solAreaOpt('cejas','Cejas') + _solAreaOpt('depilacion','Depilación') + _solAreaOpt('pestanas','Pestañas') + _solAreaOpt('retiro_lifting','Retiro / Lifting') + _solAreaOpt('facial','Facial')
-      + '</select>'
-      + '<select id="solCambioServicio" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:10px;background:var(--bg-card);color:var(--ink);"><option value="">Elegí primero el área…</option></select>'
-      + '<button onclick="solConfirmarCambioServicio(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent-deep);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">Cambiar servicio</button>'
-      + '</div>';
     acc += '<button onclick="solEliminarTicket(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;margin-top:14px;padding:13px;border:1px solid var(--danger-bg);border-radius:12px;background:var(--bg-card);color:var(--danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('trash',16) + ' Eliminar ticket (permanente)<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Solo si está roto y no se puede mover ni cobrar</div></button>';
 
     body.innerHTML = '<div class="card" style="padding:14px;">' + info + desg + acc + '</div>'
@@ -5123,7 +5110,6 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('solInspectorView').style.display = 'none';
     document.getElementById('solGuiaView').style.display = 'none';
     document.getElementById('solDetalleView').style.display = 'block';
-    try { solCambioLoadServicios(); } catch(e){}
   }
   function solCerrarDetalle(){
     const d = document.getElementById('solDetalleView');
@@ -5177,41 +5163,6 @@ body.rol-staff #confirmSvcClientName::after {
         _solLog('Eliminar ticket', nombre, idEspera, '');
         solCerrarDetalle(); loadSolucionesTickets();
       } else alert('No se pudo eliminar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
-    } catch(e){ console.error(e); alert('Error de conexión.'); }
-  }
-
-  async function solCambioLoadServicios(){
-    const selA = document.getElementById('solCambioArea');
-    const selS = document.getElementById('solCambioServicio');
-    if (!selA || !selS) return;
-    const area = selA.value;
-    selS.innerHTML = '<option value="">Cargando…</option>';
-    try { if (typeof ensureCatalogoLoaded === 'function') await ensureCatalogoLoaded(); } catch(e){}
-    if (!area){ selS.innerHTML = '<option value="">Elegí primero el área…</option>'; return; }
-    const lista = (typeof CATALOGO !== 'undefined' && CATALOGO[area]) ? CATALOGO[area] : [];
-    if (!lista.length){ selS.innerHTML = '<option value="">Sin servicios en esta área</option>'; return; }
-    selS.innerHTML = '<option value="">Elegí el servicio…</option>';
-    lista.forEach(function(s){
-      const opt = document.createElement('option');
-      opt.value = JSON.stringify({ name: s.name, price: s.price, area: area });
-      opt.textContent = s.name + ' — $' + s.price;
-      selS.appendChild(opt);
-    });
-  }
-
-  async function solConfirmarCambioServicio(idEspera, nombre){
-    const selS = document.getElementById('solCambioServicio');
-    const val = selS ? selS.value : '';
-    if (!val){ alert('Elegí el servicio correcto.'); return; }
-    let svc; try { svc = JSON.parse(val); } catch(e){ alert('Servicio inválido.'); return; }
-    if (!confirm('Vas a corregir el servicio de ' + (nombre || 'la clienta') + ':\n\n→ ' + svc.name + '   ($' + svc.price + ')\n\nQuedará como servicio puntual (sin promo) y la staff lo verá actualizado. ¿Confirmás?')) return;
-    try {
-      const r = await apiPost('cambiarServicioTicket', { idEspera: idEspera || '', servicio: svc.name, area: svc.area, precio: svc.price });
-      if (r && r.success){
-        if (typeof showToast === 'function') showToast('✓ Servicio corregido: ' + svc.name);
-        _solLog('Cambiar servicio', nombre, idEspera, svc.name + ' ($' + svc.price + ')');
-        solCerrarDetalle(); loadSolucionesTickets();
-      } else alert('No se pudo cambiar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
     } catch(e){ console.error(e); alert('Error de conexión.'); }
   }
 
@@ -16889,19 +16840,11 @@ body.rol-staff #confirmSvcClientName::after {
     const n = String(svcName || '').toLowerCase()
       .replace(/[áa]/g,'a').replace(/[éeè]/g,'e').replace(/[íi]/g,'i')
       .replace(/[óo]/g,'o').replace(/[úu]/g,'u').replace(/ñ/g,'n');
-    const esCeja = n.includes('ceja');
-    // Pestañas / lifting / lashes NUNCA llevan ficha de pigmento de cejas.
-    // (Antes "Retoque de pestañas efecto Aura" disparaba la ficha por la palabra "efecto".)
-    const esPestanaOLash = n.includes('pestana') || n.includes('lash') || n.includes('lifting') || n.includes('rizado') || n.includes('extension');
-    if (esPestanaOLash && !esCeja) return false;
-    // Señales reales de pigmento de cejas (efecto polvo / permanente / micropigmentación)
-    const esCejasPolvo     = esCeja && n.includes('polvo');
-    const esEfectoPolvo    = n.includes('efecto') && n.includes('polvo'); // "efecto polvo" como frase
-    const esMicroblading   = n.includes('microblading') || n.includes('micro blading');
-    const esMicropig       = n.includes('micropigment') || n.includes('micro pigment');
-    const esCejaPermanente = esCeja && n.includes('permanente');
-    const esRetoqueCejas   = n.includes('retoque') && esCeja; // retoque SOLO si es de cejas
-    return esCejasPolvo || esEfectoPolvo || esMicroblading || esMicropig || esCejaPermanente || esRetoqueCejas;
+    const esCejasPolvo  = (n.includes('cejas') || n.includes('ceja')) && n.includes('polvo');
+    const esRetoque     = n.includes('retoque') && (n.includes('polvo') || n.includes('efecto'));
+    const esEfectoPolvo = n.includes('efecto') && n.includes('polvo');
+    const esMicropig    = n.includes('micropigment');
+    return esCejasPolvo || esRetoque || esEfectoPolvo || esMicropig;
   }
 
   async function loadCejasQuick(clientKey, slot, clientCodigo, clientNombre) {
@@ -17937,31 +17880,20 @@ async function suscribirPushActual() {
     }
     const messaging = firebase.messaging();
 
-    // SW DEDICADO de Firebase Messaging → notificaciones con la app CERRADA (tipo WhatsApp).
-    // Si el archivo aún no está subido, cae al SW principal y sigue andando en primer plano.
-    let fcmReg = reg;
+    // PUSH EN SEGUNDO PLANO (clave para iPhone): atar la suscripción SIEMPRE al SW
+    // PRINCIPAL que CONTROLA la app (sw.js, scope '/nexserv/'). En iPhones con la PWA
+    // instalada, iOS solo despierta de forma confiable al SW que controla la app; un SW
+    // aparte en otro scope (firebase-messaging-sw.js) corre con la app abierta pero NO se
+    // despierta con el teléfono en reposo → por eso los avisos solo llegaban con la app
+    // abierta. sw.js ya tiene su propio handler de 'push' que muestra la notificación.
+    const fcmReg = reg;
+
+    // Limpieza: desregistrar el SW de push viejo en otro scope (de versiones anteriores).
+    // Así los iPhones que quedaron suscritos al SW equivocado pasan al SW principal.
     try {
-      fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
-      // Esperar a que el SW de Firebase esté ACTIVO antes de suscribir
-      // (recién registrado puede estar instalándose → "no active Service Worker")
-      if (!fcmReg.active) {
-        const sw2 = fcmReg.installing || fcmReg.waiting;
-        if (sw2) {
-          await new Promise(res => {
-            const t = setTimeout(res, 5000); // no colgar
-            sw2.addEventListener('statechange', () => {
-              if (sw2.state === 'activated') { clearTimeout(t); res(); }
-            });
-          });
-        }
-        fcmReg = (await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope')) || fcmReg;
-      }
-      // Si todavía no quedó activo, usar el SW principal (que sí lo está)
-      if (!fcmReg.active) { console.log('[Push] FCM SW aún no activo, uso SW principal'); fcmReg = reg; }
-    } catch (eReg) {
-      console.warn('[Push] FCM SW no disponible, uso SW principal:', eReg.message);
-      fcmReg = reg;
-    }
+      const _oldFcm = await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope');
+      if (_oldFcm) { await _oldFcm.unregister(); console.log('[Push] SW de push viejo desregistrado'); }
+    } catch (e) {}
 
     // Notificación cuando la app está ABIERTA en primer plano (FCM no la muestra sola)
     try {
