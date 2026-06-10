@@ -6188,7 +6188,8 @@ body.rol-staff #confirmSvcClientName::after {
           }
 
           // Precargar ficha cejas pigmento si el servicio es de efecto polvo/permanente
-          if (user) {
+          // Solo para chicas de CEJAS (pestañas/facial no deben ver la ficha de cejas/pigmento)
+          if (user && String(user.area||'').toLowerCase().includes('ceja')) {
             const svcNameForPig = slotServices[1].find(function(s){ return esSrvPigmento(s.name); });
             if (svcNameForPig) {
               const cKey1 = (a.codigo || '').toLowerCase().replace(/-/g, '');
@@ -6475,7 +6476,7 @@ body.rol-staff #confirmSvcClientName::after {
             window._facialFichaSlot = 2;
             setTimeout(function() { loadFacialFichaQuick(_fKey2, 2); }, 400);
           }
-          if (user) {
+          if (user && String(user.area||'').toLowerCase().includes('ceja')) {
             const _svcPig2 = slotServices[2] && slotServices[2].find(function(s){ return esSrvPigmento(s.name); });
             if (_svcPig2) {
               const _cKey2 = (a.codigo || '').toLowerCase().replace(/-/g, '');
@@ -6624,7 +6625,7 @@ body.rol-staff #confirmSvcClientName::after {
       try {
         if (slot === 1) {
           const user2 = window.currentUser;
-          if (user2) {
+          if (user2 && String(user2.area||'').toLowerCase().includes('ceja')) {
             const hasPig = (slotServices[1] || []).some(function(s) { return esSrvPigmento(s.name); });
             const el = document.getElementById('cejasQuick1');
             if (hasPig && el && el.style.display === 'none' && el.innerHTML.trim() === '') {
@@ -7401,7 +7402,7 @@ body.rol-staff #confirmSvcClientName::after {
     const slot_cs = window._confirmSvcSlot || 1;
     const svcs_cs = slotServices[slot_cs] || [];
     const tienePigmento = svcs_cs.some(function(s) { return esSrvPigmento(s.name); });
-    if (tienePigmento) {
+    if (tienePigmento && user && String(user.area||'').toLowerCase().includes('ceja')) {
       const clientCodigo_cs = slot_cs === 1 ? (window._as1Client || '') : (window._as2Client || '');
       const clientNombre_cs = document.getElementById('as' + slot_cs + 'Name')?.textContent?.replace(' ⭐','') || '';
       const clientKey_cs = clientCodigo_cs.toLowerCase().replace(/-/g,'');
@@ -9498,7 +9499,7 @@ body.rol-staff #confirmSvcClientName::after {
         var _cod2 = codigo || window._currentCejasClientCodigo || window._cpCodigo || '';
         var _nom2 = nombre || window._currentCejasClientNombre || window._cpNombre || '';
         var _ck2 = _cod2.toLowerCase().replace(/-/g,'');
-        if (_ce2 && _cod2) {
+        if (_ce2 && _cod2 && String((window.currentUser||{}).area||'').toLowerCase().includes('ceja')) {
           _ce2.innerHTML = '';
           _ce2.style.display = 'none';
           setTimeout(function(){ loadCejasQuick(_ck2, _cs2, _cod2, _nom2); }, 400);
