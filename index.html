@@ -501,9 +501,6 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuSolucionesBtn" style="display:none;" onclick="closeUserMenu(); openSoluciones();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.71 18.29 13.4 9.98a5.5 5.5 0 0 0-7.04-7.05l3.2 3.2a1.5 1.5 0 0 1-2.12 2.12l-3.2-3.2A5.5 5.5 0 0 0 11.3 12l8.3 8.3a1 1 0 0 0 1.42 0l.69-.69a1 1 0 0 0 0-1.32Z"/></svg> Soluciones
     </button>
-    <button class="user-menu-item" id="menuAuditClientasBtn" style="display:none;" onclick="closeUserMenu(); auditarClientasUI();">
-      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg> Auditar clientas
-    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -698,6 +695,9 @@ body.rol-staff #confirmSvcClientName::after {
       </div>
       <div id="authorizationsList"></div>
     </div>
+
+    <!-- AGENDAR CITA — Mikaela crea una cita (modal en cascada área → servicio/promo) -->
+    <button onclick="openAgendarCita()" style="width:100%;padding:15px;margin-bottom:14px;background:var(--accent-deep);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">＋ Agendar cita</button>
 
     <!-- PRELISTA DE ESPERA — citas agendadas por SYNA, pendientes de confirmar llegada -->
     <div id="prelistaSection" style="display:none;">
@@ -1083,10 +1083,7 @@ body.rol-staff #confirmSvcClientName::after {
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <div style="font-size: 13px; font-weight: 700;">Total: <span id="clientCount">0</span> clientas</div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button id="auditClientasBtn" onclick="auditarClientasUI()" style="display:none;padding:10px 14px;background:var(--bg-soft,#f0ece6);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🔍 Auditar</button>
-        <button onclick="openNewClient()" style="padding: 10px 18px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Nueva clienta</button>
-      </div>
+      <button onclick="openNewClient()" style="padding: 10px 18px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Nueva clienta</button>
     </div>
 
     <div id="clientDirectoryList"></div>
@@ -2111,6 +2108,50 @@ body.rol-staff #confirmSvcClientName::after {
         </div>
         <button class="btn-primary" onclick="saveNewPestFicha()" style="background: var(--top-purple);">Guardar nueva ficha</button>
         <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Modal: Agendar cita (cascada Área → Servicio/Promo) -->
+    <div class="modal-bg" id="agendarCitaModal">
+      <div class="modal" style="max-width:540px;">
+        <div class="modal-handle"></div>
+        <div class="modal-title">📅 Agendar cita</div>
+
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button id="acTabExist" onclick="acSetTipo('existente')" style="flex:1;padding:12px;border-radius:12px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Clienta existente</button>
+          <button id="acTabNueva" onclick="acSetTipo('nueva')" style="flex:1;padding:12px;border-radius:12px;border:none;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Nueva clienta</button>
+        </div>
+
+        <div id="acExistente">
+          <input id="acBuscar" oninput="acBuscarCliente(this.value)" placeholder="Buscar por nombre, código o teléfono…" style="width:100%;padding:13px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;box-sizing:border-box;background:var(--bg-card);color:var(--ink);">
+          <div id="acResultados" style="max-height:170px;overflow:auto;"></div>
+          <div id="acSeleccionada" style="display:none;margin-top:8px;font-size:13px;padding:10px;background:var(--bg-soft,#f6f2ec);border-radius:10px;"></div>
+        </div>
+
+        <div id="acNueva" style="display:none;">
+          <input id="acNuevoNombre" placeholder="Nombre de la clienta" style="width:100%;padding:13px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;box-sizing:border-box;margin-bottom:8px;background:var(--bg-card);color:var(--ink);">
+          <input id="acNuevoTel" placeholder="Teléfono (opcional)" style="width:100%;padding:13px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;box-sizing:border-box;background:var(--bg-card);color:var(--ink);">
+        </div>
+
+        <div style="display:flex;gap:8px;margin:14px 0;">
+          <div style="flex:1;">
+            <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px;">Fecha</label>
+            <input type="date" id="acFecha" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;box-sizing:border-box;background:var(--bg-card);color:var(--ink);">
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:11px;font-weight:700;color:var(--ink-soft);display:block;margin-bottom:4px;">Hora</label>
+            <input type="time" id="acHora" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;box-sizing:border-box;background:var(--bg-card);color:var(--ink);">
+          </div>
+        </div>
+
+        <div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:6px 0;">SERVICIOS</div>
+        <div id="acServicios"></div>
+        <button id="acAddBtn" onclick="acAddServicio()" style="width:100%;padding:12px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:transparent;color:var(--accent-deep);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Agregar servicio (1/5)</button>
+
+        <div id="acPreview"></div>
+
+        <button class="btn-primary" onclick="acConfirmar()" style="margin-top:16px;">📅 Agendar cita</button>
+        <button class="btn-primary outline" onclick="closeModal()" style="margin-top:8px;">Cancelar</button>
       </div>
     </div>
 
@@ -4918,8 +4959,6 @@ body.rol-staff #confirmSvcClientName::after {
     if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     const solBtn = document.getElementById('menuSolucionesBtn');
     if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
-    const audBtn = document.getElementById('menuAuditClientasBtn');
-    if (audBtn) audBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -5185,17 +5224,6 @@ body.rol-staff #confirmSvcClientName::after {
       });
     } catch(e){}
   }
-  function _solFechaCorta(f){
-    if (!f) return '';
-    const s = String(f).trim();
-    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s)) return s.split(' ')[0]; // ya viene dd/MM/yyyy
-    const d = new Date(s);
-    if (isNaN(d.getTime())) return s;
-    const dd = String(d.getDate()).padStart(2,'0');
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    return dd + '/' + mm + '/' + d.getFullYear();
-  }
-
   async function loadSolucionesHistorial(){
     const list = document.getElementById('solHistorialList');
     if (!list) return;
@@ -5220,14 +5248,11 @@ body.rol-staff #confirmSvcClientName::after {
         else if (acc.indexOf('Reasignar') !== -1) ic = 'refresh';
         else if (acc.indexOf('Retirar') !== -1) ic = 'exit';
         else if (acc.indexOf('Eliminar') !== -1) ic = 'trash';
-        return '<div class="card" style="padding:12px 14px;margin-bottom:8px;border-radius:14px;' + (esConsulta ? 'border-left:3px solid var(--accent-deep);' : '') + '">'
-          + '<div style="display:flex;align-items:center;gap:8px;">'
-          +   '<span style="flex-shrink:0;display:inline-flex;color:var(--accent-deep);">' + _solIcon(ic,16) + '</span>'
-          +   '<span style="font-weight:800;font-size:14px;line-height:1.25;">' + _solEsc(acc) + '</span>'
-          + '</div>'
-          + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:6px;display:flex;align-items:center;gap:5px;">' + _solIcon('person',13) + _solEsc(x.cliente) + '</div>') : '')
+        return '<div class="card" style="padding:12px;margin-bottom:8px;' + (esConsulta ? 'border-left:3px solid var(--accent-deep);' : '') + '">'
+          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><span style="font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;">' + _solIcon(ic,15) + _solEsc(acc) + '</span><span style="font-size:11px;color:var(--ink-faint);white-space:nowrap;">' + _solEsc(x.fecha) + ' · ' + _solEsc(x.hora) + '</span></div>'
+          + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:3px;display:flex;align-items:center;gap:5px;">' + _solIcon('person',13) + _solEsc(x.cliente) + '</div>') : '')
           + (x.detalle ? ('<div style="font-size:13px;color:var(--ink);margin-top:5px;line-height:1.5;' + (esConsulta ? 'font-style:italic;' : '') + '">' + (esConsulta ? '“' : '') + _solEsc(x.detalle) + (esConsulta ? '”' : '') + '</div>') : '')
-          + '<div style="font-size:11px;color:var(--ink-faint);margin-top:8px;padding-top:7px;border-top:1px solid var(--line);">' + _solEsc(_solFechaCorta(x.fecha)) + (x.hora ? ' · ' + _solEsc(x.hora) : '') + ' · Por ' + _solEsc(x.usuario || '—') + '</div>'
+          + '<div style="font-size:12px;color:var(--ink-faint);margin-top:4px;">Por: ' + _solEsc(x.usuario || '—') + '</div>'
           + '</div>';
       }).join('');
     } catch(e){
@@ -9857,6 +9882,215 @@ body.rol-staff #confirmSvcClientName::after {
   // === POR COBRAR (Mikaela) ===
 
   // ── PRELISTA DE ESPERA (citas agendadas por SYNA) ──────────────────────────
+  // ===================== AGENDAR CITA (modal en cascada) =====================
+  function _acEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  window._acState = { tipo:'existente', codigo:'', nombre:'', servicios:[] };
+  const _AC_AREAS = [
+    { key:'cejas', label:'Cejas' },
+    { key:'pestanas', label:'Pestañas' },
+    { key:'facial', label:'Facial' },
+    { key:'depilacion', label:'Depilación' },
+    { key:'retiro_lifting', label:'Permanentes / Lifting' },
+    { key:'promos', label:'Promociones' }
+  ];
+
+  async function openAgendarCita(){
+    window._acState = { tipo:'existente', codigo:'', nombre:'', servicios:[{ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 }] };
+    try { if (typeof ensureCatalogoLoaded === 'function') await ensureCatalogoLoaded(); } catch(e){}
+    try { if (typeof ensurePromosLoaded === 'function') await ensurePromosLoaded(); } catch(e){}
+    acSetTipo('existente');
+    ['acBuscar','acNuevoNombre','acNuevoTel','acFecha','acHora'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('acResultados').innerHTML='';
+    document.getElementById('acSeleccionada').style.display='none';
+    acRenderServicios();
+    document.getElementById('agendarCitaModal').classList.add('active');
+  }
+
+  function acSetTipo(t){
+    window._acState.tipo = t;
+    document.getElementById('acExistente').style.display = (t==='existente') ? 'block' : 'none';
+    document.getElementById('acNueva').style.display     = (t==='nueva')     ? 'block' : 'none';
+    var tabE=document.getElementById('acTabExist'), tabN=document.getElementById('acTabNueva');
+    tabE.style.background = (t==='existente') ? 'var(--accent-deep)' : 'var(--bg-soft, #efeae3)';
+    tabE.style.color      = (t==='existente') ? '#fff' : 'var(--ink)';
+    tabN.style.background = (t==='nueva') ? 'var(--accent-deep)' : 'var(--bg-soft, #efeae3)';
+    tabN.style.color      = (t==='nueva') ? '#fff' : 'var(--ink)';
+  }
+
+  async function _acEnsureClientas(){
+    if (window._acClientas && window._acClientas.length) return;
+    try { const r = await apiGet('getClientas'); window._acClientas = (r && r.clientas) ? r.clientas : []; }
+    catch(e){ window._acClientas = []; }
+  }
+  async function acBuscarCliente(q){
+    const cont = document.getElementById('acResultados');
+    q = String(q||'').trim().toLowerCase();
+    if (q.length < 2){ cont.innerHTML=''; return; }
+    await _acEnsureClientas();
+    const res = (window._acClientas||[]).filter(function(c){
+      return String(c.nombre||'').toLowerCase().includes(q)
+          || String(c.codigo||'').toLowerCase().includes(q)
+          || String(c.telefono||'').toLowerCase().includes(q);
+    }).slice(0,8);
+    if (!res.length){ cont.innerHTML='<div style="padding:10px;color:var(--ink-faint);font-size:12px;">Sin resultados</div>'; return; }
+    cont.innerHTML = res.map(function(c){
+      const cod=_acEsc(c.codigo), nom=_acEsc(c.nombre);
+      return '<div onclick="acSelectCliente(\''+cod+'\')" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
+    }).join('');
+  }
+  function acSelectCliente(cod){
+    const c=(window._acClientas||[]).find(function(x){ return String(x.codigo)===String(cod); });
+    const nom=c ? String(c.nombre||'') : '';
+    window._acState.tipo='existente'; window._acState.codigo=cod; window._acState.nombre=nom;
+    document.getElementById('acResultados').innerHTML='';
+    document.getElementById('acBuscar').value='';
+    var sel=document.getElementById('acSeleccionada');
+    sel.style.display='block';
+    sel.innerHTML='✓ <b>'+_acEsc(nom)+'</b> · '+_acEsc(cod)+' <span onclick="acClearCliente()" style="color:var(--danger);cursor:pointer;margin-left:8px;font-weight:700;">cambiar</span>';
+  }
+  function acClearCliente(){ window._acState.codigo=''; window._acState.nombre=''; document.getElementById('acSeleccionada').style.display='none'; }
+
+  function acRenderServicios(){
+    const cont = document.getElementById('acServicios');
+    cont.innerHTML='';
+    window._acState.servicios.forEach(function(s, i){
+      const wrap=document.createElement('div');
+      wrap.style.cssText='border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;';
+      const h=document.createElement('div');
+      h.style.cssText='font-size:11px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;display:flex;justify-content:space-between;';
+      h.innerHTML='<span>SERVICIO '+(i+1)+'</span>'+(window._acState.servicios.length>1?'<span data-rm="'+i+'" style="color:var(--danger);cursor:pointer;">✕ quitar</span>':'');
+      wrap.appendChild(h);
+      const selA=document.createElement('select');
+      selA.style.cssText='width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:8px;background:var(--bg-card);color:var(--ink);';
+      selA.innerHTML='<option value="">Área…</option>'+_AC_AREAS.map(function(a){ return '<option value="'+a.key+'"'+(s.area===a.key?' selected':'')+'>'+a.label+'</option>'; }).join('');
+      selA.addEventListener('change', function(){ acOnAreaChange(i, this.value); });
+      wrap.appendChild(selA);
+      const selS=document.createElement('select');
+      selS.id='acSrvSel_'+i;
+      selS.style.cssText='width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;background:var(--bg-card);color:var(--ink);';
+      selS.addEventListener('change', function(){ acOnServicioChange(i, this); });
+      wrap.appendChild(selS);
+      cont.appendChild(wrap);
+      acFillServicios(i, s.area, s);
+    });
+    cont.querySelectorAll('[data-rm]').forEach(function(el){ el.addEventListener('click', function(){ acRemoveServicio(parseInt(this.getAttribute('data-rm'),10)); }); });
+    const addBtn=document.getElementById('acAddBtn');
+    addBtn.textContent='+ Agregar servicio ('+window._acState.servicios.length+'/5)';
+    addBtn.style.display = window._acState.servicios.length>=5 ? 'none' : 'block';
+    acRenderPreview();
+  }
+  function acFillServicios(i, area, s){
+    const sel=document.getElementById('acSrvSel_'+i);
+    if(!sel) return;
+    if(!area){ sel.innerHTML='<option value="">Elegí el área primero</option>'; sel.disabled=true; return; }
+    sel.disabled=false;
+    if(area==='promos'){
+      const proms=((typeof PROMOS!=='undefined')?PROMOS:[]).filter(function(p){ return p.active!==false; });
+      sel._proms=proms;
+      sel.innerHTML='<option value="">Promo…</option>'+proms.map(function(p,idx){ return '<option value="promo:'+idx+'"'+((s.promoNombre&&s.promoNombre===p.name)?' selected':'')+'>'+_acEsc(p.name)+' — $'+p.price+'</option>'; }).join('');
+    } else {
+      const lista=((typeof CATALOGO!=='undefined')&&CATALOGO[area])?CATALOGO[area]:[];
+      sel._lista=lista;
+      sel.innerHTML='<option value="">Servicio…</option>'+lista.map(function(svc,idx){ return '<option value="srv:'+idx+'"'+((s.servicio&&s.servicio===svc.name&&!s.promoNombre)?' selected':'')+'>'+_acEsc(svc.name)+' — $'+svc.price+'</option>'; }).join('');
+    }
+  }
+  function acOnAreaChange(i, area){
+    const s=window._acState.servicios[i];
+    s.area=area; s.servicio=''; s.precio=0; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0;
+    acFillServicios(i, area, s);
+    acRenderPreview();
+  }
+  function acOnServicioChange(i, sel){
+    const s=window._acState.servicios[i];
+    const v=sel.value;
+    if(!v){ s.servicio=''; s.precio=0; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0; acRenderPreview(); return; }
+    if(v.indexOf('promo:')===0){
+      const p=(sel._proms||[])[parseInt(v.split(':')[1],10)];
+      if(p){ s.servicio=p.services||p.name; s.precio=p.price; s.promoNombre=p.name; s.precioPromo=p.price; s.precioRegular=p.regular||p.price; }
+    } else {
+      const svc=(sel._lista||[])[parseInt(v.split(':')[1],10)];
+      if(svc){ s.servicio=svc.name; s.precio=svc.price; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0; }
+    }
+    acRenderPreview();
+  }
+  function acAddServicio(){
+    if(window._acState.servicios.length>=5) return;
+    window._acState.servicios.push({ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 });
+    acRenderServicios();
+  }
+  function acRemoveServicio(i){
+    window._acState.servicios.splice(i,1);
+    if(!window._acState.servicios.length) window._acState.servicios.push({ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 });
+    acRenderServicios();
+  }
+  function acRenderPreview(){
+    const cont=document.getElementById('acPreview');
+    const items=window._acState.servicios.filter(function(s){ return s.servicio; });
+    if(!items.length){ cont.innerHTML=''; return; }
+    let total=0; const promosVistos={};
+    items.forEach(function(s){
+      if(s.promoNombre){ if(!promosVistos[s.promoNombre]){ promosVistos[s.promoNombre]=true; total+=Number(s.precioPromo)||0; } }
+      else total+=Number(s.precio)||0;
+    });
+    cont.innerHTML='<div style="margin-top:12px;padding:12px;background:var(--bg-soft,#f6f2ec);border-radius:12px;">'
+      +'<div style="font-size:11px;font-weight:800;color:var(--ink-soft);margin-bottom:8px;">PREVISUALIZACIÓN</div>'
+      +items.map(function(s){ return '<div style="font-size:13px;display:flex;justify-content:space-between;margin-bottom:3px;"><span>'+_acEsc(s.servicio)+(s.promoNombre?' <span style="color:var(--accent-deep);font-weight:700;">(promo)</span>':'')+'</span><span>$'+(s.promoNombre?s.precioPromo:s.precio)+'</span></div>'; }).join('')
+      +'<div style="font-size:14px;font-weight:800;display:flex;justify-content:space-between;margin-top:6px;border-top:1px solid var(--line);padding-top:6px;"><span>Total</span><span>$'+total+'</span></div>'
+      +'</div>';
+  }
+
+  async function acConfirmar(){
+    const st=window._acState;
+    let codigo=st.codigo, nombre=st.nombre;
+    if(st.tipo==='nueva'){
+      nombre=document.getElementById('acNuevoNombre').value.trim();
+      const tel=document.getElementById('acNuevoTel').value.trim();
+      if(!nombre){ alert('Poné el nombre de la clienta.'); return; }
+      try{
+        const rc=await apiPost('addClienta', { nombre:nombre, telefono:tel });
+        if(rc && rc.success && rc.codigo){ codigo=rc.codigo; window._acClientas=null; }
+        else { alert('No se pudo crear la clienta: '+((rc&&rc.message)||'intentá de nuevo.')); return; }
+      }catch(e){ console.error(e); alert('Error creando la clienta.'); return; }
+    } else if(!codigo){ alert('Elegí una clienta.'); return; }
+
+    const items=st.servicios.filter(function(s){ return s.servicio; });
+    if(!items.length){ alert('Agregá al menos un servicio.'); return; }
+
+    const fecha=document.getElementById('acFecha').value;
+    const hora=document.getElementById('acHora').value;
+    const areas=[]; const nombres=[]; let total=0;
+    let promoNombre='', precioPromo=0, precioRegular=0; const promosVistos={};
+    items.forEach(function(s){
+      if(s.area && s.area!=='promos' && areas.indexOf(s.area)<0) areas.push(s.area);
+      nombres.push(s.servicio);
+      if(s.promoNombre){
+        if(!promosVistos[s.promoNombre]){ promosVistos[s.promoNombre]=true; total+=Number(s.precioPromo)||0;
+          if(!promoNombre){ promoNombre=s.promoNombre; precioPromo=s.precioPromo; precioRegular=s.precioRegular; } }
+      } else total+=Number(s.precio)||0;
+    });
+    const payload={
+      codigo:codigo, nombre:nombre,
+      servicio:nombres.join(' + '),
+      area:areas[0]||(items[0]&&items[0].area)||'',
+      total:total, origen:'Mikaela',
+      horaAgendada:hora||'',
+      observaciones: fecha ? ('Fecha ' + fecha) : ''
+    };
+    if(promoNombre){ payload.promoNombre=promoNombre; payload.precioPromo=precioPromo; payload.precioRegular=precioRegular; }
+    if(areas.length>1){ payload.secuencia=areas; }
+
+    try{
+      const r=await apiPost('crearTicketSyna', payload);
+      if(r && r.success){
+        if(typeof showToast==='function') showToast('📅 Cita agendada para '+nombre);
+        closeModal();
+        if(typeof loadPrelista==='function') loadPrelista();
+      } else alert('No se pudo agendar: '+((r&&(r.message||r.error))||'intentá de nuevo.'));
+    }catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+  window.openAgendarCita=openAgendarCita; window.acSetTipo=acSetTipo; window.acBuscarCliente=acBuscarCliente;
+  window.acSelectCliente=acSelectCliente; window.acClearCliente=acClearCliente; window.acAddServicio=acAddServicio; window.acConfirmar=acConfirmar;
+
   async function loadPrelista() {
     const section = document.getElementById('prelistaSection');
     const list    = document.getElementById('mkPrelistaList');
@@ -11890,79 +12124,47 @@ body.rol-staff #confirmSvcClientName::after {
 
     const slot = document.createElement('div');
     slot.id = 'tmSlot-' + idx;
-    slot.style.cssText = [
-      'background:var(--bg-card)',
-      'border:1.5px solid var(--line)',
-      'border-radius:20px',
-      'padding:16px',
-      'margin-bottom:12px',
-      'box-shadow:0 2px 8px rgba(0,0,0,.06)'
-    ].join(';');
+    slot.style.cssText = 'background:var(--bg-soft,#f4f1ec);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-bottom:10px;';
     slot.innerHTML = `
       <!-- Header del slot -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <span style="font-size:14px;font-weight:800;color:var(--ink);">Servicio ${idx}</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;">
+        <span style="font-size:11px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;">Servicio ${idx}</span>
         <button onclick="quitarServicioTM(${idx})"
-          style="background:#fee2e2;color:#dc2626;border:none;border-radius:100px;
-                 padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;
-                 letter-spacing:0.02em;">
+          style="background:transparent;color:#dc2626;border:none;padding:2px 4px;font-size:11px;font-weight:700;cursor:pointer;">
           ✕ Quitar
         </button>
       </div>
 
       <!-- Selector de área -->
-      <div style="margin-bottom:12px;">
-        <div style="font-size:11px;font-weight:700;color:var(--ink-soft);
-                    text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">
-          Área
-        </div>
-        <div style="position:relative;">
-          <select id="tmArea-${idx}" onchange="onTmAreaChange(${idx})"
-            style="width:100%;padding:12px 38px 12px 14px;border-radius:14px;
-                   border:1.5px solid var(--line);background:var(--bg);
-                   font-family:inherit;font-size:14px;font-weight:700;
-                   color:var(--ink);cursor:pointer;appearance:none;
-                   -webkit-appearance:none;outline:none;">
-            <option value="">Seleccioná el área...</option>
-            <option value="Cejas">Cejas</option>
-            <option value="Depilación">Depilación</option>
-            <option value="Pestañas">Pestañas</option>
-            <option value="Lifting / Retiro">Lifting / Retiro</option>
-            <option value="Facial">Facial</option>
-          </select>
-          <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
-                       pointer-events:none;font-size:12px;color:var(--ink-soft);">▾</span>
-        </div>
-      </div>
-
-      <!-- Toggles Normal / Promo -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-        <button id="tmBtnNormal-${idx}" onclick="setTipoTM(${idx},'normal')"
-          style="padding:10px 8px;border-radius:12px;border:2px solid var(--accent);
-                 background:var(--accent);color:white;font-family:inherit;
-                 font-size:12px;font-weight:700;cursor:pointer;
-                 display:flex;align-items:center;justify-content:center;gap:5px;">
-          🛠 Normal
-        </button>
-        <button id="tmBtnPromo-${idx}" onclick="setTipoTM(${idx},'promo')"
-          style="padding:10px 8px;border-radius:12px;border:2px solid var(--line);
-                 background:transparent;color:var(--ink-soft);font-family:inherit;
-                 font-size:12px;font-weight:700;cursor:pointer;
-                 display:flex;align-items:center;justify-content:center;gap:5px;">
-          🎁 Promo
-        </button>
+      <div style="position:relative;margin-bottom:8px;">
+        <select id="tmArea-${idx}" onchange="onTmAreaChange(${idx})"
+          style="width:100%;padding:12px 38px 12px 14px;border-radius:12px;
+                 border:1px solid var(--line);background:var(--bg-card);
+                 font-family:inherit;font-size:14px;font-weight:600;
+                 color:var(--ink);cursor:pointer;appearance:none;
+                 -webkit-appearance:none;outline:none;box-sizing:border-box;">
+          <option value="">Área…</option>
+          <option value="Cejas">Cejas</option>
+          <option value="Depilación">Depilación</option>
+          <option value="Pestañas">Pestañas</option>
+          <option value="Lifting / Retiro">Lifting / Retiro</option>
+          <option value="Facial">Facial</option>
+          <option value="Promociones">🎁 Promociones</option>
+        </select>
+        <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
+                     pointer-events:none;font-size:12px;color:var(--ink-soft);">▾</span>
       </div>
 
       <!-- Selector de servicio normal -->
       <div id="tmSvcNormal-${idx}" style="display:block;">
         <div style="position:relative;">
           <select id="tmServicioSel-${idx}" onchange="onTmServicioChange(${idx})"
-            style="width:100%;padding:12px 38px 12px 14px;border-radius:14px;
-                   border:1.5px solid var(--line);background:var(--bg);
-                   font-family:inherit;font-size:13px;font-weight:600;
+            style="width:100%;padding:12px 38px 12px 14px;border-radius:12px;
+                   border:1px solid var(--line);background:var(--bg-card);
+                   font-family:inherit;font-size:13px;font-weight:500;
                    color:var(--ink);cursor:pointer;appearance:none;
-                   -webkit-appearance:none;outline:none;">
-            <option value="">Primero seleccioná el área</option>
+                   -webkit-appearance:none;outline:none;box-sizing:border-box;">
+            <option value="">Elegí el área primero</option>
           </select>
           <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
                        pointer-events:none;font-size:12px;color:var(--ink-soft);">▾</span>
@@ -11973,12 +12175,12 @@ body.rol-staff #confirmSvcClientName::after {
       <div id="tmSvcPromo-${idx}" style="display:none;">
         <div style="position:relative;">
           <select id="tmPromoSel-${idx}" onchange="onTmPromoChange(${idx})"
-            style="width:100%;padding:12px 38px 12px 14px;border-radius:14px;
-                   border:1.5px solid var(--line);background:var(--bg);
-                   font-family:inherit;font-size:13px;font-weight:600;
+            style="width:100%;padding:12px 38px 12px 14px;border-radius:12px;
+                   border:1px solid var(--line);background:var(--bg-card);
+                   font-family:inherit;font-size:13px;font-weight:500;
                    color:var(--ink);cursor:pointer;appearance:none;
-                   -webkit-appearance:none;outline:none;">
-            <option value="">Cargando promos...</option>
+                   -webkit-appearance:none;outline:none;box-sizing:border-box;">
+            <option value="">Cargando promos…</option>
           </select>
           <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
                        pointer-events:none;font-size:12px;color:var(--ink-soft);">▾</span>
@@ -11987,10 +12189,9 @@ body.rol-staff #confirmSvcClientName::after {
 
       <!-- Precio -->
       <div id="tmPrecioDisplay-${idx}"
-        style="display:none;margin-top:10px;padding:10px 14px;
-               background:var(--success-bg,#f0fdf4);border-radius:12px;
-               font-size:13px;font-weight:800;color:var(--success,#16a34a);
-               border:1.5px solid var(--success,#16a34a)20;">
+        style="display:none;margin-top:9px;padding:9px 13px;
+               background:var(--success-bg,#f0fdf4);border-radius:10px;
+               font-size:13px;font-weight:800;color:var(--success,#16a34a);">
       </div>
     `;
     container.appendChild(slot);
@@ -12010,11 +12211,13 @@ body.rol-staff #confirmSvcClientName::after {
     const svc = _tmServicios.find(s => s.idx === idx);
     if (svc) svc.tipo = tipo;
     const _btnBase = 'padding:10px 8px;border-radius:12px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;';
-    document.getElementById('tmBtnNormal-' + idx).style.cssText = _btnBase +
+    const _bN = document.getElementById('tmBtnNormal-' + idx);
+    const _bP = document.getElementById('tmBtnPromo-' + idx);
+    if (_bN) _bN.style.cssText = _btnBase +
       (tipo === 'normal'
         ? 'border:2px solid var(--accent);background:var(--accent);color:white;'
         : 'border:2px solid var(--line);background:transparent;color:var(--ink-soft);');
-    document.getElementById('tmBtnPromo-' + idx).style.cssText = _btnBase +
+    if (_bP) _bP.style.cssText = _btnBase +
       (tipo === 'promo'
         ? 'border:2px solid #b45309;background:#fef3c7;color:#7a5a1c;'
         : 'border:2px solid var(--line);background:transparent;color:var(--ink-soft);');
@@ -12032,9 +12235,27 @@ body.rol-staff #confirmSvcClientName::after {
     await ensureCatalogoLoaded();
     const areaEl = document.getElementById('tmArea-' + idx);
     const area = areaEl ? areaEl.value : '';
-    const areaKey = TM_AREA_LABELS[area] || '';
     const svc = _tmServicios.find(s => s.idx === idx);
+
+    // ÁREA = PROMOCIONES → mostrar el selector de promos (sin necesidad de área previa)
+    if (area === 'Promociones') {
+      if (svc) {
+        svc.tipo = 'promo';
+        svc.area = ''; svc.areaKey = '';
+        svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0;
+        if (svc._isComboMultiArea) { svc._isComboMultiArea = false; svc._comboAreas = null; window._secuencia = []; renderSecuencia(); }
+      }
+      const sn = document.getElementById('tmSvcNormal-' + idx); if (sn) sn.style.display = 'none';
+      const sp = document.getElementById('tmSvcPromo-' + idx);  if (sp) sp.style.display = 'block';
+      cargarPromasTM(idx);
+      const pd0 = document.getElementById('tmPrecioDisplay-' + idx); if (pd0) pd0.style.display = 'none';
+      tmActualizarResumen(); tmActualizarSecuenciaBtns();
+      return;
+    }
+
+    const areaKey = TM_AREA_LABELS[area] || '';
     if (svc) {
+      svc.tipo = 'normal';
       svc.area = area; svc.areaKey = areaKey;
       svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0;
       // Si tenía un combo, resetear para que se reordene con la nueva área
@@ -12046,6 +12267,9 @@ body.rol-staff #confirmSvcClientName::after {
         renderSecuencia();
       }
     }
+    // Mostrar el selector de servicio normal, ocultar el de promo
+    const sn2 = document.getElementById('tmSvcNormal-' + idx); if (sn2) sn2.style.display = 'block';
+    const sp2 = document.getElementById('tmSvcPromo-' + idx);  if (sp2) sp2.style.display = 'none';
 
     // Cargar servicios normales
     const sel = document.getElementById('tmServicioSel-' + idx);
@@ -12203,7 +12427,13 @@ body.rol-staff #confirmSvcClientName::after {
         areaEl1.value = area1Label;
         svc.area = area1Label;
         svc.areaKey = area1Key;
-        onTmAreaChange(idx);
+        // NO llamamos a onTmAreaChange aquí: resetearía el tipo a "normal" y borraría la promo.
+        // Solo aseguramos que siga en modo promo con el selector de promos visible.
+        svc.tipo = 'promo';
+        svc.servicio = d.nombre;
+        const _sn = document.getElementById('tmSvcNormal-' + idx); if (_sn) _sn.style.display = 'none';
+        const _sp = document.getElementById('tmSvcPromo-' + idx);  if (_sp) _sp.style.display = 'block';
+        tmActualizarSecuenciaBtns();
       }
 
       // FIX: si hay área seleccionada, encontrar la división que corresponde a esa área
@@ -12293,7 +12523,7 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   function tmActualizarResumen() {
-    const validos = _tmServicios.filter(s => s.area && s.servicio);
+    const validos = _tmServicios.filter(s => s.servicio && (s.area || (s._isComboMultiArea && s._comboAreas && s._comboAreas.length)));
     const resumen = document.getElementById('tmResumenAreas');
     if (!resumen) return;
     if (validos.length === 0) { resumen.style.display = 'none'; return; }
@@ -12301,12 +12531,15 @@ body.rol-staff #confirmSvcClientName::after {
     const totalNormal = validos.reduce((s, v) => s + v.precioNormal, 0);
     const tienePromo = validos.some(v => v.tipo === 'promo');
     resumen.style.display = 'block';
-    resumen.innerHTML = validos.map(v =>
-      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);">
-        <span>${v.area} · ${v.servicio}</span>
+    resumen.innerHTML = validos.map(v => {
+      const etq = (v._isComboMultiArea && v._comboAreas && v._comboAreas.length)
+        ? ('🎁 ' + v.servicio)
+        : ((v.area ? v.area + ' · ' : '') + v.servicio);
+      return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);">
+        <span>${etq}</span>
         <span style="font-weight:800;color:var(--accent);">$${v.precio}</span>
-      </div>`
-    ).join('') +
+      </div>`;
+    }).join('') +
     `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;">
       <span style="font-size:13px;font-weight:800;">Total</span>
       <span style="font-size:15px;font-weight:800;color:var(--ink);">$${total}${tienePromo ? ' <span style="font-size:10px;color:var(--ink-soft);">(regular $' + totalNormal + ')</span>' : ''}</span>
@@ -12817,42 +13050,11 @@ body.rol-staff #confirmSvcClientName::after {
     { key: null, code: 'C-0009', name: 'Lucía Paredes', phone: '0991-222-333', isTop: false, visits: 1, lastVisit: '19/04' },
   ];
 
-  async function auditarClientasUI() {
-    try {
-      const r = await apiGet('auditarClientas');
-      if (!r || !r.success) { alert('No se pudo auditar: ' + ((r && r.message) || 'intentá de nuevo.')); return; }
-      let msg = '🔍 Auditoría de clientas\n\n';
-      msg += 'Registradas en Clientas: ' + r.totalClientas + '\n';
-      msg += 'Código más alto: ' + r.maxCodigo + '\n\n';
-      msg += 'Códigos DUPLICADOS: ' + r.duplicados.length + '\n';
-      r.duplicados.slice(0, 12).forEach(function (d) { msg += '   • ' + d.codigo + ' (' + d.veces + 'x) ' + (d.nombre || '') + '\n'; });
-      msg += '\nClientas con ficha pero SIN registro: ' + r.orfanas.length + '\n';
-      r.orfanas.slice(0, 25).forEach(function (o) { msg += '   • ' + o.codigo + ' · ' + (o.nombre || '(sin nombre)') + ' [' + o.fuente + ']\n'; });
-
-      if (r.orfanas.length > 0) {
-        if (confirm(msg + '\n\n¿RECUPERAR esas ' + r.orfanas.length + ' clientas? Se les creará su registro en Clientas (vuelven a aparecer en el directorio).')) {
-          const rep = await apiPost('repararClientasOrfanas', {});
-          if (rep && rep.success) {
-            alert('✓ Recuperadas ' + rep.creados + ' clientas.\n\n' + (rep.detalle || []).slice(0, 25).join('\n'));
-            if (typeof renderClientDirectory === 'function') renderClientDirectory();
-          } else {
-            alert('No se pudo reparar: ' + ((rep && rep.message) || 'intentá de nuevo.'));
-          }
-        }
-      } else {
-        alert(msg + '\nNo hay clientas huérfanas para recuperar.' + (r.duplicados.length ? '\n\nLos códigos duplicados conviene revisarlos a mano en la hoja Clientas.' : ''));
-      }
-    } catch (e) { console.error(e); alert('Error de conexión: ' + e.message); }
-  }
-  window.auditarClientasUI = auditarClientasUI;
-
   async function renderClientDirectory() {
     // Cargar perfiles de clientas desde el servidor
     await loadClientProfiles();
     const search = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const list = document.getElementById('clientDirectoryList');
-    const _ab = document.getElementById('auditClientasBtn');
-    if (_ab) _ab.style.display = (window.currentUser && (window.currentUser.role === 'owner' || window.currentUser.role === 'admin')) ? 'inline-block' : 'none';
     
     // Siempre recargar desde API (no usar cache para el directorio)
     list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas...</div></div>';
