@@ -7788,6 +7788,21 @@ body.rol-staff #confirmSvcClientName::after {
     await finishAndContinue();
   }
 
+  // Normaliza cualquier nombre de área (key, label con emoji/SVG, o texto con acentos)
+  // a una clave canónica para comparar de forma confiable.
+  function _areaCanon(s) {
+    var a = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
+    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0) return 'cejas';
+    if (a.indexOf('pesta') >= 0 || a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'pestanas';
+    if (a.indexOf('facial') >= 0) return 'facial';
+    return a;
+  }
+  // Área canónica de una entrada de división: prioriza realArea (cejas/depilación guardan
+  // el nombre del servicio en `area`), si no usa el texto de `area`.
+  function _divAreaCanon(d) {
+    return _areaCanon((d && d.realArea) ? d.realArea : (d && d.area) || '');
+  }
+
   async function finishAndContinue() {
     // Pasar a otra área (devolver a lista de espera para que otra staff la tome)
     closeModal();
@@ -7905,8 +7920,8 @@ body.rol-staff #confirmSvcClientName::after {
     };
     
     // Encontrar la división correspondiente al área actual
-    const areaLabel = areaMap[areaActual] || areaActual;
-    const miDivision = promo.division.find(d => d.area === areaLabel || d.area.includes(areaLabel));
+    // FIX: comparar por área canónica (realArea o texto normalizado), NO por el label con emoji
+    const miDivision = promo.division.find(d => _divAreaCanon(d) === _areaCanon(areaActual));
     
     if (!miDivision) {
       alert('Error: No se encontró la división de precio para ' + areaActual + ' en esta promo.');
@@ -7919,14 +7934,8 @@ body.rol-staff #confirmSvcClientName::after {
       areasCompletadas.push(areaActual);
     }
     
-    // Obtener todas las áreas de la promo
-    const todasLasAreas = promo.division.map(d => {
-      // Convertir label a código de área
-      if (d.area.includes('Cejas') || d.area.includes('Depilación')) return 'cejas';
-      if (d.area.includes('Pestañas') || d.area.includes('Lifting') || d.area.includes('Retiro')) return 'pestanas';
-      if (d.area.includes('Facial')) return 'facial';
-      return '';
-    }).filter(a => a);
+    // Obtener todas las áreas de la promo (canónico: usa realArea o texto normalizado)
+    const todasLasAreas = promo.division.map(d => _divAreaCanon(d)).filter(a => a);
     
     // Áreas que faltan
     const areasFaltantes = todasLasAreas.filter(a => !areasCompletadas.includes(a));
@@ -7936,17 +7945,16 @@ body.rol-staff #confirmSvcClientName::after {
       return;
     }
     
-    // Siguiente área y su precio
+    // Siguiente área y su precio (match canónico por realArea/texto normalizado)
     const siguienteArea = areasFaltantes[0];
     const siguienteLabel = areaMap[siguienteArea];
-    const siguienteDivision = promo.division.find(d => d.area === siguienteLabel || String(d.area||'').includes(siguienteLabel) || siguienteLabel.includes(String(d.area||'')));
+    const siguienteDivision = promo.division.find(d => _divAreaCanon(d) === _areaCanon(siguienteArea));
     console.log('🔍 siguienteArea:', siguienteArea, '| siguienteLabel:', siguienteLabel, '| division areas:', promo.division.map(d=>d.area), '| siguienteDivision:', siguienteDivision);
     
     // Nombres de servicios faltantes
     const serviciosFaltantes = areasFaltantes.map(a => {
-      const label = areaMap[a];
-      const div = promo.division.find(d => d.area === label);
-      return div ? div.area.replace('💅 ', '').replace('👁 ', '').replace('Cejas ', '').replace('Pest. ', '').replace('✨ ', '').replace(/(<svg[^>]*>.*?<\/svg>)\s*/g, '') : a;
+      const div = promo.division.find(d => _divAreaCanon(d) === _areaCanon(a));
+      return div ? String(div.servicio || div.area || a).replace('💅 ', '').replace('👁 ', '').replace('✨ ', '').replace(/(<svg[^>]*>.*?<\/svg>)\s*/g, '').trim() : a;
     }).join(' + ');
     
     console.log('División calculada:', {
