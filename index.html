@@ -812,6 +812,19 @@ body.rol-staff #confirmSvcClientName::after {
 
         <!-- TOTAL -->
         <div id="cobrarTotal" style="text-align: center; font-size: 40px; font-weight: 800; color: var(--accent-deep); margin-bottom: 20px; letter-spacing: -0.03em;"></div>
+
+        <!-- ABONO (depósito de reserva) — el total completo va a caja; acá se muestra el neto a cobrar en mano -->
+        <div id="cobrarAbonoRow" style="display:none;margin:-8px 0 16px;padding:12px 14px;background:var(--bg-soft,#f6f2ec);border-radius:14px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);">
+            <span>💰 Abono ya pagado</span><span id="cobrarAbonoMonto" style="font-weight:800;color:var(--accent-deep);"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;margin-top:6px;border-top:1px solid var(--line);padding-top:6px;">
+            <span>A cobrar ahora</span><span id="cobrarAbonoNeto" style="color:var(--success);"></span>
+          </div>
+        </div>
+        <div style="text-align:center;margin:-6px 0 16px;">
+          <span onclick="_cobroRegistrarAbono()" style="font-size:12px;font-weight:700;color:var(--accent-deep);cursor:pointer;">💰 Registrar / editar abono</span>
+        </div>
         
         <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;">
@@ -10489,6 +10502,7 @@ body.rol-staff #confirmSvcClientName::after {
                 <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
                   <button onclick="cobrarDesdeBtn(this)" 
                     data-id="${p.idEspera}"
+                    data-codigo="${p.codigo||''}"
                     data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
                     data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
                     data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
@@ -11240,6 +11254,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   function cobrarDesdeBtn(btn) {
     const idEspera = btn.dataset.id || '';
+    const codigo   = btn.dataset.codigo || '';
     const nombre   = btn.dataset.nombre || '';
     const servicio = btn.dataset.servicio || '';
     const chica    = btn.dataset.chica || '';
@@ -11250,11 +11265,13 @@ body.rol-staff #confirmSvcClientName::after {
     try {
       if (btn.dataset.desglose) desglose = JSON.parse(decodeURIComponent(btn.dataset.desglose));
     } catch(e) {}
-    openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose);
+    openCobrar(idEspera, nombre, servicio, chica, total, regular, promo, desglose, codigo);
   }
 
-  function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON) {
+  function openCobrar(idEspera, nombre, servicio, chica, total, precioRegular, promoNombre, desgloseJSON, codigo) {
     window._cobrarId = idEspera;
+    window._cobrarCodigo = codigo || '';
+    window._cobrarAbonoMonto = 0;
     window._cobrarAjustes = []; // registro de correcciones/quitados que hace Mikaela en este cobro
     window._cobrarPago = 'Efectivo';
     window._cobrarTotalPromo = Number(total) || 0;
@@ -11405,6 +11422,7 @@ body.rol-staff #confirmSvcClientName::after {
       }
     });
     document.getElementById('cobrarModal').classList.add('active');
+    _cobroCargarAbono();
   }
 
   function onMixtoInput() {
@@ -11494,6 +11512,61 @@ body.rol-staff #confirmSvcClientName::after {
   }
   window.cobrarQuitarServicio = cobrarQuitarServicio;
   window.cobrarEditarMonto = cobrarEditarMonto;
+
+  // ===== ABONO (depósito de reserva) en el cobro =====
+  // El total completo va a caja (decisión: todo se cuenta al cobrar). El abono solo
+  // se muestra y se descuenta de lo que la clienta entrega en mano.
+  async function _cobroCargarAbono() {
+    window._cobrarAbonoMonto = 0;
+    const row = document.getElementById('cobrarAbonoRow');
+    if (row) row.style.display = 'none';
+    const codigo = window._cobrarCodigo || '';
+    if (!codigo) { _cobroActualizarNeto(); return; }
+    try {
+      const r = await apiGet('getAbonoActivo', { codigo: codigo });
+      const monto = (r && r.success) ? Number(r.monto || 0) : 0;
+      window._cobrarAbonoMonto = monto;
+    } catch(e) { window._cobrarAbonoMonto = 0; }
+    _cobroActualizarNeto();
+  }
+  function _cobroActualizarNeto() {
+    const row = document.getElementById('cobrarAbonoRow');
+    const montoEl = document.getElementById('cobrarAbonoMonto');
+    const netoEl = document.getElementById('cobrarAbonoNeto');
+    const abono = Number(window._cobrarAbonoMonto || 0);
+    if (!row) return;
+    if (!(abono > 0)) { row.style.display = 'none'; return; }
+    let total = Number(window._cobrarTotalConProductos || 0);
+    if (!total) {
+      const t = parseFloat((document.getElementById('cobrarTotal')?.textContent || '0').replace('$','')) || 0;
+      total = t;
+    }
+    const neto = Math.max(0, total - abono);
+    if (montoEl) montoEl.textContent = '−$' + abono.toFixed(2);
+    if (netoEl)  netoEl.textContent  = '$' + neto.toFixed(2);
+    row.style.display = 'block';
+  }
+  async function _cobroRegistrarAbono() {
+    const codigo = window._cobrarCodigo || '';
+    if (!codigo) { alert('Esta clienta no tiene código, no se le puede registrar abono.'); return; }
+    const actual = Number(window._cobrarAbonoMonto || 0);
+    const val = prompt('Monto del abono que dejó la clienta (en $):', actual > 0 ? String(actual) : '');
+    if (val === null) return;
+    const monto = parseFloat(String(val).replace(',', '.'));
+    if (isNaN(monto) || monto < 0) { alert('Monto inválido.'); return; }
+    try {
+      if (actual > 0) { await apiPost('consumirAbono', { codigo: codigo }); } // reemplaza el anterior
+      if (monto > 0) {
+        const nombre = document.getElementById('cobrarClientName')?.textContent || '';
+        const r = await apiPost('registrarAbono', { codigo: codigo, cliente: nombre, monto: monto, origen: 'Mikaela' });
+        if (!(r && r.success)) { alert('No se pudo registrar: ' + ((r && r.message) || '')); return; }
+      }
+      window._cobrarAbonoMonto = monto;
+      _cobroActualizarNeto();
+      showToast(monto > 0 ? '💰 Abono registrado: $' + monto.toFixed(2) : 'Abono quitado');
+    } catch(e) { console.error(e); alert('Error al registrar el abono.'); }
+  }
+  window._cobroRegistrarAbono = _cobroRegistrarAbono;
 
   function selectPago(metodo, btn) {
     // Unificar ambas variables de pago (cobro individual y grupal usan la misma)
@@ -11629,6 +11702,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (subtotalEl) { subtotalEl.textContent = '$' + resultado.totalFinal.toFixed(2); subtotalEl.style.color = ''; }
       window._cobrarTotalConProductos = resultado.totalFinal + totalProductos;
     }
+    if (typeof _cobroActualizarNeto === 'function') _cobroActualizarNeto();
   }
   window.refreshCobrarTotal = refreshCobrarTotal;
 
@@ -11864,6 +11938,13 @@ body.rol-staff #confirmSvcClientName::after {
       showToast('⚠ Error al confirmar: ' + (err.message || 'intenta de nuevo'));
       return; // No continuar si falló
     }
+
+    // Cobro OK → consumir el abono de esta clienta (si tenía), para que no se reutilice
+    try {
+      if (window._cobrarCodigo && Number(window._cobrarAbonoMonto) > 0) {
+        await apiPost('consumirAbono', { codigo: window._cobrarCodigo });
+      }
+    } catch (eAb) { console.error(eAb); }
 
     // Si hay productos, registrarlos en el historial
     const productosTicket = (window._cobrarId && window._apProductosEnTicket && window._apProductosEnTicket[window._cobrarId]) ? window._apProductosEnTicket[window._cobrarId] : [];
@@ -16702,6 +16783,12 @@ body.rol-staff #confirmSvcClientName::after {
       b.style.color = i === 0 ? 'white' : 'var(--ink)';
     });
     window._cobroPago = 'Efectivo';
+
+    // El cobro grupal no usa abono (v1): limpiar para que no quede una fila pegada
+    window._cobrarCodigo = '';
+    window._cobrarAbonoMonto = 0;
+    var _abRowG = document.getElementById('cobrarAbonoRow');
+    if (_abRowG) _abRowG.style.display = 'none';
 
     document.getElementById('cobrarModal').classList.add('active');
   }
