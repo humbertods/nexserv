@@ -5185,6 +5185,17 @@ body.rol-staff #confirmSvcClientName::after {
       });
     } catch(e){}
   }
+  function _solFechaCorta(f){
+    if (!f) return '';
+    const s = String(f).trim();
+    if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s)) return s.split(' ')[0]; // ya viene dd/MM/yyyy
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const dd = String(d.getDate()).padStart(2,'0');
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    return dd + '/' + mm + '/' + d.getFullYear();
+  }
+
   async function loadSolucionesHistorial(){
     const list = document.getElementById('solHistorialList');
     if (!list) return;
@@ -5209,11 +5220,14 @@ body.rol-staff #confirmSvcClientName::after {
         else if (acc.indexOf('Reasignar') !== -1) ic = 'refresh';
         else if (acc.indexOf('Retirar') !== -1) ic = 'exit';
         else if (acc.indexOf('Eliminar') !== -1) ic = 'trash';
-        return '<div class="card" style="padding:12px;margin-bottom:8px;' + (esConsulta ? 'border-left:3px solid var(--accent-deep);' : '') + '">'
-          + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><span style="font-weight:800;font-size:14px;display:flex;align-items:center;gap:6px;">' + _solIcon(ic,15) + _solEsc(acc) + '</span><span style="font-size:11px;color:var(--ink-faint);white-space:nowrap;">' + _solEsc(x.fecha) + ' · ' + _solEsc(x.hora) + '</span></div>'
-          + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:3px;display:flex;align-items:center;gap:5px;">' + _solIcon('person',13) + _solEsc(x.cliente) + '</div>') : '')
+        return '<div class="card" style="padding:12px 14px;margin-bottom:8px;border-radius:14px;' + (esConsulta ? 'border-left:3px solid var(--accent-deep);' : '') + '">'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+          +   '<span style="flex-shrink:0;display:inline-flex;color:var(--accent-deep);">' + _solIcon(ic,16) + '</span>'
+          +   '<span style="font-weight:800;font-size:14px;line-height:1.25;">' + _solEsc(acc) + '</span>'
+          + '</div>'
+          + (x.cliente ? ('<div style="font-size:13px;color:var(--ink-soft);margin-top:6px;display:flex;align-items:center;gap:5px;">' + _solIcon('person',13) + _solEsc(x.cliente) + '</div>') : '')
           + (x.detalle ? ('<div style="font-size:13px;color:var(--ink);margin-top:5px;line-height:1.5;' + (esConsulta ? 'font-style:italic;' : '') + '">' + (esConsulta ? '“' : '') + _solEsc(x.detalle) + (esConsulta ? '”' : '') + '</div>') : '')
-          + '<div style="font-size:12px;color:var(--ink-faint);margin-top:4px;">Por: ' + _solEsc(x.usuario || '—') + '</div>'
+          + '<div style="font-size:11px;color:var(--ink-faint);margin-top:8px;padding-top:7px;border-top:1px solid var(--line);">' + _solEsc(_solFechaCorta(x.fecha)) + (x.hora ? ' · ' + _solEsc(x.hora) : '') + ' · Por ' + _solEsc(x.usuario || '—') + '</div>'
           + '</div>';
       }).join('');
     } catch(e){
