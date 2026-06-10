@@ -1080,7 +1080,10 @@ body.rol-staff #confirmSvcClientName::after {
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <div style="font-size: 13px; font-weight: 700;">Total: <span id="clientCount">0</span> clientas</div>
-      <button onclick="openNewClient()" style="padding: 10px 18px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Nueva clienta</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="auditClientasBtn" onclick="auditarClientasUI()" style="display:none;padding:10px 14px;background:var(--bg-soft,#f0ece6);color:var(--ink);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🔍 Auditar</button>
+        <button onclick="openNewClient()" style="padding: 10px 18px; background: var(--ink); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Nueva clienta</button>
+      </div>
     </div>
 
     <div id="clientDirectoryList"></div>
@@ -12795,11 +12798,42 @@ body.rol-staff #confirmSvcClientName::after {
     { key: null, code: 'C-0009', name: 'Lucía Paredes', phone: '0991-222-333', isTop: false, visits: 1, lastVisit: '19/04' },
   ];
 
+  async function auditarClientasUI() {
+    try {
+      const r = await apiGet('auditarClientas');
+      if (!r || !r.success) { alert('No se pudo auditar: ' + ((r && r.message) || 'intentá de nuevo.')); return; }
+      let msg = '🔍 Auditoría de clientas\n\n';
+      msg += 'Registradas en Clientas: ' + r.totalClientas + '\n';
+      msg += 'Código más alto: ' + r.maxCodigo + '\n\n';
+      msg += 'Códigos DUPLICADOS: ' + r.duplicados.length + '\n';
+      r.duplicados.slice(0, 12).forEach(function (d) { msg += '   • ' + d.codigo + ' (' + d.veces + 'x) ' + (d.nombre || '') + '\n'; });
+      msg += '\nClientas con ficha pero SIN registro: ' + r.orfanas.length + '\n';
+      r.orfanas.slice(0, 25).forEach(function (o) { msg += '   • ' + o.codigo + ' · ' + (o.nombre || '(sin nombre)') + ' [' + o.fuente + ']\n'; });
+
+      if (r.orfanas.length > 0) {
+        if (confirm(msg + '\n\n¿RECUPERAR esas ' + r.orfanas.length + ' clientas? Se les creará su registro en Clientas (vuelven a aparecer en el directorio).')) {
+          const rep = await apiPost('repararClientasOrfanas', {});
+          if (rep && rep.success) {
+            alert('✓ Recuperadas ' + rep.creados + ' clientas.\n\n' + (rep.detalle || []).slice(0, 25).join('\n'));
+            if (typeof renderClientDirectory === 'function') renderClientDirectory();
+          } else {
+            alert('No se pudo reparar: ' + ((rep && rep.message) || 'intentá de nuevo.'));
+          }
+        }
+      } else {
+        alert(msg + '\nNo hay clientas huérfanas para recuperar.' + (r.duplicados.length ? '\n\nLos códigos duplicados conviene revisarlos a mano en la hoja Clientas.' : ''));
+      }
+    } catch (e) { console.error(e); alert('Error de conexión: ' + e.message); }
+  }
+  window.auditarClientasUI = auditarClientasUI;
+
   async function renderClientDirectory() {
     // Cargar perfiles de clientas desde el servidor
     await loadClientProfiles();
     const search = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const list = document.getElementById('clientDirectoryList');
+    const _ab = document.getElementById('auditClientasBtn');
+    if (_ab) _ab.style.display = (window.currentUser && (window.currentUser.role === 'owner' || window.currentUser.role === 'admin')) ? 'inline-block' : 'none';
     
     // Siempre recargar desde API (no usar cache para el directorio)
     list.innerHTML = '<div style="text-align: center; padding: 30px; color: var(--ink-faint);"><div style="animation: pulse 1.5s infinite; font-size: 13px;">⏳ Cargando clientas...</div></div>';
@@ -17880,20 +17914,31 @@ async function suscribirPushActual() {
     }
     const messaging = firebase.messaging();
 
-    // PUSH EN SEGUNDO PLANO (clave para iPhone): atar la suscripción SIEMPRE al SW
-    // PRINCIPAL que CONTROLA la app (sw.js, scope '/nexserv/'). En iPhones con la PWA
-    // instalada, iOS solo despierta de forma confiable al SW que controla la app; un SW
-    // aparte en otro scope (firebase-messaging-sw.js) corre con la app abierta pero NO se
-    // despierta con el teléfono en reposo → por eso los avisos solo llegaban con la app
-    // abierta. sw.js ya tiene su propio handler de 'push' que muestra la notificación.
-    const fcmReg = reg;
-
-    // Limpieza: desregistrar el SW de push viejo en otro scope (de versiones anteriores).
-    // Así los iPhones que quedaron suscritos al SW equivocado pasan al SW principal.
+    // SW DEDICADO de Firebase Messaging → notificaciones con la app CERRADA (tipo WhatsApp).
+    // Si el archivo aún no está subido, cae al SW principal y sigue andando en primer plano.
+    let fcmReg = reg;
     try {
-      const _oldFcm = await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope');
-      if (_oldFcm) { await _oldFcm.unregister(); console.log('[Push] SW de push viejo desregistrado'); }
-    } catch (e) {}
+      fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
+      // Esperar a que el SW de Firebase esté ACTIVO antes de suscribir
+      // (recién registrado puede estar instalándose → "no active Service Worker")
+      if (!fcmReg.active) {
+        const sw2 = fcmReg.installing || fcmReg.waiting;
+        if (sw2) {
+          await new Promise(res => {
+            const t = setTimeout(res, 5000); // no colgar
+            sw2.addEventListener('statechange', () => {
+              if (sw2.state === 'activated') { clearTimeout(t); res(); }
+            });
+          });
+        }
+        fcmReg = (await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope')) || fcmReg;
+      }
+      // Si todavía no quedó activo, usar el SW principal (que sí lo está)
+      if (!fcmReg.active) { console.log('[Push] FCM SW aún no activo, uso SW principal'); fcmReg = reg; }
+    } catch (eReg) {
+      console.warn('[Push] FCM SW no disponible, uso SW principal:', eReg.message);
+      fcmReg = reg;
+    }
 
     // Notificación cuando la app está ABIERTA en primer plano (FCM no la muestra sola)
     try {
