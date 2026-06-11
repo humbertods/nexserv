@@ -11687,6 +11687,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (promoBanner && hayPromo) promoBanner.style.display = 'block';
       }
       window._cobrarTotalConProductos = totalFinalG + totalProductos;
+      if (typeof _cobroActualizarNeto === 'function') _cobroActualizarNeto();
       return;
     }
 
