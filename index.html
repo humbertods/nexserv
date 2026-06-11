@@ -11552,8 +11552,22 @@ body.rol-staff #confirmSvcClientName::after {
     row.style.display = 'block';
   }
   async function _cobroRegistrarAbono() {
-    const codigo = window._cobrarCodigo || '';
-    if (!codigo) { alert('Esta clienta no tiene código, no se le puede registrar abono.'); return; }
+    let codigo = window._cobrarCodigo || '';
+    // Si la clienta no tiene código (walk-in), se lo creamos al instante y lo atamos
+    // al ticket, para poder registrar el abono y que se descuente al cobrar.
+    if (!codigo) {
+      const nombreNC = document.getElementById('cobrarClientName')?.textContent || '';
+      if (!nombreNC) { alert('No se pudo leer el nombre de la clienta.'); return; }
+      if (!confirm('Esta clienta no tiene código.\nVamos a crearle uno ahora para registrar el abono. ¿Continuar?')) return;
+      try {
+        const rc = await apiPost('addClienta', { nombre: nombreNC });
+        if (!(rc && rc.codigo)) { alert('No se pudo crear el código: ' + ((rc && rc.message) || '')); return; }
+        codigo = rc.codigo;
+        window._cobrarCodigo = codigo;
+        if (window._cobrarId) { try { await apiPost('setCodigoTicket', { idEspera: window._cobrarId, codigo: codigo }); } catch(eSc){} }
+        showToast('🆕 Código creado: ' + codigo);
+      } catch(eC) { console.error(eC); alert('Error al crear el código.'); return; }
+    }
     const actual = Number(window._cobrarAbonoMonto || 0);
     const val = prompt('Monto del abono que dejó la clienta (en $):', actual > 0 ? String(actual) : '');
     if (val === null) return;
@@ -11563,7 +11577,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (actual > 0) { await apiPost('consumirAbono', { codigo: codigo }); } // reemplaza el anterior
       if (monto > 0) {
         const nombre = document.getElementById('cobrarClientName')?.textContent || '';
-        const r = await apiPost('registrarAbono', { codigo: codigo, cliente: nombre, monto: monto, origen: 'Mikaela' });
+        const r = await apiPost('registrarAbono', { codigo: codigo, cliente: nombre, monto: monto, origen: 'Mikaela', idEspera: window._cobrarId || '' });
         if (!(r && r.success)) { alert('No se pudo registrar: ' + ((r && r.message) || '')); return; }
       }
       window._cobrarAbonoMonto = monto;
