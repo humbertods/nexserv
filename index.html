@@ -13110,38 +13110,43 @@ body.rol-staff #confirmSvcClientName::after {
 
     const areas = [];
 
-    if (tipo === 'promo') {
-      // Área 1: primera promo
-      const promo1 = _arrPromos.find(p => p !== null);
-      if (promo1) {
-        areas.push({
-          tentativo:    promo1.name,
-          area:         getPromoArea(promo1),
-          precio:       Number(promo1.price || 0),
-          precioNormal: Number(promo1.regular || promo1.price || 0),
-          tipo:         'promo'
-        });
+    // Una promo se PARTE en una área por cada parte de su división (cejas, pestañas, ...),
+    // cada una con su servicio y su monto. Así Mikaela asigna cada área a la chica correcta
+    // y ve el área real con su precio — no el nombre de la promo con el total.
+    const pushAreasDePromo = function(p) {
+      if (!p) return;
+      const promoPrice   = Number(p.price || 0);
+      const promoRegular = Number(p.regular || p.price || 0);
+      const divs = (p.division && p.division.length) ? p.division : null;
+      if (!divs) {
+        // Promo sin división detallada → una sola área (comportamiento anterior)
+        areas.push({ tentativo: p.name, area: getPromoArea(p), precio: promoPrice,
+                     precioNormal: promoRegular, tipo: 'promo' });
+        return;
       }
-      // Áreas 2-N: promos adicionales
-      _arrPromos.filter(p => p !== null).slice(1).forEach(function(p) {
+      divs.forEach(function(d) {
+        const monto = Number(d.monto || 0);
+        if (monto <= 0) return;
         areas.push({
-          tentativo:    p.name,
-          area:         getPromoArea(p),
-          precio:       Number(p.price || 0),
-          precioNormal: Number(p.regular || p.price || 0),
+          tentativo:    d.servicio || d.area || p.name,                              // servicio del área, NO el nombre de la promo
+          area:         AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || ''),  // área real de esta parte
+          precio:       monto,                                                        // monto de ESTA parte, NO el total
+          precioNormal: promoPrice > 0 ? Math.round((monto / promoPrice) * promoRegular * 100) / 100 : monto,
           tipo:         'promo'
         });
       });
+    };
+
+    if (tipo === 'promo') {
+      // Área 1: primera promo (partida por su división)
+      const promo1 = _arrPromos.find(p => p !== null);
+      if (promo1) pushAreasDePromo(promo1);
+      // Promos adicionales (cada una partida por su división)
+      _arrPromos.filter(p => p !== null).slice(1).forEach(pushAreasDePromo);
     } else {
       // tipo=multi o tipo=normal: área 1 = servicio/promo del selector principal
       if (promo) {
-        areas.push({
-          tentativo:    promo.name,
-          area:         getPromoArea(promo),
-          precio:       Number(promo.price || 0),
-          precioNormal: Number(promo.regular || promo.price || 0),
-          tipo:         'promo'
-        });
+        pushAreasDePromo(promo);
       } else if (servicio) {
         areas.push({
           tentativo:    servicio,
