@@ -4416,7 +4416,7 @@ body.rol-staff #confirmSvcClientName::after {
         activeClients[window.currentUser.name] = activeClients[window.currentUser.name].filter((_, i) => i !== slot - 1);
       }
       show('staffHome');
-      showToast('↩️ ' + clientName + ' devuelta a la lista de espera');
+      showToast('↩️ ' + clienteDisplay(clientName, window['_as' + slot + 'Client']) + ' devuelta a la lista de espera');
     } catch(e) {
       alert('Error al devolver a lista. Revisá tu conexión e intentá de nuevo.');
     }
@@ -5232,12 +5232,13 @@ body.rol-staff #confirmSvcClientName::after {
 
     const idJs    = idEspera.replace(/'/g, "\\'");
     const nomJs   = String(nombre).replace(/'/g, "\\'");
+    const codJs   = String(t.codigo || idEspera).replace(/'/g, "\\'");
     const staffJs = String(staff).replace(/'/g, "\\'");
     const aIdxJs  = String(areaIdx).replace(/'/g, "\\'");
 
     const staffAll = ['María','Keyla','Lesly','Rosa','Yadira','Diana','Laura'];
     const picker = staffAll.map(function(s){
-      return '<button onclick="solReasignar(\'' + idJs + '\',\'' + aIdxJs + '\',\'' + s + '\',\'' + nomJs + '\')" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
+      return '<button onclick="solReasignar(\'' + idJs + '\',\'' + aIdxJs + '\',\'' + s + '\',\'' + nomJs + '\',\'' + codJs + '\')" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
     }).join('');
 
     let acc = '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:18px 0 8px;">Acciones</div>';
@@ -5273,13 +5274,13 @@ body.rol-staff #confirmSvcClientName::after {
       } else alert('No se pudo devolver: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
     } catch(e){ console.error(e); alert('Error de conexión.'); }
   }
-  async function solReasignar(idEspera, areaIdx, chica, nombre){
+  async function solReasignar(idEspera, areaIdx, chica, nombre, codigo){
     if (!confirm('¿Asignar a ' + (nombre || 'la clienta') + ' con ' + chica + '?')) return;
     try {
       const r = await apiPost('asignarStaff', { idEspera: idEspera || '', areaIdx: areaIdx || '', chicaNombre: chica });
       if (r && r.success){
         if (typeof showToast === 'function') showToast('✓ ' + (nombre || 'Clienta') + ' asignada a ' + chica);
-        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (nombre || 'Clienta')); } catch(eP){}
+        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (codigo || 'Clienta')); } catch(eP){}
         _solLog('Reasignar staff', nombre, idEspera, 'A: ' + chica);
         solCerrarDetalle(); loadSolucionesTickets();
       } else alert('No se pudo reasignar: ' + ((r && (r.message || r.error)) || 'intentá de nuevo.'));
@@ -8280,7 +8281,7 @@ body.rol-staff #confirmSvcClientName::after {
     badge.style.color = count === 2 ? 'var(--danger)' : count === 1 ? 'var(--warning)' : 'var(--success)';
     
     if (clients[0]) {
-      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + (clients[0].code || clients[0].name) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clienteDisplay(clients[0].name, clients[0].code) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
       slot1.style.border = '2px solid var(--success)';
       slot1.style.background = 'var(--success-bg)';
       slot1.dataset.active = 'true';
@@ -8292,7 +8293,7 @@ body.rol-staff #confirmSvcClientName::after {
     }
     
     if (clients[1]) {
-      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + (clients[1].code || clients[1].name) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clienteDisplay(clients[1].name, clients[1].code) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
       slot2.style.border = '2px solid var(--info)';
       slot2.style.background = 'var(--info-bg)';
       slot2.dataset.active = 'true';
@@ -9049,7 +9050,7 @@ body.rol-staff #confirmSvcClientName::after {
         
         // Actualizar activeClients para doble atención
         if (user.maxClients === 2) {
-          activeClients[user.name] = result.atenciones.map(a => ({ name: a.nombre, service: a.servicio }));
+          activeClients[user.name] = result.atenciones.map(a => ({ name: a.nombre, code: a.codigo, service: a.servicio }));
           updateCapacityUI(user.name);
         }
         
@@ -10364,7 +10365,7 @@ body.rol-staff #confirmSvcClientName::after {
                 <select id="reSel_${_uid}" onchange="document.getElementById('reBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
+                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
               </div>
               <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe}')" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
             // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
@@ -10377,7 +10378,7 @@ body.rol-staff #confirmSvcClientName::after {
                 <select id="syncSel_${_uid}" onchange="document.getElementById('syncBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
+                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
               </div>`;
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
@@ -14640,7 +14641,7 @@ body.rol-staff #confirmSvcClientName::after {
       return '<option value="'+n+'">'+n+(ocup?' (Ocupada)':' (Disponible)')+'</option>';
     }).join('');
   }
-  async function reasignarStaff(idEspera, areaIdx, selId, nombre){
+  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
     if (!chica) { alert('Elegí una staff'); return; }
@@ -14649,7 +14650,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         // Notificar SOLO a la staff asignada (no a toda el área)
-        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (nombre || 'Clienta')); } catch(ePush) {}
+        try { enviarPushStaff([chica], '📌 Clienta asignada a vos', (codigo || 'Clienta')); } catch(ePush) {}
         loadMikaelaHome();
       } else {
         alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo reasignar'));
@@ -16190,8 +16191,8 @@ body.rol-staff #confirmSvcClientName::after {
         }
         if (result && result.success) {
           initFormTM();
-          simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + nombre + ' · ' + a.tentativo, isTop);
-          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+nombre+' · '+a.tentativo);
+          simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + (codigo||'Clienta') + ' · ' + a.tentativo, isTop);
+          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+a.tentativo);
           setTimeout(() => { show('mikaelaHome'); }, 600);
         } else {
           alert('Error: ' + (result?.error || result?.message || 'Error desconocido'));
@@ -16210,10 +16211,10 @@ body.rol-staff #confirmSvcClientName::after {
       if (result && result.success) {
         initFormTM();
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
-        simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMulti.length + ' servicios', isTop);
+        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMulti.length + ' servicios', isTop);
         const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
         const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
-        enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+nombre+' · '+areasMulti.length+' servicios');
+        enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMulti.length+' servicios');
         alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
@@ -16409,8 +16410,8 @@ body.rol-staff #confirmSvcClientName::after {
         }
         if (result && result.success) {
           initFormTM();
-          simulateNotif('staff', 'Nueva clienta asignada a ' + chica, nombre + ' · ' + aGA.tentativo, isTop);
-          enviarPushStaff([chica], '📌 Clienta asignada a vos', (isTop?'⭐ ':'')+nombre+' · '+aGA.tentativo);
+          simulateNotif('staff', 'Nueva clienta asignada a ' + chica, (codigo||'Clienta') + ' · ' + aGA.tentativo, isTop);
+          enviarPushStaff([chica], '📌 Clienta asignada a vos', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+aGA.tentativo);
           alert('✅ Clienta asignada a ' + chica);
           setTimeout(() => { show('mikaelaHome'); }, 400);
         } else {
@@ -16430,8 +16431,8 @@ body.rol-staff #confirmSvcClientName::after {
       });
       if (tmResult && tmResult.success) {
         initFormTM();
-        simulateNotif('staff', '🎯 Ticket multi-servicio', nombre + ' · ' + areasMultiGA.length + ' servicios', isTop);
-        enviarPushStaff([chica], '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+nombre+' · '+areasMultiGA.length+' servicios');
+        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMultiGA.length + ' servicios', isTop);
+        enviarPushStaff([chica], '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMultiGA.length+' servicios');
         alert('✅ Ticket creado (' + tmResult.id + ')');
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
@@ -16452,7 +16453,7 @@ body.rol-staff #confirmSvcClientName::after {
         window._arrPromo = null;
         
         // Notificar solo a la chica asignada
-        simulateNotif('staff', `${nombre} asignada directamente`, (isTop ? '⭐ ' : '') + servicioGA, isTop);
+        simulateNotif('staff', `${(codigo||'Clienta')} asignada directamente`, (isTop ? '⭐ ' : '') + servicioGA, isTop);
         
         alert(`✓ ${nombre} asignada directamente a ${chica}. Notificación enviada.`);
         setTimeout(() => { show('mikaelaHome'); }, 600);
