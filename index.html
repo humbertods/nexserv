@@ -2976,6 +2976,7 @@ body.rol-staff #confirmSvcClientName::after {
     // Cache-busting: agregar timestamp para evitar respuestas cacheadas
     url.searchParams.set('_t', Date.now().toString());
     if (window._session) url.searchParams.set('session', window._session);
+    if (window.currentUser && window.currentUser.name) url.searchParams.set('_who', window.currentUser.name); // pista de diagnóstico (NO autentica): identifica a la chica en el ApiLog aunque falte la sesión
     if (params) Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
     try {
       const res = await fetch(url.toString(), {
@@ -2998,6 +2999,7 @@ body.rol-staff #confirmSvcClientName::after {
     data.action = action;
     data._t = Date.now();
     if (window._session) data.session = window._session;
+    if (window.currentUser && window.currentUser.name) data._who = window.currentUser.name; // pista de diagnóstico (NO autentica): identifica a la chica en el ApiLog aunque falte la sesión
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       const controller = new AbortController();
