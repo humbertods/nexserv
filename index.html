@@ -12541,12 +12541,15 @@ body.rol-staff #confirmSvcClientName::after {
           ? Math.round((_m / _promoPrecio) * _promoRegular * 100) / 100
           : _m;
         const _areaKey = AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || ''));
-        // Etiqueta = el servicio REAL de esa parte (no el nombre de la promo), para que
-        // la staff sepa qué hacer y Mikaela vea el área correcta con su precio.
-        const _label = String(dv.servicio || dv.area || '').trim() || (d.nombre + ' · ' + _areaKey);
+        // Etiqueta = NOMBRE DE LA PROMO (no el servicio suelto). IMPORTANTE para el cobro:
+        // el motor `_regularRealTM_` reconoce el combo por esta etiqueta (vs hoja Paquetes)
+        // para cobrar el REGULAR en tarjeta. Si acá pusiéramos el servicio suelto, no
+        // reconocería el combo y la tarjeta cobraría el precio PROMO (cobro mal). El área
+        // y el precio por parte van por separado (clave + monto), así que el routing no
+        // depende de la etiqueta.
         return {
           area: _areaKey,
-          tentativo: _label,
+          tentativo: d.nombre,
           precio: _m,
           precioNormal: _reg,
           tipo: 'promo'
