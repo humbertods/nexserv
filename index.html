@@ -1473,15 +1473,12 @@ body.rol-staff #confirmSvcClientName::after {
                  color:var(--ink-soft);box-shadow:0 1px 4px rgba(0,0,0,.04);">
         </div>
 
-        <!-- Orden de atención -->
-        <div style="margin-top:20px;">
-          <div style="font-size:13px;font-weight:800;color:var(--ink);margin-bottom:6px;">Orden de atención</div>
-          <div style="font-size:11px;color:var(--ink-soft);margin-bottom:10px;">Tocá + para definir en qué orden atienden las áreas. Si no definís, cada área se atiende cuando haya una staff disponible.</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="tmSecuenciaBtns">
-            <!-- se renderizan dinámicamente según las áreas agregadas -->
-          </div>
+        <!-- Orden de atención — OCULTO: Mikaela asigna cada área a la staff correcta;
+             el sistema enruta por área. Ya no se define un orden previo. -->
+        <div style="display:none;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="tmSecuenciaBtns"></div>
           <div id="secuenciaList" style="margin-bottom:8px;"></div>
-          <div id="secuenciaEmpty" style="font-size:12px;color:var(--ink-faint);text-align:center;padding:6px 0;display:block;">Sin orden definido</div>
+          <div id="secuenciaEmpty" style="display:none;">Sin orden definido</div>
         </div>
 
         <!-- Prioridad -->
@@ -1573,7 +1570,7 @@ body.rol-staff #confirmSvcClientName::after {
             Promos solo validas con efectivo o transferencia
           </div>
         </div>
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px;display:none;">
           <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
           <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas. Toca + para agregar un área a la secuencia.</div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
@@ -1622,7 +1619,7 @@ body.rol-staff #confirmSvcClientName::after {
         <button id="btnServicioAdicional" onclick="agregarServicioAdicional()" style="width: 100%; padding: 13px; margin-top: 10px; margin-bottom: 4px; background: var(--bg); border: 2px dashed var(--line); border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; font-weight: 700; color: var(--ink-soft); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
           ➕ Servicio adicional
         </button>
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px;display:none;">
           <div style="font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 8px;">Orden de atención</div>
           <div style="font-size: 11px; color: var(--ink-soft); margin-bottom: 10px;">Indica en qué orden deben atender las áreas.</div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
@@ -12529,31 +12526,27 @@ body.rol-staff #confirmSvcClientName::after {
     // 1. Mostrar las áreas en los botones de secuencia directamente
     // 2. NO crear slots adicionales — la promo se maneja como TM internamente
     if (d.division && d.division.length > 1) {
-      // FIX: si Mikaela ya seleccionó un área, ese área va PRIMERO en _comboAreas
-      // Ordenar divisiones: la que coincide con el área seleccionada va primero
-      const selectedAreaKey = svc.areaKey || '';
-      const divsOrdenadas = [...d.division].sort((a, b) => {
-        const aKey = AREA_KEY_FROM_DIV(String(a.area || a.servicio || ''));
-        const bKey = AREA_KEY_FROM_DIV(String(b.area || b.servicio || ''));
-        if (selectedAreaKey) {
-          if (aKey === selectedAreaKey && bKey !== selectedAreaKey) return -1;
-          if (bKey === selectedAreaKey && aKey !== selectedAreaKey) return 1;
-        }
-        return 0; // mantener orden original si no hay match
-      });
-
+      // MODELO NUEVO (decide Mikaela): cada parte de la promo = un área INDEPENDIENTE
+      // con SU servicio, SU clave de área y SU monto. El orden NO importa — Mikaela
+      // asigna cada área a la staff correcta y el sistema enruta por clave de área.
+      // (Se quitó el reordenamiento "área seleccionada primero": desalineaba los
+      //  slots con la staff y hacía caer a la chica en el monto/área equivocada.)
       svc._isComboMultiArea = true;
       // Precio regular por área: proporcional al regular del combo (para que tarjeta cobre sin promo)
       const _promoPrecio  = Number(d.precio || 0);
       const _promoRegular = Number(d.regular || d.precio || 0);
-      svc._comboAreas = divsOrdenadas.map(dv => {
+      svc._comboAreas = d.division.map(dv => {
         const _m = Number(dv.monto || 0);
         const _reg = (_promoPrecio > 0 && _promoRegular > _promoPrecio)
           ? Math.round((_m / _promoPrecio) * _promoRegular * 100) / 100
           : _m;
+        const _areaKey = AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || ''));
+        // Etiqueta = el servicio REAL de esa parte (no el nombre de la promo), para que
+        // la staff sepa qué hacer y Mikaela vea el área correcta con su precio.
+        const _label = String(dv.servicio || dv.area || '').trim() || (d.nombre + ' · ' + _areaKey);
         return {
-          area: AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || '')),
-          tentativo: d.nombre,
+          area: _areaKey,
+          tentativo: _label,
           precio: _m,
           precioNormal: _reg,
           tipo: 'promo'
@@ -12572,15 +12565,9 @@ body.rol-staff #confirmSvcClientName::after {
         ).join('');
       }
 
-      // FIX: auto-agregar la secuencia según el orden detectado (sin que Mikaela tenga que tocar los botones)
-      // Si Mikaela ya definió una secuencia manual, no sobreescribir
-      if (!window._secuencia || window._secuencia.length === 0) {
-        window._secuencia = [];
-        uniqAreas.forEach(a => {
-          const LABELS = { cejas:'<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion:'Depilación', pestanas:'Pestañas', retiro_lifting:'Lifting/Retiro', facial:'Facial' };
-          addAreaSecuencia(a);
-        });
-      }
+      // MODELO NUEVO: NO se auto-arma ninguna secuencia/orden. Mikaela decide a quién
+      // manda cada área; el sistema solo enruta cada área a la staff correcta por clave.
+      window._secuencia = [];
 
       // Mostrar precio total del combo (se dividirá al crear el TM)
       const pd = document.getElementById('tmPrecioDisplay-' + idx);
