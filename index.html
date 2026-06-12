@@ -2895,6 +2895,13 @@ body.rol-staff #confirmSvcClientName::after {
     dev:  '__PEGA_DEV_EXEC_URL__'   // ← URL /exec del deployment de pruebas
   };
   const API_URL = API_URLS[ENV];
+
+  // ── Versión de la app (debe coincidir con APP_VERSION del backend) ──
+  // Subila en cada cambio que despliegues a GitHub Pages. Al abrir, la app
+  // le pregunta al servidor su versión; si la del servidor es distinta,
+  // muestra un aviso para recargar (cura el problema de caché vieja).
+  const APP_VERSION = '5.2';
+
   // Sello visual rojo "DEV" para que nunca se confunda con producción.
   if (ENV === 'dev') {
     try {
@@ -2906,6 +2913,62 @@ body.rol-staff #confirmSvcClientName::after {
       });
     } catch (e) {}
   }
+
+  // Etiqueta discreta de versión (abajo a la derecha) + chequeo de actualización.
+  function _mostrarVersionLabel() {
+    try {
+      if (document.getElementById('nxVerLabel')) return;
+      var v = document.createElement('div');
+      v.id = 'nxVerLabel';
+      v.textContent = 'v' + APP_VERSION;
+      v.style.cssText = 'position:fixed;bottom:4px;right:6px;z-index:99998;font:500 10px sans-serif;color:rgba(0,0,0,0.28);pointer-events:none;';
+      document.body.appendChild(v);
+    } catch (e) {}
+  }
+  async function _checkVersion() {
+    try {
+      const u = new URL(API_URL);
+      u.searchParams.set('action', 'getVersion');
+      u.searchParams.set('_t', Date.now().toString());
+      const r = await fetch(u.toString());
+      const j = await r.json();
+      const serverV = j && j.version ? String(j.version) : '';
+      if (serverV && serverV !== String(APP_VERSION)) _avisarActualizar(serverV);
+    } catch (e) { /* sin red: no molestar */ }
+  }
+  function _avisarActualizar(serverV) {
+    try {
+      if (document.getElementById('nxUpdateBanner')) return;
+      var bar = document.createElement('div');
+      bar.id = 'nxUpdateBanner';
+      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#b45309;color:#fff;font:600 13px sans-serif;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+      var txt = document.createElement('span');
+      txt.textContent = '🔄 Hay una versión nueva (v' + serverV + '). Recargá para actualizar.';
+      var btn = document.createElement('button');
+      btn.textContent = 'Recargar';
+      btn.style.cssText = 'background:#fff;color:#b45309;border:none;border-radius:8px;font:700 13px sans-serif;padding:6px 14px;cursor:pointer;';
+      btn.onclick = function () { _forzarActualizar(); };
+      bar.appendChild(txt); bar.appendChild(btn);
+      document.body.appendChild(bar);
+    } catch (e) {}
+  }
+  function _forzarActualizar() {
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (reg) { reg.update(); });
+          if (window.caches && caches.keys) {
+            caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); })
+              .finally(function () { location.reload(true); });
+          } else { location.reload(true); }
+        }).catch(function () { location.reload(true); });
+      } else { location.reload(true); }
+    } catch (e) { location.reload(true); }
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    _mostrarVersionLabel();
+    _checkVersion();
+  });
   
   async function apiGet(action, params) {
     const url = new URL(API_URL);
