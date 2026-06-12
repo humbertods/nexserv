@@ -3050,6 +3050,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   async function ensureCatalogoLoaded() {
     if (CATALOGO_LOADED) return;
+    if (!window._session) return; // sin sesión no pedimos catálogo (evita 'sin credenciales' pre-login)
     try {
       const result = await apiGet('getCatalogo');
       if (result.success && result.servicios) {
@@ -3276,7 +3277,7 @@ body.rol-staff #confirmSvcClientName::after {
   document.addEventListener('DOMContentLoaded', () => {
     const pi = document.getElementById('promoPrice');
     if (pi) pi.addEventListener('input', updatePromoTotal);
-    initPromoSelects();
+    // initPromoSelects() se llama recién con sesión activa (al restaurar abajo o al iniciar sesión)
 
     // ── Restaurar sesión persistida ──────────────────────────
     try {
@@ -3286,6 +3287,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (user && user.name && user.role && user.active !== false) {
           window.currentUser = user;
           window._session = (user && user.session) || null;
+          if (window._session) initPromoSelects(); // catálogo + selects de promo, ya con sesión
           document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
           startHeartbeat(false);
           const roleLabelEl = document.getElementById('roleLabel');
@@ -4756,7 +4758,6 @@ body.rol-staff #confirmSvcClientName::after {
     const localUser = USERS[u] || USERS[p];
     
     try {
-      inicializarPestanasUnaVez(); // crear pestañas si no existen (no bloquea)
       const result = await apiPost('login', { user: u, pass: p });
       if (result.success) {
         const r = result.user;
@@ -4810,6 +4811,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (roleLabelEl) roleLabelEl.textContent = 'Salir · ' + user.name;
     window.currentUser = user;
     window._session = (user && user.session) || null;
+    if (window._session) { initPromoSelects(); inicializarPestanasUnaVez(); } // catálogo/selects + setup pestañas, ya con sesión
     document.body.classList.toggle('rol-staff', !!user && user.role === 'staff');
     startHeartbeat(true);
     // Persistir sesión para que sobreviva cierre de app
