@@ -16319,9 +16319,12 @@ body.rol-staff #confirmSvcClientName::after {
       else others.push(html);
     });
 
+    // Una sola lista con TODAS las staff (sin dividir por área).
+    // Se mantiene el orden: primero las del área de la cita, luego el resto.
+    // El estado Libre / Ocupada / "puede tomar otra" se sigue avisando por tarjeta.
+    const todas = forArea.concat(others);
     let out = '';
-    if (forArea.length > 0) out += `<div class="section-title">Disponibles para ${area}</div><div class="card" style="padding:8px 20px;">${forArea.join('')}</div>`;
-    if (others.length > 0) out += `<div class="section-title">Cualquier chica del salón</div><div class="card" style="padding:8px 20px;">${others.join('')}</div>`;
+    if (todas.length > 0) out += `<div class="section-title">Staff disponibles</div><div class="card" style="padding:8px 20px;">${todas.join('')}</div>`;
     document.getElementById('assignDirectStaffList').innerHTML = out;
   }
 
