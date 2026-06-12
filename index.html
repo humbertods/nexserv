@@ -11629,15 +11629,19 @@ body.rol-staff #confirmSvcClientName::after {
     const row = document.getElementById('cobrarAbonoRow');
     const montoEl = document.getElementById('cobrarAbonoMonto');
     const netoEl = document.getElementById('cobrarAbonoNeto');
+    const totEl = document.getElementById('cobrarTotal');
     const abono = Number(window._cobrarAbonoMonto || 0);
     if (!row) return;
+    // BRUTO autoritativo = total de servicios (según método de pago) + productos.
+    // NUNCA es el neto. Fuentes en orden de confianza.
+    let bruto = Number(window._cobrarTotalConProductos || 0);
+    if (!(bruto > 0)) bruto = Number(window._cobrarTotalPromo || 0) + Number(window._cobrarTotalProductos || 0);
+    if (!(bruto > 0)) bruto = parseFloat((totEl?.textContent || '0').replace('$','')) || 0;
+    // El número grande SIEMPRE muestra el bruto. Si algo lo pisó (p.ej. con el abono),
+    // acá se auto-sana — el abono jamás reemplaza el total de servicios.
+    if (totEl && bruto > 0) totEl.textContent = '$' + bruto.toFixed(2);
     if (!(abono > 0)) { row.style.display = 'none'; return; }
-    let total = Number(window._cobrarTotalConProductos || 0);
-    if (!total) {
-      const t = parseFloat((document.getElementById('cobrarTotal')?.textContent || '0').replace('$','')) || 0;
-      total = t;
-    }
-    const neto = Math.max(0, total - abono);
+    const neto = Math.max(0, bruto - abono);
     if (montoEl) montoEl.textContent = '−$' + abono.toFixed(2);
     if (netoEl)  netoEl.textContent  = '$' + neto.toFixed(2);
     row.style.display = 'block';
