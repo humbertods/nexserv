@@ -15490,6 +15490,25 @@ body.rol-staff #confirmSvcClientName::after {
     closeModal();
     alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
 
+    // Sincronizar el cambio con el backend para que Mikaela vea el nuevo valor EN VIVO
+    // (antes solo se actualizaba el estado local de la staff y Mikaela seguía viendo el viejo).
+    const _idEsperaPromo = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    if (_idEsperaPromo) {
+      apiPost('updateServiciosAtencion', {
+        idEspera      : _idEsperaPromo,
+        chicaNombre   : user?.name || '',
+        clienteNombre : clientName,
+        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+        servicios     : promo.name,
+        total         : String(myPrice),
+        promoNombre   : promo.name,
+        tipo          : 'SP',
+        precioPromo   : String(myPrice),
+        precioRegular : String(promo.regular || promo.price || myPrice)
+      }).then(function (r) { console.log('✅ Promo sincronizada con Mikaela:', r); })
+        .catch(function (e) { console.warn('⚠ Error sincronizando promo con Mikaela:', e); });
+    }
+
     // Si la promo incluye áreas que esta staff NO hace, avisar a Mikaela del cambio
     // (ej: Yadira cambia a "brasilero + cejas" → la parte de cejas debe asignarla Mikaela)
     try {
@@ -15546,6 +15565,24 @@ body.rol-staff #confirmSvcClientName::after {
     if (promoBtn) {
       promoBtn.textContent = '✓ Promo completa aplicada';
       promoBtn.style.background = 'var(--success)';
+    }
+
+    // Sincronizar con el backend para que Mikaela vea el valor de la promo completa EN VIVO
+    const _idEsperaPC = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    if (_idEsperaPC) {
+      apiPost('updateServiciosAtencion', {
+        idEspera      : _idEsperaPC,
+        chicaNombre   : user?.name || '',
+        clienteNombre : clientName,
+        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+        servicios     : promo.name,
+        total         : String(precioTotal),
+        promoNombre   : promo.name,
+        tipo          : 'SP',
+        precioPromo   : String(precioTotal),
+        precioRegular : String(promo.regular || promo.price || precioTotal)
+      }).then(function (r) { console.log('✅ Promo completa sincronizada con Mikaela:', r); })
+        .catch(function (e) { console.warn('⚠ Error sincronizando promo completa:', e); });
     }
 
     closeModal();
