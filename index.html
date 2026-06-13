@@ -5706,6 +5706,7 @@ body.rol-staff #confirmSvcClientName::after {
     window._takingData = w;
     window._takingId = w.id;
     window._takingClient = w.name;
+    window._takingClientCode = w.codigo || w.code || '';
     window._takingService = w.service;
     
     const topPart = w.isTop ? ' <span class="top-star">⭐ TOP</span>' : '';
@@ -5898,7 +5899,7 @@ body.rol-staff #confirmSvcClientName::after {
           areaIdx:     window._takingData?.areaIdx || 0
         });
         if (!result.success) { alert(result.message || 'Error al tomar el servicio TM'); return; }
-        simulateNotif('mikaela', name + ' tomó área TM de ' + (window._takingClient || 'clienta'), 'Ticket multi · ahora', false);
+        simulateNotif('mikaela', name + ' tomó área TM de ' + (window._takingClientCode || 'clienta'), 'Ticket multi · ahora', false);
       } catch(err) {
         alert('Error de conexión'); return;
       }
@@ -5914,7 +5915,7 @@ body.rol-staff #confirmSvcClientName::after {
         chicaNombre: name
       });
       if (result.success) {
-        simulateNotif('mikaela', name + ' tomó a ' + (window._takingClient || 'una clienta'), 'Lista de espera · ahora', false);
+        simulateNotif('mikaela', name + ' tomó a ' + (window._takingClientCode || 'una clienta'), 'Lista de espera · ahora', false);
       } else if (result.message) {
         alert(result.message);
         return;
@@ -8766,7 +8767,7 @@ body.rol-staff #confirmSvcClientName::after {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
     
     setTimeout(() => {
-      document.getElementById('finishClientName').textContent = displayName;
+      document.getElementById('finishClientName').textContent = clienteDisplay(displayName, window._as1Client);
       if (promoData) {
         document.getElementById('finishPromoInfo').style.display = 'block';
         document.getElementById('finishPromoName').textContent = promoData.promo.name;
@@ -17953,7 +17954,7 @@ function renderCierreMes(d, siraInicial) {
   // ---- Productos (marca) si hay ----
   if (d.numProductos) {
     html += '<div class="card" style="padding:12px 16px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;font-size:14px;">'
-          + '<span>🛍 Productos vendidos (' + d.numProductos + ')</span><span style="font-weight:700;">' + money(d.generadoProductos) + '</span></div>';
+          + '<span><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> Productos vendidos (' + d.numProductos + ')</span><span style="font-weight:700;">' + money(d.generadoProductos) + '</span></div>';
   }
 
   // ---- Gastos ----
@@ -17966,7 +17967,7 @@ function renderCierreMes(d, siraInicial) {
         +     '<span>SIRA (mes)<br><span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">'
         +       (d.siraOk
                   ? '✓ Traído de SIRA · ' + (d.siraCount || 0) + ' gasto' + ((d.siraCount === 1) ? '' : 's') + ' del mes'
-                  : '⚠ No se pudo leer SIRA, ingrésalo manual')
+                  : '<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA, ingrésalo manual')
         +       '</span></span>'
         +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
         +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
@@ -17989,24 +17990,24 @@ function renderCierreMes(d, siraInicial) {
 
   // ---- Exportar (PDF / Excel) ----
   html += '<div style="display:flex;gap:10px;margin-top:14px;">';
-  html +=   '<button onclick="exportarCierrePDF()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">📄 Exportar PDF</button>';
-  html +=   '<button onclick="exportarCierreExcel()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">📊 Exportar Excel</button>';
+  html +=   '<button onclick="exportarCierrePDF()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;"><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6"/><path d="m9 15 3 3 3-3"/></svg> Exportar PDF</button>';
+  html +=   '<button onclick="exportarCierreExcel()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;"><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg> Exportar Excel</button>';
   html += '</div>';
 
   // ---- Estado guardado + botón Guardar ----
   const g = d.guardado;
   html += '<div style="margin-top:14px;">';
   if (g && g.fechaCierre) {
-    html += '<div id="cmGuardadoBadge" style="font-size:12px;color:var(--success);font-weight:700;text-align:center;margin-bottom:8px;">✅ Guardado el ' + g.fechaCierre + (g.registradoPor ? ' · ' + g.registradoPor : '') + '</div>';
+    html += '<div id="cmGuardadoBadge" style="font-size:12px;color:var(--success);font-weight:700;text-align:center;margin-bottom:8px;"><svg class="nx-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Guardado el ' + g.fechaCierre + (g.registradoPor ? ' · ' + g.registradoPor : '') + '</div>';
   }
   html += '<button onclick="guardarCierreMes()" id="cmGuardarBtn" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;">'
-        + (g && g.fechaCierre ? '↻ Actualizar cierre guardado' : '💾 Guardar cierre del mes') + '</button>';
+        + (g && g.fechaCierre ? '↻ Actualizar cierre guardado' : '<svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> Guardar cierre del mes') + '</button>';
   html += '<div style="font-size:11px;color:var(--ink-faint);text-align:center;padding:6px 8px 0;line-height:1.5;">Queda registrado de forma permanente en tu hoja de cálculo como respaldo verificable.</div>';
   html += '</div>';
 
   // ---- Historial de cierres guardados ----
   html += '<div style="margin-top:18px;">';
-  html += '<button onclick="toggleHistorialCierres()" id="cmHistToggle" style="width:100%;padding:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">📚 Historial de cierres guardados <span id="cmHistCaret" style="font-size:11px;">▼</span></button>';
+  html += '<button onclick="toggleHistorialCierres()" id="cmHistToggle" style="width:100%;padding:12px;background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;"><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg> Historial de cierres guardados <span id="cmHistCaret" style="font-size:11px;">▼</span></button>';
   html += '<div id="cmHistList" style="display:none;margin-top:10px;"></div>';
   html += '</div>';
 
@@ -18184,7 +18185,7 @@ function exportarCierreExcel() {
     document.body.appendChild(a);
     a.click();
     setTimeout(function(){ if (a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); }, 1200);
-    showToast('📊 Excel descargado');
+    showToast('✓ Excel descargado');
   } catch(e) {
     showToast('No se pudo descargar el Excel.');
   }
