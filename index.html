@@ -6275,6 +6275,12 @@ body.rol-staff #confirmSvcClientName::after {
             setTimeout(function() { loadFacialFichaQuick(_fKey1, 1); }, 400);
           }
 
+          // Limpiar SIEMPRE el panel de ficha cejas/pigmento antes de decidir si mostrarlo.
+          // Evita que quede pegada la ficha de una clienta/staff anterior (p. ej. si una staff
+          // de cejas atendió en esta misma pestaña y luego entra una de pestañas/facial).
+          var _cqClear1 = document.getElementById('cejasQuick1');
+          if (_cqClear1) { _cqClear1.innerHTML = ''; _cqClear1.style.display = 'none'; }
+
           // Precargar ficha cejas pigmento si el servicio es de efecto polvo/permanente
           // Solo para chicas de CEJAS (pestañas/facial no deben ver la ficha de cejas/pigmento)
           if (user && String(user.area||'').toLowerCase().includes('ceja')) {
@@ -6564,6 +6570,8 @@ body.rol-staff #confirmSvcClientName::after {
             window._facialFichaSlot = 2;
             setTimeout(function() { loadFacialFichaQuick(_fKey2, 2); }, 400);
           }
+          var _cqClear2 = document.getElementById('cejasQuick2');
+          if (_cqClear2) { _cqClear2.innerHTML = ''; _cqClear2.style.display = 'none'; }
           if (user && String(user.area||'').toLowerCase().includes('ceja')) {
             const _svcPig2 = slotServices[2] && slotServices[2].find(function(s){ return esSrvPigmento(s.name); });
             if (_svcPig2) {
