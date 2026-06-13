@@ -17987,6 +17987,12 @@ function renderCierreMes(d, siraInicial) {
 
   html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos (caja chica + SIRA). El valor de SIRA se trae automáticamente desde su sistema; puedes ajustarlo a mano si algún mes hace falta.</div>';
 
+  // ---- Exportar (PDF / Excel) ----
+  html += '<div style="display:flex;gap:10px;margin-top:14px;">';
+  html +=   '<button onclick="exportarCierrePDF()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">📄 Exportar PDF</button>';
+  html +=   '<button onclick="exportarCierreExcel()" style="flex:1;padding:13px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;color:var(--ink);cursor:pointer;">📊 Exportar Excel</button>';
+  html += '</div>';
+
   // ---- Estado guardado + botón Guardar ----
   const g = d.guardado;
   html += '<div style="margin-top:14px;">';
@@ -18031,6 +18037,160 @@ function onCierreSiraInput() {
     tge.style.color = totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)';
   }
 }
+
+// ── Export del Cierre de mes (PDF imprimible + Excel .xls) ──────────────────
+function _cierreDatos() {
+  const d = window._cmData;
+  if (!d) return null;
+  const inp = document.getElementById('cmSiraInput');
+  const key = d.mes + '-' + d.anio;
+  let sira = 0;
+  if (inp && inp.value !== '' && inp.value != null)            sira = Number(inp.value) || 0;
+  else if (window._cmSiraPorMes && window._cmSiraPorMes[key] != null) sira = Number(window._cmSiraPorMes[key]) || 0;
+  else if (d.guardado && d.guardado.gastoSIRA != null)        sira = Number(d.guardado.gastoSIRA) || 0;
+  else if (d.siraOk && d.gastoSIRA != null)                   sira = Number(d.gastoSIRA) || 0;
+  const totalGastos  = (Number(d.gastoCajaChica) || 0) + sira;
+  const totalGeneral = (Number(d.generadoTotal) || 0) - (Number(d.comisionTotal) || 0) - totalGastos;
+  return { d: d, sira: sira, totalGastos: totalGastos, totalGeneral: totalGeneral };
+}
+
+function _cierreReportHTML() {
+  const x = _cierreDatos();
+  if (!x) return '';
+  const d = x.d;
+  const money = n => '$' + (Number(n) || 0).toFixed(2);
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const mesNom = CM_MESES[d.mes - 1] + ' ' + d.anio;
+  const h = new Date();
+  const fechaGen = ('0'+h.getDate()).slice(-2)+'/'+('0'+(h.getMonth()+1)).slice(-2)+'/'+h.getFullYear()+' '+('0'+h.getHours()).slice(-2)+':'+('0'+h.getMinutes()).slice(-2);
+  let staffRows = '';
+  (d.staff || []).forEach(s => {
+    staffRows += '<tr><td>'+esc(s.chica)+'</td><td class="c">'+(s.servicios||0)+'</td><td class="r">'+money(s.generado)+'</td><td class="r rojo">'+money(s.comision)+'</td></tr>';
+  });
+  if (!staffRows) staffRows = '<tr><td colspan="4" class="c" style="color:#999;">Sin servicios registrados este mes.</td></tr>';
+  const guardadoTxt = (d.guardado && d.guardado.fechaCierre)
+    ? 'Cierre guardado el ' + esc(d.guardado.fechaCierre) + (d.guardado.registradoPor ? ' por ' + esc(d.guardado.registradoPor) : '')
+    : 'Cierre no guardado todavía';
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cierre ' + esc(mesNom) + '</title>'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0;}'
+    + 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#1a1a1a;padding:28px 30px;font-size:13px;}'
+    + 'h1{font-size:22px;letter-spacing:-0.02em;}'
+    + '.sub{color:#777;font-size:12px;margin-top:2px;}'
+    + '.hero{background:#2a2118;color:#fff;border-radius:14px;padding:18px 20px;margin:18px 0;}'
+    + '.hero .big{font-size:34px;font-weight:800;letter-spacing:-0.03em;}'
+    + '.hero .meta{font-size:12px;opacity:.78;margin-top:4px;}'
+    + '.st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#999;margin:20px 0 8px;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:13px;}'
+    + 'th,td{padding:8px 10px;border-bottom:1px solid #e5e5e5;text-align:left;}'
+    + 'th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:#999;font-weight:700;}'
+    + 'td.c,th.c{text-align:center;} td.r,th.r{text-align:right;} .rojo{color:#c0392b;}'
+    + 'tr.tot td{font-weight:800;border-top:2px solid #333;border-bottom:none;}'
+    + '.box{border:1px solid #e5e5e5;border-radius:12px;padding:12px 16px;margin-top:10px;}'
+    + '.row{display:flex;justify-content:space-between;padding:4px 0;}'
+    + '.tg{border:2px solid #2a2118;border-radius:12px;padding:14px 18px;margin-top:14px;}'
+    + '.tg .fin{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:1.5px solid #2a2118;margin-top:8px;padding-top:10px;}'
+    + '.foot{margin-top:24px;font-size:11px;color:#999;border-top:1px solid #e5e5e5;padding-top:10px;line-height:1.5;}'
+    + '@page{margin:14mm;} @media print{body{padding:0;}}'
+    + '</style></head><body>'
+    + '<h1>Cierre de mes</h1><div class="sub">' + esc(mesNom) + ' · NexServ</div>'
+    + '<div class="hero"><div class="big">' + money(d.generadoTotal) + '</div>'
+    +   '<div class="meta">Generado del mes · ' + (d.numClientas||0) + ' clientas · ' + (d.numServicios||0) + ' servicios' + (d.numProductos ? ' · ' + d.numProductos + ' productos' : '') + '</div></div>'
+    + '<div class="st">Por staff</div>'
+    + '<table><thead><tr><th>Staff</th><th class="c">Serv.</th><th class="r">Generado</th><th class="r">Comisión</th></tr></thead><tbody>'
+    +   staffRows
+    +   '<tr class="tot"><td>Total</td><td class="c">' + (d.numServicios||0) + '</td><td class="r">' + money(d.generadoServicios) + '</td><td class="r rojo">' + money(d.comisionTotal) + '</td></tr>'
+    + '</tbody></table>'
+    + (d.numProductos ? '<div class="box row"><span>Productos vendidos (' + d.numProductos + ')</span><strong>' + money(d.generadoProductos) + '</strong></div>' : '')
+    + '<div class="st">Gastos del mes</div>'
+    + '<div class="box">'
+    +   '<div class="row"><span>Caja chica (' + (d.numGastosCaja||0) + ' gastos)</span><span class="rojo">-' + money(d.gastoCajaChica) + '</span></div>'
+    +   '<div class="row"><span>SIRA (mes)' + (d.siraOk ? ' &middot; ' + (d.siraCount||0) + ' gasto(s)' : '') + '</span><span class="rojo">-' + money(x.sira) + '</span></div>'
+    +   '<div class="row" style="border-top:1.5px solid #e5e5e5;margin-top:6px;padding-top:8px;font-weight:800;"><span>Total gastos</span><span class="rojo">-' + money(x.totalGastos) + '</span></div>'
+    + '</div>'
+    + '<div class="tg">'
+    +   '<div class="row" style="color:#777;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Gastos (caja + SIRA)</span><span>-' + money(x.totalGastos) + '</span></div>'
+    +   '<div class="fin"><span>TOTAL GENERAL</span><span style="color:' + (x.totalGeneral>=0?'#1e7e34':'#c0392b') + ';">' + money(x.totalGeneral) + '</span></div>'
+    + '</div>'
+    + '<div class="foot">' + guardadoTxt + '<br>Reporte generado el ' + fechaGen + '</div>'
+    + '</body></html>';
+}
+
+function exportarCierrePDF() {
+  const html = _cierreReportHTML();
+  if (!html) { showToast('Primero cargá un cierre del mes.'); return; }
+  // 1) Ventana nueva (lo más fiable en tablet/escritorio → "Guardar como PDF")
+  let win = null;
+  try { win = window.open('', '_blank'); } catch(e) { win = null; }
+  if (win) {
+    win.document.open(); win.document.write(html); win.document.close();
+    try { win.focus(); } catch(e){}
+    setTimeout(function(){ try { win.print(); } catch(e){} }, 450);
+    return;
+  }
+  // 2) Fallback: iframe oculto tamaño A4 (PWA con ventanas emergentes bloqueadas)
+  let ifr = document.getElementById('cmPrintFrame');
+  if (ifr && ifr.parentNode) ifr.parentNode.removeChild(ifr);
+  ifr = document.createElement('iframe');
+  ifr.id = 'cmPrintFrame';
+  ifr.style.cssText = 'position:fixed;top:-10000px;left:0;width:794px;height:1123px;border:0;';
+  document.body.appendChild(ifr);
+  const doc = ifr.contentDocument || (ifr.contentWindow && ifr.contentWindow.document);
+  if (!doc) { showToast('No se pudo generar el PDF. Probá con Excel.'); return; }
+  doc.open(); doc.write(html); doc.close();
+  setTimeout(function(){
+    try { ifr.contentWindow.focus(); ifr.contentWindow.print(); }
+    catch(e) { showToast('No se pudo imprimir. Usá Excel.'); }
+  }, 500);
+}
+
+function exportarCierreExcel() {
+  const x = _cierreDatos();
+  if (!x) { showToast('Primero cargá un cierre del mes.'); return; }
+  const d = x.d;
+  const num = n => (Number(n) || 0).toFixed(2);
+  const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const mesNom = CM_MESES[d.mes - 1] + ' ' + d.anio;
+  let rows = '';
+  (d.staff || []).forEach(s => {
+    rows += '<tr><td>'+esc(s.chica)+'</td><td>'+(s.servicios||0)+'</td><td>'+num(s.generado)+'</td><td>'+num(s.comision)+'</td></tr>';
+  });
+  const tabla =
+      '<table border="1"><tr><th colspan="4">Cierre de mes — '+esc(mesNom)+'</th></tr>'
+    + '<tr><td>Generado total</td><td></td><td></td><td>'+num(d.generadoTotal)+'</td></tr>'
+    + '<tr><td>Clientas</td><td></td><td></td><td>'+(d.numClientas||0)+'</td></tr>'
+    + '<tr><td>Servicios</td><td></td><td></td><td>'+(d.numServicios||0)+'</td></tr>'
+    + (d.numProductos ? '<tr><td>Productos vendidos</td><td>'+d.numProductos+'</td><td></td><td>'+num(d.generadoProductos)+'</td></tr>' : '')
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><th>Staff</th><th>Servicios</th><th>Generado</th><th>Comisión</th></tr>'
+    + rows
+    + '<tr><td>TOTAL</td><td>'+(d.numServicios||0)+'</td><td>'+num(d.generadoServicios)+'</td><td>'+num(d.comisionTotal)+'</td></tr>'
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><td>Caja chica ('+(d.numGastosCaja||0)+' gastos)</td><td></td><td></td><td>-'+num(d.gastoCajaChica)+'</td></tr>'
+    + '<tr><td>SIRA (mes)</td><td></td><td></td><td>-'+num(x.sira)+'</td></tr>'
+    + '<tr><td>Total gastos</td><td></td><td></td><td>-'+num(x.totalGastos)+'</td></tr>'
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><th colspan="3">TOTAL GENERAL</th><th>'+num(x.totalGeneral)+'</th></tr>'
+    + '</table>';
+  const contenido = '\ufeff<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>' + tabla + '</body></html>';
+  try {
+    const blob = new Blob([contenido], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Cierre_' + CM_MESES[d.mes - 1] + '_' + d.anio + '.xls';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ if (a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); }, 1200);
+    showToast('📊 Excel descargado');
+  } catch(e) {
+    showToast('No se pudo descargar el Excel.');
+  }
+}
+window.exportarCierrePDF = exportarCierrePDF;
+window.exportarCierreExcel = exportarCierreExcel;
 
 async function guardarCierreMes() {
   const d = window._cmData;
