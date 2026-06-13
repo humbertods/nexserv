@@ -667,7 +667,7 @@ body.rol-staff #confirmSvcClientName::after {
           <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--danger);"><span>Gastos</span><span class="caja-num" data-k="gastos">—</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid var(--line);margin-top:4px;font-weight:800;"><span>Total</span><span class="caja-num" data-k="total" style="color:var(--success);">—</span></div>
         </div>
-        <div id="cajaCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;">✅ Caja cerrada hoy</div>
+        <div id="cajaCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;"><svg class="nx-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Caja cerrada hoy</div>
         <div id="cierreCajaBtn" onclick="toggleCierreCaja()"
              style="display:flex;align-items:center;justify-content:center;gap:8px;background:var(--ink);color:#fff;border-radius:var(--radius-pill);padding:12px;margin-top:12px;cursor:pointer;font-weight:700;font-size:13px;">
           CIERRE CAJA <span id="cierreChevron" style="transition:transform .2s;">▾</span>
@@ -2566,7 +2566,7 @@ body.rol-staff #confirmSvcClientName::after {
         <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid var(--line);margin-top:4px;font-weight:800;"><span>Total</span><span class="ocaja-num" data-k="total" style="color:var(--success);">—</span></div>
         <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;color:var(--ink-soft);"><span>Base de apertura</span><span class="ocaja-num" data-k="apertura">—</span></div>
       </div>
-      <div id="ocCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;">✅ Caja cerrada hoy</div>
+      <div id="ocCerradaNota" style="display:none;text-align:center;font-size:12px;color:var(--success);font-weight:700;margin-top:10px;"><svg class="nx-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Caja cerrada hoy</div>
     </div>
 
     <div class="section-title" style="margin-top:18px;">Desglose del día</div>
@@ -17648,7 +17648,7 @@ async function confirmarCierreCaja() {
     apertura: window._cajaData.apertura || 0
   };
   const res = await apiPost('cerrarCaja', { snapshot: snapshot, registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela' });
-  if (res && res.success) { alert('Caja cerrada ✅'); loadCajaChica(); }
+  if (res && res.success) { alert('Caja cerrada ✓'); loadCajaChica(); }
   else { alert((res && res.error) || 'No se pudo cerrar la caja.'); }
 }
 
@@ -17707,7 +17707,7 @@ async function confirmarGasto() {
     document.getElementById('gvResponsable').value = '';
     setGastoMetodo('efectivo');
     toggleGastosVarios();
-    alert('Gasto agregado a Caja Chica ✅');
+    alert('Gasto agregado a Caja Chica ✓');
     if (typeof loadCajaChica === 'function') loadCajaChica();
   } else {
     alert((res && res.error) || 'No se pudo guardar el gasto.');
@@ -17777,7 +17777,7 @@ function renderCajaOwnerDetalle_() {
   if (!det) return;
   if (!window._cajaOwnerData) { det.innerHTML = ''; return; }
   if (window._cajaOwnerData.cerrada) {
-    det.innerHTML = '<div style="text-align:center;color:var(--success);font-size:13px;font-weight:700;">✅ La caja del día ya fue cerrada.</div>';
+    det.innerHTML = '<div style="text-align:center;color:var(--success);font-size:13px;font-weight:700;"><svg class="nx-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> La caja del día ya fue cerrada.</div>';
     return;
   }
   const bd = window._cajaOwnerData.bd;
@@ -17834,7 +17834,7 @@ async function borrarGastoCaja(id, desc) {
   try {
     const r = await apiPost('anularGastoCaja', { id: id });
     if (r && r.success) {
-      if (typeof showToast === 'function') showToast('🗑️ Gasto borrado');
+      if (typeof showToast === 'function') showToast('✓ Gasto borrado');
       loadCajaChicaOwner();
     } else {
       alert((r && (r.error || r.message)) || 'No se pudo borrar el gasto');
