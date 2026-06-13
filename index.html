@@ -17549,6 +17549,16 @@ function parseMetodoPagoCaja_(metodoRaw, total) {
         if (met && monto > 0) out.push({ metodo: met, monto: monto });
       }
     });
+    // En cobros multi/combo, cada fila de CierresPagos trae su monto de línea pero el
+    // método mixto COMPLETO. Si el mixto completo supera el total de ESTA fila, escalamos
+    // sus partes a ese total para que la caja no sume el pago mixto completo una vez por
+    // línea (duplicación). En cobros simples mixtoSum == total → no se escala nada.
+    const _mixSum = out.reduce((s, x) => s + x.monto, 0);
+    const _t = Number(total) || 0;
+    if (_mixSum > _t + 0.01 && _t > 0) {
+      const _f = _t / _mixSum;
+      out.forEach(x => { x.monto = Math.round(x.monto * _f * 100) / 100; });
+    }
     return out;
   }
   const met = norm(low);
