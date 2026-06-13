@@ -4757,7 +4757,7 @@ body.rol-staff #confirmSvcClientName::after {
     const localUser = USERS[u] || USERS[p];
     
     try {
-      const result = await apiPost('login', { user: u, pass: p });
+      const result = await apiPost('login', { user: u, pass: p }, { timeoutMs: 30000, retries: 3 });
       if (result.success) {
         const r = result.user;
         const areaMap = {
