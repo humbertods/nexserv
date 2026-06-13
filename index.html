@@ -17967,7 +17967,7 @@ function renderCierreMes(d, siraInicial) {
         +     '<span>SIRA (mes)<br><span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">'
         +       (d.siraOk
                   ? '✓ Traído de SIRA · ' + (d.siraCount || 0) + ' gasto' + ((d.siraCount === 1) ? '' : 's') + ' del mes'
-                  : '<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA, ingrésalo manual')
+                  : '<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA, ingrésalo manual' + (d.siraError ? ' — ' + String(d.siraError).replace(/[<>]/g,'') : ''))
         +       '</span></span>'
         +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
         +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
