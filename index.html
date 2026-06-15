@@ -811,8 +811,9 @@ body.rol-staff #confirmSvcClientName::after {
         <div class="syna-empty" id="snProxList">Nada pendiente de llegada</div>
         <div class="syna-sub">En proceso <span>· llegaron</span></div>
         <div class="syna-empty" id="snProcesoList">Ninguna cita en curso</div>
-        <div class="syna-sub">Atendidas hoy <span id="snAtendidasCount">· 0</span></div>
-        <div class="syna-empty" id="snAtendidasList">Aún ninguna atendida hoy</div>
+        <div class="syna-sub">Atendidas hoy <span id="snAtendSub">· 0</span></div>
+        <div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 8px;">Listas para el seguimiento de satisfacción</div>
+        <div class="syna-empty" id="snAtendList">Nada atendido aún hoy</div>
       </div>
       <!-- Vista agenda (iframe SYNA en modo embed) -->
       <div id="synaAgendaView" style="display:none;">
@@ -10320,6 +10321,35 @@ body.rol-staff #confirmSvcClientName::after {
   window.openAgendarCita=openAgendarCita; window.acSetTipo=acSetTipo; window.acBuscarCliente=acBuscarCliente;
   window.acSelectCliente=acSelectCliente; window.acClearCliente=acClearCliente; window.acAddServicio=acAddServicio; window.acConfirmar=acConfirmar;
 
+  // ===== Validador de Prelista: detectar área y permitir reasignar =====
+  window._prelistaSel = window._prelistaSel || {};
+  const AREAS_PRELISTA = [['cejas','Cejas'],['pestañas','Pestañas'],['facial','Facial'],['depilacion','Depilación']];
+  function _prelistaAreaKey(area) {
+    const n = String(area || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (n.includes('ceja') || n.includes('pigment')) return 'cejas';
+    if (n.includes('pesta') || n.includes('lifting') || n.includes('volumen')) return 'pestañas';
+    if (n.includes('facial')) return 'facial';
+    if (n.includes('depil')) return 'depilacion';
+    return '';
+  }
+  function selPrelistaArea(citaId, key, btn) {
+    window._prelistaSel[citaId] = key;
+    const cont = btn.parentElement;
+    [...cont.querySelectorAll('button[data-k]')].forEach(function (b) {
+      const on = b.dataset.k === key;
+      b.style.background = on ? 'var(--accent)' : 'var(--bg)';
+      b.style.color = on ? '#fff' : 'var(--ink)';
+      b.style.borderColor = on ? 'var(--accent)' : 'var(--line)';
+    });
+    // refrescar el cartelito de validación de esa tarjeta
+    const badge = document.getElementById('prelistaBadge_' + citaId);
+    if (badge) {
+      badge.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--success);">'
+        + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Área lista</span>';
+    }
+  }
+  window.selPrelistaArea = selPrelistaArea;
+
   async function loadPrelista() {
     const section = document.getElementById('prelistaSection');
     const list    = document.getElementById('mkPrelistaList');
@@ -10334,20 +10364,43 @@ body.rol-staff #confirmSvcClientName::after {
       list.innerHTML = arr.map(c => {
         const ini = String(c.nombre || '?').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
         const citaTxt = c.horaCita ? ('Cita ' + c.horaCita) : 'Cita agendada';
-        const servTxt = [c.servicio, c.area].filter(Boolean).join(' · ');
+        const servTxt = [c.servicio, c.promoNombre].filter(Boolean).join(' · ') || (c.servicio || 'Servicio por definir');
         const nombreSafe = String(c.nombre || '').replace(/['"\\]/g, '');
-        return '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--warning);">' +
-          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
+
+        // ── Validador: ¿el área que mandó SYNA es clara? ──
+        const areaRaw = String(c.area || '');
+        const compuesta = areaRaw.includes('+') || areaRaw.includes('/') || /,/.test(areaRaw);
+        const areaKey = compuesta ? '' : _prelistaAreaKey(areaRaw);
+        const needsReview = compuesta || !areaKey;
+        window._prelistaSel[c.id] = areaKey; // selección por defecto ('' si hay que revisar)
+
+        const badge = needsReview
+          ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--warning);"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path fill-rule="evenodd" d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg>Revisar área · SYNA mandó "' + (areaRaw || '—') + '"</span>'
+          : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--success);"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Área OK</span>';
+
+        const chips = AREAS_PRELISTA.map(function (a) {
+          const k = a[0], lbl = a[1], on = (k === areaKey);
+          return '<button type="button" data-k="' + k + '" onclick="selPrelistaArea(\'' + c.id + '\',\'' + k + '\',this)" '
+            + 'style="flex:1;padding:8px 4px;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+            + 'background:' + (on ? 'var(--accent)' : 'var(--bg)') + ';color:' + (on ? '#fff' : 'var(--ink)') + ';'
+            + 'border:1.5px solid ' + (on ? 'var(--accent)' : 'var(--line)') + ';">' + lbl + '</button>';
+        }).join('');
+
+        return '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--' + (needsReview ? 'warning' : 'success') + ');">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
             '<div style="width:40px;height:40px;border-radius:50%;background:var(--warning-bg);color:var(--warning);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0;">' + ini + '</div>' +
             '<div style="flex:1;min-width:0;">' +
               '<div style="font-size:15px;font-weight:700;">' + (c.nombre || '—') + '</div>' +
-              '<div style="font-size:12px;color:var(--ink-soft);">' + (servTxt || 'Servicio por definir') + '</div>' +
+              '<div style="font-size:12px;color:var(--ink-soft);">' + servTxt + '</div>' +
               '<div style="font-size:11px;color:var(--warning);font-weight:700;margin-top:2px;">🕐 ' + citaTxt + '</div>' +
             '</div>' +
           '</div>' +
+          '<div id="prelistaBadge_' + c.id + '" style="margin-bottom:8px;">' + badge + '</div>' +
+          '<div style="font-size:11px;color:var(--ink-faint);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;">Área que la atiende</div>' +
+          '<div style="display:flex;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
           '<div style="display:flex;gap:8px;">' +
-            '<button onclick="confirmarLlegadaCita(\'' + c.id + '\')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó</button>' +
-            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + '\')" style="flex:1;padding:11px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗ Cancelar cita</button>' +
+            '<button onclick="confirmarLlegadaCita(\'' + c.id + '\')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
+            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + '\')" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -10357,9 +10410,17 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   async function confirmarLlegadaCita(id) {
+    // Validador: exigir que el área esté definida antes de pasar a la lista real
+    const AREA_LABEL = { 'cejas': 'cejas', 'pestañas': 'pestañas', 'facial': 'facial', 'depilacion': 'depilación' };
+    const sel = (window._prelistaSel && window._prelistaSel[id]) || '';
+    if (!sel) {
+      alert('⚠️ Revisá el área antes de pasarla.\n\nSYNA mandó un área poco clara. Tocá el área correcta (Cejas / Pestañas / Facial / Depilación) y después "Ya llegó".');
+      return;
+    }
+    const areaLabel = AREA_LABEL[sel] || sel;
     try {
       showToast('⏳ Confirmando llegada...');
-      const r = await apiPost('confirmarLlegada', { idEspera: id });
+      const r = await apiPost('confirmarLlegada', { idEspera: id, area: areaLabel });
       if (r && r.success) {
         showToast('✓ Clienta pasó a Lista de espera');
         loadPrelista();
@@ -10411,51 +10472,9 @@ body.rol-staff #confirmSvcClientName::after {
   window.switchApp = switchApp;
 
   // ===================== MÓDULO SYNA — dashboard en vivo =====================
-  // Lee el getResumen REAL de SYNA y lo muestra dentro de NexServ.
-  // SYNA_API_EXEC = URL /exec del Web App de SYNA (la MISMA que usa window.SYNA_API
-  //                 en el index.html de la app SYNA standalone).
-  // SYNA_URL_PWA  = URL del PWA de SYNA (github.io) para el iframe de la Agenda.
-  var SYNA_API_EXEC = '__PEGA_URL_EXEC_DE_SYNA__';                  // ← URL /exec del Web App de SYNA
-  var SYNA_URL_PWA  = 'https://humbertods.github.io/syna-agenda/';  // ← PWA de SYNA (iframe Agenda)
-
-  // GET a la API de SYNA (su getResumen no requiere token).
-  async function apiGetSyna(action, params) {
-    try {
-      var url = new URL(SYNA_API_EXEC);
-      url.searchParams.set('action', action);
-      url.searchParams.set('_t', Date.now().toString());   // cache-busting
-      if (params) Object.keys(params).forEach(function (k) { url.searchParams.set(k, params[k]); });
-      var res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
-    } catch (err) {
-      console.error('[SYNA] API Error:', err);
-      return { error: err.message };
-    }
-  }
-
-  // Mapea el getResumen de SYNA al formato que espera renderSynaDashboard.
-  function _synaMapResumen(r) {
-    if (!r || r.ok !== true) return _synaMock();
-    var MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    var fc = function (f) { var m = String(f).match(/(\d{4})-(\d{2})-(\d{2})/); return m ? ((+m[3]) + ' ' + MES[+m[2]-1]) : String(f || ''); };
-    var ini = (r.semana && r.semana.ini) || '', fin = (r.semana && r.semana.fin) || '';
-    var total = (r.total != null) ? r.total : ((r.porRealizar || 0) + (r.realizadas || 0));
-    return {
-      semana: (ini && fin) ? ('Semana ' + fc(ini) + ' – ' + fc(fin)) : 'Semana —',
-      citasSemana: total,
-      confirmadas: r.confirmadas || 0,
-      sinConfirmar: r.pendientes || 0,
-      proximas: (r.proximas || []).length,
-      porRealizar: r.porRealizar || 0,
-      realizadas: r.realizadas || 0,
-      totalSemana: total,
-      porArea: (r.porArea || []).map(function (a) { return { nombre: a.area, cant: a.n, color: a.color || '#999' }; }),
-      proximasLista: r.proximas || [],
-      enProceso: r.enProceso || [],
-      atendidas: r.atendidas || []
-    };
-  }
+  // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
+  // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
+  var SYNA_URL_PWA = '';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
   function _synaMock() {
     return {
       semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
@@ -10466,7 +10485,11 @@ body.rol-staff #confirmSvcClientName::after {
         { nombre: 'Facial', cant: 0, color: '#2196f3' },
         { nombre: 'Depilación de bikini completo', cant: 0, color: '#9aa0a6' }
       ],
-      proximasLista: [], enProceso: [], atendidas: []
+      proximasLista: [], enProceso: [],
+      atendidasHoy: [
+        { hora: '09:00', horaFin: '12:00', nombre: 'Yissell Siviria', servicio: 'Pestañas Classic Premium + Depilación + pigmento', area: 'Pestañas' },
+        { hora: '11:00', horaFin: '14:00', nombre: 'Omara Tapia', servicio: 'Retoque de pestañas volumen brasilero + Depilación + pigmento', area: 'Pestañas' }
+      ]
     };
   }
   function renderSynaDashboard(d) {
@@ -10485,53 +10508,50 @@ body.rol-staff #confirmSvcClientName::after {
     if (prox) prox.textContent = (d.proximasLista && d.proximasLista.length) ? '' : 'Nada pendiente de llegada';
     var proc = document.getElementById('snProcesoList');
     if (proc) proc.textContent = (d.enProceso && d.enProceso.length) ? '' : 'Ninguna cita en curso';
-    var atnd = d.atendidas || [];
-    var atndList = document.getElementById('snAtendidasList');
-    if (atndList) atndList.textContent = atnd.length ? '' : 'Aún ninguna atendida hoy';
-    var atndCount = document.getElementById('snAtendidasCount');
-    if (atndCount) atndCount.textContent = '\u00b7 ' + atnd.length;
+    var atend = d.atendidasHoy || [];
+    var atendSub = document.getElementById('snAtendSub');
+    if (atendSub) atendSub.textContent = '· ' + atend.length;
+    var atendList = document.getElementById('snAtendList');
+    if (atendList) {
+      if (!atend.length) {
+        atendList.className = 'syna-empty';
+        atendList.textContent = 'Nada atendido aún hoy';
+      } else {
+        atendList.className = '';
+        atendList.innerHTML = atend.map(function (a) {
+          var horaFin = a.horaFin ? ('<div style="font-size:11px;color:var(--ink-faint);">' + a.horaFin + '</div>') : '';
+          var serv = [a.servicio, a.area].filter(Boolean).join(' · ');
+          return '<div style="display:flex;align-items:center;gap:12px;padding:11px 12px;margin-bottom:8px;background:var(--card,#fff);border:1px solid var(--line);border-left:3px solid #46b04a;border-radius:12px;">' +
+            '<div style="flex-shrink:0;text-align:center;min-width:42px;"><div style="font-size:13px;font-weight:800;">' + (a.hora || '') + '</div>' + horaFin + '</div>' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">' + (a.nombre || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--ink-soft);">' + serv + '</div></div>' +
+            '<div style="flex-shrink:0;color:#46b04a;"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>' +
+          '</div>';
+        }).join('');
+      }
+    }
   }
   function loadSynaDashboard() {
-    renderSynaDashboard(_synaMock());   // esqueleto inmediato mientras carga
-    if (!SYNA_API_EXEC || SYNA_API_EXEC.indexOf('__PEGA') === 0) return;  // sin URL configurada: queda el mock
-    apiGetSyna('getResumen').then(function (r) {
-      if (r && r.error) {
-        console.warn('[SYNA] getResumen falló:', r.error);
-        var w = document.getElementById('synaWeek'); if (w) w.textContent = 'Semana — (sin conexión)';
-        return;
-      }
-      renderSynaDashboard(_synaMapResumen(r));
-    });
+    // Real (cuando SYNA confirme):
+    //   apiGetSyna('getDashboardSemana').then(renderSynaDashboard);
+    renderSynaDashboard(_synaMock());
   }
-  window.synaRefresh = loadSynaDashboard;   // para un botón "actualizar" dentro de la vista SYNA
-  // Abre una vista de SYNA embebida (iframe a SYNA_URL_PWA?embed=1&view=...).
-  function synaAbrirVista(view, titulo) {
+  function synaAbrirAgenda() {
     var dash = document.getElementById('synaDashView');
-    var ag   = document.getElementById('synaAgendaView');
-    var slot = document.getElementById('synaAgendaFrameSlot');
-    var ttl  = document.querySelector('#synaAgendaView .section-title');
-    if (!SYNA_URL_PWA) { alert('Falta configurar SYNA_URL_PWA'); return; }
-    if (ttl) ttl.textContent = titulo || 'SYNA';
-    if (slot) {
-      var src = SYNA_URL_PWA + '?embed=1&view=' + encodeURIComponent(view) + '&_t=' + Date.now();
-      slot.innerHTML = '<iframe class="agenda-frame" src="' + src + '" ' +
-        'style="width:100%;height:72vh;border:0;border-radius:14px;background:#fff;display:block;"></iframe>';
-    }
+    var ag = document.getElementById('synaAgendaView');
     if (dash) dash.style.display = 'none';
-    if (ag)   ag.style.display = 'block';
+    if (ag) ag.style.display = 'block';
+    // Real: document.getElementById('synaAgendaFrameSlot').outerHTML =
+    //   '<iframe class="agenda-frame" src="' + SYNA_URL_PWA + '?embed=1&view=agenda&user=mikaela"></iframe>';
   }
-  function synaAbrirAgenda()  { synaAbrirVista('agenda',    'Agenda en vivo'); }
-  function synaNuevaReserva() { synaAbrirVista('reservar',  'Nueva reserva');  }
-  function synaCopiloto()     { synaAbrirVista('asistente', 'Copiloto');       }
   function synaVolverDash() {
     var dash = document.getElementById('synaDashView');
-    var ag   = document.getElementById('synaAgendaView');
-    var slot = document.getElementById('synaAgendaFrameSlot');
-    if (ag)   ag.style.display = 'none';
+    var ag = document.getElementById('synaAgendaView');
+    if (ag) ag.style.display = 'none';
     if (dash) dash.style.display = 'block';
-    if (slot) slot.innerHTML = '';   // descarga el iframe para que la próxima apertura sea fresca
-    loadSynaDashboard();             // refresca los números al volver
   }
+  function synaNuevaReserva() { alert('SYNA → Nueva reserva (pendiente conectar)'); }
+  function synaCopiloto() { alert('SYNA → Copiloto (pendiente conectar)'); }
   window.synaAbrirAgenda = synaAbrirAgenda; window.synaVolverDash = synaVolverDash;
   window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
 
