@@ -469,6 +469,46 @@ body.rol-staff #confirmSvcClientName::after {
 
   /* PERIOD TOGGLE */
   .period-btn.active-period { background: var(--ink) !important; color: white !important; }
+
+  /* ===== SWITCH 3 APPS (Nexserv / Syna / Sira) ===== */
+  .app-switch { display:flex; background:#fff; border:1.5px solid #e7d9c4; border-radius:999px; padding:5px; margin-bottom:18px; gap:2px; }
+  .app-switch button { flex:1; border:0; background:transparent; font-family:inherit; font-weight:700; font-size:15px; padding:10px; border-radius:999px; color:var(--ink-soft); cursor:pointer; transition:background .15s, color .15s; }
+  .app-switch button.on { background:var(--ink); color:#fff; }
+
+  /* ===== Módulo SYNA (acento violeta) ===== */
+  .syna { --syna-violet:#6C4CE0; --syna-violet-soft:#EBE7FA; --syna-peach:#FBEBDD; --syna-green:#DEEFE4; --syna-soft:var(--ink-soft); --syna-line:var(--line); --syna-radius:18px; }
+  .syna .syna-week { font-size:13px; color:var(--syna-soft); margin:2px 2px 14px; }
+  .syna .syna-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+  .syna .syna-stat { border-radius:var(--syna-radius); padding:18px 16px; min-height:118px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .syna .syna-stat .ic { width:26px; height:26px; opacity:.9; }
+  .syna .syna-stat .lbl { font-size:13px; color:#5c5c63; font-weight:600; }
+  .syna .syna-stat .num { font-size:34px; font-weight:800; color:var(--syna-violet); line-height:1; letter-spacing:-1px; }
+  .syna .c-peach{background:var(--syna-peach);} .syna .c-green{background:var(--syna-green);} .syna .c-lav{background:var(--syna-violet-soft);} .syna .c-white{background:#fff;}
+  .syna .syna-actions { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .syna .syna-btn { border:0; border-radius:14px; padding:15px; font-family:inherit; font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px; }
+  .syna .syna-btn-primary { background:var(--syna-violet); color:#fff; box-shadow:0 4px 14px rgba(108,76,224,.28); }
+  .syna .syna-btn-ghost { background:#fff; color:var(--syna-violet); border:1.5px solid var(--syna-line); }
+  .syna .syna-btn-agenda { width:100%; background:#fff; color:var(--syna-violet); border:1.5px solid var(--syna-line); border-radius:14px; padding:16px; font-size:17px; font-weight:800; cursor:pointer; margin-bottom:14px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .syna .syna-mini { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
+  .syna .syna-mini .mini { background:#fff; border-radius:14px; padding:14px 8px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .syna .syna-mini .mini .n { font-size:24px; font-weight:800; color:var(--syna-violet); }
+  .syna .syna-mini .mini .l { font-size:11px; color:var(--syna-soft); margin-top:2px; }
+  .syna .syna-areas { background:#fff; border-radius:var(--syna-radius); padding:6px 16px; box-shadow:0 1px 3px rgba(0,0,0,.04); margin-bottom:18px; }
+  .syna .area-row { display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-bottom:1px solid var(--syna-line); }
+  .syna .area-row:last-child { border-bottom:0; }
+  .syna .area-l { display:flex; align-items:center; gap:11px; font-size:15px; font-weight:600; }
+  .syna .dot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .syna .area-n { font-size:16px; font-weight:800; color:var(--syna-violet); }
+  .syna .syna-sub { font-size:14px; font-weight:800; margin:0 2px 4px; }
+  .syna .syna-sub span { color:var(--syna-soft); font-weight:600; }
+  .syna .syna-empty { text-align:center; color:var(--syna-soft); font-size:14px; padding:18px 0 24px; }
+  .syna .agenda-bar { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .syna .agenda-back { background:#fff; border:1.5px solid var(--syna-line); border-radius:12px; padding:9px 14px; font-weight:700; color:var(--syna-violet); cursor:pointer; font-family:inherit; }
+  .syna .agenda-frame { width:100%; height:560px; border:0; border-radius:var(--syna-radius); background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+  .syna .agenda-placeholder { height:480px; border:1.5px dashed #cfcfd6; border-radius:var(--syna-radius); display:flex; align-items:center; justify-content:center; text-align:center; color:var(--syna-soft); font-size:14px; padding:20px; }
+
+  /* ===== Placeholder de SIRA ===== */
+  .sira-ph { height:520px; border:1.5px dashed #cfcfd6; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:var(--ink-soft); font-size:14px; padding:24px; gap:8px; }
 </style>
 <!-- ── MANDAMIENTOS DEL SISTEMA ── cargado antes del body para que sus funciones estén disponibles globalmente -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -646,6 +686,16 @@ body.rol-staff #confirmSvcClientName::after {
       <div class="avatar" onclick="openUserMenu(this)" style="cursor: pointer;">M</div>
     </div>
 
+    <!-- ===== SWITCH 3 APPS ===== -->
+    <div class="app-switch">
+      <button id="appBtn_nexserv" class="on" onclick="switchApp('nexserv')">Nexserv</button>
+      <button id="appBtn_syna" onclick="switchApp('syna')">Syna</button>
+      <button id="appBtn_sira" onclick="switchApp('sira')">Sira</button>
+    </div>
+
+    <!-- ============ TAB: NEXSERV (contenido actual) ============ -->
+    <div id="tabNexserv">
+
     <div class="stat-grid" id="mikaelaStats">
       <div class="stat warning"><div class="label">Esperando</div><div class="value" id="mkStatEspera">—</div></div>
       <div class="stat info"><div class="label">En servicio</div><div class="value" id="mkStatServicio">—</div></div>
@@ -691,14 +741,14 @@ body.rol-staff #confirmSvcClientName::after {
     <!-- AUTORIZACIONES PENDIENTES -->
     <div id="authorizationsSection" style="display: none;">
       <div class="section-title" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 10px 16px; border-radius: 12px; margin-bottom: 12px;">
-        ⚠️ Autorizaciones pendientes <span class="count" style="background: white; color: #ff9800;" id="authCount">0</span>
+        <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-3px;margin-right:6px;"><path fill-rule="evenodd" d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg>Autorizaciones pendientes <span class="count" style="background: white; color: #ff9800;" id="authCount">0</span>
       </div>
       <div id="authorizationsList"></div>
     </div>
 
     <!-- PRELISTA DE ESPERA — citas agendadas por SYNA, pendientes de confirmar llegada -->
     <div id="prelistaSection" style="display:none;">
-      <div class="section-title">📅 Prelista de espera <span class="count" id="mkPrelistaCount">0</span></div>
+      <div class="section-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-3px;margin-right:6px;"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7Zm12 7v10H5V9h14Z"/></svg>Prelista de espera <span class="count" id="mkPrelistaCount">0</span></div>
       <div id="mkPrelistaList"></div>
     </div>
 
@@ -709,7 +759,7 @@ body.rol-staff #confirmSvcClientName::after {
     <div id="mkAtencionList"><div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando...</div></div>
 
     <!-- POR COBRAR -->
-    <div class="section-title">💵 Por cobrar <span class="count" id="porCobrarCount">0</span></div>
+    <div class="section-title"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-3px;margin-right:6px;"><path d="M3 6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6Zm2 1v10h14V7H5Zm7 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z"/></svg>Por cobrar <span class="count" id="porCobrarCount">0</span></div>
     <div id="porCobrarList">
       <div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>
     </div>
@@ -719,6 +769,68 @@ body.rol-staff #confirmSvcClientName::after {
       <div class="section-title" style="margin-top:16px;">⏳ Esperando asignación <span class="count" id="esperandoAsignacionCount">0</span></div>
       <div id="esperandoAsignacionList"></div>
     </div>
+
+    </div><!-- ============ /TAB NEXSERV ============ -->
+
+    <!-- ============ TAB: SYNA (dashboard en vivo + Agenda) ============ -->
+    <div id="tabSyna" class="syna" style="display:none;">
+      <!-- Vista dashboard -->
+      <div id="synaDashView">
+        <div class="syna-week" id="synaWeek">—</div>
+        <div class="syna-grid">
+          <div class="syna-stat c-peach">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#c98a4a" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
+            <div class="lbl">Citas Semana</div><div class="num" id="snCitasSemana">0</div>
+          </div>
+          <div class="syna-stat c-green">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#3f9d5f" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <div class="lbl">Citas confirmadas</div><div class="num" id="snConfirmadas">0</div>
+          </div>
+          <div class="syna-stat c-lav">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#6C4CE0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 16c.8-1 2-1.5 3-1.5s2.2.5 3 1.5"/><circle cx="9" cy="10" r="1" fill="#6C4CE0" stroke="none"/><circle cx="15" cy="10" r="1" fill="#6C4CE0" stroke="none"/></svg>
+            <div class="lbl">Sin confirmar</div><div class="num" id="snSinConfirmar">0</div>
+          </div>
+          <div class="syna-stat c-white">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#6C4CE0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <div class="lbl">Próximas a atender</div><div class="num" id="snProximas">0</div>
+          </div>
+        </div>
+        <div class="syna-actions">
+          <button class="syna-btn syna-btn-primary" onclick="synaNuevaReserva()">+ Nueva reserva</button>
+          <button class="syna-btn syna-btn-ghost" onclick="synaCopiloto()"><svg viewBox="0 0 24 24" width="16" height="16" fill="#e0a93a"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8L12 2zM18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14z"/></svg>Copiloto</button>
+        </div>
+        <button class="syna-btn-agenda" onclick="synaAbrirAgenda()">Agenda</button>
+        <div class="syna-mini">
+          <div class="mini"><div class="n" id="snPorRealizar">0</div><div class="l">Por realizar</div></div>
+          <div class="mini"><div class="n" id="snRealizadas">0</div><div class="l">Realizadas</div></div>
+          <div class="mini"><div class="n" id="snTotalSemana">0</div><div class="l">Total semana</div></div>
+        </div>
+        <div class="section-title">Citas por área</div>
+        <div class="syna-areas" id="snAreas"></div>
+        <div class="syna-sub">Próximas a atender <span>· pendientes</span></div>
+        <div class="syna-empty" id="snProxList">Nada pendiente de llegada</div>
+        <div class="syna-sub">En proceso <span>· llegaron</span></div>
+        <div class="syna-empty" id="snProcesoList">Ninguna cita en curso</div>
+      </div>
+      <!-- Vista agenda (iframe SYNA en modo embed) -->
+      <div id="synaAgendaView" style="display:none;">
+        <div class="agenda-bar">
+          <button class="agenda-back" onclick="synaVolverDash()">← Volver</button>
+          <div class="section-title" style="margin:0;">Agenda en vivo</div>
+        </div>
+        <div class="agenda-placeholder" id="synaAgendaFrameSlot">
+          Aquí se carga la agenda real de SYNA<br>(iframe a <code>?embed=1&amp;view=agenda</code>)<br>cuando SYNA confirme su modo embed.
+        </div>
+      </div>
+    </div><!-- /TAB SYNA -->
+
+    <!-- ============ TAB: SIRA (placeholder, conectar iframe) ============ -->
+    <div id="tabSira" style="display:none;">
+      <div class="sira-ph">
+        <strong>SIRA — inventario</strong>
+        <div>Acá va el iframe de SIRA (su pantalla de stock).<br>Pendiente: confirmar URL embebible de SIRA.</div>
+      </div>
+    </div><!-- /TAB SIRA -->
 
     <button class="fab" onclick="show('newArrival')">+</button>
 
@@ -10275,6 +10387,84 @@ body.rol-staff #confirmSvcClientName::after {
       alert('Error de conexión al cancelar');
     }
   }
+
+  // ===================== SWITCH 3 APPS (Nexserv / Syna / Sira) =====================
+  function switchApp(app) {
+    ['nexserv','syna','sira'].forEach(function (t) {
+      var tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (tab) tab.style.display = (t === app) ? '' : 'none';
+      var btn = document.getElementById('appBtn_' + t);
+      if (btn) btn.classList.toggle('on', t === app);
+    });
+    // El FAB (+) y la barra inferior son de NexServ → solo en esa pestaña
+    var home = document.getElementById('mikaelaHome');
+    var fab = home ? home.querySelector('.fab') : null;
+    var nav = home ? home.querySelector('nav.nav') : null;
+    if (fab) fab.style.display = (app === 'nexserv') ? '' : 'none';
+    if (nav) nav.style.display = (app === 'nexserv') ? '' : 'none';
+    window._currentApp = app;
+    if (app === 'syna') loadSynaDashboard();
+    // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
+  }
+  window.switchApp = switchApp;
+
+  // ===================== MÓDULO SYNA — dashboard en vivo =====================
+  // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
+  // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
+  var SYNA_URL_PWA = '';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
+  function _synaMock() {
+    return {
+      semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
+      porRealizar: 0, realizadas: 0, totalSemana: 0,
+      porArea: [
+        { nombre: 'Cejas', cant: 0, color: '#46b04a' },
+        { nombre: 'Pestañas', cant: 0, color: '#ff8a3d' },
+        { nombre: 'Facial', cant: 0, color: '#2196f3' },
+        { nombre: 'Depilación de bikini completo', cant: 0, color: '#9aa0a6' }
+      ],
+      proximasLista: [], enProceso: []
+    };
+  }
+  function renderSynaDashboard(d) {
+    d = d || _synaMock();
+    var set = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = (v != null ? v : 0); };
+    set('synaWeek', d.semana || '');
+    set('snCitasSemana', d.citasSemana); set('snConfirmadas', d.confirmadas);
+    set('snSinConfirmar', d.sinConfirmar); set('snProximas', d.proximas);
+    set('snPorRealizar', d.porRealizar); set('snRealizadas', d.realizadas); set('snTotalSemana', d.totalSemana);
+    var areas = document.getElementById('snAreas');
+    if (areas) areas.innerHTML = (d.porArea || []).map(function (a) {
+      return '<div class="area-row"><div class="area-l"><span class="dot" style="background:' +
+        a.color + '"></span>' + a.nombre + '</div><div class="area-n">' + a.cant + '</div></div>';
+    }).join('');
+    var prox = document.getElementById('snProxList');
+    if (prox) prox.textContent = (d.proximasLista && d.proximasLista.length) ? '' : 'Nada pendiente de llegada';
+    var proc = document.getElementById('snProcesoList');
+    if (proc) proc.textContent = (d.enProceso && d.enProceso.length) ? '' : 'Ninguna cita en curso';
+  }
+  function loadSynaDashboard() {
+    // Real (cuando SYNA confirme):
+    //   apiGetSyna('getDashboardSemana').then(renderSynaDashboard);
+    renderSynaDashboard(_synaMock());
+  }
+  function synaAbrirAgenda() {
+    var dash = document.getElementById('synaDashView');
+    var ag = document.getElementById('synaAgendaView');
+    if (dash) dash.style.display = 'none';
+    if (ag) ag.style.display = 'block';
+    // Real: document.getElementById('synaAgendaFrameSlot').outerHTML =
+    //   '<iframe class="agenda-frame" src="' + SYNA_URL_PWA + '?embed=1&view=agenda&user=mikaela"></iframe>';
+  }
+  function synaVolverDash() {
+    var dash = document.getElementById('synaDashView');
+    var ag = document.getElementById('synaAgendaView');
+    if (ag) ag.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+  }
+  function synaNuevaReserva() { alert('SYNA → Nueva reserva (pendiente conectar)'); }
+  function synaCopiloto() { alert('SYNA → Copiloto (pendiente conectar)'); }
+  window.synaAbrirAgenda = synaAbrirAgenda; window.synaVolverDash = synaVolverDash;
+  window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
 
   async function loadMikaelaHome() {
     loadCajaChica();
