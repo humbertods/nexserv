@@ -7894,11 +7894,12 @@ body.rol-staff #confirmSvcClientName::after {
     // ── PASO 5: Llamar al backend ──────────────────────────────────────────────
     // Para enganche SN-→SP: usar el SP ticket del desglose si existe, no el SN original
     const esEngancheSN = !esTicketSP && miTicketSheet && miTicketSheet.idEspera && miTicketSheet.idEspera.startsWith('SP-');
+    let _finResp = null;
     try {
       if (esTicketSP || esEngancheSN) {
         const idParaFinalizar = esEngancheSN ? miTicketSheet.idEspera : idEsperaActual;
         const _spInfo = (typeof PROMOS !== 'undefined' ? PROMOS : []).find(function(p){ return p && p.name === data.promoNombre; });
-        await apiPost('finalizarServicioPromo', {
+        _finResp = await apiPost('finalizarServicioPromo', {
           idEspera: idParaFinalizar,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
@@ -7910,7 +7911,7 @@ body.rol-staff #confirmSvcClientName::after {
           serviciosDetalle: desgloseAcumulado
         });
       } else {
-        await apiPost('finalizarAtencion', {
+        _finResp = await apiPost('finalizarAtencion', {
           idEspera: idEsperaActual,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
@@ -7922,9 +7923,17 @@ body.rol-staff #confirmSvcClientName::after {
           serviciosDetalle: desgloseAcumulado
         });
       }
-    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); }
+    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); _finResp = null; }
 
-    // ── LIMPIEZA: siempre limpiar el slot independientemente del resultado del backend ──
+    // ── VALIDACIÓN: si el backend NO confirmó el envío, NO limpiar ni mostrar éxito ──
+    // (antes el alert de éxito salía SIEMPRE y la clienta desaparecía de la pantalla sin haberse enviado)
+    if (!_finResp || !_finResp.success) {
+      const _msg = (_finResp && _finResp.message) ? _finResp.message : 'no se pudo conectar con el servidor';
+      alert('⚠️ NO se pudo enviar la clienta a cobro.\n\nMotivo: ' + _msg + '.\n\nLa clienta sigue en tu pantalla — volvé a tocar "Finalizar servicio". Si sigue fallando, avisá a Mikaela.');
+      return;
+    }
+
+    // ── LIMPIEZA: el backend confirmó el envío, ahora sí limpiar el slot ──
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
     if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
     window._as1IdEspera = '';
