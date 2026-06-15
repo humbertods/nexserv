@@ -506,6 +506,8 @@ body.rol-staff #confirmSvcClientName::after {
   .syna .agenda-back { background:#fff; border:1.5px solid var(--syna-line); border-radius:12px; padding:9px 14px; font-weight:700; color:var(--syna-violet); cursor:pointer; font-family:inherit; }
   .syna .agenda-frame { width:100%; height:560px; border:0; border-radius:var(--syna-radius); background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); }
   .syna .agenda-placeholder { height:480px; border:1.5px dashed #cfcfd6; border-radius:var(--syna-radius); display:flex; align-items:center; justify-content:center; text-align:center; color:var(--syna-soft); font-size:14px; padding:20px; }
+  .syna .syna-full { margin-top:4px; }
+  .syna .syna-full iframe { width:100%; height:calc(100vh - 200px); min-height:540px; border:0; border-radius:14px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.06); display:block; }
 
   /* ===== Placeholder de SIRA ===== */
   .sira-ph { height:520px; border:1.5px dashed #cfcfd6; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:var(--ink-soft); font-size:14px; padding:24px; gap:8px; }
@@ -774,57 +776,9 @@ body.rol-staff #confirmSvcClientName::after {
 
     <!-- ============ TAB: SYNA (dashboard en vivo + Agenda) ============ -->
     <div id="tabSyna" class="syna" style="display:none;">
-      <!-- Vista dashboard -->
-      <div id="synaDashView">
-        <div class="syna-week" id="synaWeek">—</div>
-        <div class="syna-grid">
-          <div class="syna-stat c-peach">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#c98a4a" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
-            <div class="lbl">Citas Semana</div><div class="num" id="snCitasSemana">0</div>
-          </div>
-          <div class="syna-stat c-green">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#3f9d5f" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
-            <div class="lbl">Citas confirmadas</div><div class="num" id="snConfirmadas">0</div>
-          </div>
-          <div class="syna-stat c-lav">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#6C4CE0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 16c.8-1 2-1.5 3-1.5s2.2.5 3 1.5"/><circle cx="9" cy="10" r="1" fill="#6C4CE0" stroke="none"/><circle cx="15" cy="10" r="1" fill="#6C4CE0" stroke="none"/></svg>
-            <div class="lbl">Sin confirmar</div><div class="num" id="snSinConfirmar">0</div>
-          </div>
-          <div class="syna-stat c-white">
-            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#6C4CE0" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            <div class="lbl">Próximas a atender</div><div class="num" id="snProximas">0</div>
-          </div>
-        </div>
-        <div class="syna-actions">
-          <button class="syna-btn syna-btn-primary" onclick="synaNuevaReserva()">+ Nueva reserva</button>
-          <button class="syna-btn syna-btn-ghost" onclick="synaCopiloto()"><svg viewBox="0 0 24 24" width="16" height="16" fill="#e0a93a"><path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8L12 2zM18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9L18 14z"/></svg>Copiloto</button>
-        </div>
-        <button class="syna-btn-agenda" onclick="synaAbrirAgenda()">Agenda</button>
-        <div class="syna-mini">
-          <div class="mini"><div class="n" id="snPorRealizar">0</div><div class="l">Por realizar</div></div>
-          <div class="mini"><div class="n" id="snRealizadas">0</div><div class="l">Realizadas</div></div>
-          <div class="mini"><div class="n" id="snTotalSemana">0</div><div class="l">Total semana</div></div>
-        </div>
-        <div class="section-title">Citas por área</div>
-        <div class="syna-areas" id="snAreas"></div>
-        <div class="syna-sub">Próximas a atender <span>· pendientes</span></div>
-        <div class="syna-empty" id="snProxList">Nada pendiente de llegada</div>
-        <div class="syna-sub">En proceso <span>· llegaron</span></div>
-        <div class="syna-empty" id="snProcesoList">Ninguna cita en curso</div>
-        <div class="syna-sub">Atendidas hoy <span id="snAtendSub">· 0</span></div>
-        <div style="font-size:11px;color:var(--ink-soft);margin:-4px 0 8px;">Listas para el seguimiento de satisfacción</div>
-        <div class="syna-empty" id="snAtendList">Nada atendido aún hoy</div>
-      </div>
-      <!-- Vista agenda (iframe SYNA en modo embed) -->
-      <div id="synaAgendaView" style="display:none;">
-        <div class="agenda-bar">
-          <button class="agenda-back" onclick="synaVolverDash()">← Volver</button>
-          <div class="section-title" style="margin:0;" id="synaAgendaTitulo">Agenda en vivo</div>
-        </div>
-        <div class="agenda-placeholder" id="synaAgendaFrameSlot">
-          Aquí se carga la agenda real de SYNA<br>(iframe a <code>?embed=1&amp;view=agenda</code>)<br>cuando SYNA confirme su modo embed.
-        </div>
-      </div>
+      <!-- SYNA real embebido a pantalla completa. Se navega con la propia barra de SYNA;
+           para volver a NexServ se usa el switch Nexserv/Syna/Sira de arriba. -->
+      <div id="synaFullFrame" class="syna-full"></div>
     </div><!-- /TAB SYNA -->
 
     <!-- ============ TAB: SIRA (placeholder, conectar iframe) ============ -->
@@ -10546,9 +10500,10 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
   function loadSynaDashboard() {
-    // Real (cuando SYNA confirme):
-    //   apiGetSyna('getDashboardSemana').then(renderSynaDashboard);
-    renderSynaDashboard(_synaMock());
+    var slot = document.getElementById('synaFullFrame');
+    if (!slot) return;
+    if (slot.querySelector('iframe')) return; // ya cargado: conservar el estado de SYNA al cambiar de tab
+    slot.innerHTML = '<iframe src="' + SYNA_URL_PWA + '?embed=1&user=mikaela" allow="clipboard-write"></iframe>';
   }
   // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
   // view: 'agenda' | 'nueva' | 'copiloto' (deep-link best-effort; si SYNA todavía no soporta
