@@ -819,7 +819,7 @@ body.rol-staff #confirmSvcClientName::after {
       <div id="synaAgendaView" style="display:none;">
         <div class="agenda-bar">
           <button class="agenda-back" onclick="synaVolverDash()">← Volver</button>
-          <div class="section-title" style="margin:0;">Agenda en vivo</div>
+          <div class="section-title" style="margin:0;" id="synaAgendaTitulo">Agenda en vivo</div>
         </div>
         <div class="agenda-placeholder" id="synaAgendaFrameSlot">
           Aquí se carga la agenda real de SYNA<br>(iframe a <code>?embed=1&amp;view=agenda</code>)<br>cuando SYNA confirme su modo embed.
@@ -7796,7 +7796,12 @@ body.rol-staff #confirmSvcClientName::after {
       try {
         const spData2 = await apiGet('getServicioPromo');
         if (spData2.success) {
-          const allSP = [...(spData2.enServicio || []), ...(spData2.porCobrar || [])];
+          // IMPORTANTE: solo SP "en servicio". Un SP que ya está "por cobrar" está finalizado
+          // y NO es el ticket de un enganche en curso. Incluir los "por cobrar" hacía que un
+          // servicio extra (SN-) se enlazara con un SP ajeno YA cobrable de la misma clienta
+          // (ej: la depilación de Keyla en "Por cobrar") y se intentara finalizar ESE SP
+          // congelado → "Ticket SP no encontrado". El SN- debe finalizarse por su propio camino.
+          const allSP = [...(spData2.enServicio || [])];
           // Buscar SP ticket para esta clienta (puede tener desglose de la staff previa)
           const linkedSP = allSP.find(t =>
             (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
@@ -10483,7 +10488,7 @@ body.rol-staff #confirmSvcClientName::after {
   // ===================== MÓDULO SYNA — dashboard en vivo =====================
   // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
   // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
-  var SYNA_URL_PWA = '';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
+  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
   function _synaMock() {
     return {
       semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
@@ -10545,24 +10550,37 @@ body.rol-staff #confirmSvcClientName::after {
     //   apiGetSyna('getDashboardSemana').then(renderSynaDashboard);
     renderSynaDashboard(_synaMock());
   }
-  function synaAbrirAgenda() {
+  // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
+  // view: 'agenda' | 'nueva' | 'copiloto' (deep-link best-effort; si SYNA todavía no soporta
+  // el parámetro, cae en su home igual y sigue siendo funcional).
+  function synaAbrirEmbed(view, titulo) {
     var dash = document.getElementById('synaDashView');
-    var ag = document.getElementById('synaAgendaView');
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    var ttl  = document.getElementById('synaAgendaTitulo');
     if (dash) dash.style.display = 'none';
-    if (ag) ag.style.display = 'block';
-    // Real: document.getElementById('synaAgendaFrameSlot').outerHTML =
-    //   '<iframe class="agenda-frame" src="' + SYNA_URL_PWA + '?embed=1&view=agenda&user=mikaela"></iframe>';
+    if (ag)   ag.style.display = 'block';
+    if (ttl)  ttl.textContent = titulo || 'SYNA';
+    if (slot) {
+      var url = SYNA_URL_PWA + '?embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : '');
+      slot.className = '';
+      slot.innerHTML = '<iframe class="agenda-frame" src="' + url + '" allow="clipboard-write"></iframe>';
+    }
   }
+  function synaAbrirAgenda()  { synaAbrirEmbed('agenda',   'Agenda en vivo'); }
+  function synaNuevaReserva() { synaAbrirEmbed('nueva',    'Nueva reserva'); }
+  function synaCopiloto()     { synaAbrirEmbed('copiloto', 'Copiloto'); }
   function synaVolverDash() {
     var dash = document.getElementById('synaDashView');
-    var ag = document.getElementById('synaAgendaView');
-    if (ag) ag.style.display = 'none';
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    if (ag)   ag.style.display = 'none';
     if (dash) dash.style.display = 'block';
+    if (slot) slot.innerHTML = ''; // descargar el iframe al volver (libera recursos)
   }
-  function synaNuevaReserva() { alert('SYNA → Nueva reserva (pendiente conectar)'); }
-  function synaCopiloto() { alert('SYNA → Copiloto (pendiente conectar)'); }
   window.synaAbrirAgenda = synaAbrirAgenda; window.synaVolverDash = synaVolverDash;
   window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
+  window.synaAbrirEmbed = synaAbrirEmbed;
 
   async function loadMikaelaHome() {
     loadCajaChica();
