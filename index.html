@@ -6218,7 +6218,10 @@ body.rol-staff #confirmSvcClientName::after {
               // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
               // Para promo compartida: excluir completedAreas → la 2da staff ve solo su parte
               const precioMiAreaSP = Number(a.precioMiArea || 0);
-              const myPrice = precioMiAreaSP > 0
+              // El precioMiArea horneado puede traer el del ÁREA PRIORITARIA (la más cara, p.ej.
+              // pestañas), no la de ESTA staff. En promos multi-área SIEMPRE calculamos desde MI área.
+              const _esMultiArea = (promoFull.division || []).length > 1;
+              const myPrice = (!_esMultiArea && precioMiAreaSP > 0)
                 ? precioMiAreaSP
                 : getMyPromoPrice(promoFull, myArea, restoredCompletedAreas);
               
@@ -6525,7 +6528,8 @@ body.rol-staff #confirmSvcClientName::after {
               // Para SP de enganche: usar a.precioMiArea (monto de esta área específica)
               // Para promo compartida: excluir completedAreas → la 2da staff ve solo su parte
               const precioMiAreaSP2 = Number(a.precioMiArea || 0);
-              const myPrice2 = precioMiAreaSP2 > 0
+              const _esMultiArea2 = (promoFull.division || []).length > 1;
+              const myPrice2 = (!_esMultiArea2 && precioMiAreaSP2 > 0)
                 ? precioMiAreaSP2
                 : getMyPromoPrice(promoFull, myArea2, restoredCompletedAreas2);
 
@@ -10438,7 +10442,12 @@ body.rol-staff #confirmSvcClientName::after {
     // sola app) e igualar el fondo al gris-lavanda de SYNA (#E6E6EA) para que no se note el borde.
     var mkHeader = document.getElementById('mkHomeHeader');
     if (mkHeader) mkHeader.style.display = (app === 'syna') ? 'none' : '';
-    document.body.style.background = (app === 'syna') ? '#E6E6EA' : '';
+    // Igualar el fondo de TODO el contenedor al gris-lavanda de SYNA. El .phone tiene su
+    // propio fondo crema (var(--bg)=#f5f5f3) — ESE era el borde que se notaba contra el iframe.
+    var _synaBg = (app === 'syna') ? '#E6E6EA' : '';
+    document.body.style.background = _synaBg;
+    var _phoneEl = document.querySelector('.phone');
+    if (_phoneEl) _phoneEl.style.background = _synaBg;
     window._currentApp = app;
     if (app === 'syna') loadSynaDashboard(yaEnSyna); // si ya estaba en Syna, recarga a su pantalla principal
     // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
