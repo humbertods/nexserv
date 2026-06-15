@@ -506,8 +506,8 @@ body.rol-staff #confirmSvcClientName::after {
   .syna .agenda-back { background:#fff; border:1.5px solid var(--syna-line); border-radius:12px; padding:9px 14px; font-weight:700; color:var(--syna-violet); cursor:pointer; font-family:inherit; }
   .syna .agenda-frame { width:100%; height:560px; border:0; border-radius:var(--syna-radius); background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.04); }
   .syna .agenda-placeholder { height:480px; border:1.5px dashed #cfcfd6; border-radius:var(--syna-radius); display:flex; align-items:center; justify-content:center; text-align:center; color:var(--syna-soft); font-size:14px; padding:20px; }
-  .syna .syna-full { margin-top:4px; }
-  .syna .syna-full iframe { width:100%; height:calc(100vh - 200px); min-height:540px; border:0; border-radius:14px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.06); display:block; }
+  .syna .syna-full { margin:6px -24px -100px; }
+  .syna .syna-full iframe { width:100%; height:calc(100vh - 118px); min-height:560px; border:0; border-radius:0; background:#E6E6EA; display:block; }
 
   /* ===== Placeholder de SIRA ===== */
   .sira-ph { height:520px; border:1.5px dashed #cfcfd6; border-radius:18px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:var(--ink-soft); font-size:14px; padding:24px; gap:8px; }
@@ -680,7 +680,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   <!-- MIKAELA HOME -->
   <div class="screen" id="mikaelaHome">
-    <div class="header">
+    <div class="header" id="mkHomeHeader">
       <div class="greeting">
         <div class="hello">Buenos días,</div>
         <div class="name">Mikaela</div>
@@ -10434,6 +10434,11 @@ body.rol-staff #confirmSvcClientName::after {
     var nav = home ? home.querySelector('nav.nav') : null;
     if (fab) fab.style.display = (app === 'nexserv') ? '' : 'none';
     if (nav) nav.style.display = (app === 'nexserv') ? '' : 'none';
+    // En SYNA: ocultar el header "Buenos días, Mikaela" (no repetir el nombre / verse como una
+    // sola app) e igualar el fondo al gris-lavanda de SYNA (#E6E6EA) para que no se note el borde.
+    var mkHeader = document.getElementById('mkHomeHeader');
+    if (mkHeader) mkHeader.style.display = (app === 'syna') ? 'none' : '';
+    document.body.style.background = (app === 'syna') ? '#E6E6EA' : '';
     window._currentApp = app;
     if (app === 'syna') loadSynaDashboard(yaEnSyna); // si ya estaba en Syna, recarga a su pantalla principal
     // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
