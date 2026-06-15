@@ -10421,6 +10421,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   // ===================== SWITCH 3 APPS (Nexserv / Syna / Sira) =====================
   function switchApp(app) {
+    var yaEnSyna = (window._currentApp === 'syna'); // re-tap en "Syna" estando en Syna = volver al inicio de SYNA
     ['nexserv','syna','sira'].forEach(function (t) {
       var tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
       if (tab) tab.style.display = (t === app) ? '' : 'none';
@@ -10434,7 +10435,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (fab) fab.style.display = (app === 'nexserv') ? '' : 'none';
     if (nav) nav.style.display = (app === 'nexserv') ? '' : 'none';
     window._currentApp = app;
-    if (app === 'syna') loadSynaDashboard();
+    if (app === 'syna') loadSynaDashboard(yaEnSyna); // si ya estaba en Syna, recarga a su pantalla principal
     // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
   }
   window.switchApp = switchApp;
@@ -10499,10 +10500,12 @@ body.rol-staff #confirmSvcClientName::after {
       }
     }
   }
-  function loadSynaDashboard() {
+  function loadSynaDashboard(force) {
     var slot = document.getElementById('synaFullFrame');
     if (!slot) return;
-    if (slot.querySelector('iframe')) return; // ya cargado: conservar el estado de SYNA al cambiar de tab
+    // Sin force: si ya está cargado, conservar el estado de SYNA al cambiar de tab.
+    // force=true (re-tap del botón "Syna") → recarga a la pantalla principal de SYNA.
+    if (!force && slot.querySelector('iframe')) return;
     slot.innerHTML = '<iframe src="' + SYNA_URL_PWA + '?embed=1&user=mikaela" allow="clipboard-write"></iframe>';
   }
   // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
