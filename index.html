@@ -10409,9 +10409,50 @@ body.rol-staff #confirmSvcClientName::after {
   window.switchApp = switchApp;
 
   // ===================== MÓDULO SYNA — dashboard en vivo =====================
-  // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
-  // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
-  var SYNA_URL_PWA = '';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
+  // Lee el getResumen REAL de SYNA y lo muestra dentro de NexServ.
+  // SYNA_API_EXEC = URL /exec del Web App de SYNA (la MISMA que usa window.SYNA_API
+  //                 en el index.html de la app SYNA standalone).
+  // SYNA_URL_PWA  = URL del PWA de SYNA (github.io) para el iframe de la Agenda.
+  var SYNA_API_EXEC = '__PEGA_URL_EXEC_DE_SYNA__';                  // ← URL /exec del Web App de SYNA
+  var SYNA_URL_PWA  = 'https://humbertods.github.io/syna-agenda/';  // ← PWA de SYNA (iframe Agenda)
+
+  // GET a la API de SYNA (su getResumen no requiere token).
+  async function apiGetSyna(action, params) {
+    try {
+      var url = new URL(SYNA_API_EXEC);
+      url.searchParams.set('action', action);
+      url.searchParams.set('_t', Date.now().toString());   // cache-busting
+      if (params) Object.keys(params).forEach(function (k) { url.searchParams.set(k, params[k]); });
+      var res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      console.error('[SYNA] API Error:', err);
+      return { error: err.message };
+    }
+  }
+
+  // Mapea el getResumen de SYNA al formato que espera renderSynaDashboard.
+  function _synaMapResumen(r) {
+    if (!r || r.ok !== true) return _synaMock();
+    var MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var fc = function (f) { var m = String(f).match(/(\d{4})-(\d{2})-(\d{2})/); return m ? ((+m[3]) + ' ' + MES[+m[2]-1]) : String(f || ''); };
+    var ini = (r.semana && r.semana.ini) || '', fin = (r.semana && r.semana.fin) || '';
+    var total = (r.total != null) ? r.total : ((r.porRealizar || 0) + (r.realizadas || 0));
+    return {
+      semana: (ini && fin) ? ('Semana ' + fc(ini) + ' – ' + fc(fin)) : 'Semana —',
+      citasSemana: total,
+      confirmadas: r.confirmadas || 0,
+      sinConfirmar: r.pendientes || 0,
+      proximas: (r.proximas || []).length,
+      porRealizar: r.porRealizar || 0,
+      realizadas: r.realizadas || 0,
+      totalSemana: total,
+      porArea: (r.porArea || []).map(function (a) { return { nombre: a.area, cant: a.n, color: a.color || '#999' }; }),
+      proximasLista: r.proximas || [],
+      enProceso: r.enProceso || []
+    };
+  }
   function _synaMock() {
     return {
       semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
@@ -10443,10 +10484,18 @@ body.rol-staff #confirmSvcClientName::after {
     if (proc) proc.textContent = (d.enProceso && d.enProceso.length) ? '' : 'Ninguna cita en curso';
   }
   function loadSynaDashboard() {
-    // Real (cuando SYNA confirme):
-    //   apiGetSyna('getDashboardSemana').then(renderSynaDashboard);
-    renderSynaDashboard(_synaMock());
+    renderSynaDashboard(_synaMock());   // esqueleto inmediato mientras carga
+    if (!SYNA_API_EXEC || SYNA_API_EXEC.indexOf('__PEGA') === 0) return;  // sin URL configurada: queda el mock
+    apiGetSyna('getResumen').then(function (r) {
+      if (r && r.error) {
+        console.warn('[SYNA] getResumen falló:', r.error);
+        var w = document.getElementById('synaWeek'); if (w) w.textContent = 'Semana — (sin conexión)';
+        return;
+      }
+      renderSynaDashboard(_synaMapResumen(r));
+    });
   }
+  window.synaRefresh = loadSynaDashboard;   // para un botón "actualizar" dentro de la vista SYNA
   function synaAbrirAgenda() {
     var dash = document.getElementById('synaDashView');
     var ag = document.getElementById('synaAgendaView');
