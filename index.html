@@ -10413,7 +10413,7 @@ body.rol-staff #confirmSvcClientName::after {
   // SYNA_API_EXEC = URL /exec del Web App de SYNA (la MISMA que usa window.SYNA_API
   //                 en el index.html de la app SYNA standalone).
   // SYNA_URL_PWA  = URL del PWA de SYNA (github.io) para el iframe de la Agenda.
-  var SYNA_API_EXEC = 'https://script.google.com/macros/s/AKfycbxShQ8OsbaXajcaqI-D3_QWWszIkTvoi6b-R3UXqvjmirDCkfvY6rtm60ivXfDsnc8q/exec';   // ← URL /exec del Web App de SYNA
+  var SYNA_API_EXEC = '__PEGA_URL_EXEC_DE_SYNA__';                  // ← URL /exec del Web App de SYNA
   var SYNA_URL_PWA  = 'https://humbertods.github.io/syna-agenda/';  // ← PWA de SYNA (iframe Agenda)
 
   // GET a la API de SYNA (su getResumen no requiere token).
@@ -10496,22 +10496,34 @@ body.rol-staff #confirmSvcClientName::after {
     });
   }
   window.synaRefresh = loadSynaDashboard;   // para un botón "actualizar" dentro de la vista SYNA
-  function synaAbrirAgenda() {
+  // Abre una vista de SYNA embebida (iframe a SYNA_URL_PWA?embed=1&view=...).
+  function synaAbrirVista(view, titulo) {
     var dash = document.getElementById('synaDashView');
-    var ag = document.getElementById('synaAgendaView');
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    var ttl  = document.querySelector('#synaAgendaView .section-title');
+    if (!SYNA_URL_PWA) { alert('Falta configurar SYNA_URL_PWA'); return; }
+    if (ttl) ttl.textContent = titulo || 'SYNA';
+    if (slot) {
+      var src = SYNA_URL_PWA + '?embed=1&view=' + encodeURIComponent(view) + '&_t=' + Date.now();
+      slot.innerHTML = '<iframe class="agenda-frame" src="' + src + '" ' +
+        'style="width:100%;height:72vh;border:0;border-radius:14px;background:#fff;display:block;"></iframe>';
+    }
     if (dash) dash.style.display = 'none';
-    if (ag) ag.style.display = 'block';
-    // Real: document.getElementById('synaAgendaFrameSlot').outerHTML =
-    //   '<iframe class="agenda-frame" src="' + SYNA_URL_PWA + '?embed=1&view=agenda&user=mikaela"></iframe>';
+    if (ag)   ag.style.display = 'block';
   }
+  function synaAbrirAgenda()  { synaAbrirVista('agenda',    'Agenda en vivo'); }
+  function synaNuevaReserva() { synaAbrirVista('reservar',  'Nueva reserva');  }
+  function synaCopiloto()     { synaAbrirVista('asistente', 'Copiloto');       }
   function synaVolverDash() {
     var dash = document.getElementById('synaDashView');
-    var ag = document.getElementById('synaAgendaView');
-    if (ag) ag.style.display = 'none';
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    if (ag)   ag.style.display = 'none';
     if (dash) dash.style.display = 'block';
+    if (slot) slot.innerHTML = '';   // descarga el iframe para que la próxima apertura sea fresca
+    loadSynaDashboard();             // refresca los números al volver
   }
-  function synaNuevaReserva() { alert('SYNA → Nueva reserva (pendiente conectar)'); }
-  function synaCopiloto() { alert('SYNA → Copiloto (pendiente conectar)'); }
   window.synaAbrirAgenda = synaAbrirAgenda; window.synaVolverDash = synaVolverDash;
   window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
 
