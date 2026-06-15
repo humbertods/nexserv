@@ -811,6 +811,8 @@ body.rol-staff #confirmSvcClientName::after {
         <div class="syna-empty" id="snProxList">Nada pendiente de llegada</div>
         <div class="syna-sub">En proceso <span>· llegaron</span></div>
         <div class="syna-empty" id="snProcesoList">Ninguna cita en curso</div>
+        <div class="syna-sub">Atendidas hoy <span id="snAtendidasCount">· 0</span></div>
+        <div class="syna-empty" id="snAtendidasList">Aún ninguna atendida hoy</div>
       </div>
       <!-- Vista agenda (iframe SYNA en modo embed) -->
       <div id="synaAgendaView" style="display:none;">
@@ -10450,7 +10452,8 @@ body.rol-staff #confirmSvcClientName::after {
       totalSemana: total,
       porArea: (r.porArea || []).map(function (a) { return { nombre: a.area, cant: a.n, color: a.color || '#999' }; }),
       proximasLista: r.proximas || [],
-      enProceso: r.enProceso || []
+      enProceso: r.enProceso || [],
+      atendidas: r.atendidas || []
     };
   }
   function _synaMock() {
@@ -10463,7 +10466,7 @@ body.rol-staff #confirmSvcClientName::after {
         { nombre: 'Facial', cant: 0, color: '#2196f3' },
         { nombre: 'Depilación de bikini completo', cant: 0, color: '#9aa0a6' }
       ],
-      proximasLista: [], enProceso: []
+      proximasLista: [], enProceso: [], atendidas: []
     };
   }
   function renderSynaDashboard(d) {
@@ -10482,6 +10485,11 @@ body.rol-staff #confirmSvcClientName::after {
     if (prox) prox.textContent = (d.proximasLista && d.proximasLista.length) ? '' : 'Nada pendiente de llegada';
     var proc = document.getElementById('snProcesoList');
     if (proc) proc.textContent = (d.enProceso && d.enProceso.length) ? '' : 'Ninguna cita en curso';
+    var atnd = d.atendidas || [];
+    var atndList = document.getElementById('snAtendidasList');
+    if (atndList) atndList.textContent = atnd.length ? '' : 'Aún ninguna atendida hoy';
+    var atndCount = document.getElementById('snAtendidasCount');
+    if (atndCount) atndCount.textContent = '\u00b7 ' + atnd.length;
   }
   function loadSynaDashboard() {
     renderSynaDashboard(_synaMock());   // esqueleto inmediato mientras carga
