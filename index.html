@@ -4146,7 +4146,16 @@ body.rol-staff #confirmSvcClientName::after {
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
-          if (tienePromoEnTM) {
+          // ── REGLA IRREVOCABLE: el botón "Cobrar promo completa" es EXCLUSIVO de la
+          // staff de PESTAÑAS y SOLO para la promo "pestañas + depilación de cejas"
+          // (la clienta paga la promo completa pero solo se hace las pestañas).
+          // NUNCA se muestra para staff de depilación/cejas ni para ningún otro combo.
+          var _areaStaffTM    = String(user && user.area || '').toLowerCase();
+          var _staffEsPestanas = _areaStaffTM.indexOf('pesta') >= 0;
+          var _areasComboTM   = (tm.areas || []).map(function(a){ return String(a.area || a.tentativo || '').toLowerCase(); });
+          var _comboTienePestanas = _areasComboTM.some(function(n){ return n.indexOf('pesta') >= 0; });
+          var _comboTieneCejas    = _areasComboTM.some(function(n){ return n.indexOf('cej') >= 0; });
+          if (tienePromoEnTM && _staffEsPestanas && _comboTienePestanas && _comboTieneCejas) {
             btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — todo el valor a mi nombre ($' + Number(totalPromoComboTM).toFixed(2) + ')</button>'
               + btnsBaseTM;
           }
@@ -4245,7 +4254,10 @@ body.rol-staff #confirmSvcClientName::after {
         // Todavía falta otra área del combo
         html += `<button class="btn-primary" style="margin-bottom:10px;" onclick="finishSlotAndContinue(${slotActual})">➡️ Continuar siguiente área</button>`;
       }
-      html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
+      // REGLA IRREVOCABLE: "Cobrar promo completa" solo para staff de PESTAÑAS (ver bloque TM).
+      if (String((window.currentUser && window.currentUser.area) || '').toLowerCase().indexOf('pesta') >= 0) {
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
+      }
       html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">💰 Mandar a cobrar (solo mi parte)</button>`;
     }
     btnContainer.innerHTML = html;
