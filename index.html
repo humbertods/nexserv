@@ -18530,13 +18530,10 @@ function renderCierreMes(d, siraInicial) {
           + '<span><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> Productos vendidos (' + d.numProductos + ')</span><span style="font-weight:700;">' + money(d.generadoProductos) + '</span></div>';
   }
 
-  // ---- Gastos ----
+  // ---- Gastos ---- (solo SIRA; caja chica es control diario, no entra al cuadre)
   html += '<div class="section-title" style="margin-top:18px;">Gastos del mes</div>';
   html += '<div class="card" style="padding:14px 16px;font-size:14px;">';
-  html +=   '<div style="display:flex;justify-content:space-between;padding:4px 0;">'
-        +     '<span>Caja chica (interno)<br><span style="font-size:11px;color:var(--ink-faint);">' + d.numGastosCaja + ' gastos registrados</span></span>'
-        +     '<span style="color:var(--danger);font-weight:700;">-' + money(d.gastoCajaChica) + '</span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;border-top:1px solid var(--line);margin-top:6px;">'
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">'
         +     '<span>SIRA (mes)<br><span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">'
         +       (d.siraOk
                   ? '✓ Traído de SIRA · ' + (d.siraCount || 0) + ' gasto' + ((d.siraCount === 1) ? '' : 's') + ' del mes'
@@ -18546,20 +18543,26 @@ function renderCierreMes(d, siraInicial) {
         +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
         +       'style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
   html +=   '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;border-top:1.5px solid var(--line);margin-top:6px;font-weight:800;">'
-        +     '<span>Total gastos</span><span id="cmTotalGastos" style="color:var(--danger);">-' + money(d.gastoCajaChica + sira) + '</span></div>';
+        +     '<span>Total gastos</span><span id="cmTotalGastos" style="color:var(--danger);">-' + money(sira) + '</span></div>';
   html += '</div>';
 
   // ---- TOTAL GENERAL ----
-  const totalGeneral = d.generadoTotal - d.comisionTotal - d.gastoCajaChica - sira;
+  const totalGeneral = d.generadoTotal - d.comisionTotal - sira;
   html += '<div id="cmTotalGeneralCard" style="background:var(--bg);border:2px solid var(--accent-deep);border-radius:18px;padding:16px 18px;margin-top:16px;">';
   html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>';
   html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Gastos (caja + SIRA)</span><span id="cmTotalGastosResumen">-' + money(d.gastoCajaChica + sira) + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Gastos (SIRA)</span><span id="cmTotalGastosResumen">-' + money(sira) + '</span></div>';
   html +=   '<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;border-top:1.5px solid var(--accent-deep);margin-top:8px;padding-top:10px;">'
         +     '<span>TOTAL GENERAL</span><span id="cmTotalGeneral" style="color:' + (totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + money(totalGeneral) + '</span></div>';
   html += '</div>';
 
-  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos (caja chica + SIRA). El valor de SIRA se trae automáticamente desde su sistema; puedes ajustarlo a mano si algún mes hace falta.</div>';
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos de SIRA. El valor de SIRA se trae automáticamente desde su sistema; puedes ajustarlo a mano si algún mes hace falta.</div>';
+
+  // Caja chica — solo referencia informativa, NO se descuenta del cuadre
+  html += '<div style="font-size:11px;color:var(--ink-faint);padding:8px 4px 0;margin-top:8px;border-top:1px dashed var(--line);line-height:1.5;">'
+        + '<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="currentColor" style="vertical-align:-1px;"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7Zm0 3h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Z"/></svg> '
+        + 'Caja chica de Mikaela este mes: <b>' + money(d.gastoCajaChica) + '</b> en ' + (d.numGastosCaja||0) + ' gasto' + ((d.numGastosCaja===1)?'':'s')
+        + '. Es solo su control diario de caja — <b>no se incluye en el cuadre mensual</b> (el gasto real lo lleva SIRA).</div>';
 
   // ---- Exportar (PDF / Excel) ----
   html += '<div style="display:flex;gap:10px;margin-top:14px;">';
@@ -18598,7 +18601,7 @@ function onCierreSiraInput() {
   window._cmSiraPorMes[key] = sira;
 
   const money = n => '$' + (Number(n) || 0).toFixed(2);
-  const totalGastos = d.gastoCajaChica + sira;
+  const totalGastos = sira; // caja chica no entra al cuadre
   const totalGeneral = d.generadoTotal - d.comisionTotal - totalGastos;
 
   const tg  = document.getElementById('cmTotalGastos');
@@ -18623,7 +18626,10 @@ function _cierreDatos() {
   else if (window._cmSiraPorMes && window._cmSiraPorMes[key] != null) sira = Number(window._cmSiraPorMes[key]) || 0;
   else if (d.guardado && d.guardado.gastoSIRA != null)        sira = Number(d.guardado.gastoSIRA) || 0;
   else if (d.siraOk && d.gastoSIRA != null)                   sira = Number(d.gastoSIRA) || 0;
-  const totalGastos  = (Number(d.gastoCajaChica) || 0) + sira;
+  // Caja chica NO entra en el cuadre mensual: es solo el control diario de caja de
+  // Mikaela. El gasto real del mes lo lleva SIRA (productos, ingresos, gastos varios).
+  // Contar ambos duplicaría el gasto.
+  const totalGastos  = sira;
   const totalGeneral = (Number(d.generadoTotal) || 0) - (Number(d.comisionTotal) || 0) - totalGastos;
   return { d: d, sira: sira, totalGastos: totalGastos, totalGeneral: totalGeneral };
 }
@@ -18678,17 +18684,16 @@ function _cierreReportHTML() {
     + (d.numProductos ? '<div class="box row"><span>Productos vendidos (' + d.numProductos + ')</span><strong>' + money(d.generadoProductos) + '</strong></div>' : '')
     + '<div class="st">Gastos del mes</div>'
     + '<div class="box">'
-    +   '<div class="row"><span>Caja chica (' + (d.numGastosCaja||0) + ' gastos)</span><span class="rojo">-' + money(d.gastoCajaChica) + '</span></div>'
     +   '<div class="row"><span>SIRA (mes)' + (d.siraOk ? ' &middot; ' + (d.siraCount||0) + ' gasto(s)' : '') + '</span><span class="rojo">-' + money(x.sira) + '</span></div>'
     +   '<div class="row" style="border-top:1.5px solid #e5e5e5;margin-top:6px;padding-top:8px;font-weight:800;"><span>Total gastos</span><span class="rojo">-' + money(x.totalGastos) + '</span></div>'
     + '</div>'
     + '<div class="tg">'
     +   '<div class="row" style="color:#777;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>'
     +   '<div class="row" style="color:#777;"><span>&minus; Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>'
-    +   '<div class="row" style="color:#777;"><span>&minus; Gastos (caja + SIRA)</span><span>-' + money(x.totalGastos) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Gastos (SIRA)</span><span>-' + money(x.totalGastos) + '</span></div>'
     +   '<div class="fin"><span>TOTAL GENERAL</span><span style="color:' + (x.totalGeneral>=0?'#1e7e34':'#c0392b') + ';">' + money(x.totalGeneral) + '</span></div>'
     + '</div>'
-    + '<div class="foot">' + guardadoTxt + '<br>Reporte generado el ' + fechaGen + '</div>'
+    + '<div class="foot">Caja chica de Mikaela este mes: ' + money(d.gastoCajaChica) + ' en ' + (d.numGastosCaja||0) + ' gasto(s) — control diario de caja, no se incluye en el cuadre (el gasto del mes lo lleva SIRA).<br>' + guardadoTxt + '<br>Reporte generado el ' + fechaGen + '</div>'
     + '</body></html>';
 }
 
@@ -18742,11 +18747,12 @@ function exportarCierreExcel() {
     + rows
     + '<tr><td>TOTAL</td><td>'+(d.numServicios||0)+'</td><td>'+num(d.generadoServicios)+'</td><td>'+num(d.comisionTotal)+'</td></tr>'
     + '<tr><td colspan="4"></td></tr>'
-    + '<tr><td>Caja chica ('+(d.numGastosCaja||0)+' gastos)</td><td></td><td></td><td>-'+num(d.gastoCajaChica)+'</td></tr>'
     + '<tr><td>SIRA (mes)</td><td></td><td></td><td>-'+num(x.sira)+'</td></tr>'
     + '<tr><td>Total gastos</td><td></td><td></td><td>-'+num(x.totalGastos)+'</td></tr>'
     + '<tr><td colspan="4"></td></tr>'
     + '<tr><th colspan="3">TOTAL GENERAL</th><th>'+num(x.totalGeneral)+'</th></tr>'
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><td>Caja chica ('+(d.numGastosCaja||0)+' gastos) — control diario, NO se incluye en el cuadre</td><td></td><td></td><td>'+num(d.gastoCajaChica)+'</td></tr>'
     + '</table>';
   const contenido = '\ufeff<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>' + tabla + '</body></html>';
   try {
@@ -18771,7 +18777,9 @@ async function guardarCierreMes() {
   if (!d) return;
   const inp = document.getElementById('cmSiraInput');
   const sira = Number(inp && inp.value) || 0;
-  const totalGeneral = d.generadoTotal - d.comisionTotal - d.gastoCajaChica - sira;
+  // Caja chica NO entra en el cuadre guardado (control diario, no gasto del mes).
+  // Se sigue guardando d.gastoCajaChica como dato de referencia en la hoja.
+  const totalGeneral = d.generadoTotal - d.comisionTotal - sira;
   const btn = document.getElementById('cmGuardarBtn');
   const txtOrig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando…'; }
