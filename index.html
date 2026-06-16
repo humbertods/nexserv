@@ -11014,6 +11014,25 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   async function loadServiciosHistory() {
+    // ── Rango por ROL: el Owner ve todas las semanas; Mikaela/admin solo la semana en curso ──
+    (function(){
+      const sel = document.getElementById('historyWeekSelect');
+      if (!sel) return;
+      const esOwner = window.currentUser && window.currentUser.role === 'owner';
+      if (esOwner) {
+        // Owner: asegurar el set completo (por si quedó recortado antes)
+        if (sel.options.length < 4) {
+          sel.innerHTML = '<option value="0">Esta semana</option>'
+            + '<option value="1">Semana pasada</option>'
+            + '<option value="2">Hace 2 semanas</option>'
+            + '<option value="3">Hace 3 semanas</option>';
+        }
+      } else {
+        // Mikaela / admin / staff: SOLO la semana en curso
+        sel.innerHTML = '<option value="0">Esta semana</option>';
+        sel.value = '0';
+      }
+    })();
     const semanaOffset = parseInt(document.getElementById('historyWeekSelect')?.value || '0');
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>';
