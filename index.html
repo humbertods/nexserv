@@ -4255,6 +4255,7 @@ body.rol-staff #confirmSvcClientName::after {
   // Congela lo realizado, manda el siguiente área a lista de espera
   async function compartirSiguienteServicio() {
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     const data = window._finishingData;
     const clientKey = data?.clientKey || '';
@@ -4409,6 +4410,7 @@ body.rol-staff #confirmSvcClientName::after {
     // La misma staff continúa con el siguiente servicio del combo
     // Solo registra que terminó esa parte y actualiza el total
     const slot = 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
@@ -6939,6 +6941,34 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('addServiceModal').classList.add('active');
   }
 
+  // ── ROBUSTEZ: resolver el id del ticket activo desde el BACKEND si el local está vacío.
+  // Evita el "no hay ticket / está vacío" al finalizar (que hoy se arregla saliendo y
+  // re-entrando, justamente porque al re-entrar se re-lee fresco del backend).
+  // Solo hace la llamada extra cuando el id FALTA → cero overhead en el caso normal.
+  async function ensureIdEsperaFresco(slot) {
+    slot = slot || 1;
+    const key = slot === 1 ? '_as1IdEspera' : '_as2IdEspera';
+    if (window[key]) return window[key]; // ya hay id válido en memoria
+    const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+    const user = window.currentUser;
+    if (!clientCode || !user) return '';
+    const staffName = String(user.name || '').trim().toLowerCase();
+    try {
+      const r = await apiGet('getListaCompleta');
+      if (!r) return '';
+      const enServ = r.enServicio || [];
+      const otros  = [].concat(r.porCobrar || [], r.paraRedirigir || [], r.lista || []);
+      const mismaCli = x => String(x.codigo || '') === clientCode;
+      const miStaff  = x => String(x.tomadaPor || x.asignada || '').trim().toLowerCase() === staffName;
+      let cand = enServ.find(x => mismaCli(x) && miStaff(x));   // 1) en servicio, mía, de esta clienta
+      if (!cand) cand = enServ.find(mismaCli);                  // 2) en servicio de esta clienta
+      if (!cand) cand = otros.find(x => mismaCli(x) && miStaff(x)) || otros.find(mismaCli); // 3) otras colas
+      const id = cand ? String(cand.idEspera || cand.id || '') : '';
+      if (id) { window[key] = id; console.log('[ticket] id vacío → resuelto del backend:', id); }
+      return id;
+    } catch (e) { console.warn('ensureIdEsperaFresco error', e); return ''; }
+  }
+
   async function syncServiciosBackend(slot, total, promoData) {
     const user = window.currentUser;
     if (!user) return;
@@ -6985,6 +7015,7 @@ body.rol-staff #confirmSvcClientName::after {
   // Opciones al finalizar servicio
   async function finishAndSendAll() {
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
@@ -7661,6 +7692,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   async function finalizarServicioSP(slot) {
     slot = slot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     if (!user) return;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
@@ -7736,6 +7768,7 @@ body.rol-staff #confirmSvcClientName::after {
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
 
     // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
     let idEsperaActual = data.idEspera || window._as1IdEspera || '';
@@ -8006,6 +8039,7 @@ body.rol-staff #confirmSvcClientName::after {
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot;
+    await ensureIdEsperaFresco(slot || 1); // ROBUSTEZ: resolver id fresco si el local está vacío
     const clientKey = data.clientKey;
     const displayName = data.clientName;
     
@@ -17257,6 +17291,7 @@ body.rol-staff #confirmSvcClientName::after {
   // ── TICKET MULTI — funciones de la staff ──────────────────
   async function completarAreaMulti() {
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
     try {
@@ -17301,6 +17336,7 @@ body.rol-staff #confirmSvcClientName::after {
 
   async function completarAreaMultiFinal() {
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
 
