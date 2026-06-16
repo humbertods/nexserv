@@ -6942,15 +6942,27 @@ body.rol-staff #confirmSvcClientName::after {
   async function syncServiciosBackend(slot, total, promoData) {
     const user = window.currentUser;
     if (!user) return;
-    const svcs = slotServices[slot] || [];
-    const activeNames = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado').map(s => s.name).join(' + ');
+    // ── DEDUP por nombre: un mismo servicio/adicional no debe contarse ni mostrarse 2 veces.
+    // (causaba "Combo X + Adicional A + Adicional B + Adicional B + Adicional A" al agregar extras,
+    //  e inflaba el total). Persistimos el dedup en slotServices para que el cobro quede limpio.
+    const _seenSync = {};
+    const svcs = (slotServices[slot] || []).filter(s => {
+      const k = String(s.name || '').trim().toLowerCase();
+      if (!k) return false;
+      if (_seenSync[k]) return false;
+      _seenSync[k] = true;
+      return true;
+    });
+    slotServices[slot] = svcs;
+    const _activosSync = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const activeNames = _activosSync.map(s => s.name).join(' + ');
     if (!activeNames) return;
     const clientName = slot === 1
       ? (document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '')
       : (document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '');
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
-    const totalEstaStaff = Number(total || 0);
+    const totalEstaStaff = _activosSync.reduce((sum, s) => sum + Number(s.price || 0), 0);
     try {
       const payload = {
         chicaNombre   : user.name,
