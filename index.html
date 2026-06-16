@@ -11793,12 +11793,41 @@ body.rol-staff #confirmSvcClientName::after {
         return !incluidoEnOtra;
       });
       // Recalcular el precio REGULAR por línea (montoNormal) con el catálogo de promos,
-      // para que la tarjeta recalcule aunque el ticket no haya guardado el regular por área
-      // (caso TM con servicio cambiado a promo o líneas combinadas normal + promo).
+      // para que la tarjeta recalcule aunque el ticket no haya guardado el regular por área.
+      // CLAVE: el descuento de una promo se cuenta UNA sola vez por TICKET, aunque el combo
+      // aparezca en varias áreas (depilación + pestañas). Antes se sumaba el descuento por
+      // cada área → la tarjeta quedaba inflada en combos multi-área (ej. $65 en vez de $57).
+      const _vistosPromoTicket = new Set();
       desglose.forEach(function(d){
-        const _regLn = _regularLineaDesc(d);
-        if (_regLn > (Number(d.montoNormal) || 0)) d.montoNormal = _regLn;
-        if ((Number(d.montoNormal) || 0) < (Number(d.monto) || 0)) d.montoNormal = Number(d.monto) || 0;
+        const m = Number(d.monto) || 0;
+        let uplift = 0;
+        let encontroPromo = false;
+        if (typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
+          const nombres = [];
+          if (d.promoNombre) String(d.promoNombre).split(',').forEach(function(n){ nombres.push(n.trim()); });
+          if (d.servicio)    String(d.servicio).split('+').forEach(function(n){ nombres.push(n.trim()); });
+          nombres.forEach(function(nm){
+            const k = String(nm || '').toLowerCase();
+            if (!k) return;
+            const p = PROMOS.find(function(p){ return String(p.name || '').trim().toLowerCase() === k; });
+            if (p && Number(p.regular || 0) > Number(p.price || 0)) {
+              encontroPromo = true;
+              if (!_vistosPromoTicket.has(k)) {          // descuento contado 1 sola vez por ticket
+                uplift += (Number(p.regular) - Number(p.price));
+                _vistosPromoTicket.add(k);
+              }
+            }
+          });
+        }
+        if (encontroPromo) {
+          // El catálogo manda: regular = monto + descuento (ya contado una sola vez).
+          // No usamos el montoNormal guardado para no arrastrar un regular inflado de antes.
+          d.montoNormal = Math.round((m + uplift) * 100) / 100;
+        } else {
+          // Sin promo conocida en la línea (servicio suelto/extra) → respetar el regular
+          // guardado si es mayor, si no el propio monto.
+          d.montoNormal = Math.max(Number(d.montoNormal) || 0, m);
+        }
       });
       // Modo ticket detallado
       window._cobrarDesglose = desglose;
