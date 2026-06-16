@@ -4747,7 +4747,7 @@ body.rol-staff #confirmSvcClientName::after {
     }
     // Detener polling si el staff navega a otra pantalla
     if (id !== 'activeService' && id !== 'activeService2') { detenerPollAutorizaciones(); }
-    if (id === 'serviciosHistory') { loadServiciosHistory(); }
+    if (id === 'serviciosHistory') { _setupHistorySelectPorRol(); loadServiciosHistory(); }
 
     if (id === 'arrivalExisting') {
       document.getElementById('arrivalSearch').value = '';
@@ -11013,40 +11013,55 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
 
+  // Construye las opciones del selector de historial según el ROL y deja "Hoy" por defecto.
+  // Se llama al ABRIR la pantalla (no en cada refresh) para no perder la selección.
+  function _setupHistorySelectPorRol() {
+    const sel = document.getElementById('historyWeekSelect');
+    if (!sel) return;
+    const esOwner = window.currentUser && window.currentUser.role === 'owner';
+    if (esOwner) {
+      // Owner: acceso completo
+      sel.innerHTML = '<option value="hoy">Hoy</option>'
+        + '<option value="0">Esta semana</option>'
+        + '<option value="1">Semana pasada</option>'
+        + '<option value="2">Hace 2 semanas</option>'
+        + '<option value="3">Hace 3 semanas</option>';
+    } else {
+      // Mikaela / admin: solo Hoy + Semana (en curso)
+      sel.innerHTML = '<option value="hoy">Hoy</option>'
+        + '<option value="0">Semana</option>';
+    }
+    sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
+  }
+
   async function loadServiciosHistory() {
-    // ── Rango por ROL: el Owner ve todas las semanas; Mikaela/admin solo la semana en curso ──
-    (function(){
-      const sel = document.getElementById('historyWeekSelect');
-      if (!sel) return;
-      const esOwner = window.currentUser && window.currentUser.role === 'owner';
-      if (esOwner) {
-        // Owner: asegurar el set completo (por si quedó recortado antes)
-        if (sel.options.length < 4) {
-          sel.innerHTML = '<option value="0">Esta semana</option>'
-            + '<option value="1">Semana pasada</option>'
-            + '<option value="2">Hace 2 semanas</option>'
-            + '<option value="3">Hace 3 semanas</option>';
-        }
-      } else {
-        // Mikaela / admin / staff: SOLO la semana en curso
-        sel.innerHTML = '<option value="0">Esta semana</option>';
-        sel.value = '0';
-      }
-    })();
-    const semanaOffset = parseInt(document.getElementById('historyWeekSelect')?.value || '0');
+    const selVal = document.getElementById('historyWeekSelect')?.value || 'hoy';
+    const esHoy = selVal === 'hoy';
+    const semanaOffset = esHoy ? 0 : parseInt(selVal || '0');
+    const scopeLabel = esHoy ? 'Hoy'
+      : (semanaOffset === 0 ? 'Esta semana'
+        : semanaOffset === 1 ? 'Semana pasada'
+        : 'Hace ' + semanaOffset + ' semanas');
+    window._histScopeLabel = scopeLabel;
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>';
 
     try {
-      // Calcular rango de semana
+      // Calcular rango: HOY (solo el día) o la SEMANA (lunes–sábado con offset)
       const now = new Date();
-      const dayOfWeek = (now.getDay() + 6) % 7;
-      const lunes = new Date(now);
-      lunes.setDate(now.getDate() - dayOfWeek - (semanaOffset * 7));
-      lunes.setHours(0, 0, 0, 0);
-      const sabado = new Date(lunes);
-      sabado.setDate(lunes.getDate() + 6);
-      sabado.setHours(23, 59, 59);
+      let lunes, sabado;
+      if (esHoy) {
+        lunes = new Date(now); lunes.setHours(0, 0, 0, 0);
+        sabado = new Date(now); sabado.setHours(23, 59, 59);
+      } else {
+        const dayOfWeek = (now.getDay() + 6) % 7;
+        lunes = new Date(now);
+        lunes.setDate(now.getDate() - dayOfWeek - (semanaOffset * 7));
+        lunes.setHours(0, 0, 0, 0);
+        sabado = new Date(lunes);
+        sabado.setDate(lunes.getDate() + 6);
+        sabado.setHours(23, 59, 59);
+      }
 
       const result = await apiGet('getHistorial', { periodo: 'todo' });
       if (!result.success || !result.historial) {
@@ -11098,7 +11113,7 @@ body.rol-staff #confirmSvcClientName::after {
       document.getElementById('historyAvgAmount').textContent = totalServicios > 0 ? '$' + (totalSemana/totalServicios).toFixed(0) : '$0';
       document.getElementById('historyCount').textContent = totalServicios;
       var _scopeEl0 = document.getElementById('historyStatScope');
-      if (_scopeEl0) _scopeEl0.textContent = 'Esta semana';
+      if (_scopeEl0) _scopeEl0.textContent = scopeLabel;
 
       const dias = Object.values(porDia).sort(function(a,b){ return a.sortKey - b.sortKey; });
 
@@ -11186,7 +11201,7 @@ body.rol-staff #confirmSvcClientName::after {
       scope = data.label || 'Día';
     } else {
       data  = window._histSemana || { count: 0, total: 0 };
-      scope = 'Esta semana';
+      scope = window._histScopeLabel || 'Esta semana';
     }
     if (c)  c.textContent  = data.count || 0;
     if (t)  t.textContent  = '$' + Number(data.total || 0).toFixed(0);
