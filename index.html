@@ -17854,6 +17854,37 @@ body.rol-staff #confirmSvcClientName::after {
   window.openRegistrarVisitaPestanas = openRegistrarVisitaPestanas;
   window.guardarVisitaPestanas = guardarVisitaPestanas;
 
+  // Reconstruye las líneas del COMBO de un slot desde las áreas del ticket TM del
+  // backend (fuente de verdad): toma las áreas de ESTA staff, marca completadas vs
+  // en curso, y PRESERVA los extras (servicios con autorización) ya presentes.
+  // Evita parchear estado local a mano (causa de listas que no se actualizan o
+  // pierden la parte ya completada del combo).
+  function _rebuildComboSlotFromTM(slot, areas) {
+    const u = window.currentUser || {};
+    const miNombre = String(u.name || '').trim().toLowerCase();
+    const mine = (areas || []).filter(function(a){
+      const est = String(a.estado || '').toLowerCase();
+      if (est === 'cancelado') return false;
+      return String(a.staff || '').trim().toLowerCase() === miNombre;
+    });
+    const prev = slotServices[slot] || [];
+    // Extras = servicios fuera del combo (los que pasaron por autorización o tienen nota)
+    const extras = prev.filter(function(s){
+      return s && (s.status === 'pendiente' || s.status === 'aprobado' || s.status === 'rechazado' || s._extra === true || s.note);
+    });
+    const combo = mine.map(function(a){
+      const done = String(a.estado || '').toLowerCase() === 'completado';
+      return {
+        name: a.tentativo || a.confirmado || a.area || 'Servicio',
+        price: Number(a.precio || 0),
+        area: a.area || '',
+        status: done ? 'completado' : undefined,
+        completada: done
+      };
+    });
+    slotServices[slot] = combo.concat(extras);
+  }
+
   async function completarYTomarSiguiente() {
     const slot = window._finishingSlot || 1;
     const user = window.currentUser;
@@ -17882,22 +17913,21 @@ body.rol-staff #confirmSvcClientName::after {
             btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slot + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           }
         } else {
-          // Cargar el siguiente servicio en el panel (sin salir de la clienta)
-          const sigNombre = r.siguienteArea || '';
-          const sigPrecio = r.siguientePrecio || 0;
-          // Agregar a slotServices
-          if (sigNombre) {
-            slotServices[slot] = slotServices[slot] || [];
-            const yaExiste = slotServices[slot].find(s => s.name === sigNombre);
-            if (!yaExiste) {
-              slotServices[slot].push({ name: sigNombre, price: sigPrecio, area: user?.area || '' });
-              renderServicesForSlot(slot);
-              const nuevoTotal = slotServices[slot].reduce((s,v) => s + Number(v.price||0), 0);
-              document.getElementById('as' + slot + 'Total').textContent = '$' + nuevoTotal;
-              document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
-            }
-          }
-          showToast('✅ Siguiente servicio tomado: ' + sigNombre);
+          // ── Reconstruir la lista desde el backend (no parchear estado local) ──
+          // Antes se hacía push del siguiente servicio con guard "yaExiste": si el
+          // combo se llamaba igual en dos áreas, NO re-renderizaba (había que salir
+          // del ticket y volver a entrar). Ahora se rearma desde las áreas frescas.
+          const _areasFresh = (slot === 1 ? window._tmAreasActuales : window._tmAreasActuales2) || [];
+          _rebuildComboSlotFromTM(slot, _areasFresh);
+          renderServicesForSlot(slot);
+          const nuevoTotal = (slotServices[slot] || []).reduce(function(s,v){
+            return (v.status === 'pendiente' || v.status === 'rechazado') ? s : s + Number(v.price || 0);
+          }, 0);
+          const _tEl = document.getElementById('as' + slot + 'Total');
+          if (_tEl) _tEl.textContent = '$' + nuevoTotal;
+          const _cEl = document.getElementById('as' + slot + 'SvcCount');
+          if (_cEl) _cEl.textContent = (slotServices[slot] || []).filter(function(s){ return s.status !== 'rechazado'; }).length;
+          showToast('✅ Siguiente servicio tomado: ' + (r.siguienteArea || ''));
           setTimeout(() => updateFinishButtons(slot), 300);
         }
       } else {
