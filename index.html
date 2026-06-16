@@ -4599,36 +4599,26 @@ body.rol-staff #confirmSvcClientName::after {
                   String(a.estado||'').toLowerCase() === 'en servicio'
                 );
 
-                // PASO 1: slotServices + renderServicesForSlot (borra innerHTML)
-                if (misAreasActivas.length > 0) {
-                  slotServices[1] = misAreasActivas.map(ar => ({
-                    name: ar.tentativo || ar.confirmado || '',
-                    price: ar.precio || 0,
-                    area: ar.area || user1?.area || 'cejas'
-                  }));
-                  renderServicesForSlot(1);
-                }
-
-                // PASO 2: insertar chips completados DESPUÉS del render
-                if (areasCompletadasR.length > 0 && svcListEl1) {
-                  [...svcListEl1.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
-                  const histHtml1 = areasCompletadasR.map(ar =>
-                    '<div class="tm-completado-chip" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border-radius:12px;margin-bottom:8px;">'
-                    + '<span style="font-size:16px;">✅</span>'
-                    + '<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">'
-                    + (ar.tentativo || ar.area || 'Servicio previo')
-                    + '</div><div style="font-size:11px;color:var(--success);">Completado</div></div>'
-                    + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + (ar.precio || 0) + '</div>'
-                    + '</div>'
-                  ).join('');
-                  svcListEl1.insertAdjacentHTML('afterbegin', histHtml1);
-                }
-
-                // PASO 3: total y contador
-                const totalActivos = (slotServices[1] || []).reduce((s,v) => s + Number(v.price||0), 0);
-                const totalComp = areasCompletadasR.reduce((s,a) => s + Number(a.precio||0), 0);
-                document.getElementById('as1Total').textContent = '$' + (totalActivos + totalComp);
-                document.getElementById('as1SvcCount').textContent = String((slotServices[1]||[]).length + areasCompletadasR.length);
+                // Completadas + en servicio: TODAS dentro de slotServices (no como chips
+                // de DOM). Antes la parte completada se inyectaba como chip aparte y
+                // CUALQUIER re-render (agregar extra, aprobación) lo borraba (problema 3).
+                const _completadas1 = areasCompletadasR.map(ar => ({
+                  name: ar.tentativo || ar.confirmado || ar.area || 'Servicio',
+                  price: Number(ar.precio || 0),
+                  area: ar.area || '',
+                  status: 'completado', completada: true
+                }));
+                const _activas1 = misAreasActivas.map(ar => ({
+                  name: ar.tentativo || ar.confirmado || '',
+                  price: Number(ar.precio || 0),
+                  area: ar.area || user1?.area || 'cejas'
+                }));
+                slotServices[1] = _completadas1.concat(_activas1);
+                if (svcListEl1) [...svcListEl1.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
+                renderServicesForSlot(1);
+                const _tot1 = slotServices[1].reduce((s,v) => (v.status==='pendiente'||v.status==='rechazado') ? s : s + Number(v.price||0), 0);
+                document.getElementById('as1Total').textContent = '$' + _tot1;
+                document.getElementById('as1SvcCount').textContent = String(slotServices[1].filter(s=>s.status!=='rechazado').length);
                 updateFinishButtons(1);
               }
             }
@@ -4697,23 +4687,25 @@ body.rol-staff #confirmSvcClientName::after {
                 window._tmAreasActuales2 = tm2.areas || [];
                 const miNombre2 = user2?.name || '';
                 const svcListEl2 = document.getElementById('as2ServicesList');
-                // Mis áreas en servicio → servicios editables
+                // Mis áreas: completadas (✅) + en servicio → TODAS dentro de slotServices
+                // (no como chips de DOM, que se borran en cualquier re-render — problema 3).
+                const misCompletadas2 = (tm2.areas || []).filter(a =>
+                  String(a.staff||'') === miNombre2 && String(a.estado||'').toLowerCase() === 'completado'
+                );
                 const misAreasActivas2 = (tm2.areas || []).filter(a =>
                   String(a.staff||'') === miNombre2 && String(a.estado||'').toLowerCase() === 'en servicio'
                 );
-                if (misAreasActivas2.length > 0) {
-                  slotServices[2] = misAreasActivas2.map(ar => ({
-                    name: ar.tentativo || ar.confirmado || '',
-                    price: ar.precio || 0,
-                    area: ar.area || user2?.area || 'cejas'
-                  }));
-                  renderServicesForSlot(2);
-                }
-                // El RESTO del ticket (otras áreas: completadas o en espera) → chips de contexto
-                const otrasAreas2 = (tm2.areas || []).filter(a => {
-                  const esMiaActiva = String(a.staff||'') === miNombre2 && String(a.estado||'').toLowerCase() === 'en servicio';
-                  return !esMiaActiva;
-                });
+                slotServices[2] = misCompletadas2.map(ar => ({
+                  name: ar.tentativo || ar.confirmado || ar.area || 'Servicio',
+                  price: Number(ar.precio || 0), area: ar.area || '', status:'completado', completada:true
+                })).concat(misAreasActivas2.map(ar => ({
+                  name: ar.tentativo || ar.confirmado || '',
+                  price: Number(ar.precio || 0), area: ar.area || user2?.area || 'cejas'
+                })));
+                if (svcListEl2) [...svcListEl2.querySelectorAll('.tm-completado-chip')].forEach(el => el.remove());
+                renderServicesForSlot(2);
+                // SOLO áreas de OTRA staff → chips de contexto (no editables, no las cobra esta staff)
+                const otrasAreas2 = (tm2.areas || []).filter(a => String(a.staff||'') !== miNombre2);
                 if (otrasAreas2.length > 0 && svcListEl2) {
                   [...svcListEl2.querySelectorAll('.tm-contexto-chip')].forEach(el => el.remove());
                   const chipsHtml2 = otrasAreas2.map(ar => {
@@ -4732,10 +4724,10 @@ body.rol-staff #confirmSvcClientName::after {
                   }).join('');
                   svcListEl2.insertAdjacentHTML('beforeend', chipsHtml2);
                 }
-                // Total y contador (solo lo que cobra María)
-                const totalMias2 = (slotServices[2] || []).reduce((s,v) => s + Number(v.price||0), 0);
+                // Total y contador (solo lo que cobra esta staff)
+                const totalMias2 = slotServices[2].reduce((s,v) => (v.status==='pendiente'||v.status==='rechazado')?s:s + Number(v.price||0), 0);
                 document.getElementById('as2Total').textContent = '$' + totalMias2;
-                document.getElementById('as2SvcCount').textContent = String((slotServices[2]||[]).length);
+                document.getElementById('as2SvcCount').textContent = String(slotServices[2].filter(s=>s.status!=='rechazado').length);
                 updateFinishButtons(2);
               }
             }
@@ -6851,6 +6843,7 @@ body.rol-staff #confirmSvcClientName::after {
       const isPending = s.status === 'pendiente';
       const isApproved = s.status === 'aprobado';
       const isRejected = s.status === 'rechazado';
+      const isCompleted = s.status === 'completado' || s.completada === true;
       // Enganche: primer servicio cuando viene de otra área, editable directamente (slot 1 Y slot 2)
       const _engancheActivoSlot = slot === 1 ? window._esEnganche : window._esEnganche2;
       const isEngancheEditable = idx === 0 && _engancheActivoSlot && !isPending && !isApproved;
@@ -6866,6 +6859,8 @@ body.rol-staff #confirmSvcClientName::after {
         '<div style="background: #dc3545; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">✕ RECHAZADO</div>' :
         isEngancheEditable ?
         '<div style="background: #3b82f6; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">🔗 ENGANCHE · Podés cambiarlo</div>' :
+        isCompleted ?
+        '<div style="background:#e8f6ee; color:#1b7a3e; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 100px; margin-top: 4px; display: inline-block;">✅ COMPLETADO</div>' :
         '';
       
       const noteInfo = (isPending || isApproved) && s.note ? 
@@ -6874,16 +6869,14 @@ body.rol-staff #confirmSvcClientName::after {
       // Estado de progreso para partes de un combo: ✅ Listo / 🟢 En curso
       const _esParteCombo = _esCombo && !isPending && !isRejected;
       const _parteCompletada = s.status === 'completado' || s.completada === true;
-      const progresoBadge = _esParteCombo
-        ? (_parteCompletada
-            ? '<div style="background:#e8f6ee; color:#1b7a3e; font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; margin-top:5px; display:inline-block;">✅ Listo</div>'
-            : '<div style="background:#fff4e6; color:#b45309; font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; margin-top:5px; display:inline-block;">🟢 En curso</div>')
+      const progresoBadge = (_esParteCombo && !_parteCompletada)
+        ? '<div style="background:#fff4e6; color:#b45309; font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; margin-top:5px; display:inline-block;">🟢 En curso</div>'
         : '';
       
       // Botón de editar para enganche directo (sin autorización)
       const editBtn = isEngancheEditable
         ? `<button onclick="editEngancheService(${slot}, ${idx})" style="background: #3b82f6; border: none; color: white; cursor: pointer; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px;">✏️ Cambiar</button>`
-        : (!isPending ? `<button onclick="removeServiceItem(${slot}, ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px;">✕</button>` : '');
+        : ((!isPending && !isCompleted) ? `<button onclick="removeServiceItem(${slot}, ${idx})" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 4px;">✕</button>` : '');
 
       return `
       <div class="service-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: ${bgColor}; ${borderStyle} border-radius: 12px; margin-bottom: 8px; ${_parteCompletada ? 'opacity:0.85;' : ''}">
@@ -6984,18 +6977,22 @@ body.rol-staff #confirmSvcClientName::after {
   async function syncServiciosBackend(slot, total, promoData) {
     const user = window.currentUser;
     if (!user) return;
-    // ── DEDUP por nombre: un mismo servicio/adicional no debe contarse ni mostrarse 2 veces.
-    // (causaba "Combo X + Adicional A + Adicional B + Adicional B + Adicional A" al agregar extras,
-    //  e inflaba el total). Persistimos el dedup en slotServices para que el cobro quede limpio.
+    // Las partes COMPLETADAS del combo ya están registradas en el backend como áreas TM:
+    // NO entran al sync ni al dedup por nombre (si no, colisionan por nombre con la parte
+    // activa del mismo combo y se perdería una, además de inflar el total del área activa).
+    const _allSync = slotServices[slot] || [];
+    const _completadasSlot = _allSync.filter(s => s.status === 'completado' || s.completada === true);
+    const _restoSync = _allSync.filter(s => !(s.status === 'completado' || s.completada === true));
+    // ── DEDUP por nombre (solo activos/extras): un mismo servicio no debe contarse 2 veces.
     const _seenSync = {};
-    const svcs = (slotServices[slot] || []).filter(s => {
+    const svcs = _restoSync.filter(s => {
       const k = String(s.name || '').trim().toLowerCase();
       if (!k) return false;
       if (_seenSync[k]) return false;
       _seenSync[k] = true;
       return true;
     });
-    slotServices[slot] = svcs;
+    slotServices[slot] = _completadasSlot.concat(svcs);
     const _activosSync = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const activeNames = _activosSync.map(s => s.name).join(' + ');
     if (!activeNames) return;
