@@ -4242,7 +4242,17 @@ body.rol-staff #confirmSvcClientName::after {
       // Verificar si es la última área
       const completedAreas = promoData.completedAreas || [];
       const totalAreas = promo.division ? promo.division.length : 1;
-      const esUltimaArea = completedAreas.length >= totalAreas - 1;
+      // ROBUSTEZ congelamiento: a veces completedAreas llega vacío a la 2da staff (no se
+      // propagó en la handoff). Pero las áreas que ESTA staff NO puede hacer ya las hizo
+      // otra (por eso la clienta llegó a ella). Si esas cubren todas las demás áreas,
+      // ella es la última aunque completedAreas esté vacío → así no se congela.
+      const divisionesNoMias = (promo.division || []).filter(d => {
+        const dArea = String(d.area||'').toLowerCase().replace(/[^\w\s]/gi,' ').trim();
+        const dSvc  = String(d.servicio||d.service||'').toLowerCase();
+        const dRealArea = String(d.realArea||'').toLowerCase();
+        return !myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
+      }).length;
+      const esUltimaArea = completedAreas.length >= totalAreas - 1 || divisionesNoMias >= totalAreas - 1;
 
       if (esUltimaArea) {
         // Última área — promo completada
@@ -10868,15 +10878,25 @@ body.rol-staff #confirmSvcClientName::after {
               }
             } // fin else normal/promo
 
-            // TOTAL ACUMULADO = serviciosDetalle (partes ya hechas) + a.total (área actual en curso)
+            // TOTAL ACUMULADO.
+            // OJO promo repartida: el precio del combo es FIJO (ej. Combo 25 Clásicas = $47).
+            // Las partes en serviciosDetalle (pestañas $42 + cejas $5) son SUBDIVISIONES de
+            // ese precio, NO sumandos. Sumarlas encima de a.total daba el bug $42+$47=$89.
             let totalAcumDisplay = Number(a.total) || 0;
+            const _promoFullTot = a.promoNombre ? (PROMOS || []).find(p => p.name === a.promoNombre) : null;
+            const _promoPrecioFijo = _promoFullTot ? Number(_promoFullTot.price || _promoFullTot.precio || 0) : 0;
             if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
               const totalDetalle = a.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
-              // Si hay desglose, el total real = desglose + precio área en curso
               if (totalDetalle > 0) {
-                // a.total ya puede incluir el desglose (cuando viene de col M acumulado)
-                // usar el mayor para evitar contar doble
-                totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
+                if (_promoPrecioFijo > 0) {
+                  // Promo de precio fijo: el total ES el precio del combo. Nunca sumar las
+                  // partes del propio combo encima. (Si a.total ya incluye adicionales
+                  // reales fuera del combo, se respeta el mayor.)
+                  totalAcumDisplay = Math.max(_promoPrecioFijo, Number(a.total) || 0);
+                } else {
+                  // Multi-servicio SIN promo fija: sí se suman las partes hechas + la actual.
+                  totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
+                }
               }
             }
             const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
