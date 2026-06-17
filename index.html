@@ -16713,8 +16713,14 @@ body.rol-staff #confirmSvcClientName::after {
     }
 
     // ── USAR FORMULARIO TM UNIFICADO ─────────────────────────────────────
-    const _comboSinModo = _tmServicios.find(s => s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff);
-    if (_comboSinModo) { window._goToListRunning = false; alert('Elegí cuántas staff hacen el combo "' + _comboSinModo.servicio + '" (una sola o repartido).'); return; }
+    // Va a la lista (sin asignación directa): no hay staff para derivar el modo, así que
+    // los combos multi-área sin modo se reparten por área, para que cada staff del área
+    // los tome desde la lista. (Si Mikaela quiere una sola staff, lo elige en el dropdown.)
+    _tmServicios.forEach(s => {
+      if (s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff) {
+        s._modoStaff = 'repartida';
+      }
+    });
     const areasMulti = buildTMAreasFromForm();
     if (areasMulti.length === 0) {
       alert('Agregá al menos un servicio con área y servicio seleccionado.');
@@ -16934,8 +16940,24 @@ body.rol-staff #confirmSvcClientName::after {
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
     // ── USAR FORMULARIO TM UNIFICADO (asignación directa) ────────────────
-    const _comboSinModoGA = _tmServicios.find(s => s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff);
-    if (_comboSinModoGA) { window._goAssignRunning = false; alert('Elegí cuántas staff hacen el combo "' + _comboSinModoGA.servicio + '" (una sola o repartido).'); return; }
+    // Combos multi-área SIN modo elegido: en vez de bloquear, derivar del staff asignado.
+    // Si la chica puede hacer TODAS las áreas del combo → "una sola" (combo en 1 línea,
+    // ruta SP limpia). Si no → "repartida": las áreas que no puede hacer vuelven a la cola
+    // de Mikaela para asignarlas a otra staff. (Mismas claves que AREA_KEY_FROM_DIV.)
+    const _capsRoster = {
+      'María':['cejas','depilacion','retiro_lifting'], 'Keyla':['cejas','depilacion','retiro_lifting'],
+      'Lesly':['cejas','depilacion','retiro_lifting'], 'Rosa':['cejas','depilacion','retiro_lifting'],
+      'Yadira':['pestanas','retiro_lifting'], 'Diana':['pestanas','retiro_lifting'], 'Laura':['facial']
+    };
+    const _capsChica = _capsRoster[chica] || [];
+    _tmServicios.forEach(s => {
+      if (s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff) {
+        const _puedeTodoChica = _capsChica.length > 0 &&
+          s._comboAreas.every(ca => _capsChica.includes(String(ca.area || '')));
+        s._modoStaff = _puedeTodoChica ? 'una' : 'repartida';
+        console.log('🧩 Modo combo auto-derivado para', chica, '→', s._modoStaff, '(' + s.servicio + ')');
+      }
+    });
     const areasMultiGA = buildTMAreasFromForm();
     if (areasMultiGA.length === 0) {
       alert('Agregá al menos un servicio con área y servicio seleccionado.');
