@@ -16926,22 +16926,39 @@ body.rol-staff #confirmSvcClientName::after {
       return;
     }
 
-    // 2+ áreas → TM con asignación directa
+    // 2+ áreas → UNA entrada SP/SN por área (modelo Lineas, sin TicketMulti).
+    // La PRIMERA área se asigna a la staff elegida (queda en servicio); el resto
+    // queda en cola para que Mikaela lo asigne a la staff correcta de cada área.
+    // Cada área cae en Lineas por el gancho SP/SN y todas quedan agrupadas por la
+    // misma visita (el código de la clienta) → cobro agrupado por ese código.
     try {
-      const tmResult = await apiPost('crearTicketMulti', {
-        codigo: codigo, nombre: nombre, prioridad: 'Normal',
-        observaciones: obs, areas: areasMultiGA,
-        secuencia: window._secuencia.map(s => s.area),
-        asignadaA: chica
-      });
-      if (tmResult && tmResult.success) {
+      let _okCount = 0, _errMsg = '';
+      for (let _i = 0; _i < areasMultiGA.length; _i++) {
+        const aGA = areasMultiGA[_i];
+        const _esPromoGA = aGA.tipo === 'promo';
+        const _staffGA = (_i === 0) ? chica : '';
+        const _baseGA = {
+          codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
+          area: aGA.area, prioridad: 'Normal', observaciones: obs,
+          esTop: isTop ? 'Sí' : 'No', total: aGA.precio
+        };
+        if (_staffGA) _baseGA.asignadaA = _staffGA;
+        if (_esPromoGA) {
+          _baseGA.promoNombre   = aGA.tentativo;
+          _baseGA.precioPromo   = aGA.precio;
+          _baseGA.precioRegular = aGA.precioNormal || aGA.precio;
+        }
+        const _rGA = await apiPost(_esPromoGA ? 'addServicioPromo' : 'addServicioNormal', _baseGA);
+        if (_rGA && _rGA.success) _okCount++; else _errMsg = (_rGA && (_rGA.message || _rGA.error)) || _errMsg;
+      }
+      if (_okCount > 0) {
         initFormTM();
-        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMultiGA.length + ' servicios', isTop);
-        enviarPushStaff([chica], '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMultiGA.length+' servicios');
-        alert('✅ Ticket creado (' + tmResult.id + ')');
+        simulateNotif('staff', '👤 Clienta con varios servicios', (codigo||'Clienta') + ' · ' + _okCount + ' servicios', isTop);
+        enviarPushStaff([chica], '📌 Clienta asignada a vos', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+_okCount+' servicios');
+        alert('✅ Clienta asignada a ' + chica + ' con ' + _okCount + ' servicio(s)');
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
-        alert('Error al crear ticket: ' + (tmResult?.message || 'Error'));
+        alert('Error al crear los servicios: ' + (_errMsg || 'Error'));
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
     return;
