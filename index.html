@@ -4582,18 +4582,25 @@ body.rol-staff #confirmSvcClientName::after {
       cont.innerHTML = orden.map(function(k){
         const g = grupos[k];
         const total = g.lineas.reduce(function(s,l){ return s + (Number(l.monto)||0); }, 0);
+        const totalReg = g.lineas.reduce(function(s,l){ return s + (Number(l.montoRegular)||0); }, 0);
+        const totalHtml = (totalReg && Math.abs(totalReg - total) > 0.01)
+          ? '<div style="text-align:right;"><div style="font-weight:800;font-size:14px;">$'+total+'</div>'
+            + '<div style="font-size:10px;color:var(--ink-faint);font-weight:600;">reg $'+(Math.round(totalReg*100)/100)+'</div></div>'
+          : '<div style="font-weight:800;font-size:14px;">$'+total+'</div>';
         const filas = g.lineas.map(function(l){
           const col = colorEstado(l.estado);
+          const _reg = Number(l.montoRegular)||0; const _m = Number(l.monto)||0;
+          const _regChip = (_reg && Math.abs(_reg - _m) > 0.01) ? ' <span style="font-size:10px;color:var(--ink-faint);font-weight:600;">(reg $'+(Math.round(_reg*100)/100)+')</span>' : '';
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-left:4px solid '+col+';background:var(--bg-card);border-radius:8px;margin-top:6px;">'
             + '<div><div style="font-size:13px;font-weight:700;">'+(l.servicio||'')+'</div>'
             + '<div style="font-size:11px;color:var(--ink-soft);">'+(l.area||'')+(l.staff?' · '+l.staff:'')+'</div></div>'
-            + '<div style="text-align:right;"><div style="font-size:13px;font-weight:800;">$'+(Number(l.monto)||0)+'</div>'
+            + '<div style="text-align:right;"><div style="font-size:13px;font-weight:800;">$'+_m+_regChip+'</div>'
             + '<div style="font-size:10px;font-weight:700;color:'+col+';">'+etiqueta(l.estado)+'</div></div></div>';
         }).join('');
         return '<div style="background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">'
           + '<div style="display:flex;justify-content:space-between;align-items:center;">'
           + '<div style="font-weight:800;font-size:15px;">'+(g.cliente||'Clienta')+' <span style="font-size:11px;color:var(--ink-faint);font-weight:600;">'+(g.codigo||'')+'</span></div>'
-          + '<div style="font-weight:800;font-size:14px;">$'+total+'</div></div>'
+          + totalHtml + '</div>'
           + filas + '</div>';
       }).join('');
     } catch(e) {
