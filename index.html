@@ -19245,5 +19245,85 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<!-- ═══════════════════════════════════════════════════════════════════
+     TABLERO LÍNEAS (beta) — pantalla dinámica de Mikaela sobre la hoja Lineas
+     Pegar este bloque UNA sola vez, justo ANTES de  </body>  en index.html.
+     No toca ninguna función existente. Solo lee (apiGet getTableroLineas).
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<button id="lnBtn" onclick="lnAbrir()"
+  style="position:fixed;right:14px;bottom:90px;z-index:9998;background:#1f1b16;color:#fff;border:none;border-radius:24px;padding:11px 16px;font-family:inherit;font-size:13px;font-weight:800;box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;">📋 Líneas</button>
+
+<div id="lnPanel" style="display:none;position:fixed;inset:0;z-index:9999;background:#f6f4f1;overflow:auto;-webkit-overflow-scrolling:touch;">
+  <div style="position:sticky;top:0;background:#fff;border-bottom:1px solid #e8e2da;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-weight:800;font-size:16px;color:#1f1b16;">Tablero Líneas — en vivo</div>
+      <div style="font-size:11px;color:#8f857a;" id="lnClock">cargando…</div>
+    </div>
+    <button onclick="lnCerrar()" style="background:transparent;border:1px solid #e8e2da;border-radius:9px;padding:8px 14px;font-family:inherit;font-weight:700;cursor:pointer;color:#1f1b16;">Cerrar ✕</button>
+  </div>
+  <div id="lnCols" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px;max-width:1100px;margin:0 auto;"></div>
+</div>
+
+<style>
+  @media(max-width:760px){ #lnCols{grid-template-columns:1fr 1fr !important;} }
+  @media(max-width:480px){ #lnCols{grid-template-columns:1fr !important;} }
+</style>
+
+<script>
+(function(){
+  window._lnTimer = null;
+
+  window.lnAbrir = function(){
+    document.getElementById('lnPanel').style.display = 'block';
+    lnRefrescar();
+    if (window._lnTimer) clearInterval(window._lnTimer);
+    window._lnTimer = setInterval(lnRefrescar, 4000);
+  };
+  window.lnCerrar = function(){
+    document.getElementById('lnPanel').style.display = 'none';
+    if (window._lnTimer) { clearInterval(window._lnTimer); window._lnTimer = null; }
+  };
+
+  function lnEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function lnCard(o){
+    return '<div style="border:1px solid #e8e2da;border-radius:10px;padding:9px;margin-bottom:7px;background:#fff;">'
+      + '<div style="display:flex;justify-content:space-between;gap:6px;"><b style="font-size:13px;color:#1f1b16;">'+lnEsc(o.cliente||o.codigo||'—')+'</b><b style="color:#1f1b16;">$'+lnEsc(o.monto)+'</b></div>'
+      + '<div style="font-size:11px;color:#8f857a;margin-top:3px;">'+lnEsc(o.servicio)+' · '+lnEsc(o.area)
+        + (o.staff ? (' · '+lnEsc(o.staff)) : '')
+        + (o.metodoPago ? (' · '+lnEsc(o.metodoPago)) : '')
+      + '</div></div>';
+  }
+  function lnCol(titulo, arr){
+    var cards = (arr && arr.length)
+      ? arr.map(lnCard).join('')
+      : '<div style="color:#8f857a;font-size:11px;text-align:center;padding:14px 0;font-style:italic;">vacío</div>';
+    return '<div style="background:#fff;border:1px solid #e8e2da;border-radius:12px;padding:10px;">'
+      + '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#8f857a;font-weight:800;margin-bottom:8px;">'
+      + titulo + ' <span style="background:#f0ece6;border-radius:20px;padding:1px 8px;color:#1f1b16;">'+(arr?arr.length:0)+'</span></div>'
+      + cards + '</div>';
+  }
+
+  window.lnRefrescar = async function(){
+    try {
+      var t = await apiGet('getTableroLineas');
+      if (!t || !t.success) { document.getElementById('lnClock').textContent = 'sin datos (¿endpoint desplegado?)'; return; }
+      document.getElementById('lnCols').innerHTML =
+          lnCol('Cola · espera', t.cola)
+        + lnCol('En servicio',   t.en_servicio)
+        + lnCol('Completado',    t.completado)
+        + lnCol('Cobrado',       t.cobrado);
+      document.getElementById('lnClock').textContent =
+        'Actualizado ' + new Date().toLocaleTimeString() + ' · ' + (t.fecha||'') + ' · solo lectura (beta)';
+    } catch (e) {
+      document.getElementById('lnClock').textContent = 'error de conexión';
+    }
+  };
+})();
+</script>
+<!-- ═══ fin TABLERO LÍNEAS ═══ -->
+
+
 </body>
 </html>
