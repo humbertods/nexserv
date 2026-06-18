@@ -12202,20 +12202,27 @@ body.rol-staff #confirmSvcClientName::after {
       const totalPromoG   = g.clientas.reduce((s,c)=> s + (Number(c.total)||0), 0);
       const totalRegularG = g.clientas.reduce((s,c)=> s + (c._editado ? (Number(c.total)||0) : (Number(_regularClienta(c))||0)), 0);
       const totalFinalG   = usaRegular ? totalRegularG : totalPromoG;
+      // Productos REALES de este grupo (suma de los productos de cada clienta del cobro),
+      // NO el valor global que pudo quedar pegado de un cobro anterior.
+      const totalProductosG = g.clientas.reduce(function(s, c) {
+        const prods = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
+        return s + prods.reduce(function(ss, p) { return ss + (Number(p.precio) * Number(p.cantidad || 1)); }, 0);
+      }, 0);
+      window._cobrarTotalProductos = totalProductosG;
       if (usaRegular) {
         if (aviso) aviso.style.display = 'block';
         const pp = document.getElementById('cobrarPrecioPromo');   if (pp) pp.textContent = '$' + totalPromoG.toFixed(2);
         const pr = document.getElementById('cobrarPrecioRegular'); if (pr) pr.textContent = '$' + totalRegularG.toFixed(2);
-        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductos).toFixed(2); totalEl.style.color = 'var(--danger)'; }
+        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductosG).toFixed(2); totalEl.style.color = 'var(--danger)'; }
         if (subtotalEl) { subtotalEl.textContent = '$' + totalFinalG.toFixed(2); subtotalEl.style.color = 'var(--danger)'; }
         if (promoBanner) promoBanner.style.display = 'none';
       } else {
         if (aviso) aviso.style.display = 'none';
-        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductos).toFixed(2); totalEl.style.color = 'var(--accent-deep)'; }
+        if (totalEl)    { totalEl.textContent = '$' + (totalFinalG + totalProductosG).toFixed(2); totalEl.style.color = 'var(--accent-deep)'; }
         if (subtotalEl) { subtotalEl.textContent = '$' + totalFinalG.toFixed(2); subtotalEl.style.color = ''; }
         if (promoBanner && hayPromo) promoBanner.style.display = 'block';
       }
-      window._cobrarTotalConProductos = totalFinalG + totalProductos;
+      window._cobrarTotalConProductos = totalFinalG + totalProductosG;
       if (typeof _cobroActualizarNeto === 'function') _cobroActualizarNeto();
       return;
     }
