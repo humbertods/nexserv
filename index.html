@@ -16693,37 +16693,22 @@ body.rol-staff #confirmSvcClientName::after {
 
     // 2+ áreas → TM
     try {
-      // 2+ áreas → UNA entrada SP/SN por área (modelo Lineas, sin TicketMulti).
-      // Cada área entra como su servicio (las chicas la atienden igual), cae en
-      // Lineas por el gancho SP/SN, y todas quedan agrupadas por la misma visita
-      // (el código de la clienta). El cobro se hace agrupado por ese código.
-      let _okCount = 0, _errMsg = '';
-      for (const a of areasMulti) {
-        const _esPromo = a.tipo === 'promo';
-        const _payload = _esPromo ? {
-          codigo: codigo, nombre: nombre, servicio: a.tentativo, area: a.area,
-          prioridad: prioridad, observaciones: obs, esTop: isTop ? 'Sí' : 'No',
-          total: a.precio, promoNombre: a.tentativo, precioPromo: a.precio,
-          precioRegular: a.precioNormal || a.precio
-        } : {
-          codigo: codigo, nombre: nombre, servicio: a.tentativo, area: a.area,
-          prioridad: prioridad, observaciones: obs, esTop: isTop ? 'Sí' : 'No',
-          total: a.precio
-        };
-        const _r = await apiPost(_esPromo ? 'addServicioPromo' : 'addServicioNormal', _payload);
-        if (_r && _r.success) _okCount++; else _errMsg = (_r && (_r.message || _r.error)) || _errMsg;
-      }
-      if (_okCount > 0) {
+      const result = await apiPost('crearTicketMulti', {
+        codigo: codigo, nombre: nombre, prioridad: prioridad,
+        observaciones: obs, areas: areasMulti,
+        secuencia: window._secuencia.map(s => s.area)
+      });
+      if (result && result.success) {
         initFormTM();
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
-        simulateNotif('staff', '👤 Clienta con varios servicios', (codigo||'Clienta') + ' · ' + _okCount + ' servicios', isTop);
+        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMulti.length + ' servicios', isTop);
         const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
         const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
-        enviarPushStaff(_staffNotif, '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+_okCount+' servicios');
-        alert('✅ Clienta agregada con ' + _okCount + ' servicio(s)' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
+        enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMulti.length+' servicios');
+        alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
-        alert('Error al crear los servicios: ' + (_errMsg || 'Error desconocido'));
+        alert('Error al crear ticket: ' + (result?.message || 'Error desconocido'));
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
   }
@@ -16926,39 +16911,22 @@ body.rol-staff #confirmSvcClientName::after {
       return;
     }
 
-    // 2+ áreas → UNA entrada SP/SN por área (modelo Lineas, sin TicketMulti).
-    // La PRIMERA área se asigna a la staff elegida (queda en servicio); el resto
-    // queda en cola para que Mikaela lo asigne a la staff correcta de cada área.
-    // Cada área cae en Lineas por el gancho SP/SN y todas quedan agrupadas por la
-    // misma visita (el código de la clienta) → cobro agrupado por ese código.
+    // 2+ áreas → TM con asignación directa
     try {
-      let _okCount = 0, _errMsg = '';
-      for (let _i = 0; _i < areasMultiGA.length; _i++) {
-        const aGA = areasMultiGA[_i];
-        const _esPromoGA = aGA.tipo === 'promo';
-        const _staffGA = (_i === 0) ? chica : '';
-        const _baseGA = {
-          codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
-          area: aGA.area, prioridad: 'Normal', observaciones: obs,
-          esTop: isTop ? 'Sí' : 'No', total: aGA.precio
-        };
-        if (_staffGA) _baseGA.asignadaA = _staffGA;
-        if (_esPromoGA) {
-          _baseGA.promoNombre   = aGA.tentativo;
-          _baseGA.precioPromo   = aGA.precio;
-          _baseGA.precioRegular = aGA.precioNormal || aGA.precio;
-        }
-        const _rGA = await apiPost(_esPromoGA ? 'addServicioPromo' : 'addServicioNormal', _baseGA);
-        if (_rGA && _rGA.success) _okCount++; else _errMsg = (_rGA && (_rGA.message || _rGA.error)) || _errMsg;
-      }
-      if (_okCount > 0) {
+      const tmResult = await apiPost('crearTicketMulti', {
+        codigo: codigo, nombre: nombre, prioridad: 'Normal',
+        observaciones: obs, areas: areasMultiGA,
+        secuencia: window._secuencia.map(s => s.area),
+        asignadaA: chica
+      });
+      if (tmResult && tmResult.success) {
         initFormTM();
-        simulateNotif('staff', '👤 Clienta con varios servicios', (codigo||'Clienta') + ' · ' + _okCount + ' servicios', isTop);
-        enviarPushStaff([chica], '📌 Clienta asignada a vos', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+_okCount+' servicios');
-        alert('✅ Clienta asignada a ' + chica + ' con ' + _okCount + ' servicio(s)');
+        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMultiGA.length + ' servicios', isTop);
+        enviarPushStaff([chica], '🎯 Ticket multi asignado', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMultiGA.length+' servicios');
+        alert('✅ Ticket creado (' + tmResult.id + ')');
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
-        alert('Error al crear los servicios: ' + (_errMsg || 'Error'));
+        alert('Error al crear ticket: ' + (tmResult?.message || 'Error'));
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
     return;
