@@ -12814,24 +12814,6 @@ body.rol-staff #confirmSvcClientName::after {
         </div>
       </div>
 
-      <!-- ¿Cuántas staff? (solo combos multi-área: decide Mikaela) -->
-      <div id="tmModoStaff-${idx}" style="display:none;margin-top:8px;">
-        <div style="position:relative;">
-          <select id="tmModoStaffSel-${idx}" onchange="onTmModoStaffChange(${idx})"
-            style="width:100%;padding:12px 38px 12px 14px;border-radius:12px;
-                   border:1px solid var(--line);background:var(--bg-card);
-                   font-family:inherit;font-size:13px;font-weight:500;
-                   color:var(--ink);cursor:pointer;appearance:none;
-                   -webkit-appearance:none;outline:none;box-sizing:border-box;">
-            <option value="">¿Cuántas staff hacen el servicio?</option>
-            <option value="una">Una sola staff (lo hace todo)</option>
-            <option value="repartida">Dos staff (se reparte por área)</option>
-          </select>
-          <span style="position:absolute;right:14px;top:50%;transform:translateY(-50%);
-                       pointer-events:none;font-size:12px;color:var(--ink-soft);">▾</span>
-        </div>
-      </div>
-
       <!-- Precio -->
       <div id="tmPrecioDisplay-${idx}"
         style="display:none;margin-top:9px;padding:9px 13px;
@@ -12840,7 +12822,7 @@ body.rol-staff #confirmSvcClientName::after {
       </div>
     `;
     container.appendChild(slot);
-    _tmServicios.push({ idx, area: '', areaKey: '', servicio: '', precio: 0, precioNormal: 0, tipo: 'normal', _modoStaff: '' });
+    _tmServicios.push({ idx, area: '', areaKey: '', servicio: '', precio: 0, precioNormal: 0, tipo: 'normal' });
     tmActualizarSecuenciaBtns();
   }
 
@@ -12890,7 +12872,6 @@ body.rol-staff #confirmSvcClientName::after {
         svc.servicio = ''; svc.precio = 0; svc.precioNormal = 0;
         if (svc._isComboMultiArea) { svc._isComboMultiArea = false; svc._comboAreas = null; window._secuencia = []; renderSecuencia(); }
       }
-      _tmShowModoStaff(idx, false);
       const sn = document.getElementById('tmSvcNormal-' + idx); if (sn) sn.style.display = 'none';
       const sp = document.getElementById('tmSvcPromo-' + idx);  if (sp) sp.style.display = 'block';
       cargarPromasTM(idx);
@@ -12913,7 +12894,6 @@ body.rol-staff #confirmSvcClientName::after {
         renderSecuencia();
       }
     }
-    _tmShowModoStaff(idx, false);
     // Mostrar el selector de servicio normal, ocultar el de promo
     const sn2 = document.getElementById('tmSvcNormal-' + idx); if (sn2) sn2.style.display = 'block';
     const sp2 = document.getElementById('tmSvcPromo-' + idx);  if (sp2) sp2.style.display = 'none';
@@ -12943,7 +12923,6 @@ body.rol-staff #confirmSvcClientName::after {
     const d = JSON.parse(sel.value);
     const svc = _tmServicios.find(s => s.idx === idx);
     if (svc) { svc.servicio = d.nombre; svc.precio = d.precio; svc.precioNormal = d.precio; }
-    _tmShowModoStaff(idx, false);
     const pd = document.getElementById('tmPrecioDisplay-' + idx);
     if (pd) { pd.textContent = '💵 $' + d.precio; pd.style.display = 'block'; }
     tmActualizarResumen();
@@ -12992,9 +12971,6 @@ body.rol-staff #confirmSvcClientName::after {
       // (Se quitó el reordenamiento "área seleccionada primero": desalineaba los
       //  slots con la staff y hacía caer a la chica en el monto/área equivocada.)
       svc._isComboMultiArea = true;
-      // Mostrar el selector "¿Cuántas staff?" — sólo acá tiene sentido (combo cruza áreas).
-      // Mikaela decide: una sola staff (combo en 1 línea, ruta SP limpia) o repartido (TM).
-      _tmShowModoStaff(idx, true);
       // Precio regular por área: proporcional al regular del combo (para que tarjeta cobre sin promo)
       const _promoPrecio  = Number(d.precio || 0);
       const _promoRegular = Number(d.regular || d.precio || 0);
@@ -13054,7 +13030,6 @@ body.rol-staff #confirmSvcClientName::after {
     }
 
     // Promo simple (1 sola área) — flujo normal
-    _tmShowModoStaff(idx, false);
 
     // FIX: si la promo tiene división multi-área, auto-detectar y llenar las áreas
     if (d.division && d.division.length > 0) {
@@ -13167,36 +13142,6 @@ body.rol-staff #confirmSvcClientName::after {
     tmActualizarResumen();
   }
 
-  // Muestra/oculta el selector "¿Cuántas staff?" de un slot. Al ocultar, resetea el modo.
-  function _tmShowModoStaff(idx, show) {
-    const box = document.getElementById('tmModoStaff-' + idx);
-    if (box) box.style.display = show ? 'block' : 'none';
-    if (show) {
-      // Reflejar en el <select> el modo ya guardado (si lo había)
-      const svc = _tmServicios.find(s => s.idx === idx);
-      const sel = document.getElementById('tmModoStaffSel-' + idx);
-      if (sel && svc) sel.value = svc._modoStaff || '';
-    } else {
-      const svc = _tmServicios.find(s => s.idx === idx);
-      if (svc) svc._modoStaff = '';
-      const sel = document.getElementById('tmModoStaffSel-' + idx);
-      if (sel) sel.value = '';
-    }
-  }
-  window._tmShowModoStaff = _tmShowModoStaff;
-
-  // Mikaela eligió cuántas staff hacen el combo de este slot.
-  //   'una'       → el combo va en UNA sola línea (no se parte) → ruta limpia SP.
-  //   'repartida' → el combo se parte por área (comportamiento TM actual).
-  function onTmModoStaffChange(idx) {
-    const sel = document.getElementById('tmModoStaffSel-' + idx);
-    const svc = _tmServicios.find(s => s.idx === idx);
-    if (svc) svc._modoStaff = sel ? sel.value : '';
-    tmActualizarResumen();
-    tmActualizarSecuenciaBtns();
-  }
-  window.onTmModoStaffChange = onTmModoStaffChange;
-
   function tmActualizarResumen() {
     const validos = _tmServicios.filter(s => s.servicio && (s.area || (s._isComboMultiArea && s._comboAreas && s._comboAreas.length)));
     const resumen = document.getElementById('tmResumenAreas');
@@ -13246,38 +13191,16 @@ body.rol-staff #confirmSvcClientName::after {
     const result = [];
     _tmServicios.filter(s => s.servicio).forEach(s => {
       if (s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0) {
-        if (s._modoStaff === 'una') {
-          // UNA sola staff hace todo el combo → NO se parte: una sola línea con el
-          // combo completo. Área = la de mayor monto (división principal). Precio =
-          // total promo; precioNormal = total regular. La etiqueta = nombre del combo,
-          // así Paquetes/_regularRealTM_ lo reconoce y la tarjeta cobra el regular.
-          // Si es el único servicio → buildTMAreasFromForm devuelve 1 línea → el submit
-          // la enruta por addServicioPromo (flujo SP-, ya validado: efectivo=promo,
-          // tarjeta=regular). Sin partición = sin doble descuento ni concatenación.
-          const partes = s._comboAreas;
-          const principal = partes.reduce((a, b) =>
-            (Number(b.precio || 0) > Number(a.precio || 0) ? b : a), partes[0]);
-          const totalPromo   = partes.reduce((acc, ca) => acc + Number(ca.precio || 0), 0);
-          const totalRegular = partes.reduce((acc, ca) => acc + Number(ca.precioNormal || ca.precio || 0), 0);
+        // Combo multi-área: expandir en slots individuales por área
+        s._comboAreas.forEach(ca => {
           result.push({
-            tentativo:    s.servicio,            // nombre del combo (reconocido por Paquetes/SP)
-            area:         principal.area,        // área de la división de mayor monto
-            precio:       totalPromo,
-            precioNormal: totalRegular,
+            tentativo:    ca.tentativo || s.servicio,
+            area:         ca.area,
+            precio:       ca.precio,
+            precioNormal: ca.precioNormal || ca.precio,
             tipo:         'promo'
           });
-        } else {
-          // Repartida (comportamiento actual) → expandir en slots individuales por área
-          s._comboAreas.forEach(ca => {
-            result.push({
-              tentativo:    ca.tentativo || s.servicio,
-              area:         ca.area,
-              precio:       ca.precio,
-              precioNormal: ca.precioNormal || ca.precio,
-              tipo:         'promo'
-            });
-          });
-        }
+        });
       } else if (s.area) {
         // Servicio simple o promo de 1 área
         result.push({
@@ -16713,14 +16636,6 @@ body.rol-staff #confirmSvcClientName::after {
     }
 
     // ── USAR FORMULARIO TM UNIFICADO ─────────────────────────────────────
-    // Va a la lista (sin asignación directa): no hay staff para derivar el modo, así que
-    // los combos multi-área sin modo se reparten por área, para que cada staff del área
-    // los tome desde la lista. (Si Mikaela quiere una sola staff, lo elige en el dropdown.)
-    _tmServicios.forEach(s => {
-      if (s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff) {
-        s._modoStaff = 'repartida';
-      }
-    });
     const areasMulti = buildTMAreasFromForm();
     if (areasMulti.length === 0) {
       alert('Agregá al menos un servicio con área y servicio seleccionado.');
@@ -16940,24 +16855,6 @@ body.rol-staff #confirmSvcClientName::after {
     console.log('📤 Enviando a lista de espera con asignación directa a', chica, postData);
 
     // ── USAR FORMULARIO TM UNIFICADO (asignación directa) ────────────────
-    // Combos multi-área SIN modo elegido: en vez de bloquear, derivar del staff asignado.
-    // Si la chica puede hacer TODAS las áreas del combo → "una sola" (combo en 1 línea,
-    // ruta SP limpia). Si no → "repartida": las áreas que no puede hacer vuelven a la cola
-    // de Mikaela para asignarlas a otra staff. (Mismas claves que AREA_KEY_FROM_DIV.)
-    const _capsRoster = {
-      'María':['cejas','depilacion','retiro_lifting'], 'Keyla':['cejas','depilacion','retiro_lifting'],
-      'Lesly':['cejas','depilacion','retiro_lifting'], 'Rosa':['cejas','depilacion','retiro_lifting'],
-      'Yadira':['pestanas','retiro_lifting'], 'Diana':['pestanas','retiro_lifting'], 'Laura':['facial']
-    };
-    const _capsChica = _capsRoster[chica] || [];
-    _tmServicios.forEach(s => {
-      if (s.servicio && s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0 && !s._modoStaff) {
-        const _puedeTodoChica = _capsChica.length > 0 &&
-          s._comboAreas.every(ca => _capsChica.includes(String(ca.area || '')));
-        s._modoStaff = _puedeTodoChica ? 'una' : 'repartida';
-        console.log('🧩 Modo combo auto-derivado para', chica, '→', s._modoStaff, '(' + s.servicio + ')');
-      }
-    });
     const areasMultiGA = buildTMAreasFromForm();
     if (areasMultiGA.length === 0) {
       alert('Agregá al menos un servicio con área y servicio seleccionado.');
