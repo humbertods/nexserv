@@ -13553,14 +13553,29 @@ body.rol-staff #confirmSvcClientName::after {
                      precioNormal: promoRegular, tipo: 'promo' });
         return;
       }
-      divs.forEach(function(d) {
+      // Repartir el precio del combo entre sus partes para que SUMEN EXACTO el
+      // precio promo (y el regular, el regular). Antes usaba el monto crudo de cada
+      // parte, que podía no sumar el total → se undercobraba (bug Kaina: 5+15=20 en vez de 34).
+      // La última parte absorbe el redondeo para que la suma sea exacta.
+      const _partes = divs.filter(function(d) { return Number(d.monto || 0) > 0; });
+      const _sumaPartes = _partes.reduce(function(a, d) { return a + Number(d.monto || 0); }, 0);
+      let _accP = 0, _accR = 0;
+      _partes.forEach(function(d, idx) {
         const monto = Number(d.monto || 0);
-        if (monto <= 0) return;
+        const frac  = _sumaPartes > 0 ? monto / _sumaPartes : 1 / _partes.length;
+        let precioParte, regularParte;
+        if (idx === _partes.length - 1) {
+          precioParte  = Math.round((promoPrice   - _accP) * 100) / 100;   // resto exacto
+          regularParte = Math.round((promoRegular - _accR) * 100) / 100;
+        } else {
+          precioParte  = Math.round(frac * promoPrice   * 100) / 100; _accP += precioParte;
+          regularParte = Math.round(frac * promoRegular * 100) / 100; _accR += regularParte;
+        }
         areas.push({
-          tentativo:    d.servicio || d.area || p.name,                              // servicio del área, NO el nombre de la promo
-          area:         AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || ''),  // área real de esta parte
-          precio:       monto,                                                        // monto de ESTA parte, NO el total
-          precioNormal: promoPrice > 0 ? Math.round((monto / promoPrice) * promoRegular * 100) / 100 : monto,
+          tentativo:    d.servicio || d.area || p.name,
+          area:         AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || ''),
+          precio:       precioParte,                                       // parte del TOTAL del combo
+          precioNormal: regularParte,
           tipo:         'promo'
         });
       });
