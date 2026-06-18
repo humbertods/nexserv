@@ -695,6 +695,8 @@ body.rol-staff #confirmSvcClientName::after {
       <button id="appBtn_sira" onclick="switchApp('sira')">Sira</button>
     </div>
 
+    <button onclick="show('tableroLineas')" style="width:calc(100% - 28px);margin:0 14px 4px;padding:11px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">📊 Tablero en vivo</button>
+
     <!-- ============ TAB: NEXSERV (contenido actual) ============ -->
     <div id="tabNexserv">
 
@@ -1015,6 +1017,26 @@ body.rol-staff #confirmSvcClientName::after {
   </div>
 
   <!-- CLIENT PROFILE -->
+  <!-- ===== TABLERO EN VIVO (lee de Lineas, paralelo) ===== -->
+  <div class="screen" id="tableroLineas">
+    <div class="header">
+      <div class="greeting">
+        <div class="hello">Tablero en vivo</div>
+        <div class="name">Hoy · <span id="tabLineasFecha">—</span></div>
+      </div>
+      <div class="avatar" onclick="show('mikaelaHome')" style="cursor:pointer;background:var(--ink);">←</div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;margin:8px 0 4px;font-size:11px;font-weight:700;flex-wrap:wrap;">
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--success);display:inline-block;"></span>En servicio</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--warning);display:inline-block;"></span>En espera</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>Terminado</span>
+      <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--ink-faint);display:inline-block;"></span>Cobrado</span>
+    </div>
+    <div id="tabLineasContenido" style="padding:0 14px 90px;">
+      <div style="text-align:center;color:var(--ink-faint);padding:30px;font-size:13px;">Cargando…</div>
+    </div>
+  </div>
+
   <div class="screen" id="clientProfile">
     <button class="back-btn" id="profileBackBtn" onclick="show('mikaelaHome')">← Volver</button>
     
@@ -4523,6 +4545,63 @@ body.rol-staff #confirmSvcClientName::after {
       .replace(/[⭐]/g, '');
   }
 
+  async function renderTableroLineas() {
+    const cont = document.getElementById('tabLineasContenido');
+    const fechaEl = document.getElementById('tabLineasFecha');
+    if (!cont) return;
+    try {
+      const r = await apiGet('getTableroLineas');
+      if (!r || !r.success) { cont.innerHTML = '<div style="text-align:center;color:var(--danger);padding:30px;font-size:13px;">No se pudo cargar el tablero.</div>'; return; }
+      if (fechaEl) fechaEl.textContent = r.fecha || '';
+      const todas = [].concat(r.en_servicio||[], r.cola||[], r.completado||[], r.cobrado||[]);
+      if (todas.length === 0) { cont.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:30px;font-size:13px;">No hay servicios hoy todavía.</div>'; return; }
+      const colorEstado = function(e){
+        if (e === 'en_servicio') return 'var(--success)';
+        if (e === 'esperando')   return 'var(--warning)';
+        if (e === 'completado')  return '#3b82f6';
+        if (e === 'cobrado')     return 'var(--ink-faint)';
+        return 'var(--line)';
+      };
+      const etiqueta = function(e){
+        return e === 'en_servicio' ? 'En servicio' : e === 'esperando' ? 'En espera' : e === 'completado' ? 'Terminado' : e === 'cobrado' ? 'Cobrado' : e;
+      };
+      const rank = function(e){ return e === 'en_servicio' ? 0 : e === 'esperando' ? 1 : e === 'completado' ? 2 : 3; };
+      // Agrupar por visita (clienta)
+      const grupos = {}; const orden = [];
+      todas.forEach(function(l){
+        const k = l.visita || l.codigo || l.id;
+        if (!grupos[k]) { grupos[k] = { cliente: l.cliente, codigo: l.codigo, lineas: [] }; orden.push(k); }
+        grupos[k].lineas.push(l);
+      });
+      // Ordenar grupos por el estado "más activo" que tengan
+      orden.sort(function(a,b){
+        const ra = Math.min.apply(null, grupos[a].lineas.map(function(l){return rank(l.estado);}));
+        const rb = Math.min.apply(null, grupos[b].lineas.map(function(l){return rank(l.estado);}));
+        return ra - rb;
+      });
+      cont.innerHTML = orden.map(function(k){
+        const g = grupos[k];
+        const total = g.lineas.reduce(function(s,l){ return s + (Number(l.monto)||0); }, 0);
+        const filas = g.lineas.map(function(l){
+          const col = colorEstado(l.estado);
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-left:4px solid '+col+';background:var(--bg-card);border-radius:8px;margin-top:6px;">'
+            + '<div><div style="font-size:13px;font-weight:700;">'+(l.servicio||'')+'</div>'
+            + '<div style="font-size:11px;color:var(--ink-soft);">'+(l.area||'')+(l.staff?' · '+l.staff:'')+'</div></div>'
+            + '<div style="text-align:right;"><div style="font-size:13px;font-weight:800;">$'+(Number(l.monto)||0)+'</div>'
+            + '<div style="font-size:10px;font-weight:700;color:'+col+';">'+etiqueta(l.estado)+'</div></div></div>';
+        }).join('');
+        return '<div style="background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px;">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+          + '<div style="font-weight:800;font-size:15px;">'+(g.cliente||'Clienta')+' <span style="font-size:11px;color:var(--ink-faint);font-weight:600;">'+(g.codigo||'')+'</span></div>'
+          + '<div style="font-weight:800;font-size:14px;">$'+total+'</div></div>'
+          + filas + '</div>';
+      }).join('');
+    } catch(e) {
+      cont.innerHTML = '<div style="text-align:center;color:var(--danger);padding:30px;font-size:13px;">Error: '+(e && e.message ? e.message : e)+'</div>';
+    }
+  }
+  window.renderTableroLineas = renderTableroLineas;
+
   async function show(id) {
     const targetScreen = document.getElementById(id);
     if (!targetScreen) {
@@ -4537,6 +4616,15 @@ body.rol-staff #confirmSvcClientName::after {
     window.scrollTo(0, 0);
     console.log('[show] → ' + id);
     if (id === 'waitList') renderWaitList();
+    if (id === 'tableroLineas') {
+      renderTableroLineas();
+      if (window._tabLineasRefresh) clearInterval(window._tabLineasRefresh);
+      window._tabLineasRefresh = setInterval(function(){
+        const el = document.getElementById('tableroLineas');
+        if (el && el.classList.contains('active')) renderTableroLineas();
+        else { clearInterval(window._tabLineasRefresh); window._tabLineasRefresh = null; }
+      }, 12000);
+    }
     if (id === 'staffHome') loadStaffHome();
     if (id === 'ownerHome') {
       loadOwnerHome();
