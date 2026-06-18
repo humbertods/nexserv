@@ -5661,6 +5661,15 @@ body.rol-staff #confirmSvcClientName::after {
     // 2) Observaciones que las staff dejan en sus FICHAS de área (lo que más se usa).
     //    Se consolidan acá para tener el panorama completo al revisar el perfil.
     try {
+      // Bitácora permanente: notas que dejaron las staff durante el servicio
+      // (todas las áreas). Son las más relevantes para guiar a la próxima staff.
+      (Array.isArray(r.observacionesStaff) ? r.observacionesStaff : []).forEach(function(o){
+        if (o && o.observacion && String(o.observacion).trim()) {
+          var _a = o.area ? (String(o.area).charAt(0).toUpperCase() + String(o.area).slice(1)) : 'Nota';
+          var _lbl = _a + (o.staff ? ' · ' + o.staff : '') + (o.fecha ? ' · ' + _histFecha(o.fecha) : '');
+          _obsItems.push([_lbl, o.observacion]);
+        }
+      });
       // Facial (Laura): nota + alergias (alergias es clave tenerla en cuenta)
       if (facial && facial.obsExtra && String(facial.obsExtra).trim()) {
         _obsItems.push(['Facial' + (facial.fecha ? ' · ' + _histFecha(facial.fecha) : ''), facial.obsExtra]);
@@ -16234,6 +16243,8 @@ body.rol-staff #confirmSvcClientName::after {
     const edit = document.getElementById(id + 'Edit');
     if (edit.style.display === 'none') {
       edit.value = display.textContent.trim();
+      // Guardar el texto con el que se abrió, para no re-guardar si no cambió.
+      window['_' + id + 'Original'] = display.textContent.trim();
       edit.style.display = 'block';
       display.style.display = 'none';
       edit.focus();
@@ -16246,11 +16257,32 @@ body.rol-staff #confirmSvcClientName::after {
     const display = document.getElementById(id + 'Display');
     const edit = document.getElementById(id + 'Edit');
     const val = edit.value.trim();
-    if (val) {
-      display.textContent = val;
-    }
     edit.style.display = 'none';
     display.style.display = 'block';
+    if (!val) return;
+    display.textContent = val;
+    // Persistir SOLO si cambió respecto a lo que se mostraba / a lo último guardado
+    // (evita appends repetidos en cada onfocusout y notas duplicadas).
+    if (val === window['_' + id + 'Original'] || val === window['_' + id + 'LastSaved']) return;
+    // Contexto de la clienta según el slot (obs1 → activeService, obs2 → activeService2)
+    const slot = (id === 'obs2') ? 2 : 1;
+    const codeRaw = (document.getElementById('as' + slot + 'Code') || {}).textContent || '';
+    const m = codeRaw.match(/C-\d{4}/);
+    const codigo = m ? m[0] : '';
+    if (!codigo) { console.warn('saveObs: sin código de clienta, no se persiste'); return; }
+    const cliente = ((document.getElementById('as' + slot + 'Name') || {}).textContent || '').replace(' ⭐', '').trim();
+    const user = window.currentUser || {};
+    window['_' + id + 'LastSaved'] = val;
+    apiPost('addObservacionClienta', {
+      codigo: codigo,
+      cliente: cliente,
+      area: user.area || '',
+      staff: user.name || '',
+      observacion: val
+    }).then(function(r){
+      if (r && r.success) { try { showToast('📝 Observación guardada en el perfil'); } catch(e){} }
+      else { console.error('addObservacionClienta falló', r); }
+    }).catch(function(e){ console.error('addObservacionClienta', e); });
   }
 
   // === MULTI-SERVICIO (hasta 5 por atención) ===
