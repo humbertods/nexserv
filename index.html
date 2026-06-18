@@ -16693,22 +16693,37 @@ body.rol-staff #confirmSvcClientName::after {
 
     // 2+ áreas → TM
     try {
-      const result = await apiPost('crearTicketMulti', {
-        codigo: codigo, nombre: nombre, prioridad: prioridad,
-        observaciones: obs, areas: areasMulti,
-        secuencia: window._secuencia.map(s => s.area)
-      });
-      if (result && result.success) {
+      // 2+ áreas → UNA entrada SP/SN por área (modelo Lineas, sin TicketMulti).
+      // Cada área entra como su servicio (las chicas la atienden igual), cae en
+      // Lineas por el gancho SP/SN, y todas quedan agrupadas por la misma visita
+      // (el código de la clienta). El cobro se hace agrupado por ese código.
+      let _okCount = 0, _errMsg = '';
+      for (const a of areasMulti) {
+        const _esPromo = a.tipo === 'promo';
+        const _payload = _esPromo ? {
+          codigo: codigo, nombre: nombre, servicio: a.tentativo, area: a.area,
+          prioridad: prioridad, observaciones: obs, esTop: isTop ? 'Sí' : 'No',
+          total: a.precio, promoNombre: a.tentativo, precioPromo: a.precio,
+          precioRegular: a.precioNormal || a.precio
+        } : {
+          codigo: codigo, nombre: nombre, servicio: a.tentativo, area: a.area,
+          prioridad: prioridad, observaciones: obs, esTop: isTop ? 'Sí' : 'No',
+          total: a.precio
+        };
+        const _r = await apiPost(_esPromo ? 'addServicioPromo' : 'addServicioNormal', _payload);
+        if (_r && _r.success) _okCount++; else _errMsg = (_r && (_r.message || _r.error)) || _errMsg;
+      }
+      if (_okCount > 0) {
         initFormTM();
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
-        simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMulti.length + ' servicios', isTop);
+        simulateNotif('staff', '👤 Clienta con varios servicios', (codigo||'Clienta') + ' · ' + _okCount + ' servicios', isTop);
         const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
         const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
-        enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMulti.length+' servicios');
-        alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
+        enviarPushStaff(_staffNotif, '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+_okCount+' servicios');
+        alert('✅ Clienta agregada con ' + _okCount + ' servicio(s)' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
       } else {
-        alert('Error al crear ticket: ' + (result?.message || 'Error desconocido'));
+        alert('Error al crear los servicios: ' + (_errMsg || 'Error desconocido'));
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
   }
