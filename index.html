@@ -934,7 +934,7 @@ body.rol-staff #confirmSvcClientName::after {
         </div>
 
         <button class="btn-primary" onclick="confirmarCobro()" style="background: var(--success);" id="cobrarBtn">✓ Confirmar cobro</button>
-        <button class="btn-primary outline" onclick="closeModal()" style="margin-top: 8px;">Cancelar</button>
+        <button class="btn-primary outline" onclick="cancelarCobroModal()" style="margin-top: 8px;">Cancelar</button>
       </div>
     </div>
 
@@ -12519,6 +12519,9 @@ body.rol-staff #confirmSvcClientName::after {
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
         window._cobroGrupal = null;
+        // Vaciar TODO el mapa de productos staged tras cobro OK: ningún producto
+        // sobrevive a un cobro para reaparecerle a la siguiente clienta (reúso de id).
+        window._apProductosEnTicket = {};
         mkRenderEsperandoCobro();
         closeModal();
         showToast('✓ Cobro grupal confirmado — ' + metodoPago);
@@ -12619,6 +12622,8 @@ body.rol-staff #confirmSvcClientName::after {
       }
     } catch(e) {}
     await loadPorCobrar();
+    // Vaciar TODO el mapa de productos staged tras cobro OK (mismo motivo que en grupal).
+    window._apProductosEnTicket = {};
 
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
@@ -16619,6 +16624,25 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('clientasFrecuentesModal').classList.add('active');
   }
   window.mostrarClientasFrecuentes = mostrarClientasFrecuentes;
+
+  // Cancelar el cobro: descarta los productos staged de ESTE cobro para que NO se
+  // arrastren a la siguiente clienta (sobre todo con el reúso de id de ticket), y cierra.
+  // No toca closeModal genérico (lo usa también el modal de agregar producto).
+  function cancelarCobroModal() {
+    try {
+      if (window._apProductosEnTicket) {
+        if (window._cobroGrupal && Array.isArray(window._cobroGrupal.clientas)) {
+          window._cobroGrupal.clientas.forEach(function(c){
+            if (c && c.idEspera) delete window._apProductosEnTicket[c.idEspera];
+          });
+        } else if (window._cobrarId) {
+          delete window._apProductosEnTicket[window._cobrarId];
+        }
+      }
+    } catch(e) { console.error('cancelarCobroModal', e); }
+    closeModal();
+  }
+  window.cancelarCobroModal = cancelarCobroModal;
 
   function closeModal() {
     document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
