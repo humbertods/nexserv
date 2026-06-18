@@ -930,6 +930,17 @@ body.rol-staff #confirmSvcClientName::after {
               oninput="onMixtoInput()"
               style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
           </div>
+          <!-- Fila 3 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
+            <select id="mixtoMetodo3" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+              <option value="Tarjeta">💳 Tarjeta</option>
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">📱 Transferencia</option>
+            </select>
+            <input type="number" id="mixtoMonto3" min="0" step="0.01" placeholder="$0.00 (opcional)"
+              oninput="onMixtoInput()"
+              style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
+          </div>
           <div id="mixtoSuma" style="font-size:12px;font-weight:700;text-align:center;color:var(--ink-soft);"></div>
         </div>
 
@@ -12093,7 +12104,8 @@ body.rol-staff #confirmSvcClientName::after {
     const total = parseFloat((totalEl?.textContent || '0').replace('$','')) || 0;
     const m1 = parseFloat(document.getElementById('mixtoMonto1')?.value || 0) || 0;
     const m2 = parseFloat(document.getElementById('mixtoMonto2')?.value || 0) || 0;
-    const suma = Math.round((m1 + m2) * 100) / 100;
+    const m3 = parseFloat(document.getElementById('mixtoMonto3')?.value || 0) || 0;
+    const suma = Math.round((m1 + m2 + m3) * 100) / 100;
     const diff = Math.round((total - suma) * 100) / 100;
     const sumaEl = document.getElementById('mixtoSuma');
     if (sumaEl) {
@@ -12108,9 +12120,9 @@ body.rol-staff #confirmSvcClientName::after {
         sumaEl.style.color = 'var(--danger)';
       }
     }
-    // Auto-completar fila 2 si fila 1 tiene monto y fila 2 está vacía
+    // Auto-completar fila 2 si fila 1 tiene monto y fila 2 está vacía (y fila 3 sin usar)
     const m2El = document.getElementById('mixtoMonto2');
-    if (m1 > 0 && diff > 0 && m2El && (!m2El.value || parseFloat(m2El.value) === 0)) {
+    if (m1 > 0 && diff > 0 && m3 === 0 && m2El && (!m2El.value || parseFloat(m2El.value) === 0)) {
       m2El.value = diff.toFixed(2);
       onMixtoInput();
     }
@@ -12267,8 +12279,10 @@ body.rol-staff #confirmSvcClientName::after {
       if (metodo === 'Pago mixto') {
         const m1 = document.getElementById('mixtoMonto1');
         const m2 = document.getElementById('mixtoMonto2');
+        const m3 = document.getElementById('mixtoMonto3');
         if (m1) m1.value = '';
         if (m2) m2.value = '';
+        if (m3) m3.value = '';
         const sumaEl = document.getElementById('mixtoSuma');
         if (sumaEl) { sumaEl.textContent = 'Ingresá los montos'; sumaEl.style.color = 'var(--ink-soft)'; }
         setTimeout(() => m1?.focus(), 100);
@@ -12493,22 +12507,25 @@ body.rol-staff #confirmSvcClientName::after {
     if (_metodoPagoFinal === 'Pago mixto') {
       const m1 = parseFloat(document.getElementById('mixtoMonto1')?.value || 0) || 0;
       const m2 = parseFloat(document.getElementById('mixtoMonto2')?.value || 0) || 0;
+      const m3 = parseFloat(document.getElementById('mixtoMonto3')?.value || 0) || 0;
       const met1 = document.getElementById('mixtoMetodo1')?.value || 'Efectivo';
       const met2 = document.getElementById('mixtoMetodo2')?.value || 'Transferencia';
+      const met3 = document.getElementById('mixtoMetodo3')?.value || 'Tarjeta';
       const totalNum = parseFloat((document.getElementById('cobrarTotal')?.textContent || '0').replace('$','')) || 0;
-      if (m1 <= 0 && m2 <= 0) {
+      if (m1 <= 0 && m2 <= 0 && m3 <= 0) {
         alert('Ingresá los montos del pago mixto.');
         return;
       }
-      const diff = Math.abs(totalNum - (m1 + m2));
+      const diff = Math.abs(totalNum - (m1 + m2 + m3));
       if (diff > 0.1) {
-        alert('El total del pago mixto ($' + (m1+m2).toFixed(2) + ') no coincide con el total a cobrar ($' + totalNum.toFixed(2) + '). Ajustá los montos.');
+        alert('El total del pago mixto ($' + (m1+m2+m3).toFixed(2) + ') no coincide con el total a cobrar ($' + totalNum.toFixed(2) + '). Ajustá los montos.');
         return;
       }
       // Construir string descriptivo
       const partes = [];
       if (m1 > 0) partes.push('$' + m1.toFixed(2) + ' ' + met1.toLowerCase());
       if (m2 > 0) partes.push('$' + m2.toFixed(2) + ' ' + met2.toLowerCase());
+      if (m3 > 0) partes.push('$' + m3.toFixed(2) + ' ' + met3.toLowerCase());
       _metodoPagoFinal = 'Mixto: ' + partes.join(' + ');
       window._cobrarPago = _metodoPagoFinal;
       window._cobroPago  = _metodoPagoFinal;
