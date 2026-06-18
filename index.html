@@ -16634,6 +16634,15 @@ body.rol-staff #confirmSvcClientName::after {
         // Guardar ID de autorización en el servicio
         service.authId = result.authId;
         console.log('✅ Solicitud de autorización enviada:', result.authId);
+        // Avisar a Mikaela por push: antes la solicitud solo aparecía si ella
+        // estaba mirando el polling; ahora le llega notificación aunque tenga la app cerrada.
+        try {
+          const _staff  = user?.name || 'Staff';
+          const _precio = (service.price !== undefined && service.price !== null && service.price !== '')
+            ? (' · $' + service.price) : '';
+          enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar',
+            _staff + ' → ' + (clientName || 'clienta') + ': ' + (service.name || 'servicio') + _precio);
+        } catch (ePush) { console.warn('[Push] aviso de autorización a Mikaela falló:', ePush); }
       } else {
         console.error('❌ Error al enviar autorización:', result.message);
       }
