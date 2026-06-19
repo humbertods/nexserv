@@ -11319,6 +11319,44 @@ body.rol-staff #confirmSvcClientName::after {
         return;
       }
 
+      // ── HOY: desglose por STAFF directo (como la vista del owner, sin comisiones) ──
+      if (esHoy) {
+        const _hoyNom = DIAS_LABEL[new Date().getDay()];
+        const staffHoy = porDia[_hoyNom] ? Object.values(porDia[_hoyNom].staff).sort(function(a,b){ return b.total - a.total; }) : [];
+        if (!staffHoy.length) {
+          list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin servicios cobrados hoy</div>';
+          return;
+        }
+        list.innerHTML = staffHoy.map(function(s, si) {
+          const canDelete = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
+          return '<div style="margin-bottom:6px;">' +
+            '<div onclick="toggleHistStaff(0,' + si + ')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+              '<div><div style="font-size:15px;font-weight:700;">' + s.nombre + '</div>' +
+              '<div style="font-size:11px;color:var(--ink-soft);">' + s.servicios.length + ' servicio' + (s.servicios.length!==1?'s':'') + '</div></div>' +
+              '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<div style="font-size:16px;font-weight:800;">$' + s.total.toFixed(0) + '</div>' +
+                '<div id="arrow-staff-0-' + si + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>' +
+              '</div>' +
+            '</div>' +
+            '<div id="staff-hist-0-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
+              s.servicios.map(function(sv, svi) {
+                return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                  '<div style="flex:1;">' +
+                    '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
+                    '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                  '</div>' +
+                  '<div style="display:flex;align-items:center;gap:8px;">' +
+                    '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                    (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">🗑</button>' : '') +
+                  '</div>' +
+                '</div>';
+              }).join('') +
+            '</div>' +
+          '</div>';
+        }).join('');
+        return;
+      }
+
       // Incluir todos los días de la semana aunque esten vacios
       const todosLosDias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
       const hoyNombre = DIAS_LABEL[new Date().getDay()];
