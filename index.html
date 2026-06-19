@@ -4151,8 +4151,10 @@ body.rol-staff #confirmSvcClientName::after {
         var slotN = slot1 ? 1 : 2;
 
         // Áreas pendientes (no completadas, no en servicio por esta staff)
+        // Filtro tolerante: acepta 'esperando', 'En espera', variantes con espacios.
         var areasEsperando = (tm.areas || []).filter(function(a) {
-          return String(a.estado||'').toLowerCase() === 'esperando';
+          var e = String(a.estado||'').trim().toLowerCase();
+          return e === 'esperando' || e === 'en espera' || e === 'en_espera';
         });
         var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
         var hayMas = areasEsperando.length > 0;
@@ -4260,8 +4262,14 @@ body.rol-staff #confirmSvcClientName::after {
 
     let html = '';
     if (!esPromoMultiArea) {
-      // Promo de 1 sola área → botón simple de finalizar
-      html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
+      // Promo de 1 sola área. Si hay otra promo pendiente del combo → ofrecer "Yo sigo".
+      if (promasExtraPendientes.length > 0) {
+        const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — Yo sigo: ${sigNombre}</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente)</button>`;
+      } else {
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
+      }
     } else if (puedeTodo) {
       if (promasExtraPendientes.length > 0) {
         // Hay otra promo independiente pendiente
