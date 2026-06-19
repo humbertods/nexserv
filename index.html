@@ -11139,6 +11139,8 @@ body.rol-staff #confirmSvcClientName::after {
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">⏳ Esperar</button>
                   <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}')"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
+                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}')"
+                    style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🗑 Borrar</button>
                 </div>
               </div>
               <!-- Asignar cliente al cobro: aparece si hay clientas esperando asignación -->
