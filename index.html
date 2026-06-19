@@ -957,6 +957,8 @@ body.rol-staff #confirmSvcClientName::after {
         <div style="text-align: center; margin-bottom: 16px;">
           <div id="assignSvcClientName" style="font-size: 16px; font-weight: 700;"></div>
         </div>
+
+        <button onclick="switchToAssignPromo()" style="width:100%;padding:11px;margin-bottom:16px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">🏷 ¿Es una promoción? Elegir promo</button>
         
         <div class="input-group">
           <label>Área</label>
@@ -10230,6 +10232,19 @@ body.rol-staff #confirmSvcClientName::after {
     }
   }
   
+  // Pasar del modal de servicio al de promo (reusa el flujo de promo que YA existe).
+  // Así Mikaela asigna la promo directo, sin el workaround de mandar normal para que
+  // la staff la cambie (que era la raíz del lío de precios en combos).
+  function switchToAssignPromo() {
+    var c = window._assigningClient;
+    if (!c || !c.code) { alert('No se encontró la clienta'); return; }
+    // Si venía en modo "+ servicio extra", la promo se asigna como su propio ticket.
+    window._extraTicketId = null;
+    closeModal();
+    openAssignPromoModal(c.code, c.name);
+  }
+  window.switchToAssignPromo = switchToAssignPromo;
+
   function openAssignPromoModal(clientCode, clientName) {
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignPromoClientName').textContent = clientName;
