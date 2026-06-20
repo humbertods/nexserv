@@ -10256,7 +10256,7 @@ body.rol-staff #confirmSvcClientName::after {
   }
   window.switchToAssignPromo = switchToAssignPromo;
 
-  function openAssignPromoModal(clientCode, clientName, extraTicketId) {
+  async function openAssignPromoModal(clientCode, clientName, extraTicketId) {
     // extraTicketId sólo llega desde "+ Servicio Extra" → modo promo-extra (ticket aparte).
     // Los botones "Redirigir promo" / "🏷 Promo" de la cola llaman sin él → modo normal.
     window._extraPromoTicketId = extraTicketId || null;
@@ -10264,10 +10264,23 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('assignPromoClientName').textContent = clientName;
     const pStaff = document.getElementById('assignPromoStaff');
     if (pStaff) pStaff.innerHTML = opcionesStaff(null); // todas las staff (la promo puede arrancar en cualquier área)
-    
+
+    const list = document.getElementById('assignPromoList');
+    // Mostrar el modal de una vez, con placeholder mientras cargan las promos.
+    if (list) list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:16px;font-size:13px;">Cargando promos…</div>';
+    var _promoNota = document.getElementById('assignPromoNota'); if (_promoNota) _promoNota.value = '';
+    document.getElementById('assignPromoModal').classList.add('active');
+
+    // Asegurar que PROMOS esté cargado: en sesión nueva viene vacío y la lista salía en blanco.
+    await ensurePromosLoaded();
+
     // Renderizar lista de promos activas
     const active = PROMOS.filter(p => p.active);
-    const list = document.getElementById('assignPromoList');
+    if (!list) return;
+    if (active.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:16px;font-size:13px;">No hay promos activas. Activá alguna en la pantalla de Promociones.</div>';
+      return;
+    }
     list.innerHTML = active.map((p, i) => `
       <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="confirmAssignPromo(${i})">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -10285,9 +10298,6 @@ body.rol-staff #confirmSvcClientName::after {
         </div>
       </div>
     `).join('');
-    
-    var _promoNota = document.getElementById('assignPromoNota'); if (_promoNota) _promoNota.value = '';
-    document.getElementById('assignPromoModal').classList.add('active');
   }
   
   async function confirmAssignPromo(promoIdx) {
