@@ -10688,12 +10688,7 @@ body.rol-staff #confirmSvcClientName::after {
   // ===================== MÓDULO SYNA — dashboard en vivo =====================
   // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
   // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
-  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // URL del PWA de SYNA (iframe)
-  var SYNA_EMBED_VERSION = '20260620-fase1';
-  function synaEmbedUrl_(view) {
-    var url = SYNA_URL_PWA + '?v=' + encodeURIComponent(SYNA_EMBED_VERSION) + '&embed=1&user=mikaela';
-    return view ? (url + '&view=' + encodeURIComponent(view)) : url;
-  }
+  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
   function _synaMock() {
     return {
       semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
@@ -10756,7 +10751,7 @@ body.rol-staff #confirmSvcClientName::after {
     // Sin force: si ya está cargado, conservar el estado de SYNA al cambiar de tab.
     // force=true (re-tap del botón "Syna") → recarga a la pantalla principal de SYNA.
     if (!force && slot.querySelector('iframe')) return;
-    slot.innerHTML = '<iframe src="' + synaEmbedUrl_('principal') + '" allow="clipboard-write"></iframe>';
+    slot.innerHTML = '<iframe src="' + SYNA_URL_PWA + '?embed=1&user=mikaela" allow="clipboard-write"></iframe>';
   }
   // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
   // view: 'agenda' | 'nueva' | 'copiloto' (deep-link best-effort; si SYNA todavía no soporta
@@ -10770,13 +10765,13 @@ body.rol-staff #confirmSvcClientName::after {
     if (ag)   ag.style.display = 'block';
     if (ttl)  ttl.textContent = titulo || 'SYNA';
     if (slot) {
-      var url = synaEmbedUrl_(view);
+      var url = SYNA_URL_PWA + '?embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : '');
       slot.className = '';
       slot.innerHTML = '<iframe class="agenda-frame" src="' + url + '" allow="clipboard-write"></iframe>';
     }
   }
   function synaAbrirAgenda()  { synaAbrirEmbed('agenda',   'Agenda en vivo'); }
-  function synaNuevaReserva() { synaAbrirEmbed('reservar', 'Nueva reserva'); }
+  function synaNuevaReserva() { synaAbrirEmbed('nueva',    'Nueva reserva'); }
   function synaCopiloto()     { synaAbrirEmbed('copiloto', 'Copiloto'); }
   function synaVolverDash() {
     var dash = document.getElementById('synaDashView');
@@ -13782,18 +13777,25 @@ body.rol-staff #confirmSvcClientName::after {
                      precioNormal: promoRegular, tipo: 'promo' });
         return;
       }
-      // Repartir el precio del combo entre sus partes para que SUMEN EXACTO el
-      // precio promo (y el regular, el regular). Antes usaba el monto crudo de cada
-      // parte, que podía no sumar el total → se undercobraba (bug Kaina: 5+15=20 en vez de 34).
-      // La última parte absorbe el redondeo para que la suma sea exacta.
+      // MODELO "una promo = un ticket": agrupar las partes por ÁREA real. Las partes de la
+      // MISMA área (ej. Combo 7: piernas+bikini+axilas = depilación) van a UN SOLO slot — no a
+      // slots separados que se duplicaban al finalizar (bug $57+$26+$5=$88). El precio del combo
+      // se reparte entre los GRUPOS (no las partes) para que sumen EXACTO el total. Los
+      // sub-servicios se ven en el desglose leyéndolos del catálogo por el nombre de la promo.
       const _partes = divs.filter(function(d) { return Number(d.monto || 0) > 0; });
-      const _sumaPartes = _partes.reduce(function(a, d) { return a + Number(d.monto || 0); }, 0);
+      const _grupos = [];
+      const _idxArea = {};
+      _partes.forEach(function(d) {
+        const ak = AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || '');
+        if (_idxArea[ak] === undefined) { _idxArea[ak] = _grupos.length; _grupos.push({ area: ak, monto: 0 }); }
+        _grupos[_idxArea[ak]].monto += Number(d.monto || 0);
+      });
+      const _sumaGrupos = _grupos.reduce(function(a, g) { return a + g.monto; }, 0);
       let _accP = 0, _accR = 0;
-      _partes.forEach(function(d, idx) {
-        const monto = Number(d.monto || 0);
-        const frac  = _sumaPartes > 0 ? monto / _sumaPartes : 1 / _partes.length;
+      _grupos.forEach(function(g, idx) {
+        const frac  = _sumaGrupos > 0 ? g.monto / _sumaGrupos : 1 / _grupos.length;
         let precioParte, regularParte;
-        if (idx === _partes.length - 1) {
+        if (idx === _grupos.length - 1) {
           precioParte  = Math.round((promoPrice   - _accP) * 100) / 100;   // resto exacto
           regularParte = Math.round((promoRegular - _accR) * 100) / 100;
         } else {
@@ -13801,9 +13803,9 @@ body.rol-staff #confirmSvcClientName::after {
           regularParte = Math.round(frac * promoRegular * 100) / 100; _accR += regularParte;
         }
         areas.push({
-          tentativo:    d.servicio || d.area || p.name,
-          area:         AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || ''),
-          precio:       precioParte,                                       // parte del TOTAL del combo
+          tentativo:    p.name,            // SIEMPRE el nombre de la promo (cobro + desglose por catálogo)
+          area:         g.area,
+          precio:       precioParte,
           precioNormal: regularParte,
           tipo:         'promo'
         });
@@ -15359,7 +15361,27 @@ body.rol-staff #confirmSvcClientName::after {
       c.areas.forEach(function(a){
         const est = String(a.estado||'').toLowerCase();
         if (est === 'cancelado') return;
-        filas.push({ label: (a.confirmado || a.tentativo || a.area || 'Servicio'), staff: a.staff||'—', monto: Number(a.precio||0), done: est === 'completado' });
+        const lbl = (a.confirmado || a.tentativo || a.area || 'Servicio');
+        const done = est === 'completado';
+        // Si el área es una promo de catálogo con división, mostrar sus sub-servicios de ESTA
+        // área (lo que incluye el combo) en vez de una sola línea con el nombre de la promo.
+        var promoCat = (typeof PROMOS !== 'undefined' && PROMOS)
+          ? PROMOS.find(function(p){ return p.name === lbl && p.division && p.division.length; }) : null;
+        var akArea = String(a.area||'').toLowerCase();
+        var subPartes = promoCat
+          ? promoCat.division.filter(function(d){
+              if (Number(d.monto||0) <= 0) return false;
+              if (typeof AREA_KEY_FROM_DIV !== 'function') return true;
+              return AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || '') === akArea;
+            })
+          : [];
+        if (subPartes.length > 1) {
+          subPartes.forEach(function(d){
+            filas.push({ label: (d.servicio || d.area || lbl), staff: a.staff||'—', monto: Number(d.monto||0), done: done });
+          });
+        } else {
+          filas.push({ label: lbl, staff: a.staff||'—', monto: Number(a.precio||0), done: done });
+        }
       });
     } else if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length) {
       c.serviciosDetalle.forEach(function(d){
