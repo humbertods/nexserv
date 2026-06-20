@@ -10688,7 +10688,12 @@ body.rol-staff #confirmSvcClientName::after {
   // ===================== MÓDULO SYNA — dashboard en vivo =====================
   // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
   // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
-  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // ← URL del PWA de SYNA (para el iframe de la Agenda)
+  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // URL del PWA de SYNA (iframe)
+  var SYNA_EMBED_VERSION = '20260620-fase1';
+  function synaEmbedUrl_(view) {
+    var url = SYNA_URL_PWA + '?v=' + encodeURIComponent(SYNA_EMBED_VERSION) + '&embed=1&user=mikaela';
+    return view ? (url + '&view=' + encodeURIComponent(view)) : url;
+  }
   function _synaMock() {
     return {
       semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
@@ -10751,7 +10756,7 @@ body.rol-staff #confirmSvcClientName::after {
     // Sin force: si ya está cargado, conservar el estado de SYNA al cambiar de tab.
     // force=true (re-tap del botón "Syna") → recarga a la pantalla principal de SYNA.
     if (!force && slot.querySelector('iframe')) return;
-    slot.innerHTML = '<iframe src="' + SYNA_URL_PWA + '?embed=1&user=mikaela" allow="clipboard-write"></iframe>';
+    slot.innerHTML = '<iframe src="' + synaEmbedUrl_('principal') + '" allow="clipboard-write"></iframe>';
   }
   // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
   // view: 'agenda' | 'nueva' | 'copiloto' (deep-link best-effort; si SYNA todavía no soporta
@@ -10765,13 +10770,13 @@ body.rol-staff #confirmSvcClientName::after {
     if (ag)   ag.style.display = 'block';
     if (ttl)  ttl.textContent = titulo || 'SYNA';
     if (slot) {
-      var url = SYNA_URL_PWA + '?embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : '');
+      var url = synaEmbedUrl_(view);
       slot.className = '';
       slot.innerHTML = '<iframe class="agenda-frame" src="' + url + '" allow="clipboard-write"></iframe>';
     }
   }
   function synaAbrirAgenda()  { synaAbrirEmbed('agenda',   'Agenda en vivo'); }
-  function synaNuevaReserva() { synaAbrirEmbed('nueva',    'Nueva reserva'); }
+  function synaNuevaReserva() { synaAbrirEmbed('reservar', 'Nueva reserva'); }
   function synaCopiloto()     { synaAbrirEmbed('copiloto', 'Copiloto'); }
   function synaVolverDash() {
     var dash = document.getElementById('synaDashView');
