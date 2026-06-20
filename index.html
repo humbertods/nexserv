@@ -10246,14 +10246,20 @@ body.rol-staff #confirmSvcClientName::after {
   function switchToAssignPromo() {
     var c = window._assigningClient;
     if (!c || !c.code) { alert('No se encontró la clienta'); return; }
-    // Si venía en modo "+ servicio extra", la promo se asigna como su propio ticket.
+    // Si venía en modo "+ servicio extra", llevamos el id del ticket original al
+    // modal de promo para que la promo se cree como su PROPIO ticket (SP- aparte),
+    // sin tocar el servicio ya completado. Si no era extra, ticket = null (flujo normal).
+    var ticket = window._extraTicketId || null;
     window._extraTicketId = null;
     closeModal();
-    openAssignPromoModal(c.code, c.name);
+    openAssignPromoModal(c.code, c.name, ticket);
   }
   window.switchToAssignPromo = switchToAssignPromo;
 
-  function openAssignPromoModal(clientCode, clientName) {
+  function openAssignPromoModal(clientCode, clientName, extraTicketId) {
+    // extraTicketId sólo llega desde "+ Servicio Extra" → modo promo-extra (ticket aparte).
+    // Los botones "Redirigir promo" / "🏷 Promo" de la cola llaman sin él → modo normal.
+    window._extraPromoTicketId = extraTicketId || null;
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignPromoClientName').textContent = clientName;
     const pStaff = document.getElementById('assignPromoStaff');
@@ -10289,7 +10295,39 @@ body.rol-staff #confirmSvcClientName::after {
     const client = window._assigningClient;
     const chica = (document.getElementById('assignPromoStaff') || {}).value || '';
     if (!chica) { alert('Elegí qué staff arranca la promo'); return; }
-    
+
+    // ── Modo "+ Servicio Extra" cuando el extra ES una promo → ticket SP- APARTE ──
+    if (window._extraPromoTicketId) {
+      const idEx = window._extraPromoTicketId;
+      const firstDiv = (promo.division && promo.division[0]) ? promo.division[0] : null;
+      try {
+        const rEx = await apiPost('agregarPromoExtra', {
+          idEspera: idEx,
+          promoNombre: promo.name,
+          precioPromo: promo.price,
+          precioRegular: promo.regular,
+          area: firstDiv ? firstDiv.area : '',
+          precioMiArea: firstDiv ? firstDiv.monto : promo.price,
+          chica: chica,
+          observaciones: (document.getElementById('assignPromoNota') || {}).value || ''
+        });
+        window._extraPromoTicketId = null;
+        if (rEx && rEx.success) {
+          const msg = '✓ Promo extra "' + promo.name + '" agregada como ticket aparte → ' + chica;
+          if (typeof showToast === 'function') showToast(msg); else alert(msg);
+          closeModal();
+          loadMikaelaHome();
+        } else {
+          alert('Error: ' + ((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar la promo extra'));
+        }
+      } catch (err) {
+        window._extraPromoTicketId = null;
+        console.error(err);
+        alert('Error al agregar la promo extra');
+      }
+      return;
+    }
+
     try {
       const result = await apiPost('asignarPromo', {
         codigo: client.code,
