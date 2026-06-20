@@ -3418,11 +3418,26 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e) {
       console.warn('[Sesión] Error al restaurar:', e.message);
     }
+    // Refresco INSTANTÁNEO del panel de la chica al volver la app a primer plano.
+    // Esto cubre el caso del teléfono: cuando la chica toma el celular y mira la app,
+    // el panel se actualiza al toque sin esperar al push ni al intervalo.
+    function _refrescarStaffHomeSiActivo() {
+      const el = document.getElementById('staffHome');
+      if (!el || !el.classList.contains('active')) return;
+      if (document.hidden || document.querySelector('.modal-bg.active') || window._staffHomeLoading) return;
+      if (typeof loadStaffHome !== 'function') return;
+      window._staffHomeLoading = true;
+      Promise.resolve(loadStaffHome()).finally(() => { window._staffHomeLoading = false; });
+    }
     // Modo de descanso: revisar al volver la app al frente, al enfocar, por actividad y cada 25s
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && typeof verificarDescansoActivo === 'function') verificarDescansoActivo();
+      if (!document.hidden) _refrescarStaffHomeSiActivo();
     });
-    window.addEventListener('focus', () => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); });
+    window.addEventListener('focus', () => {
+      if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo();
+      _refrescarStaffHomeSiActivo();
+    });
     // Al detectar movimiento/actividad (con throttle de 5s) revalidar el bloqueo
     ['pointerdown','keydown'].forEach(ev => document.addEventListener(ev, () => {
       const ahora = Date.now();
@@ -4653,7 +4668,25 @@ body.rol-staff #confirmSvcClientName::after {
         else { clearInterval(window._tabLineasRefresh); window._tabLineasRefresh = null; }
       }, 12000);
     }
-    if (id === 'staffHome') loadStaffHome();
+    if (id === 'staffHome') {
+      loadStaffHome();
+      // Auto-refresco del panel de la chica MIENTRAS lo tiene abierto (primer plano).
+      // Así la clienta recién asignada aparece sola en pocos segundos, sin depender del push.
+      // Se pausa solo si: no es la pantalla activa, la app está en segundo plano, hay un
+      // modal abierto, o ya hay una carga en curso (evita solapar llamadas).
+      if (window._staffHomeRefresh) clearInterval(window._staffHomeRefresh);
+      window._staffHomeRefresh = setInterval(async () => {
+        const el = document.getElementById('staffHome');
+        if (!el || !el.classList.contains('active')) {
+          clearInterval(window._staffHomeRefresh); window._staffHomeRefresh = null; return;
+        }
+        if (document.hidden || document.querySelector('.modal-bg.active') || window._staffHomeLoading) return;
+        window._staffHomeLoading = true;
+        try { await loadStaffHome(); } finally { window._staffHomeLoading = false; }
+      }, 10000);
+    } else if (window._staffHomeRefresh) {
+      clearInterval(window._staffHomeRefresh); window._staffHomeRefresh = null;
+    }
     if (id === 'ownerHome') {
       loadOwnerHome();
       if (window._ownerHomeRefresh) clearInterval(window._ownerHomeRefresh);
