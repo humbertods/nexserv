@@ -16603,7 +16603,10 @@ body.rol-staff #confirmSvcClientName::after {
         promoNombre   : promo.name,
         tipo          : 'SP',
         precioPromo   : String(myPrice),
-        precioRegular : String(promo.regular || promo.price || myPrice)
+        precioRegular : String(promo.regular || promo.price || myPrice),
+        // áreas que cubre la promo NUEVA → el backend cancela las otras áreas del combo
+        // viejo que queden huérfanas (ej. Depilación $8.96 del Classic Premium)
+        promoAreas    : (Array.isArray(promo.division) ? promo.division.map(function (d) { return d.area; }) : []).join(',')
       }).then(function (r) { console.log('✅ Promo sincronizada con Mikaela:', r); })
         .catch(function (e) { console.warn('⚠ Error sincronizando promo con Mikaela:', e); });
     }
