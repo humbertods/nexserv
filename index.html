@@ -1121,6 +1121,12 @@ body.rol-staff #confirmSvcClientName::after {
       <div id="profileObs" style="font-size: 13px; color: #5a4a2a; line-height: 1.5; font-weight: 500;"></div>
     </div>
 
+    <!-- Datos de facturación de la clienta -->
+    <div id="profileFactBlock" style="background: var(--bg); border: 1.5px solid var(--line); border-radius: 20px; padding: 14px 16px; margin-bottom: 20px;">
+      <div style="font-size: 12px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px;">🧾 Datos de facturación</div>
+      <div id="profileFactBody" style="font-size: 13px; color: var(--ink-soft); line-height: 1.7; font-weight: 500;"></div>
+    </div>
+
     <!-- Tabs por área -->
     <div style="display: flex; gap: 0; margin-bottom: 16px; background: var(--bg-card); border-radius: var(--radius-pill); padding: 4px; box-shadow: var(--shadow-card); overflow-x: auto;">
       <button onclick="switchProfileTab('cejas', this)" class="profile-tab active-period" style="flex: 1; padding: 10px 8px; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .2s;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z"/></svg> Cejas</button>
@@ -1279,6 +1285,7 @@ body.rol-staff #confirmSvcClientName::after {
             <input type="text" id="ncApellido" placeholder="López Reyes">
           </div>
         </div>
+        <div style="display: flex; align-items: center; gap: 6px; margin: 6px 0 2px; font-size: 12.5px; font-weight: 800; color: var(--ink-soft);">🧾 Datos de facturación <span style="font-weight: 600; color: var(--ink-faint);">(para SRI · opcional)</span></div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="input-group">
             <label>Cédula / RUC</label>
@@ -12134,7 +12141,7 @@ body.rol-staff #confirmSvcClientName::after {
     window._facturacionActual = null;
     window._cobroClienteFiscal = null;
     const block = document.getElementById('factBlock');
-    if (block) block.style.display = window._cobroGrupal ? 'none' : 'block';
+    if (block) block.style.display = 'block';   // visible también en cobro grupal (factura a la pagadora)
     ['factResumen', 'factForm', 'factRecordarWrap', 'factHint'].forEach(function(id) {
       const el = document.getElementById(id); if (el) el.style.display = 'none';
     });
@@ -12153,8 +12160,11 @@ body.rol-staff #confirmSvcClientName::after {
       let fiscal = window._cobroClienteFiscal;
       if (!fiscal) {
         try {
-          if (window._cobrarCodigo) {
-            const r = await apiGet('getDatosFacturacion', { codigo: window._cobrarCodigo });
+          // En grupal, la facturación es a nombre de la pagadora (principal = clientas[0]).
+          const _codFiscal = window._cobrarCodigo ||
+            (window._cobroGrupal && window._cobroGrupal.clientas && window._cobroGrupal.clientas[0] && window._cobroGrupal.clientas[0].codigo) || '';
+          if (_codFiscal) {
+            const r = await apiGet('getDatosFacturacion', { codigo: _codFiscal });
             if (r && r.success) fiscal = r.datos || null;
           }
         } catch (e) { console.error(e); }
@@ -12917,12 +12927,12 @@ body.rol-staff #confirmSvcClientName::after {
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
 
-    // ── FACTURACIÓN: exigir datos fiscales antes de cobrar (solo cobro individual) ──
-    // No aplica al cobro grupal (varias clientas a la vez) — eso queda para v2.
-    if (!window._cobroGrupal) {
+    // ── FACTURACIÓN (OPCIONAL): si hay datos válidos se usan y se guardan; si no, se cobra
+    // igual y se cargan la próxima. Nunca bloquea el cobro. Aplica también al grupal
+    // (factura a la pagadora / principal). ──
+    {
       const _fv = factValidarParaCobro();
-      if (!_fv.ok) { alert('🧾 ' + _fv.msg); return; }
-      window._facturacionActual = _fv.fact;
+      window._facturacionActual = _fv.ok ? _fv.fact : null;
     }
 
     // FIX: si es pago mixto, validar y construir el string desglosado
@@ -13001,6 +13011,26 @@ body.rol-staff #confirmSvcClientName::after {
             delete window._apProductosEnTicket[c.idEspera];
           }
         }
+        // ── FACTURACIÓN grupal (OPCIONAL): factura a nombre de la pagadora (principal),
+        // con el total combinado. Endpoint aparte, nunca bloquea. ──
+        try {
+          if (window._facturacionActual && clientas && clientas.length) {
+            const _pagadora = clientas[0];
+            const _totG = clientas.reduce(function (s, c) { return s + Number(c.total || 0); }, 0);
+            const _servG = clientas.map(function (c) {
+              return { servicio: (c.servicios || c.promoNombre || c.nombre || 'Servicio'),
+                       area: '', monto: Number(c.total || 0), cantidad: 1, staff: c.staff || '' };
+            });
+            const _snapG = {
+              servicios: _servG, descuento: 0, total: Number(_totG || 0),
+              metodoPago: metodoPago || '', fechaEmision: new Date().toISOString()
+            };
+            const _docG = factBuildDocumentoSRI(window._facturacionActual, _snapG);
+            apiPost('guardarFacturacion', {
+              idEspera: _pagadora.idEspera || '', codigo: _pagadora.codigo || '', documento: _docG
+            }).catch(function (e) { console.warn('guardarFacturacion grupal:', e); });
+          }
+        } catch (eFG) { console.warn('facturacion grupal snapshot:', eFG); }
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
         window._cobroGrupal = null;
@@ -15250,6 +15280,26 @@ body.rol-staff #confirmSvcClientName::after {
     document.getElementById('profileSpent').textContent = '$' + c.spent;
     document.getElementById('profileLast').textContent = c.last;
     document.getElementById('profileObs').textContent = c.obs;
+
+    // Datos de facturación de la clienta (desde el directorio: cédula col K, correo col L)
+    try {
+      const _cd = (typeof CLIENT_DIRECTORY_CACHE !== 'undefined' && Array.isArray(CLIENT_DIRECTORY_CACHE))
+        ? CLIENT_DIRECTORY_CACHE.find(function (x) { return x.key === key || x.code === c.code; }) : null;
+      const _ced = (_cd && _cd.cedula) ? String(_cd.cedula).trim() : '';
+      const _cor = (_cd && _cd.correo) ? String(_cd.correo).trim() : '';
+      const _tipo = _ced ? (_ced.replace(/\D/g, '').length === 13 ? 'RUC' : 'Cédula') : '';
+      const _body = document.getElementById('profileFactBody');
+      if (_body) {
+        if (_ced || _cor) {
+          _body.innerHTML =
+            (_ced ? '<div><b>' + _tipo + ':</b> ' + _ced + '</div>' : '') +
+            (_cor ? '<div><b>Correo:</b> ' + _cor + '</div>' : '') +
+            (!_ced || !_cor ? '<div style="color:var(--ink-faint);font-size:12px;margin-top:4px;">' + (!_ced && !_cor ? '' : 'Faltan datos · ') + 'Completalos con “✏️ Editar clienta”.</div>' : '');
+        } else {
+          _body.innerHTML = '<div style="color:var(--ink-faint);">Sin datos de facturación. Registralos con “✏️ Editar clienta”.</div>';
+        }
+      }
+    } catch (eFP) { console.warn('perfil facturación:', eFP); }
     
     // Determinar quién ve el perfil
     const user = window.currentUser;
