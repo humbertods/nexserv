@@ -853,6 +853,51 @@ body.rol-staff #confirmSvcClientName::after {
           <div id="cobrarClientName" style="font-size: 18px; font-weight: 800;"></div>
         </div>
 
+        <!-- ════════ DATOS DE FACTURACIÓN (preparado para SRI) ════════ -->
+        <div id="factBlock" style="background: var(--bg); border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 14px;">
+          <div style="font-size: 13px; font-weight: 800; margin-bottom: 2px;">🧾 Datos de facturación</div>
+          <div style="font-size: 11px; color: var(--ink-faint); margin-bottom: 10px;">¿A nombre de quién va la factura?</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button type="button" id="factBtnMismos" onclick="factSetModo('mismos_datos')"
+              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;">👤 Mismos datos</button>
+            <button type="button" id="factBtnOtros" onclick="factSetModo('otros_datos')"
+              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;">✏️ Otros datos</button>
+          </div>
+
+          <!-- Resumen de la clienta registrada (modo "mismos_datos") -->
+          <div id="factResumen" style="display: none; margin-top: 12px; background: var(--bg-card); border-radius: 12px; padding: 12px 14px; font-size: 12.5px;"></div>
+
+          <!-- Formulario para facturar a otra persona (modo "otros_datos") -->
+          <div id="factForm" style="display: none; margin-top: 12px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 4px;">Tipo de identificación</div>
+            <select id="factTipo" onchange="factOnTipoChange()"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 13px; font-weight: 700; background: var(--bg-card); color: var(--ink); appearance: none; -webkit-appearance: none; cursor: pointer; box-sizing: border-box; margin-bottom: 8px;">
+              <option value="">Elegí…</option>
+              <option value="Cédula">Cédula</option>
+              <option value="RUC">RUC</option>
+              <option value="Pasaporte">Pasaporte</option>
+              <option value="Consumidor final">Consumidor final</option>
+            </select>
+            <input id="factNumero" type="text" inputmode="numeric" placeholder="Número de identificación"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box; margin-bottom: 8px;">
+            <input id="factRazon" type="text" placeholder="Nombre o Razón Social"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box; margin-bottom: 8px;">
+            <input id="factCorreo" type="email" placeholder="Correo electrónico"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box; margin-bottom: 8px;">
+            <input id="factTelefono" type="tel" placeholder="Teléfono (opcional)"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box;">
+          </div>
+
+          <!-- Recordar datos -->
+          <label id="factRecordarWrap" style="display: none; margin-top: 10px; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); cursor: pointer;">
+            <input type="checkbox" id="factRecordar" style="width: 16px; height: 16px; cursor: pointer;">
+            <span>Recordar estos datos para futuras facturas</span>
+          </label>
+
+          <div id="factHint" style="display: none; margin-top: 8px; font-size: 11px; font-weight: 600; color: var(--danger);"></div>
+        </div>
+
         <!-- TICKET DETALLADO: desglose por staff -->
         <div id="cobrarDesglose" style="background: var(--bg); border-radius: 16px; padding: 12px 14px; margin-bottom: 12px; display: none;">
           <div style="font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; letter-spacing: 0.04em;">DETALLE DE SERVICIOS</div>
@@ -12040,6 +12085,172 @@ body.rol-staff #confirmSvcClientName::after {
     t._timeout = setTimeout(() => { t.style.opacity = '0'; }, 2500);
   }
 
+  // ════════════ MÓDULO DE FACTURACIÓN (preparado para SRI) ════════════
+  // Captura los datos fiscales de la clienta ANTES de cobrar. NO toca la lógica de caja:
+  // el guardado se hace en un endpoint aparte (guardarFacturacion) tras el cobro OK.
+  window._facturacionActual  = null;   // objeto facturacion del cobro en curso
+  window._cobroClienteFiscal = null;   // datos fiscales de la clienta (cache del cobro actual)
+
+  function _factEmailValido(e) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(e || '').trim());
+  }
+  function _factFila(k, v) {
+    return '<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;">' +
+           '<span style="color:var(--ink-faint);">' + k + '</span>' +
+           '<span style="font-weight:700;text-align:right;">' + String(v || '') + '</span></div>';
+  }
+  function _factHint(msg) {
+    const h = document.getElementById('factHint'); if (!h) return;
+    if (msg) { h.textContent = msg; h.style.display = 'block'; } else { h.style.display = 'none'; }
+  }
+  function _factMarcarBoton(modo) {
+    const bm = document.getElementById('factBtnMismos'), bo = document.getElementById('factBtnOtros');
+    [[bm, 'mismos_datos'], [bo, 'otros_datos']].forEach(function(par) {
+      const b = par[0]; if (!b) return; const on = (modo === par[1]);
+      b.style.background  = on ? 'var(--ink)'  : 'var(--bg-card)';
+      b.style.color       = on ? '#fff'        : 'var(--ink)';
+      b.style.borderColor = on ? 'var(--ink)'  : 'var(--line)';
+    });
+  }
+
+  // Reset del bloque al abrir el modal de cobro
+  function factResetUI() {
+    window._facturacionActual = null;
+    window._cobroClienteFiscal = null;
+    const block = document.getElementById('factBlock');
+    if (block) block.style.display = window._cobroGrupal ? 'none' : 'block';
+    ['factResumen', 'factForm', 'factRecordarWrap', 'factHint'].forEach(function(id) {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+    ['factTipo', 'factNumero', 'factRazon', 'factCorreo', 'factTelefono'].forEach(function(id) {
+      const el = document.getElementById(id); if (el) { el.value = ''; el.disabled = false; }
+    });
+    const rec = document.getElementById('factRecordar'); if (rec) rec.checked = false;
+    _factMarcarBoton(null);
+  }
+
+  async function factSetModo(modo) {
+    _factHint('');
+    const recWrap = document.getElementById('factRecordarWrap');
+    if (modo === 'mismos_datos') {
+      document.getElementById('factForm').style.display = 'none';
+      let fiscal = window._cobroClienteFiscal;
+      if (!fiscal) {
+        try {
+          if (window._cobrarCodigo) {
+            const r = await apiGet('getDatosFacturacion', { codigo: window._cobrarCodigo });
+            if (r && r.success) fiscal = r.datos || null;
+          }
+        } catch (e) { console.error(e); }
+        window._cobroClienteFiscal = fiscal;
+      }
+      const nombre = (fiscal && fiscal.nombre) || (document.getElementById('cobrarClientName') || {}).textContent || '';
+      const ident  = (fiscal && fiscal.cedula)   || '';
+      const correo = (fiscal && fiscal.correo)   || '';
+      const tel    = (fiscal && fiscal.telefono) || '';
+      const faltan = [];
+      if (!String(nombre).trim()) faltan.push('nombre');
+      if (!String(ident).trim())  faltan.push('identificación');
+      if (!_factEmailValido(correo)) faltan.push('correo válido');
+      if (faltan.length) {
+        document.getElementById('factResumen').style.display = 'none';
+        alert('A la clienta le falta: ' + faltan.join(', ') + '.\n\nLos podés completar en "Otros datos" para facturar a su nombre.');
+        await factSetModo('otros_datos');
+        const tEl = document.getElementById('factTipo'); if (tEl) tEl.value = ident ? 'Cédula' : '';
+        if (String(ident).trim())  document.getElementById('factNumero').value = ident;
+        document.getElementById('factRazon').value = nombre || '';
+        if (String(correo).trim()) document.getElementById('factCorreo').value = correo;
+        if (String(tel).trim())    document.getElementById('factTelefono').value = tel;
+        return;
+      }
+      const tipo = (String(ident).replace(/\D/g, '').length === 13) ? 'RUC' : 'Cédula';
+      window._facturacionActual = {
+        modo: 'mismos_datos', tipoIdentificacion: tipo, identificacion: String(ident),
+        razonSocial: nombre, correo: correo, telefono: tel || '', recordarDatos: false
+      };
+      const res = document.getElementById('factResumen');
+      res.innerHTML = '<div style="font-weight:800;margin-bottom:6px;">Se factura a la clienta</div>' +
+        _factFila('Nombre', nombre) + _factFila('Tipo', tipo) + _factFila('Identificación', ident) +
+        _factFila('Correo', correo) + (String(tel).trim() ? _factFila('Teléfono', tel) : '');
+      res.style.display = 'block';
+      _factMarcarBoton('mismos_datos');
+      recWrap.style.display = 'none'; // ya están en la ficha de la clienta
+    } else {
+      document.getElementById('factResumen').style.display = 'none';
+      document.getElementById('factForm').style.display = 'block';
+      recWrap.style.display = 'flex';
+      _factMarcarBoton('otros_datos');
+      window._facturacionActual = { modo: 'otros_datos' }; // se completa al confirmar
+    }
+  }
+
+  function factOnTipoChange() {
+    const tipo = document.getElementById('factTipo').value;
+    const num = document.getElementById('factNumero'), raz = document.getElementById('factRazon');
+    if (tipo === 'Consumidor final') {
+      num.value = '9999999999999'; num.disabled = true;
+      raz.value = 'CONSUMIDOR FINAL'; raz.disabled = true;
+    } else {
+      if (num.disabled) { num.value = ''; num.disabled = false; }
+      if (raz.disabled) { raz.value = ''; raz.disabled = false; }
+    }
+  }
+
+  // Lee y valida el formulario "otros_datos" → {ok, fact, msg}
+  function _factLeerFormulario() {
+    const tipo = document.getElementById('factTipo').value;
+    const numero = String(document.getElementById('factNumero').value || '').trim();
+    const razon  = String(document.getElementById('factRazon').value || '').trim();
+    const correo = String(document.getElementById('factCorreo').value || '').trim();
+    const tel    = String(document.getElementById('factTelefono').value || '').trim();
+    const recordar = !!(document.getElementById('factRecordar') || {}).checked;
+    if (!tipo) return { ok: false, msg: 'Elegí el tipo de identificación.' };
+    if (tipo === 'Consumidor final') {
+      return { ok: true, fact: { modo: 'otros_datos', tipoIdentificacion: 'Consumidor final',
+        identificacion: '9999999999999', razonSocial: 'CONSUMIDOR FINAL', correo: correo, telefono: tel, recordarDatos: recordar } };
+    }
+    if (!numero) return { ok: false, msg: 'Ingresá el número de identificación.' };
+    if (!razon)  return { ok: false, msg: 'Ingresá el nombre o razón social.' };
+    if (!_factEmailValido(correo)) return { ok: false, msg: 'Ingresá un correo electrónico válido.' };
+    return { ok: true, fact: { modo: 'otros_datos', tipoIdentificacion: tipo, identificacion: numero,
+      razonSocial: razon, correo: correo, telefono: tel, recordarDatos: recordar } };
+  }
+
+  // Validación final antes de cobrar → {ok, fact, msg}
+  function factValidarParaCobro() {
+    const modo = window._facturacionActual && window._facturacionActual.modo;
+    if (!modo) return { ok: false, msg: 'Elegí los datos de facturación (Mismos datos u Otros datos) antes de cobrar.' };
+    if (modo === 'mismos_datos') {
+      if (!window._facturacionActual.identificacion || !window._facturacionActual.correo)
+        return { ok: false, msg: 'Faltan datos de la clienta para facturar.' };
+      return { ok: true, fact: window._facturacionActual };
+    }
+    const r = _factLeerFormulario();
+    if (!r.ok) return r;
+    window._facturacionActual = r.fact;
+    return { ok: true, fact: r.fact };
+  }
+
+  // Arma el documento listo para SRI (NO se envía al SRI todavía; solo se persiste para el futuro).
+  function factBuildDocumentoSRI(fact, snap) {
+    const total = Number(snap.total || 0);
+    const ivaRate = 0.15; // IVA Ecuador 2024+ — CONFIRMAR antes de conectar SRI
+    // Asunción preliminar: el precio cobrado YA incluye IVA (servicios al público).
+    const base = ivaRate > 0 ? total / (1 + ivaRate) : total;
+    return {
+      facturacion: fact,
+      servicios: snap.servicios || [],
+      subtotal: Math.round(base * 100) / 100,
+      descuento: Number(snap.descuento || 0),
+      iva: Math.round((total - base) * 100) / 100,
+      ivaRate: ivaRate,
+      ivaIncluido: true,             // preliminar — confirmar política de precios
+      total: total,
+      metodoPago: snap.metodoPago || '',
+      fechaEmision: snap.fechaEmision || new Date().toISOString()
+    };
+  }
+
   function cobrarDesdeBtn(btn) {
     const idEspera = btn.dataset.id || '';
     const codigo   = btn.dataset.codigo || '';
@@ -12076,6 +12287,8 @@ body.rol-staff #confirmSvcClientName::after {
 
     document.getElementById('cobrarClientName').textContent = nombre;
     document.getElementById('cobrarTarjetaAviso').style.display = 'none';
+    window._cobroGrupal = null;                            // cobro individual nunca es grupal
+    if (typeof factResetUI === 'function') factResetUI();  // bloque de facturación limpio
 
     // Intentar parsear desglose multi-staff
     let desglose = null;
@@ -12645,6 +12858,14 @@ body.rol-staff #confirmSvcClientName::after {
   async function confirmarCobro() {
     const btn = document.getElementById('cobrarBtn');
 
+    // ── FACTURACIÓN: exigir datos fiscales antes de cobrar (solo cobro individual) ──
+    // No aplica al cobro grupal (varias clientas a la vez) — eso queda para v2.
+    if (!window._cobroGrupal) {
+      const _fv = factValidarParaCobro();
+      if (!_fv.ok) { alert('🧾 ' + _fv.msg); return; }
+      window._facturacionActual = _fv.fact;
+    }
+
     // FIX: si es pago mixto, validar y construir el string desglosado
     let _metodoPagoFinal = window._cobrarPago || window._cobroPago || 'Efectivo';
     if (_metodoPagoFinal === 'Pago mixto') {
@@ -12814,6 +13035,29 @@ body.rol-staff #confirmSvcClientName::after {
       const ticketDiv = document.getElementById('productos-ticket-' + window._cobrarId);
       if (ticketDiv) ticketDiv.innerHTML = '';
     }
+
+    // ── FACTURACIÓN: guardar el documento (endpoint aparte, NUNCA bloquea el cobro) ──
+    // El cobro ya quedó registrado arriba; esto solo persiste los datos fiscales para
+    // el futuro envío al SRI. Si falla, se loguea y la clienta igual quedó cobrada.
+    try {
+      if (!window._cobroGrupal && window._facturacionActual) {
+        const _snap = {
+          servicios: (window._cobrarDesglose || []).map(function(d) {
+            return { servicio: d.servicio, area: d.area, monto: Number(d.monto || 0), staff: d.staff || '' };
+          }),
+          descuento: Math.max(0, Number(window._cobrarTotalRegular || 0) - Number(totalServicios || 0)),
+          total: Number(totalFinal || 0),
+          metodoPago: window._cobrarPago || '',
+          fechaEmision: new Date().toISOString()
+        };
+        const _doc = factBuildDocumentoSRI(window._facturacionActual, _snap);
+        apiPost('guardarFacturacion', {
+          idEspera: window._cobrarId || '',
+          codigo: window._cobrarCodigo || '',
+          documento: _doc
+        }).catch(function(e) { console.warn('guardarFacturacion:', e); });
+      }
+    } catch (e) { console.warn('facturacion snapshot:', e); }
 
     btn.textContent = '✓ Confirmar cobro';
     btn.disabled = false;
@@ -17708,6 +17952,7 @@ body.rol-staff #confirmSvcClientName::after {
     // Construir el cobro combinado
     const clientas = [principal, asignada];
     window._cobroGrupal = { clientas, idxEsperando };
+    if (typeof factResetUI === 'function') factResetUI();  // oculta el bloque de facturación en cobro grupal (v2 pendiente)
 
     // Calcular total combinado
     const totalCombinado = clientas.reduce((s, c) => s + (Number(c.total)||0), 0);
