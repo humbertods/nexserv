@@ -2050,6 +2050,13 @@ body.rol-staff #confirmSvcClientName::after {
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
     </div>
 
+    <!-- Último servicio de cejas (SOLO staff de cejas) -->
+    <div id="as1CejasBox" style="display:none; margin-bottom:20px;">
+      <button type="button" id="as1CejasBtn" onclick="verUltimoCejas(1)"
+        style="width:100%; padding:12px; border-radius:var(--radius-pill); border:1.5px solid var(--line); background:var(--bg-card); color:var(--ink); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer;">🪞 Ver último servicio de cejas</button>
+      <div id="as1CejasInfo" style="display:none; margin-top:10px; background:var(--bg); border-radius:14px; padding:12px 14px; font-size:13px;"></div>
+    </div>
+
     <div class="section-title">Servicios registrados <span class="count" id="as1SvcCount">0</span></div>
     <div id="as1ServicesList"></div>
 
@@ -2529,6 +2536,13 @@ body.rol-staff #confirmSvcClientName::after {
       </div>
       <textarea id="obs2Edit" style="display: none; width: 100%; padding: 12px; border: 1.5px solid #f0e5c8; border-radius: 14px; font-family: inherit; font-size: 13px; font-weight: 500; min-height: 80px; resize: vertical; background: white; color: #5a4a2a; box-sizing: border-box;" onfocusout="saveObs('obs2')"></textarea>
       <div style="margin-top: 8px; font-size: 10px; color: #b8975c; font-weight: 600;">Visible para todas las chicas · Se guarda en el perfil de la clienta</div>
+    </div>
+
+    <!-- Último servicio de cejas (SOLO staff de cejas) -->
+    <div id="as2CejasBox" style="display:none; margin-bottom:20px;">
+      <button type="button" id="as2CejasBtn" onclick="verUltimoCejas(2)"
+        style="width:100%; padding:12px; border-radius:var(--radius-pill); border:1.5px solid var(--line); background:var(--bg-card); color:var(--ink); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer;">🪞 Ver último servicio de cejas</button>
+      <div id="as2CejasInfo" style="display:none; margin-top:10px; background:var(--bg); border-radius:14px; padding:12px 14px; font-size:13px;"></div>
     </div>
 
     <div class="section-title">Servicios registrados <span class="count" id="as2SvcCount">0</span></div>
@@ -4776,6 +4790,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (id === 'activeService') {
       restoreActivePromos();
       recargarAutorizacionesStaff(1);
+      if (typeof _gateCejasBtn === 'function') _gateCejasBtn();  // botón cejas solo para staff de cejas
       setTimeout(async () => {
         const idEsperaActual = window._as1IdEspera || '';
         const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
@@ -4875,6 +4890,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (id === 'activeService2') {
       restoreActivePromos();
       recargarAutorizacionesStaff(2);
+      if (typeof _gateCejasBtn === 'function') _gateCejasBtn();  // botón cejas solo para staff de cejas
       setTimeout(async () => {
         const user2 = window.currentUser;
         const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
@@ -12249,6 +12265,49 @@ body.rol-staff #confirmSvcClientName::after {
       metodoPago: snap.metodoPago || '',
       fechaEmision: snap.fechaEmision || new Date().toISOString()
     };
+  }
+
+  // ════════════ ÚLTIMO SERVICIO DE CEJAS (solo staff de cejas) ════════════
+  // Muestra/oculta el botón según el área de la staff logueada, y al tocarlo trae
+  // el último servicio de cejas de la clienta (fecha/hora · staff · servicio).
+  function _esStaffCejas() {
+    return String((window.currentUser && window.currentUser.area) || '').toLowerCase().indexOf('cej') >= 0;
+  }
+  function _gateCejasBtn() {
+    const esCejas = _esStaffCejas();
+    [1, 2].forEach(function(s) {
+      const box = document.getElementById('as' + s + 'CejasBox');
+      if (box) box.style.display = esCejas ? 'block' : 'none';
+      const info = document.getElementById('as' + s + 'CejasInfo');
+      if (info) { info.style.display = 'none'; info.innerHTML = ''; }  // reset al entrar a la pantalla
+    });
+  }
+  async function verUltimoCejas(slot) {
+    const codigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+    const infoEl = document.getElementById('as' + slot + 'CejasInfo');
+    if (!infoEl) return;
+    if (infoEl.style.display === 'block') { infoEl.style.display = 'none'; return; }  // toggle cerrar
+    infoEl.style.display = 'block';
+    if (!codigo) { infoEl.innerHTML = '<span style="color:var(--ink-faint);">No hay código de clienta.</span>'; return; }
+    infoEl.innerHTML = '<span style="color:var(--ink-faint);">⏳ Buscando…</span>';
+    try {
+      const r = await apiGet('getUltimoServicioArea', { codigo: codigo, area: 'cejas' });
+      if (r && r.success && r.found) {
+        infoEl.innerHTML =
+          '<div style="font-weight:800;margin-bottom:6px;">🪞 Último servicio de cejas</div>' +
+          _factFila('Fecha', (r.fecha || '') + (r.hora ? ' · ' + r.hora : '')) +
+          _factFila('Staff', r.staff || '—') +
+          _factFila('Servicio', r.servicio || '—') +
+          (Number(r.valor) > 0 ? _factFila('Valor', '$' + Number(r.valor).toFixed(2)) : '');
+      } else if (r && r.success) {
+        infoEl.innerHTML = '<span style="color:var(--ink-faint);">Sin servicios de cejas previos para esta clienta.</span>';
+      } else {
+        infoEl.innerHTML = '<span style="color:var(--danger);">No se pudo cargar' + (r && r.message ? (': ' + r.message) : '') + '.</span>';
+      }
+    } catch (e) {
+      console.error(e);
+      infoEl.innerHTML = '<span style="color:var(--danger);">⚠ No se pudo cargar. Probá de nuevo.</span>';
+    }
   }
 
   function cobrarDesdeBtn(btn) {
