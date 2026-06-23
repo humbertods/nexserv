@@ -12207,7 +12207,7 @@ body.rol-staff #confirmSvcClientName::after {
     ['factTipo', 'factNumero', 'factRazon', 'factCorreo', 'factTelefono'].forEach(function(id) {
       const el = document.getElementById(id); if (el) { el.value = ''; el.disabled = false; }
     });
-    const rec = document.getElementById('factRecordar'); if (rec) rec.checked = false;
+    const rec = document.getElementById('factRecordar'); if (rec) rec.checked = true;
     _factMarcarBoton(null);
   }
 
