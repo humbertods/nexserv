@@ -4107,6 +4107,20 @@ body.rol-staff #confirmSvcClientName::after {
   // Si solo puede hacer algunas partes, recibe la suma de esas partes
   // ============================================
   // Áreas de la promo que NO puede hacer esta staff (las que hay que asignar a otra chica)
+  // Categoría de un área (cejas/pestanas/facial) para mandar la división al backend.
+  function _promoCatDe(areaTxt) {
+    const a = String(areaTxt || '').toLowerCase();
+    const MAP = {
+      'pestanas': ['pestanas','pestañas','pestaña','volumen','pelo a pelo','efecto','clasicas','clásicas','natural','hawaiano','aura','brasil'],
+      'facial':   ['facial','hidra','limpieza'],
+      'cejas':    ['cejas','depilacion','bigote','depil','ceja','pigment','brow','retiro','lifting']
+    };
+    for (const cat of ['pestanas','facial','cejas']) {
+      if (MAP[cat].some(k => a.includes(k))) return cat;
+    }
+    return 'cejas';
+  }
+
   function getOtherPromoAreas(promo, myArea) {
     if (!promo || !Array.isArray(promo.division)) return [];
     const AREA_FILTER_MAP = {
@@ -16701,7 +16715,15 @@ body.rol-staff #confirmSvcClientName::after {
         precioRegular : String(promo.regular || promo.price || myPrice),
         // áreas que cubre la promo NUEVA → el backend cancela las otras áreas del combo
         // viejo que queden huérfanas (ej. Depilación $8.96 del Classic Premium)
-        promoAreas    : (Array.isArray(promo.division) ? promo.division.map(function (d) { return d.area; }) : []).join(',')
+        promoAreas    : (Array.isArray(promo.division) ? promo.division.map(function (d) { return d.area; }) : []).join(','),
+        // división completa del combo nuevo (categoría + precio por área) → el backend
+        // ACTUALIZA las áreas compartidas (ej. cejas) al combo nuevo en vez de dejarlas
+        // con el combo viejo, así la otra staff (María) recibe el combo correcto.
+        promoDivision : JSON.stringify(
+          (Array.isArray(promo.division) ? promo.division : []).map(function (d) {
+            return { cat: _promoCatDe(d.realArea || d.area), servicio: (d.servicio || d.area || ''), monto: Number(d.monto || 0) };
+          })
+        )
       }).then(function (r) { console.log('✅ Promo sincronizada con Mikaela:', r); })
         .catch(function (e) { console.warn('⚠ Error sincronizando promo con Mikaela:', e); });
     }
