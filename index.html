@@ -2711,7 +2711,7 @@ body.rol-staff #confirmSvcClientName::after {
     <div style="padding:20px 16px 120px;">
 
       <!-- Estado actual -->
-      <div style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:24px 16px;text-align:center;margin-bottom:24px;">
+      <div id="staffAsisCard" style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:24px 16px;text-align:center;margin-bottom:24px;transition:background .3s,border .3s;">
         <div id="staffAsisEstadoIcon" style="font-size:44px;margin-bottom:10px;">⬜</div>
         <div id="staffAsisEstadoLabel" style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:4px;">Sin registro hoy</div>
         <div id="staffAsisHoraInfo" style="font-size:13px;color:var(--ink-soft);line-height:1.5;"></div>
@@ -12704,10 +12704,26 @@ body.rol-staff #confirmSvcClientName::after {
     if (iconEl)  iconEl.textContent  = c.icon;
     if (labelEl) { labelEl.textContent = c.label; labelEl.style.color = c.color; }
 
+    // Color del card según estado
+    const cardEl = document.getElementById('staffAsisCard');
+    if (cardEl) {
+      const cardStyles = {
+        activa:           { bg:'rgba(34,170,102,0.07)', border:'1.5px solid rgba(34,170,102,0.3)' },
+        en_permiso:       { bg:'rgba(184,151,92,0.08)', border:'1.5px solid rgba(184,151,92,0.35)' },
+        cerrada:          { bg:'var(--bg-card)',         border:'1.5px solid var(--line)' },
+        no_iniciada:      { bg:'var(--bg-card)',         border:'1.5px solid var(--line)' },
+        salida_pendiente: { bg:'rgba(238,85,51,0.06)',  border:'1.5px solid rgba(238,85,51,0.3)' },
+        ausente:          { bg:'rgba(238,85,51,0.06)',  border:'1.5px solid rgba(238,85,51,0.3)' },
+      };
+      const cs = cardStyles[estado] || cardStyles.no_iniciada;
+      cardEl.style.background = cs.bg;
+      cardEl.style.border     = cs.border;
+    }
+
     let infoTxt = '';
     if (horaEntrada) infoTxt += 'Entrada: ' + horaEntrada;
-    if (yo && yo.minutosPermiso > 0) infoTxt += '\nPermiso: ' + yo.minutosPermiso + ' min';
-    if (yo && yo.minutosTrabajados > 0) infoTxt += '\nTrabajado: ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min';
+    if (yo && yo.minutosPermiso > 0) infoTxt += ' · Permiso: ' + yo.minutosPermiso + ' min';
+    if (yo && yo.minutosTrabajados > 0) infoTxt += ' · ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min trabajados';
     if (horaEl) horaEl.textContent = infoTxt;
 
     // ── Helpers de habilitado/deshabilitado visual ────────────────────
@@ -12740,8 +12756,13 @@ body.rol-staff #confirmSvcClientName::after {
     const puedoSalida   = (estado === 'activa' || estado === 'en_permiso');
     const puedoPermiso  = (estado === 'activa');
 
-    _setEnabled(entBtn,  puedoEntrada,  true);
-    _setEnabled(salBtn,  puedoSalida,   false);
+    // El botón primario (negro) es el de la acción disponible principal:
+    // sin entrada → Entrada es primario; con entrada → Salida es primario
+    const entradaEsPrimario = puedoEntrada;
+    const salidaEsPrimario  = puedoSalida && !puedoEntrada;
+
+    _setEnabled(entBtn,  puedoEntrada,  entradaEsPrimario);
+    _setEnabled(salBtn,  puedoSalida,   salidaEsPrimario);
     _setEnabled(permBtn, puedoPermiso,  false);
 
     if (entBtn) entBtn.textContent = '✅ Registrar entrada';
