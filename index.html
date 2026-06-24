@@ -447,13 +447,16 @@ body.rol-staff #confirmSvcClientName::after {
   .nav .refresh-btn {
     background: var(--accent) !important;
     color: white !important;
-    width: 52px !important; height: 52px !important;
+    width: 40px !important; height: 40px !important;
     border-radius: 50% !important;
     padding: 0 !important;
-    margin: -14px 4px 0;
-    box-shadow: 0 4px 16px rgba(212,165,116,0.4);
+    margin: 0 4px;
+    box-shadow: 0 2px 10px rgba(212,165,116,0.4);
     transition: transform .4s ease;
     font-size: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .nav .refresh-btn.spinning { animation: spin .6s ease; }
@@ -3692,7 +3695,13 @@ body.rol-staff #confirmSvcClientName::after {
             if (av) av.textContent = user.name[0];
             if (wl) wl.textContent = user.name[0];
           }
-          show(user.screen || 'staffHome');
+          // No restaurar asistenciaPanel automáticamente — siempre arrancar en home
+          var _safeScreen = user.screen || 'staffHome';
+          if (_safeScreen === 'asistenciaPanel') {
+            var _rol2 = String(user.role || user.rol || '').toLowerCase();
+            _safeScreen = _rol2 === 'owner' ? 'ownerHome' : (_rol2 === 'admin' ? 'mikaelaHome' : 'staffHome');
+          }
+          show(_safeScreen);
           console.log('[Sesión] Restaurada para:', user.name);
           // Modo de descanso: si quedó bloqueada con la sesión abierta, cerrarla
           setTimeout(() => { if (typeof verificarDescansoActivo === 'function') verificarDescansoActivo(); }, 1200);
@@ -5503,7 +5512,13 @@ body.rol-staff #confirmSvcClientName::after {
     }
     
     ensureCatalogoLoaded(); // Pre-cargar catalogo en background
-    show(user.screen);
+    // No restaurar asistenciaPanel automáticamente
+    var _ss2 = user.screen;
+    if (_ss2 === 'asistenciaPanel') {
+      var _r2 = String(user.role || user.rol || '').toLowerCase();
+      _ss2 = _r2 === 'owner' ? 'ownerHome' : (_r2 === 'admin' ? 'mikaelaHome' : 'staffHome');
+    }
+    show(_ss2);
   }
 
   // Modo de descanso: bloquea staff si está en descanso individual O si el descanso GLOBAL está activo.
