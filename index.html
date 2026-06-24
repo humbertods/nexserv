@@ -2702,7 +2702,7 @@ body.rol-staff #confirmSvcClientName::after {
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div class="screen" id="asistenciaPanel">
     <div class="header">
-      <button class="back-btn" onclick="history.back()">← Volver</button>
+      <button class="back-btn" onclick="_asisVolver()">← Volver</button>
       <h2>Asistencia</h2>
       <button onclick="_asisCargarHoy()" style="background:none;border:none;font-size:20px;cursor:pointer;">↻</button>
     </div>
@@ -2759,7 +2759,7 @@ body.rol-staff #confirmSvcClientName::after {
 
     </div>
     <nav class="nav">
-      <button onclick="history.back()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button onclick="_asisVolver()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
       <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span><span class="label-dock">Asistencia</span></button>
       <button class="refresh-btn" onclick="_asisCargarHoy()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
     </nav>
@@ -12542,6 +12542,15 @@ body.rol-staff #confirmSvcClientName::after {
       console.error(e);
       infoEl.innerHTML = '<span style="color:var(--danger);">⚠ No se pudo cargar. Probá de nuevo.</span>';
     }
+  }
+
+  // Volver desde Asistencia al home correcto según el rol (sin history.back())
+  function _asisVolver() {
+    const u = window.currentUser;
+    if (!u) { show('login'); return; }
+    if (u.role === 'owner' || u.role === 'dueño') show('ownerHome');
+    else if (u.role === 'admin' || /mikaela/i.test(u.name || '')) show('mikaelaHome');
+    else show('staffHome');
   }
 
   // ════════════════════════════════════════════════════════════════════
