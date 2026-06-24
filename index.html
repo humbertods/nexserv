@@ -809,6 +809,7 @@ body.rol-staff #confirmSvcClientName::after {
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
       <button onclick="show('serviciosHistory')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span><span class="label-dock">Historial</span></button>
       <button onclick="openMkStock()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6.5 2A4.5 4.5 0 0 0 2 6.5V18a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4V6.5A4.5 4.5 0 0 0 17.5 2h-11ZM9 6.5a3 3 0 0 0 6 0 1 1 0 1 1 2 0 5 5 0 0 1-10 0 1 1 0 0 1 2 0Z"/></svg></span><span class="label-dock">Stock</span></button>
+      <button onclick="show('asistenciaPanel')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5l1.5 1.5L20 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="label-dock">Asistencia</span></button>
       <div class="refresh-toast" id="refreshToast">✓ Actualizado</div>
     </nav>
 
@@ -2682,7 +2683,78 @@ body.rol-staff #confirmSvcClientName::after {
       <button class="refresh-btn" onclick="doRefresh(this)"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
       <button onclick="show('ownerReports')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><rect x="3" y="12" width="4" height="8" rx="1"/><rect x="10" y="7" width="4" height="13" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/></svg></span></button>
       <button onclick="show('ownerPayments')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7ZM2 10h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg></span></button>
+      <button onclick="show('asistenciaPanel')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5l1.5 1.5L20 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="label-dock">Asistencia</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
+    </nav>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ASISTENCIA Y PERMISOS                                             -->
+  <!-- Visible para: Mikaela (admin) + Owner. Staff registra desde aquí -->
+  <!-- o por WhatsApp. Owner ve informe mensual.                         -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="asistenciaPanel">
+    <div class="header">
+      <button class="back-btn" onclick="history.back()">← Volver</button>
+      <h2>Asistencia</h2>
+      <button onclick="_asisCargarHoy()" style="background:none;border:none;font-size:20px;cursor:pointer;">↻</button>
+    </div>
+    <div style="padding:0 16px 100px;">
+
+      <!-- REGISTRO RÁPIDO (Admin/Mikaela: registrar por nombre) -->
+      <div id="asisRegistroBox" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">Registrar evento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <select id="asisNombreSelect" style="padding:12px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);">
+            <option value="">— Empleada —</option>
+          </select>
+          <select id="asisTipoSelect" style="padding:12px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);">
+            <option value="ENTRADA">✅ Entrada</option>
+            <option value="SALIDA">👋 Salida</option>
+            <option value="PERMISO">🔒 Permiso</option>
+            <option value="REGRESO">✅ Regreso</option>
+            <option value="AUSENCIA">❌ Ausencia</option>
+            <option value="JUSTIFICADO">📋 Justificado</option>
+            <option value="VACACIONES">🏖 Vacaciones</option>
+          </select>
+        </div>
+        <input id="asisMotivoInput" placeholder="Motivo (opcional)" style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);margin-bottom:10px;box-sizing:border-box;">
+        <button onclick="_asisRegistrar()" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:4px;">Registrar</button>
+        <div id="asisMsgBox" style="text-align:center;font-size:13px;font-weight:700;margin:8px 0;min-height:20px;"></div>
+      </div>
+
+      <!-- ESTADO HOY -->
+      <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px;">Estado de hoy</div>
+      <div id="asisEstadoHoy" style="font-size:13px;color:var(--ink-soft);text-align:center;padding:20px;">Cargando…</div>
+
+      <!-- INFORME MENSUAL (solo Owner) -->
+      <div id="asisInformeBox" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:24px 0 10px;">Informe mensual</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="asisMesInput" placeholder="MM/yyyy" value="" style="flex:1;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);">
+          <button onclick="_asisCargarInforme()" style="padding:12px 18px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">Ver</button>
+        </div>
+        <div id="asisInformeBody"></div>
+      </div>
+
+      <!-- CORRECCIÓN ADMIN -->
+      <div id="asisCorreccionBox" style="display:none;margin-top:24px;">
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Corrección de jornada</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <input id="asisCorIdJornada" placeholder="ID jornada (JRN-0001)" style="padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;background:var(--bg-card);">
+          <input id="asisCorEstado" placeholder="Estado final" style="padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;background:var(--bg-card);">
+          <input id="asisCorEntrada" placeholder="Hora entrada HH:mm" style="padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;background:var(--bg-card);">
+          <input id="asisCorSalida" placeholder="Hora salida HH:mm" style="padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;background:var(--bg-card);">
+        </div>
+        <input id="asisCorObs" placeholder="Observación obligatoria" style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);margin-bottom:8px;box-sizing:border-box;">
+        <button onclick="_asisCorregir()" style="width:100%;padding:13px;background:#e53;color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Guardar corrección</button>
+      </div>
+
+    </div>
+    <nav class="nav">
+      <button onclick="history.back()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
+      <button class="active"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></span><span class="label-dock">Asistencia</span></button>
+      <button class="refresh-btn" onclick="_asisCargarHoy()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 4a8 8 0 1 0 7.938 7H17.9A6 6 0 1 1 12 6V4Z"/><path d="M12 1v6l4-3-4-3Z"/></svg></span></button>
     </nav>
   </div>
 
@@ -4867,6 +4939,21 @@ body.rol-staff #confirmSvcClientName::after {
       const _permitidoMH = _uMH && (_uMH.role === 'admin' || _uMH.role === 'owner' || /mikaela/i.test(_uMH.name || ''));
       if (_uMH && !_permitidoMH) { show('staffHome'); return; }
       loadMikaelaHome();
+    }
+    if (id === 'asistenciaPanel') {
+      const esAdmin = window.currentUser && (window.currentUser.rol === 'admin' || window.currentUser.rol === 'owner');
+      const esOwner = window.currentUser && window.currentUser.rol === 'owner';
+      const regBox = document.getElementById('asisRegistroBox');
+      const infBox = document.getElementById('asisInformeBox');
+      const corBox = document.getElementById('asisCorreccionBox');
+      if (regBox) regBox.style.display = esAdmin ? 'block' : 'none';
+      if (infBox) infBox.style.display = esOwner ? 'block' : 'none';
+      if (corBox) corBox.style.display = 'none';
+      const mesInp = document.getElementById('asisMesInput');
+      if (mesInp && !mesInp.value) {
+        const hoy = new Date(); const m = String(hoy.getMonth()+1).padStart(2,'0'); mesInp.value = m + '/' + hoy.getFullYear();
+      }
+      _asisCargarHoy();
     }
     if (id === 'activeService') {
       restoreActivePromos();
@@ -12446,6 +12533,125 @@ body.rol-staff #confirmSvcClientName::after {
       console.error(e);
       infoEl.innerHTML = '<span style="color:var(--danger);">⚠ No se pudo cargar. Probá de nuevo.</span>';
     }
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // MÓDULO ASISTENCIA Y PERMISOS
+  // ════════════════════════════════════════════════════════════════════
+  const ASIS_ESTADO_LABELS = {
+    'activa':           { icon:'🟢', label:'Activa' },
+    'en_permiso':       { icon:'🟡', label:'En permiso' },
+    'cerrada':          { icon:'⚫', label:'Cerrada' },
+    'salida_pendiente': { icon:'🔴', label:'Salida pendiente' },
+    'no_iniciada':      { icon:'⬜', label:'No iniciada' },
+    'ausente':          { icon:'❌', label:'Ausente' },
+  };
+
+  // Cargar estado del día al entrar a la pantalla
+  async function _asisCargarHoy() {
+    const el = document.getElementById('asisEstadoHoy');
+    if (el) el.innerHTML = '<span style="color:var(--ink-faint);">Cargando…</span>';
+    try {
+      const r = await apiGet('getAsistenciaHoy');
+      if (!r || !r.success) { if (el) el.innerHTML = '⚠ Error al cargar.'; return; }
+      _asisRenderEstadoHoy(r);
+    } catch(e) { if (el) el.innerHTML = '⚠ ' + e.message; }
+  }
+
+  function _asisRenderEstadoHoy(r) {
+    const el = document.getElementById('asisEstadoHoy');
+    if (!el) return;
+    if (!r.staff || r.staff.length === 0) { el.innerHTML = '<div style="color:var(--ink-faint);padding:20px;text-align:center;">Sin registros hoy.</div>'; return; }
+    el.innerHTML = r.staff.map(function(s) {
+      const e = ASIS_ESTADO_LABELS[s.estadoFinal] || { icon:'⬜', label: s.estadoFinal };
+      const retrasoTag = s.retrasoMin > 0 ? '<span style="color:#e53;font-size:11px;font-weight:700;margin-left:6px;">+' + s.retrasoMin + 'min</span>' : '';
+      const permisoTag = s.permisoActivo ? '<div style="font-size:11px;color:#b8975c;margin-top:3px;">🔒 Permiso desde ' + s.permisoActivo.hora + (s.permisoActivo.motivo ? ' · ' + s.permisoActivo.motivo : '') + '</div>' : '';
+      const horasTag = s.minutosTrabajados > 0 ? '<span style="color:var(--ink-faint);font-size:11px;margin-left:6px;">' + Math.floor(s.minutosTrabajados/60) + 'h ' + (s.minutosTrabajados%60) + 'min</span>' : '';
+      const corBtn = (window.currentUser && (window.currentUser.rol === 'admin' || window.currentUser.rol === 'owner'))
+        ? '<button onclick="_asisPreCorreccion(\'' + s.idJornada + '\')" style="background:none;border:1px solid var(--line);border-radius:20px;font-size:11px;padding:2px 8px;cursor:pointer;color:var(--ink-soft);">✏️ Corregir</button>' : '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);">'
+        + '<div style="font-size:20px;">' + e.icon + '</div>'
+        + '<div style="flex:1;">'
+        +   '<div style="font-weight:700;font-size:14px;">' + s.nombre + retrasoTag + '</div>'
+        +   '<div style="font-size:12px;color:var(--ink-soft);">' + e.label
+        +     (s.horaEntrada ? ' · entrada ' + s.horaEntrada : '')
+        +     (s.horaSalida  ? ' · salida ' + s.horaSalida   : '')
+        +     horasTag + '</div>'
+        +   permisoTag
+        + '</div>'
+        + corBtn
+        + '</div>';
+    }).join('');
+    // cargar select de nombres
+    const sel = document.getElementById('asisNombreSelect');
+    if (sel && sel.options.length <= 1) {
+      r.staff.forEach(function(s){ const o=document.createElement('option'); o.value=s.nombre; o.textContent=s.nombre; sel.appendChild(o); });
+    }
+  }
+
+  async function _asisRegistrar() {
+    const nombre = document.getElementById('asisNombreSelect')?.value;
+    const tipo   = document.getElementById('asisTipoSelect')?.value;
+    const motivo = document.getElementById('asisMotivoInput')?.value || '';
+    const msgEl  = document.getElementById('asisMsgBox');
+    if (!nombre) { if (msgEl) msgEl.textContent = '⚠ Seleccioná una empleada.'; return; }
+    if (msgEl) msgEl.textContent = '⏳ Registrando…';
+    const acciones = { ENTRADA:'asistenciaEntrada', SALIDA:'asistenciaSalida', PERMISO:'asistenciaPermiso', REGRESO:'asistenciaRegreso' };
+    const action = acciones[tipo] || 'asistenciaEvento';
+    try {
+      const r = await apiPost(action, { nombre, tipo, motivo, origen:'panel', registradoPor: window.currentUser?.name || 'admin' });
+      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
+      if (r.success) { await _asisCargarHoy(); document.getElementById('asisMotivoInput').value = ''; }
+    } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
+  }
+
+  async function _asisCargarInforme() {
+    const mes = document.getElementById('asisMesInput')?.value.trim();
+    const body = document.getElementById('asisInformeBody');
+    if (!body) return;
+    body.innerHTML = '<span style="color:var(--ink-faint);">Cargando…</span>';
+    try {
+      const r = await apiGet('getInformeMensual', mes ? { mes } : {});
+      if (!r || !r.success || !r.informe) { body.innerHTML = '⚠ Error.'; return; }
+      if (r.informe.length === 0) { body.innerHTML = '<div style="color:var(--ink-faint);text-align:center;padding:20px;">Sin datos para ' + (mes || 'este mes') + '.</div>'; return; }
+      body.innerHTML = r.informe.map(function(emp) {
+        const horas = Math.floor(emp.minutosTrabajados/60);
+        const mins  = emp.minutosTrabajados % 60;
+        return '<div style="background:var(--bg-card);border-radius:16px;padding:14px 16px;margin-bottom:10px;">'
+          + '<div style="font-weight:800;font-size:15px;margin-bottom:8px;">' + emp.nombre + '</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--ink-soft);">'
+          + '<div>📅 Días trabajados: <b>' + emp.diasTrabajados + '</b></div>'
+          + '<div>⏰ Puntuales: <b>' + emp.puntuales + '</b></div>'
+          + '<div>⚠ Retrasos: <b>' + emp.retrasos + '</b></div>'
+          + '<div>🔴 Salida pendiente: <b>' + emp.salidaPendiente + '</b></div>'
+          + '<div>❌ Ausencias: <b>' + emp.ausencias + '</b></div>'
+          + '<div>🔒 Permisos: <b>' + emp.totalPermisos + '</b> (' + emp.minutosEnPermisos + 'min)</div>'
+          + '<div style="grid-column:1/-1;">⏱ Horas trabajadas: <b>' + horas + 'h ' + mins + 'min</b></div>'
+          + '</div></div>';
+      }).join('');
+    } catch(e) { body.innerHTML = '⚠ ' + e.message; }
+  }
+
+  function _asisPreCorreccion(idJornada) {
+    const box = document.getElementById('asisCorreccionBox');
+    if (box) box.style.display = 'block';
+    const inp = document.getElementById('asisCorIdJornada');
+    if (inp) inp.value = idJornada || '';
+    inp.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function _asisCorregir() {
+    const idJornada   = document.getElementById('asisCorIdJornada')?.value.trim();
+    const estadoFinal = document.getElementById('asisCorEstado')?.value.trim();
+    const horaEntrada = document.getElementById('asisCorEntrada')?.value.trim();
+    const horaSalida  = document.getElementById('asisCorSalida')?.value.trim();
+    const observacion = document.getElementById('asisCorObs')?.value.trim();
+    if (!observacion) { alert('La observación es obligatoria para corregir.'); return; }
+    try {
+      const r = await apiPost('asistenciaCorreccion', { idJornada, estadoFinal, horaEntrada, horaSalida, observacion, admin: window.currentUser?.name || 'admin' });
+      alert(r.message || (r.success ? '✅ Corregido.' : '⚠ Error.'));
+      if (r.success) { document.getElementById('asisCorreccionBox').style.display = 'none'; await _asisCargarHoy(); }
+    } catch(e) { alert('⚠ ' + e.message); }
   }
 
   function cobrarDesdeBtn(btn) {
