@@ -11845,9 +11845,18 @@ body.rol-staff #confirmSvcClientName::after {
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
     const countEl = document.getElementById('porCobrarCount');
-    
+
+    // ── PASO 3: switch Lineas / legacy ──────────────────────────────────────
+    // USE_LINEAS_POR_COBRAR = true  → leer desde Lineas (fuente de verdad nueva)
+    // USE_LINEAS_POR_COBRAR = false → leer desde SN/SP/TM/ListaEspera (legacy)
+    // Activar con: localStorage.setItem('NEXSERV_LINEAS_PC', '1') en consola.
+    // Revertir con: localStorage.removeItem('NEXSERV_LINEAS_PC')
+    const USE_LINEAS_POR_COBRAR = localStorage.getItem('NEXSERV_LINEAS_PC') === '1';
+    const _accion = USE_LINEAS_POR_COBRAR ? 'getPorCobrarDesdeLineas' : 'getPorCobrar';
+    if (USE_LINEAS_POR_COBRAR) console.log('[PorCobrar] 🟢 leyendo desde LINEAS');
+
     try {
-      const result = await apiGet('getPorCobrar');
+      const result = await apiGet(_accion);
       if (result.success && result.porCobrar && result.porCobrar.length > 0) {
         window._mkPorCobrarData = result.porCobrar;
         countEl.textContent = result.porCobrar.length;
