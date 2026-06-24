@@ -12711,12 +12711,28 @@ body.rol-staff #confirmSvcClientName::after {
     if (horaEl) horaEl.textContent = infoTxt;
 
     // ── Helpers de habilitado/deshabilitado visual ────────────────────
-    function _setEnabled(btn, enabled) {
+    // Activo: negro (primario) o borde oscuro (secundario). Inactivo: gris visible.
+    function _setEnabled(btn, enabled, esPrimario) {
       if (!btn) return;
       btn.disabled = !enabled;
-      btn.style.opacity   = enabled ? '1' : '0.35';
-      btn.style.cursor    = enabled ? 'pointer' : 'not-allowed';
+      btn.style.cursor        = enabled ? 'pointer' : 'default';
       btn.style.pointerEvents = enabled ? '' : 'none';
+      btn.style.opacity       = '1';
+      if (enabled) {
+        if (esPrimario) {
+          btn.style.background = '#1a1a1a';
+          btn.style.color      = '#fff';
+          btn.style.border     = 'none';
+        } else {
+          btn.style.background = 'var(--bg-card)';
+          btn.style.color      = 'var(--ink)';
+          btn.style.border     = '1.5px solid var(--line)';
+        }
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color      = '#b0b0b0';
+        btn.style.border     = '1.5px solid #e0e0e0';
+      }
     }
 
     // Determinar qué acciones están disponibles según el estado
@@ -12724,12 +12740,10 @@ body.rol-staff #confirmSvcClientName::after {
     const puedoSalida   = (estado === 'activa' || estado === 'en_permiso');
     const puedoPermiso  = (estado === 'activa');
 
-    // Aplicar a cada botón
-    _setEnabled(entBtn,  puedoEntrada);
-    _setEnabled(salBtn,  puedoSalida);
-    _setEnabled(permBtn, puedoPermiso);
+    _setEnabled(entBtn,  puedoEntrada,  true);
+    _setEnabled(salBtn,  puedoSalida,   false);
+    _setEnabled(permBtn, puedoPermiso,  false);
 
-    // Texto dinámico del botón entrada
     if (entBtn) entBtn.textContent = '✅ Registrar entrada';
 
     // Cerrar acordeón de permiso si no está disponible
