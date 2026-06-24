@@ -3701,6 +3701,7 @@ body.rol-staff #confirmSvcClientName::after {
             var _rol2 = String(user.role || user.rol || '').toLowerCase();
             _safeScreen = _rol2 === 'owner' ? 'ownerHome' : (_rol2 === 'admin' ? 'mikaelaHome' : 'staffHome');
           }
+          if (_safeScreen === 'staffAsistencia') { _safeScreen = 'staffHome'; }
           show(_safeScreen);
           console.log('[Sesión] Restaurada para:', user.name);
           // Modo de descanso: si quedó bloqueada con la sesión abierta, cerrarla
@@ -5518,6 +5519,7 @@ body.rol-staff #confirmSvcClientName::after {
       var _r2 = String(user.role || user.rol || '').toLowerCase();
       _ss2 = _r2 === 'owner' ? 'ownerHome' : (_r2 === 'admin' ? 'mikaelaHome' : 'staffHome');
     }
+    if (_ss2 === 'staffAsistencia') { _ss2 = 'staffHome'; }
     show(_ss2);
   }
 
@@ -12757,7 +12759,16 @@ body.rol-staff #confirmSvcClientName::after {
     try {
       const r = await apiPost(action, { nombre, origen:'staff_panel', registradoPor: nombre });
       if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success,#2a7)' : '#e53'; }
-      if (r.success) await _staffAsisCargar();
+      if (r.success) {
+        // Forzar render inmediato según la acción ejecutada (sin esperar al backend)
+        // Esto cubre el caso donde getAsistenciaHoy devuelve índices incorrectos
+        const estadoMap = { entrada: 'activa', salida: 'cerrada', regreso: 'activa' };
+        const nuevoEstado = estadoMap[tipo] || _staffAsisEstado;
+        _staffAsisEstado = nuevoEstado;
+        _staffAsisRenderEstado(nuevoEstado, tipo === 'entrada' ? (r.hora || '') : '', tipo === 'salida' ? (r.hora || '') : '', null);
+        // Luego sincronizar con el backend para datos reales
+        await _staffAsisCargar();
+      }
     } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
   }
 
