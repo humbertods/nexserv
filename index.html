@@ -2710,44 +2710,73 @@ body.rol-staff #confirmSvcClientName::after {
     <div style="padding:20px 16px 120px;">
 
       <!-- Estado actual -->
-      <div id="staffAsisEstadoCard" style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:20px;text-align:center;margin-bottom:24px;">
-        <div id="staffAsisEstadoIcon" style="font-size:40px;margin-bottom:8px;">⬜</div>
-        <div id="staffAsisEstadoLabel" style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px;">Sin registro hoy</div>
-        <div id="staffAsisHoraInfo" style="font-size:13px;color:var(--ink-soft);"></div>
+      <div style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:24px 16px;text-align:center;margin-bottom:24px;">
+        <div id="staffAsisEstadoIcon" style="font-size:44px;margin-bottom:10px;">⬜</div>
+        <div id="staffAsisEstadoLabel" style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:4px;">Sin registro hoy</div>
+        <div id="staffAsisHoraInfo" style="font-size:13px;color:var(--ink-soft);line-height:1.5;"></div>
       </div>
 
-      <!-- Botón ENTRADA / SALIDA (toggle según estado) -->
+      <!-- ESTADO 1: sin entrada → solo botón Registrar entrada -->
+      <!-- ESTADO 2: activa → Registrar salida + Permiso Temporal (con flecha) -->
+      <!-- ESTADO 3: en permiso → Confirmar salida (hora) + Confirmar llegada (hora) -->
+
+      <!-- Botón principal ENTRADA / SALIDA -->
       <button id="staffAsisEntradaBtn" onclick="_staffAsisAccion('entrada')"
-        style="width:100%;padding:16px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:#1a1a1a;color:#fff;">
+        style="width:100%;padding:16px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:#1a1a1a;color:#fff;display:block;">
         ✅ Registrar entrada
       </button>
 
-      <!-- Botón PERMISO (solo activo si tiene entrada) -->
-      <button id="staffAsisPermisoBtn" onclick="_staffAsisAccion('permiso')"
-        style="width:100%;padding:16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:var(--bg-card);color:var(--ink-soft);"
-        disabled>
-        🔒 Permiso (salida temporal)
-      </button>
-
-      <!-- Motivo del permiso (aparece solo al tocar Permiso) -->
-      <div id="staffAsisPermisoMotivo" style="display:none;margin-bottom:12px;">
-        <input id="staffAsisMotivoInp" placeholder="Motivo del permiso (obligatorio)"
-          style="width:100%;padding:13px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);box-sizing:border-box;margin-bottom:8px;">
-        <button onclick="_staffAsisConfirmarPermiso()"
-          style="width:100%;padding:13px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;background:#b8975c;color:#fff;">
-          Confirmar permiso
+      <!-- Bloque ACTIVA: Registrar salida + acordeón Permiso Temporal -->
+      <div id="staffAsisActivaBloque" style="display:none;">
+        <button onclick="_staffAsisAccion('salida')"
+          style="width:100%;padding:15px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;background:var(--bg-card);color:var(--ink);">
+          Registrar salida
         </button>
+
+        <!-- Permiso Temporal acordeón -->
+        <button onclick="_staffAsisTogglePermiso()"
+          style="width:100%;padding:15px 18px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;background:var(--bg-card);color:var(--ink);display:flex;align-items:center;justify-content:space-between;">
+          <span>Permiso Temporal</span>
+          <span id="staffAsisPermisoArrow" style="font-size:14px;transition:transform .2s;">▼</span>
+        </button>
+        <div id="staffAsisPermisoBox" style="display:none;margin-top:8px;padding:14px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:18px;">
+          <input id="staffAsisMotivoInp" placeholder="Motivo (obligatorio)"
+            style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg);box-sizing:border-box;margin-bottom:10px;">
+          <button onclick="_staffAsisConfirmarPermiso()"
+            style="width:100%;padding:13px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;background:#1a1a1a;color:#fff;">
+            Confirmar permiso
+          </button>
+        </div>
       </div>
 
-      <!-- Botón REGRESO (solo activo si está en permiso) -->
-      <button id="staffAsisRegresoBtn" onclick="_staffAsisAccion('regreso')"
-        style="width:100%;padding:16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:var(--bg-card);color:var(--ink-soft);"
-        disabled>
-        ✅ Confirmar llegada
-      </button>
+      <!-- Bloque EN PERMISO: Confirmar salida (hora) + Confirmar llegada (hora) -->
+      <div id="staffAsisPermisoBloque" style="display:none;margin-top:4px;">
+        <!-- Fila: Confirmar salida + hora -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <button onclick="_staffAsisAccion('salida')"
+            style="flex:1;padding:15px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;background:#1a1a1a;color:#fff;">
+            Confirmar salida
+          </button>
+          <div id="staffAsisHoraSalida"
+            style="min-width:80px;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center;background:var(--bg-card);">
+            —
+          </div>
+        </div>
+        <!-- Fila: Confirmar llegada + hora -->
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button onclick="_staffAsisAccion('regreso')"
+            style="flex:1;padding:15px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;background:#1a1a1a;color:#fff;">
+            Confirmar llegada
+          </button>
+          <div id="staffAsisHoraRegreso"
+            style="min-width:80px;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center;background:var(--bg-card);">
+            ·····
+          </div>
+        </div>
+      </div>
 
       <!-- Feedback -->
-      <div id="staffAsisMsgBox" style="text-align:center;font-size:13px;font-weight:700;min-height:20px;margin-top:8px;"></div>
+      <div id="staffAsisMsgBox" style="text-align:center;font-size:13px;font-weight:700;min-height:20px;margin-top:16px;"></div>
 
     </div>
   </div>
@@ -12633,100 +12662,88 @@ body.rol-staff #confirmSvcClientName::after {
   }
 
   function _staffAsisRenderEstado(estado, horaEntrada, horaSalida, yo) {
-    const iconEl   = document.getElementById('staffAsisEstadoIcon');
-    const labelEl  = document.getElementById('staffAsisEstadoLabel');
-    const horaEl   = document.getElementById('staffAsisHoraInfo');
-    const entBtn   = document.getElementById('staffAsisEntradaBtn');
-    const permBtn  = document.getElementById('staffAsisPermisoBtn');
-    const regBtn   = document.getElementById('staffAsisRegresoBtn');
-    const motivoEl = document.getElementById('staffAsisPermisoMotivo');
-    const msgEl    = document.getElementById('staffAsisMsgBox');
+    const iconEl     = document.getElementById('staffAsisEstadoIcon');
+    const labelEl    = document.getElementById('staffAsisEstadoLabel');
+    const horaEl     = document.getElementById('staffAsisHoraInfo');
+    const entBtn     = document.getElementById('staffAsisEntradaBtn');
+    const activaBlq  = document.getElementById('staffAsisActivaBloque');
+    const permisoBlq = document.getElementById('staffAsisPermisoBloque');
+    const msgEl      = document.getElementById('staffAsisMsgBox');
+    const horaSalEl  = document.getElementById('staffAsisHoraSalida');
+    const horaRegEl  = document.getElementById('staffAsisHoraRegreso');
 
     const cfg = {
-      no_iniciada:      { icon:'⬜', label:'Sin registro hoy',      color:'var(--ink)' },
-      activa:           { icon:'🟢', label:'Activa',                 color:'var(--success)' },
-      en_permiso:       { icon:'🟡', label:'En permiso',             color:'#b8975c' },
-      cerrada:          { icon:'⚫', label:'Jornada cerrada',         color:'var(--ink-soft)' },
-      salida_pendiente: { icon:'🔴', label:'Salida pendiente',        color:'#e53' },
-      ausente:          { icon:'❌', label:'Ausente',                 color:'#e53' },
+      no_iniciada:      { icon:'⬜', label:'Sin registro hoy',    color:'var(--ink)' },
+      activa:           { icon:'🟢', label:'Activa',               color:'var(--success,#2a7)' },
+      en_permiso:       { icon:'🟡', label:'En permiso',           color:'#b8975c' },
+      cerrada:          { icon:'⚫', label:'Jornada cerrada',       color:'var(--ink-soft)' },
+      salida_pendiente: { icon:'🔴', label:'Salida pendiente',      color:'#e53' },
+      ausente:          { icon:'❌', label:'Ausente',               color:'#e53' },
     };
     const c = cfg[estado] || cfg.no_iniciada;
     if (iconEl)  iconEl.textContent  = c.icon;
     if (labelEl) { labelEl.textContent = c.label; labelEl.style.color = c.color; }
 
-    // Info de horas
     let infoTxt = '';
     if (horaEntrada) infoTxt += 'Entrada: ' + horaEntrada;
-    if (horaSalida)  infoTxt += '  ·  Salida: ' + horaSalida;
-    if (yo && yo.minutosTrabajados > 0) infoTxt += '  ·  ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min';
+    if (yo && yo.minutosPermiso > 0) infoTxt += '\nPermiso: ' + yo.minutosPermiso + ' min';
+    if (yo && yo.minutosTrabajados > 0) infoTxt += '\nTrabajado: ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min';
     if (horaEl) horaEl.textContent = infoTxt;
 
-    // Botón principal: ENTRADA / SALIDA según estado
-    if (entBtn) {
-      if (estado === 'no_iniciada' || estado === 'cerrada' || estado === 'salida_pendiente') {
-        entBtn.textContent = '✅ Registrar entrada';
-        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
-        entBtn.disabled = false;
-      } else if (estado === 'activa') {
-        entBtn.textContent = '👋 Registrar salida';
-        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
-        entBtn.disabled = false;
-      } else if (estado === 'en_permiso') {
-        entBtn.textContent = '👋 Registrar salida';
-        entBtn.style.background = 'var(--bg-card)'; entBtn.style.color = 'var(--ink-soft)';
-        entBtn.disabled = true;
-      } else {
-        entBtn.textContent = '✅ Registrar entrada';
-        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
-        entBtn.disabled = false;
+    // ── Estado 1: sin entrada ─────────────────────────────────────────
+    const sinEntrada = (estado === 'no_iniciada' || estado === 'cerrada' || estado === 'salida_pendiente' || estado === 'ausente');
+    if (entBtn)    { entBtn.style.display = sinEntrada ? 'block' : 'none'; entBtn.textContent = '✅ Registrar entrada'; }
+    if (activaBlq) activaBlq.style.display = 'none';
+    if (permisoBlq) permisoBlq.style.display = 'none';
+
+    // ── Estado 2: activa ──────────────────────────────────────────────
+    if (estado === 'activa') {
+      if (entBtn)    entBtn.style.display = 'none';
+      if (activaBlq) activaBlq.style.display = 'block';
+      // cerrar el acordeón de permiso si quedó abierto
+      const permBox = document.getElementById('staffAsisPermisoBox');
+      if (permBox) permBox.style.display = 'none';
+      const arrow = document.getElementById('staffAsisPermisoArrow');
+      if (arrow) arrow.style.transform = '';
+    }
+
+    // ── Estado 3: en permiso ──────────────────────────────────────────
+    if (estado === 'en_permiso') {
+      if (entBtn)     entBtn.style.display = 'none';
+      if (activaBlq)  activaBlq.style.display = 'none';
+      if (permisoBlq) permisoBlq.style.display = 'block';
+      // mostrar hora de inicio del permiso y placeholder llegada
+      if (horaSalEl) {
+        // la hora del permiso viene en horaInfo de yo, si no usamos "—"
+        const hPerm = (yo && yo.permisoActivo) ? yo.permisoActivo.hora : (horaEntrada || '—');
+        horaSalEl.textContent = hPerm;
       }
+      if (horaRegEl) horaRegEl.textContent = '·····';
     }
 
-    // Botón PERMISO: activo solo si está activa
-    if (permBtn) {
-      const puedePermiso = (estado === 'activa');
-      permBtn.disabled = !puedePermiso;
-      permBtn.style.color = puedePermiso ? 'var(--ink)' : 'var(--ink-soft)';
-      permBtn.style.borderColor = puedePermiso ? 'var(--ink)' : 'var(--line)';
-      permBtn.style.cursor = puedePermiso ? 'pointer' : 'not-allowed';
-    }
-
-    // Botón REGRESO/CONFIRMAR LLEGADA: activo solo si está en permiso
-    if (regBtn) {
-      const puedeRegreso = (estado === 'en_permiso');
-      regBtn.disabled = !puedeRegreso;
-      regBtn.style.background = puedeRegreso ? '#1a1a1a' : 'var(--bg-card)';
-      regBtn.style.color = puedeRegreso ? '#fff' : 'var(--ink-soft)';
-      regBtn.style.borderColor = puedeRegreso ? '#1a1a1a' : 'var(--line)';
-      regBtn.style.cursor = puedeRegreso ? 'pointer' : 'not-allowed';
-    }
-
-    // Ocultar motivo y limpiar msg
-    if (motivoEl) motivoEl.style.display = 'none';
     if (msgEl) msgEl.textContent = '';
+  }
+
+  function _staffAsisTogglePermiso() {
+    const box   = document.getElementById('staffAsisPermisoBox');
+    const arrow = document.getElementById('staffAsisPermisoArrow');
+    if (!box) return;
+    const abierto = box.style.display !== 'none';
+    box.style.display   = abierto ? 'none' : 'block';
+    if (arrow) arrow.style.transform = abierto ? '' : 'rotate(180deg)';
   }
 
   async function _staffAsisAccion(tipo) {
     const nombre = window.currentUser?.name;
     const msgEl  = document.getElementById('staffAsisMsgBox');
     if (!nombre) return;
-
-    // Permiso: mostrar campo de motivo antes de confirmar
-    if (tipo === 'permiso') {
-      const motivoEl = document.getElementById('staffAsisPermisoMotivo');
-      if (motivoEl) { motivoEl.style.display = motivoEl.style.display === 'none' ? 'block' : 'none'; }
-      return;
-    }
-
-    const accionMap = { entrada: 'asistenciaEntrada', salida: 'asistenciaSalida', regreso: 'asistenciaRegreso' };
-    // entrada = puede ser SALIDA según estado actual
-    let action = accionMap[tipo];
-    if (tipo === 'entrada' && (_staffAsisEstado === 'activa')) action = 'asistenciaSalida';
-
+    const accionMap = { entrada:'asistenciaEntrada', salida:'asistenciaSalida', regreso:'asistenciaRegreso' };
+    const action = accionMap[tipo];
+    if (!action) return;
     if (msgEl) { msgEl.textContent = '⏳ Registrando…'; msgEl.style.color = 'var(--ink-soft)'; }
     try {
-      const r = await apiPost(action, { nombre, origen: 'staff_panel', registradoPor: nombre });
-      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
+      const r = await apiPost(action, { nombre, origen:'staff_panel', registradoPor: nombre });
+      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success,#2a7)' : '#e53'; }
       if (r.success) await _staffAsisCargar();
     } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
   }
@@ -12744,10 +12761,12 @@ body.rol-staff #confirmSvcClientName::after {
     if (msgEl) { msgEl.textContent = '⏳ Registrando permiso…'; msgEl.style.color = 'var(--ink-soft)'; }
     try {
       const r = await apiPost('asistenciaPermiso', { nombre, motivo, origen: 'staff_panel', registradoPor: nombre });
-      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Permiso registrado.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
+      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Permiso registrado.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success,#2a7)' : '#e53'; }
       if (r.success) {
-        document.getElementById('staffAsisMotivoInp').value = '';
-        document.getElementById('staffAsisPermisoMotivo').style.display = 'none';
+        const inp = document.getElementById('staffAsisMotivoInp');
+        if (inp) inp.value = '';
+        const box = document.getElementById('staffAsisPermisoBox');
+        if (box) box.style.display = 'none';
         await _staffAsisCargar();
       }
     } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
