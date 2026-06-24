@@ -12600,10 +12600,51 @@ body.rol-staff #confirmSvcClientName::after {
         + corBtn
         + '</div>';
     }).join('');
-    // cargar select de nombres
+    // cargar select de nombres — siempre refrescar con estado actual
     const sel = document.getElementById('asisNombreSelect');
-    if (sel && sel.options.length <= 1) {
-      r.staff.forEach(function(s){ const o=document.createElement('option'); o.value=s.nombre; o.textContent=s.nombre; sel.appendChild(o); });
+    if (sel) {
+      const valActual = sel.value;
+      sel.innerHTML = '<option value="">— Seleccioná una empleada —</option>';
+      r.staff.forEach(function(s) {
+        const o = document.createElement('option');
+        o.value = s.nombre;
+        const icons = { activa:'🟢', en_permiso:'🟡', cerrada:'⚫', salida_pendiente:'🔴', no_iniciada:'⬜', ausente:'❌' };
+        o.textContent = (icons[s.estadoFinal] || '⬜') + ' ' + s.nombre;
+        o.dataset.estado = s.estadoFinal;
+        sel.appendChild(o);
+      });
+      if (valActual) sel.value = valActual;
+      // al cambiar la empleada, sugerir el tipo correcto y mostrar estado
+      sel.onchange = function() { _asisSugerirTipo(r.staff); };
+    }
+  }
+
+  // Sugiere el tipo de evento correcto según el estado actual de la empleada
+  function _asisSugerirTipo(staffList) {
+    const sel    = document.getElementById('asisNombreSelect');
+    const tipo   = document.getElementById('asisTipoSelect');
+    const msgEl  = document.getElementById('asisMsgBox');
+    if (!sel || !tipo) return;
+    const nombre = sel.value;
+    if (!nombre) { if (msgEl) { msgEl.textContent = ''; } return; }
+    const staff  = (staffList || []).find(function(s){ return s.nombre === nombre; });
+    const estado = staff ? staff.estadoFinal : 'no_iniciada';
+    // Sugerir tipo según estado
+    const sugerencias = {
+      no_iniciada:      'ENTRADA',
+      activa:           'SALIDA',
+      en_permiso:       'REGRESO',
+      cerrada:          'ENTRADA',
+      salida_pendiente: 'ENTRADA',
+      ausente:          'JUSTIFICADO'
+    };
+    if (tipo) tipo.value = sugerencias[estado] || 'ENTRADA';
+    // Mostrar estado actual como hint
+    const labels = { activa:'Activa', en_permiso:'En permiso', cerrada:'Jornada cerrada', salida_pendiente:'Salida pendiente', no_iniciada:'Sin entrada hoy', ausente:'Ausente' };
+    const icons  = { activa:'🟢', en_permiso:'🟡', cerrada:'⚫', salida_pendiente:'🔴', no_iniciada:'⬜', ausente:'❌' };
+    if (msgEl) {
+      msgEl.textContent = (icons[estado] || '⬜') + ' Estado actual: ' + (labels[estado] || estado);
+      msgEl.style.color = 'var(--ink-soft)';
     }
   }
 
@@ -12612,15 +12653,63 @@ body.rol-staff #confirmSvcClientName::after {
     const tipo   = document.getElementById('asisTipoSelect')?.value;
     const motivo = document.getElementById('asisMotivoInput')?.value || '';
     const msgEl  = document.getElementById('asisMsgBox');
-    if (!nombre) { if (msgEl) msgEl.textContent = '⚠ Seleccioná una empleada.'; return; }
-    if (msgEl) msgEl.textContent = '⏳ Registrando…';
-    const acciones = { ENTRADA:'asistenciaEntrada', SALIDA:'asistenciaSalida', PERMISO:'asistenciaPermiso', REGRESO:'asistenciaRegreso' };
+
+    if (!nombre) {
+      if (msgEl) { msgEl.textContent = '⚠ Seleccioná una empleada.'; msgEl.style.color = '#e53'; }
+      return;
+    }
+
+    // Validación cliente antes de enviar (evita ida y vuelta innecesaria)
+    const sel      = document.getElementById('asisNombreSelect');
+    const optEl    = sel ? sel.options[sel.selectedIndex] : null;
+    const estadoAct = optEl ? (optEl.dataset.estado || 'no_iniciada') : 'no_iniciada';
+    const bloqueantes = {
+      SALIDA:  { invalidos: ['no_iniciada','cerrada','salida_pendiente'], msg: '⚠ ' + nombre + ' no tiene entrada activa hoy.' },
+      PERMISO: { invalidos: ['no_iniciada','cerrada','salida_pendiente','en_permiso'], msg: '⚠ ' + nombre + ' no tiene entrada activa o ya está en permiso.' },
+      REGRESO: { invalidos: ['no_iniciada','cerrada','activa','salida_pendiente'], msg: '⚠ ' + nombre + ' no tiene un permiso activo.' },
+      ENTRADA: { invalidos: ['activa','en_permiso'], msg: '⚠ ' + nombre + ' ya tiene una entrada registrada hoy.' }
+    };
+    const regla = bloqueantes[tipo];
+    if (regla && regla.invalidos.indexOf(estadoAct) >= 0) {
+      if (msgEl) { msgEl.textContent = regla.msg; msgEl.style.color = '#e53'; }
+      return;
+    }
+
+    // Pedir motivo si es PERMISO, AUSENCIA o JUSTIFICADO
+    if ((tipo === 'PERMISO' || tipo === 'AUSENCIA' || tipo === 'JUSTIFICADO') && !motivo.trim()) {
+      if (msgEl) { msgEl.textContent = '⚠ Ingresá el motivo para ' + tipo.toLowerCase() + '.'; msgEl.style.color = '#e53'; }
+      document.getElementById('asisMotivoInput')?.focus();
+      return;
+    }
+
+    if (msgEl) { msgEl.textContent = '⏳ Registrando…'; msgEl.style.color = 'var(--ink-soft)'; }
+
+    const acciones = {
+      ENTRADA: 'asistenciaEntrada', SALIDA: 'asistenciaSalida',
+      PERMISO: 'asistenciaPermiso', REGRESO: 'asistenciaRegreso'
+    };
     const action = acciones[tipo] || 'asistenciaEvento';
+
     try {
-      const r = await apiPost(action, { nombre, tipo, motivo, origen:'panel', registradoPor: window.currentUser?.name || 'admin' });
-      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
-      if (r.success) { await _asisCargarHoy(); document.getElementById('asisMotivoInput').value = ''; }
-    } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
+      const r = await apiPost(action, {
+        nombre, tipo, motivo,
+        origen: 'panel',
+        registradoPor: window.currentUser?.name || 'admin'
+      });
+      if (msgEl) {
+        msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.');
+        msgEl.style.color = r.success ? 'var(--success)' : '#e53';
+      }
+      if (r.success) {
+        await _asisCargarHoy();
+        document.getElementById('asisMotivoInput').value = '';
+        // Resetear select al placeholder
+        const selEl = document.getElementById('asisNombreSelect');
+        if (selEl) selEl.value = '';
+      }
+    } catch(e) {
+      if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; }
+    }
   }
 
   async function _asisCargarInforme() {
