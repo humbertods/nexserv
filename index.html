@@ -12847,13 +12847,19 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e) { if (el) el.innerHTML = '⚠ ' + e.message; }
   }
 
+  // Nombres de owners/dueños que nunca aparecen en la lista de asistencia operativa
+  const _ASIS_EXCLUIR = ['humberto','rosa'];
+
   function _asisRenderEstadoHoy(r) {
     const el = document.getElementById('asisEstadoHoy');
     if (!el) return;
-    if (!r.staff || r.staff.length === 0) { el.innerHTML = '<div style="color:var(--ink-faint);padding:20px;text-align:center;">Sin registros hoy.</div>'; return; }
+    const staffFiltrado = (r.staff || []).filter(function(s) {
+      return _ASIS_EXCLUIR.indexOf((s.nombre||'').trim().toLowerCase()) < 0;
+    });
+    if (staffFiltrado.length === 0) { el.innerHTML = '<div style="color:var(--ink-faint);padding:20px;text-align:center;">Sin registros hoy.</div>'; return; }
     const estadoBg = { activa:'rgba(34,170,102,0.10)', en_permiso:'rgba(184,151,92,0.12)', cerrada:'rgba(0,0,0,0.04)', salida_pendiente:'rgba(238,85,51,0.09)', no_iniciada:'transparent', ausente:'rgba(238,85,51,0.09)' };
     const estadoBorder = { activa:'1.5px solid rgba(34,170,102,0.25)', en_permiso:'1.5px solid rgba(184,151,92,0.3)', cerrada:'1.5px solid var(--line)', salida_pendiente:'1.5px solid rgba(238,85,51,0.25)', no_iniciada:'1.5px solid var(--line)', ausente:'1.5px solid rgba(238,85,51,0.25)' };
-    el.innerHTML = r.staff.map(function(s) {
+    el.innerHTML = staffFiltrado.map(function(s) {
       const e = ASIS_ESTADO_LABELS[s.estadoFinal] || { icon:'\u25a1', label: s.estadoFinal };
       const bg = estadoBg[s.estadoFinal] || 'transparent';
       const border = estadoBorder[s.estadoFinal] || '1.5px solid var(--line)';
@@ -12878,7 +12884,7 @@ body.rol-staff #confirmSvcClientName::after {
     if (sel) {
       const valActual = sel.value;
       sel.innerHTML = '<option value="">— Seleccioná una empleada —</option>';
-      r.staff.forEach(function(s) {
+      staffFiltrado.forEach(function(s) {
         const o = document.createElement('option');
         o.value = s.nombre;
         const icons = { activa:'🟢', en_permiso:'🟡', cerrada:'⚫', salida_pendiente:'🔴', no_iniciada:'⬜', ausente:'❌' };
@@ -12888,7 +12894,7 @@ body.rol-staff #confirmSvcClientName::after {
       });
       if (valActual) sel.value = valActual;
       // al cambiar la empleada, sugerir el tipo correcto y mostrar estado
-      sel.onchange = function() { _asisSugerirTipo(r.staff); };
+      sel.onchange = function() { _asisSugerirTipo(staffFiltrado); };
     }
   }
 
