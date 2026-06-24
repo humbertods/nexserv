@@ -550,6 +550,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuAsistenciaBtn" style="display:none;" onclick="closeUserMenu(); show('asistenciaPanel');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2Zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4Z"/><path d="M17 8l1.5 1.5L21 7" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg> Asistencia y permisos
     </button>
+    <button class="user-menu-item" id="menuAsistenciaStaffBtn" style="display:none;" onclick="closeUserMenu(); show('staffAsistencia');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2a5 5 0 1 1 0 10A5 5 0 0 1 12 2Zm0 12c5.33 0 8 2.67 8 4v2H4v-2c0-1.33 2.67-4 8-4Z"/><circle cx="17" cy="17" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M17 15v2l1 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg> Asistencia
+    </button>
     <button class="user-menu-item" onclick="closeUserMenu(); logout();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13 3a2 2 0 0 1 2 2v1h2a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2V5a2 2 0 0 1 2-2h2Zm0 2h-2v1h2V5Zm-4 4H7v11h10V9h-2v7a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2V9Zm2 0v7h2V9h-2Zm3 3.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"/></svg> Cerrar sesión
     </button>
@@ -2693,6 +2696,60 @@ body.rol-staff #confirmSvcClientName::after {
       <button onclick="show('asistenciaPanel')"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><path d="M16 3.5l1.5 1.5L20 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="label-dock">Asistencia</span></button>
       <div class="refresh-toast">✓ Actualizado</div>
     </nav>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ASISTENCIA STAFF — pantalla personal de cada chica               -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="staffAsistencia">
+    <div class="header">
+      <button class="back-btn" onclick="show('staffHome')">← Mi panel</button>
+      <h2>Mi asistencia</h2>
+      <button onclick="_staffAsisCargar()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink);">↻</button>
+    </div>
+    <div style="padding:20px 16px 120px;">
+
+      <!-- Estado actual -->
+      <div id="staffAsisEstadoCard" style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:20px;text-align:center;margin-bottom:24px;">
+        <div id="staffAsisEstadoIcon" style="font-size:40px;margin-bottom:8px;">⬜</div>
+        <div id="staffAsisEstadoLabel" style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:4px;">Sin registro hoy</div>
+        <div id="staffAsisHoraInfo" style="font-size:13px;color:var(--ink-soft);"></div>
+      </div>
+
+      <!-- Botón ENTRADA / SALIDA (toggle según estado) -->
+      <button id="staffAsisEntradaBtn" onclick="_staffAsisAccion('entrada')"
+        style="width:100%;padding:16px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:#1a1a1a;color:#fff;">
+        ✅ Registrar entrada
+      </button>
+
+      <!-- Botón PERMISO (solo activo si tiene entrada) -->
+      <button id="staffAsisPermisoBtn" onclick="_staffAsisAccion('permiso')"
+        style="width:100%;padding:16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:var(--bg-card);color:var(--ink-soft);"
+        disabled>
+        🔒 Permiso (salida temporal)
+      </button>
+
+      <!-- Motivo del permiso (aparece solo al tocar Permiso) -->
+      <div id="staffAsisPermisoMotivo" style="display:none;margin-bottom:12px;">
+        <input id="staffAsisMotivoInp" placeholder="Motivo del permiso (obligatorio)"
+          style="width:100%;padding:13px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);box-sizing:border-box;margin-bottom:8px;">
+        <button onclick="_staffAsisConfirmarPermiso()"
+          style="width:100%;padding:13px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;background:#b8975c;color:#fff;">
+          Confirmar permiso
+        </button>
+      </div>
+
+      <!-- Botón REGRESO (solo activo si está en permiso) -->
+      <button id="staffAsisRegresoBtn" onclick="_staffAsisAccion('regreso')"
+        style="width:100%;padding:16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:12px;background:var(--bg-card);color:var(--ink-soft);"
+        disabled>
+        ✅ Confirmar llegada
+      </button>
+
+      <!-- Feedback -->
+      <div id="staffAsisMsgBox" style="text-align:center;font-size:13px;font-weight:700;min-height:20px;margin-top:8px;"></div>
+
+    </div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
@@ -4947,6 +5004,7 @@ body.rol-staff #confirmSvcClientName::after {
       if (_uMH && !_permitidoMH) { show('staffHome'); return; }
       loadMikaelaHome();
     }
+    if (id === 'staffAsistencia') { _staffAsisCargar(); }
     if (id === 'asistenciaPanel') {
       const esAdmin = window.currentUser && (window.currentUser.rol === 'admin' || window.currentUser.rol === 'owner');
       const esOwner = window.currentUser && window.currentUser.rol === 'owner';
@@ -5527,6 +5585,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
     const asisBtn = document.getElementById('menuAsistenciaBtn');
     if (asisBtn) asisBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    const asisStaffBtn = document.getElementById('menuAsistenciaStaffBtn');
+    if (asisStaffBtn) asisStaffBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
@@ -12551,6 +12611,146 @@ body.rol-staff #confirmSvcClientName::after {
     if (u.role === 'owner' || u.role === 'dueño') show('ownerHome');
     else if (u.role === 'admin' || /mikaela/i.test(u.name || '')) show('mikaelaHome');
     else show('staffHome');
+  }
+
+  // ════════════════════════════════════════════════════════════════════
+  // ASISTENCIA STAFF — pantalla personal
+  // ════════════════════════════════════════════════════════════════════
+  let _staffAsisEstado = 'no_iniciada';  // estado local en memoria
+
+  async function _staffAsisCargar() {
+    const nombre = window.currentUser?.name;
+    if (!nombre) return;
+    try {
+      const r = await apiGet('getAsistenciaHoy');
+      if (!r || !r.success) return;
+      const yo = (r.staff || []).find(function(s){ return s.nombre.toLowerCase() === nombre.toLowerCase(); });
+      _staffAsisEstado = yo ? yo.estadoFinal : 'no_iniciada';
+      const horaEntrada = yo ? yo.horaEntrada : '';
+      const horaSalida  = yo ? yo.horaSalida  : '';
+      _staffAsisRenderEstado(_staffAsisEstado, horaEntrada, horaSalida, yo);
+    } catch(e) { console.error(e); }
+  }
+
+  function _staffAsisRenderEstado(estado, horaEntrada, horaSalida, yo) {
+    const iconEl   = document.getElementById('staffAsisEstadoIcon');
+    const labelEl  = document.getElementById('staffAsisEstadoLabel');
+    const horaEl   = document.getElementById('staffAsisHoraInfo');
+    const entBtn   = document.getElementById('staffAsisEntradaBtn');
+    const permBtn  = document.getElementById('staffAsisPermisoBtn');
+    const regBtn   = document.getElementById('staffAsisRegresoBtn');
+    const motivoEl = document.getElementById('staffAsisPermisoMotivo');
+    const msgEl    = document.getElementById('staffAsisMsgBox');
+
+    const cfg = {
+      no_iniciada:      { icon:'⬜', label:'Sin registro hoy',      color:'var(--ink)' },
+      activa:           { icon:'🟢', label:'Activa',                 color:'var(--success)' },
+      en_permiso:       { icon:'🟡', label:'En permiso',             color:'#b8975c' },
+      cerrada:          { icon:'⚫', label:'Jornada cerrada',         color:'var(--ink-soft)' },
+      salida_pendiente: { icon:'🔴', label:'Salida pendiente',        color:'#e53' },
+      ausente:          { icon:'❌', label:'Ausente',                 color:'#e53' },
+    };
+    const c = cfg[estado] || cfg.no_iniciada;
+    if (iconEl)  iconEl.textContent  = c.icon;
+    if (labelEl) { labelEl.textContent = c.label; labelEl.style.color = c.color; }
+
+    // Info de horas
+    let infoTxt = '';
+    if (horaEntrada) infoTxt += 'Entrada: ' + horaEntrada;
+    if (horaSalida)  infoTxt += '  ·  Salida: ' + horaSalida;
+    if (yo && yo.minutosTrabajados > 0) infoTxt += '  ·  ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min';
+    if (horaEl) horaEl.textContent = infoTxt;
+
+    // Botón principal: ENTRADA / SALIDA según estado
+    if (entBtn) {
+      if (estado === 'no_iniciada' || estado === 'cerrada' || estado === 'salida_pendiente') {
+        entBtn.textContent = '✅ Registrar entrada';
+        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
+        entBtn.disabled = false;
+      } else if (estado === 'activa') {
+        entBtn.textContent = '👋 Registrar salida';
+        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
+        entBtn.disabled = false;
+      } else if (estado === 'en_permiso') {
+        entBtn.textContent = '👋 Registrar salida';
+        entBtn.style.background = 'var(--bg-card)'; entBtn.style.color = 'var(--ink-soft)';
+        entBtn.disabled = true;
+      } else {
+        entBtn.textContent = '✅ Registrar entrada';
+        entBtn.style.background = '#1a1a1a'; entBtn.style.color = '#fff';
+        entBtn.disabled = false;
+      }
+    }
+
+    // Botón PERMISO: activo solo si está activa
+    if (permBtn) {
+      const puedePermiso = (estado === 'activa');
+      permBtn.disabled = !puedePermiso;
+      permBtn.style.color = puedePermiso ? 'var(--ink)' : 'var(--ink-soft)';
+      permBtn.style.borderColor = puedePermiso ? 'var(--ink)' : 'var(--line)';
+      permBtn.style.cursor = puedePermiso ? 'pointer' : 'not-allowed';
+    }
+
+    // Botón REGRESO/CONFIRMAR LLEGADA: activo solo si está en permiso
+    if (regBtn) {
+      const puedeRegreso = (estado === 'en_permiso');
+      regBtn.disabled = !puedeRegreso;
+      regBtn.style.background = puedeRegreso ? '#1a1a1a' : 'var(--bg-card)';
+      regBtn.style.color = puedeRegreso ? '#fff' : 'var(--ink-soft)';
+      regBtn.style.borderColor = puedeRegreso ? '#1a1a1a' : 'var(--line)';
+      regBtn.style.cursor = puedeRegreso ? 'pointer' : 'not-allowed';
+    }
+
+    // Ocultar motivo y limpiar msg
+    if (motivoEl) motivoEl.style.display = 'none';
+    if (msgEl) msgEl.textContent = '';
+  }
+
+  async function _staffAsisAccion(tipo) {
+    const nombre = window.currentUser?.name;
+    const msgEl  = document.getElementById('staffAsisMsgBox');
+    if (!nombre) return;
+
+    // Permiso: mostrar campo de motivo antes de confirmar
+    if (tipo === 'permiso') {
+      const motivoEl = document.getElementById('staffAsisPermisoMotivo');
+      if (motivoEl) { motivoEl.style.display = motivoEl.style.display === 'none' ? 'block' : 'none'; }
+      return;
+    }
+
+    const accionMap = { entrada: 'asistenciaEntrada', salida: 'asistenciaSalida', regreso: 'asistenciaRegreso' };
+    // entrada = puede ser SALIDA según estado actual
+    let action = accionMap[tipo];
+    if (tipo === 'entrada' && (_staffAsisEstado === 'activa')) action = 'asistenciaSalida';
+
+    if (msgEl) { msgEl.textContent = '⏳ Registrando…'; msgEl.style.color = 'var(--ink-soft)'; }
+    try {
+      const r = await apiPost(action, { nombre, origen: 'staff_panel', registradoPor: nombre });
+      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Listo.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
+      if (r.success) await _staffAsisCargar();
+    } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
+  }
+
+  async function _staffAsisConfirmarPermiso() {
+    const nombre = window.currentUser?.name;
+    const motivo = document.getElementById('staffAsisMotivoInp')?.value.trim();
+    const msgEl  = document.getElementById('staffAsisMsgBox');
+    if (!nombre) return;
+    if (!motivo) {
+      if (msgEl) { msgEl.textContent = '⚠ Ingresá el motivo del permiso.'; msgEl.style.color = '#e53'; }
+      document.getElementById('staffAsisMotivoInp')?.focus();
+      return;
+    }
+    if (msgEl) { msgEl.textContent = '⏳ Registrando permiso…'; msgEl.style.color = 'var(--ink-soft)'; }
+    try {
+      const r = await apiPost('asistenciaPermiso', { nombre, motivo, origen: 'staff_panel', registradoPor: nombre });
+      if (msgEl) { msgEl.textContent = r.message || (r.success ? '✅ Permiso registrado.' : '⚠ Error.'); msgEl.style.color = r.success ? 'var(--success)' : '#e53'; }
+      if (r.success) {
+        document.getElementById('staffAsisMotivoInp').value = '';
+        document.getElementById('staffAsisPermisoMotivo').style.display = 'none';
+        await _staffAsisCargar();
+      }
+    } catch(e) { if (msgEl) { msgEl.textContent = '⚠ ' + e.message; msgEl.style.color = '#e53'; } }
   }
 
   // ════════════════════════════════════════════════════════════════════
