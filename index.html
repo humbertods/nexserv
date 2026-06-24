@@ -5043,8 +5043,8 @@ body.rol-staff #confirmSvcClientName::after {
     }
     if (id === 'staffAsistencia') { _staffAsisCargar(); }
     if (id === 'asistenciaPanel') {
-      const esAdmin = window.currentUser && (window.currentUser.rol === 'admin' || window.currentUser.rol === 'owner');
-      const esOwner = window.currentUser && window.currentUser.rol === 'owner';
+      const esAdmin = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
+      const esOwner = window.currentUser && window.currentUser.role === 'owner';
       const regBox = document.getElementById('asisRegistroBox');
       const infBox = document.getElementById('asisInformeBox');
       const corBox = document.getElementById('asisCorreccionBox');
@@ -12828,7 +12828,7 @@ body.rol-staff #confirmSvcClientName::after {
       const retrasoTag = s.retrasoMin > 0 ? '<span style="color:#e53;font-size:11px;font-weight:700;margin-left:6px;">+' + s.retrasoMin + 'min</span>' : '';
       const permisoTag = s.permisoActivo ? '<div style="font-size:11px;color:#b8975c;margin-top:3px;">🔒 Permiso desde ' + s.permisoActivo.hora + (s.permisoActivo.motivo ? ' · ' + s.permisoActivo.motivo : '') + '</div>' : '';
       const horasTag = s.minutosTrabajados > 0 ? '<span style="color:var(--ink-faint);font-size:11px;margin-left:6px;">' + Math.floor(s.minutosTrabajados/60) + 'h ' + (s.minutosTrabajados%60) + 'min</span>' : '';
-      const corBtn = (window.currentUser && (window.currentUser.rol === 'admin' || window.currentUser.rol === 'owner'))
+      const corBtn = (window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner'))
         ? '<button onclick="_asisPreCorreccion(\'' + s.idJornada + '\')" style="background:none;border:1px solid var(--line);border-radius:20px;font-size:11px;padding:2px 8px;cursor:pointer;color:var(--ink-soft);">✏️ Corregir</button>' : '';
       return '<div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);">'
         + '<div style="font-size:20px;">' + e.icon + '</div>'
