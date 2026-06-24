@@ -5327,10 +5327,18 @@ body.rol-staff #confirmSvcClientName::after {
         const r = result.user;
         const areaMap = {
           'Cejas + Depilación': 'cejas',
+          'Cejas+Depilación': 'cejas',
+          'Cejas + Depilacion': 'cejas',
           'Cejas': 'cejas',
+          'cejas': 'cejas',
+          'Depilación': 'cejas',
           'Pestañas': 'pestanas',
+          'Pestanas': 'pestanas',
+          'pestanas': 'pestanas',
           'Facial': 'facial',
-          'Todas': 'todas'
+          'facial': 'facial',
+          'Todas': 'todas',
+          'todas': 'todas'
         };
         const rolNorm = String(r.rol || '').trim().toLowerCase();
         const screenMap = { 'owner':'ownerHome','dueño':'ownerHome','dueno':'ownerHome','admin':'mikaelaHome','staff':'staffHome' };
