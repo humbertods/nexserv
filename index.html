@@ -2797,24 +2797,24 @@ body.rol-staff #confirmSvcClientName::after {
 
       <!-- REGISTRO RÁPIDO (Admin/Mikaela: registrar por nombre) -->
       <div id="asisRegistroBox" style="display:none;">
-        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">Registrar evento</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-          <select id="asisNombreSelect" style="padding:12px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);">
-            <option value="">— Empleada —</option>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 10px;">Registrar evento</div>
+        <div style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;">
+          <select id="asisNombreSelect" style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);margin-bottom:10px;box-sizing:border-box;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;">
+            <option value="">— Seleccioná una empleada —</option>
           </select>
-          <select id="asisTipoSelect" style="padding:12px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);">
+          <select id="asisTipoSelect" style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);margin-bottom:10px;box-sizing:border-box;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%23888' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 12px center;">
             <option value="ENTRADA">✅ Entrada</option>
             <option value="SALIDA">👋 Salida</option>
-            <option value="PERMISO">🔒 Permiso</option>
-            <option value="REGRESO">✅ Regreso</option>
+            <option value="PERMISO">🔒 Permiso temporal</option>
+            <option value="REGRESO">↩️ Regreso de permiso</option>
             <option value="AUSENCIA">❌ Ausencia</option>
             <option value="JUSTIFICADO">📋 Justificado</option>
             <option value="VACACIONES">🏖 Vacaciones</option>
           </select>
+          <input id="asisMotivoInput" placeholder="Motivo (opcional)" style="width:100%;padding:11px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);margin-bottom:12px;box-sizing:border-box;">
+          <button onclick="_asisRegistrar()" style="width:100%;padding:13px;background:var(--ink);color:#fff;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Registrar</button>
         </div>
-        <input id="asisMotivoInput" placeholder="Motivo (opcional)" style="width:100%;padding:12px 16px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;background:var(--bg-card);margin-bottom:10px;box-sizing:border-box;">
-        <button onclick="_asisRegistrar()" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;margin-bottom:4px;">Registrar</button>
-        <div id="asisMsgBox" style="text-align:center;font-size:13px;font-weight:700;margin:8px 0;min-height:20px;"></div>
+        <div id="asisMsgBox" style="text-align:center;font-size:13px;font-weight:700;margin:4px 0 8px;min-height:20px;"></div>
       </div>
 
       <!-- ESTADO HOY -->
@@ -12823,21 +12823,23 @@ body.rol-staff #confirmSvcClientName::after {
     const el = document.getElementById('asisEstadoHoy');
     if (!el) return;
     if (!r.staff || r.staff.length === 0) { el.innerHTML = '<div style="color:var(--ink-faint);padding:20px;text-align:center;">Sin registros hoy.</div>'; return; }
+    const estadoBg = { activa:'rgba(34,170,102,0.10)', en_permiso:'rgba(184,151,92,0.12)', cerrada:'rgba(0,0,0,0.04)', salida_pendiente:'rgba(238,85,51,0.09)', no_iniciada:'transparent', ausente:'rgba(238,85,51,0.09)' };
+    const estadoBorder = { activa:'1.5px solid rgba(34,170,102,0.25)', en_permiso:'1.5px solid rgba(184,151,92,0.3)', cerrada:'1.5px solid var(--line)', salida_pendiente:'1.5px solid rgba(238,85,51,0.25)', no_iniciada:'1.5px solid var(--line)', ausente:'1.5px solid rgba(238,85,51,0.25)' };
     el.innerHTML = r.staff.map(function(s) {
-      const e = ASIS_ESTADO_LABELS[s.estadoFinal] || { icon:'⬜', label: s.estadoFinal };
-      const retrasoTag = s.retrasoMin > 0 ? '<span style="color:#e53;font-size:11px;font-weight:700;margin-left:6px;">+' + s.retrasoMin + 'min</span>' : '';
-      const permisoTag = s.permisoActivo ? '<div style="font-size:11px;color:#b8975c;margin-top:3px;">🔒 Permiso desde ' + s.permisoActivo.hora + (s.permisoActivo.motivo ? ' · ' + s.permisoActivo.motivo : '') + '</div>' : '';
-      const horasTag = s.minutosTrabajados > 0 ? '<span style="color:var(--ink-faint);font-size:11px;margin-left:6px;">' + Math.floor(s.minutosTrabajados/60) + 'h ' + (s.minutosTrabajados%60) + 'min</span>' : '';
+      const e = ASIS_ESTADO_LABELS[s.estadoFinal] || { icon:'\u25a1', label: s.estadoFinal };
+      const bg = estadoBg[s.estadoFinal] || 'transparent';
+      const border = estadoBorder[s.estadoFinal] || '1.5px solid var(--line)';
+      const retrasoTag = s.retrasoMin > 0 ? '<span style="background:#ffeaea;color:#e53;font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:6px;">+' + s.retrasoMin + 'min</span>' : '';
+      const permisoTag = s.permisoActivo ? '<div style="font-size:11px;color:#b8975c;margin-top:4px;">\uD83D\uDD12 Permiso desde ' + s.permisoActivo.hora + (s.permisoActivo.motivo ? ' · ' + s.permisoActivo.motivo : '') + '</div>' : '';
+      const horasTag = s.minutosTrabajados > 0 ? '<span style="font-size:11px;color:var(--ink-faint);"> · ' + Math.floor(s.minutosTrabajados/60) + 'h ' + (s.minutosTrabajados%60) + 'min</span>' : '';
+      const horaEntradaTag = s.horaEntrada ? '<span style="font-size:12px;color:var(--ink-soft);">Entrada ' + s.horaEntrada + (s.horaSalida ? ' · Salida ' + s.horaSalida : '') + '</span>' : '<span style="font-size:12px;color:var(--ink-faint);">Sin registro</span>';
       const corBtn = (window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner'))
-        ? '<button onclick="_asisPreCorreccion(\'' + s.idJornada + '\')" style="background:none;border:1px solid var(--line);border-radius:20px;font-size:11px;padding:2px 8px;cursor:pointer;color:var(--ink-soft);">✏️ Corregir</button>' : '';
-      return '<div style="display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);">'
-        + '<div style="font-size:20px;">' + e.icon + '</div>'
-        + '<div style="flex:1;">'
-        +   '<div style="font-weight:700;font-size:14px;">' + s.nombre + retrasoTag + '</div>'
-        +   '<div style="font-size:12px;color:var(--ink-soft);">' + e.label
-        +     (s.horaEntrada ? ' · entrada ' + s.horaEntrada : '')
-        +     (s.horaSalida  ? ' · salida ' + s.horaSalida   : '')
-        +     horasTag + '</div>'
+        ? '<button onclick="_asisPreCorreccion(\'' + s.idJornada + '\')" style="background:none;border:1px solid var(--line);border-radius:20px;font-size:11px;padding:3px 9px;cursor:pointer;color:var(--ink-soft);flex-shrink:0;">\u270F\uFE0F</button>' : '';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;margin-bottom:6px;background:' + bg + ';border:' + border + ';">'
+        + '<div style="font-size:22px;line-height:1;">' + e.icon + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+        +   '<div style="font-weight:700;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;gap:2px;">' + s.nombre + retrasoTag + '</div>'
+        +   '<div style="margin-top:2px;">' + horaEntradaTag + horasTag + '</div>'
         +   permisoTag
         + '</div>'
         + corBtn
