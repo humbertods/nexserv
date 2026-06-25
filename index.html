@@ -20176,7 +20176,436 @@ function _cierreReportHTML() {
     +   '<div class="fin"><span>TOTAL GENERAL</span><span style="color:' + (x.totalGeneral>=0?'#1e7e34':'#c0392b') + ';">' + money(x.totalGeneral) + '</span></div>'
     + '</div>'
     + '<div class="foot">Caja chica de Mikaela este mes: ' + money(d.gastoCajaChica) + ' en ' + (d.numGastosCaja||0) + ' gasto(s) — control diario de caja, no se incluye en el cuadre (el gasto del mes lo lleva SIRA).<br>' + guardadoTxt + '<br>Reporte generado el ' + fechaGen + '</div>'
-    + '</body></html>';
+    + '<!-- NEXCERT R-010: Validación frontend flujo de cobro -->
+<script>
+(function() {
+  'use strict';
+
+  /**
+   * NEXCERT R-010 — Validación de inputs en capa frontend
+   * Propósito: reducir carga de validación en backend y prevenir que datos
+   * malformados, nulos o con patrones de inyección lleguen al servidor.
+   * Aplica a todos los campos del flujo de cobro de NexServ.
+   */
+
+  // Patrones de inyección básica a rechazar en campos de texto libre
+  var INJECTION_PATTERNS = [
+    /<script[\s\S]*?>/i,
+    /javascript\s*:/i,
+    /on\w+\s*=/i,
+    /['"`;].*[-]{2}/,
+    /\bDROP\b|\bSELECT\b|\bINSERT\b|\bDELETE\b|\bUPDATE\b/i
+  ];
+
+  // Límites aceptables para campos numéricos de cobro
+  var COBRO_LIMITS = {
+    monto: { min: 0.01, max: 9999999 },
+    cantidad: { min: 1, max: 9999 },
+    descuento: { min: 0, max: 100 }
+  };
+
+  /**
+   * Sanitiza y valida un string de texto libre.
+   * @param {string} valor
+   * @param {string} campo — nombre del campo (para mensaje de error)
+   * @param {object} opts — { required, maxLength }
+   * @returns {{ ok: boolean, error: string|null }}
+   */
+  function validarTexto(valor, campo, opts) {
+    opts = opts || {};
+    var v = (valor == null) ? '' : String(valor).trim();
+
+    if (opts.required && v.length === 0) {
+      return { ok: false, error: 'El campo "' + campo + '" es obligatorio.' };
+    }
+    if (opts.maxLength && v.length > opts.maxLength) {
+      return { ok: false, error: 'El campo "' + campo + '" supera el máximo de ' + opts.maxLength + ' caracteres.' };
+    }
+    for (var i = 0; i < INJECTION_PATTERNS.length; i++) {
+      if (INJECTION_PATTERNS[i].test(v)) {
+        return { ok: false, error: 'El campo "' + campo + '" contiene caracteres no permitidos.' };
+      }
+    }
+    return { ok: true, error: null };
+  }
+
+  /**
+   * Valida un valor numérico de cobro.
+   * @param {*} valor
+   * @param {string} campo
+   * @param {string} tipo — clave en COBRO_LIMITS ('monto'|'cantidad'|'descuento')
+   * @returns {{ ok: boolean, error: string|null }}
+   */
+  function validarNumerico(valor, campo, tipo) {
+    if (valor == null || valor === '') {
+      return { ok: false, error: 'El campo "' + campo + '" es obligatorio.' };
+    }
+    var n = Number(valor);
+    if (!isFinite(n) || isNaN(n)) {
+      return { ok: false, error: 'El campo "' + campo + '" debe ser un número válido.' };
+    }
+    var lim = COBRO_LIMITS[tipo];
+    if (lim) {
+      if (n < lim.min) {
+        return { ok: false, error: 'El campo "' + campo + '" debe ser mayor o igual a ' + lim.min + '.' };
+      }
+      if (n > lim.max) {
+        return { ok: false, error: 'El campo "' + campo + '" supera el valor máximo permitido (' + lim.max + ').' };
+      }
+    }
+    return { ok: true, error: null };
+  }
+
+  /**
+   * Ejecuta todas las validaciones sobre el payload del flujo de cobro.
+   * @param {object} payload — objeto con los campos a enviar al backend
+   * @returns {{ ok: boolean, errores: string[] }}
+   */
+  function validarPayloadCobro(payload) {
+    var errores = [];
+    var r;
+
+    // Guardia global: payload no puede ser nulo
+    if (!payload || typeof payload !== 'object') {
+      return { ok: false, errores: ['Payload de cobro inválido o nulo.'] };
+    }
+
+    // Campos de texto obligatorios
+    var camposTexto = [
+      { key: 'clienteNombre', label: 'Nombre del cliente', opts: { required: true, maxLength: 120 } },
+      { key: 'servicio',      label: 'Servicio',           opts: { required: true, maxLength: 200 } },
+      { key: 'metodoPago',    label: 'Método de pago',     opts: { required: true, maxLength: 60  } }
+    ];
+    camposTexto.forEach(function(c) {
+      r = validarTexto(payload[c.key], c.label, c.opts);
+      if (!r.ok) errores.push(r.error);
+    });
+
+    // Campos de texto opcionales (sólo sanitización)
+    var camposOpcionales = [
+      { key: 'notas',     label: 'Notas',     opts: { maxLength: 500 } },
+      { key: 'referencia', label: 'Referencia', opts: { maxLength: 100 } }
+    ];
+    camposOpcionales.forEach(function(c) {
+      if (payload[c.key] != null && payload[c.key] !== '') {
+        r = validarTexto(payload[c.key], c.label, c.opts);
+        if (!r.ok) errores.push(r.error);
+      }
+    });
+
+    // Campos numéricos
+    r = validarNumerico(payload.monto, 'Monto', 'monto');
+    if (!r.ok) errores.push(r.error);
+
+    if (payload.cantidad != null && payload.cantidad !== '') {
+      r = validarNumerico(payload.cantidad, 'Cantidad', 'cantidad');
+      if (!r.ok) errores.push(r.error);
+    }
+    if (payload.descuento != null && payload.descuento !== '') {
+      r = validarNumerico(payload.descuento, 'Descuento', 'descuento');
+      if (!r.ok) errores.push(r.error);
+    }
+
+    return { ok: errores.length === 0, errores: errores };
+  }
+
+  /**
+   * Muestra errores de validación en la UI.
+   * Busca o crea un contenedor #nexcert-validation-errors dentro del formulario dado.
+   * @param {HTMLElement} form
+   * @param {string[]} errores
+   */
+  function mostrarErroresValidacion(form, errores) {
+    var contenedor = form ? form.querySelector('#nexcert-validation-errors') : null;
+    if (!contenedor) {
+      contenedor = document.getElementById('nexcert-validation-errors');
+    }
+    if (!contenedor) {
+      contenedor = document.createElement('div');
+      contenedor.id = 'nexcert-validation-errors';
+      contenedor.style.cssText = [
+        'background:#fce8e8',
+        'color:#c65d5d',
+        'border-radius:14px',
+        'padding:14px 18px',
+        'font-size:13px',
+        'font-weight:600',
+        'margin-bottom:12px',
+        'line-height:1.6'
+      ].join(';');
+      if (form) {
+        form.insertBefore(contenedor, form.firstChild);
+      } else {
+        document.body.insertBefore(contenedor, document.body.firstChild);
+      }
+    }
+    contenedor.innerHTML = errores.map(function(e) {
+      return '&#9888; ' + e;
+    }).join('<br>');
+    contenedor.style.display = 'block';
+    contenedor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  /**
+   * Oculta el contenedor de errores de validación.
+   * @param {HTMLElement} form
+   */
+  function limpiarErroresValidacion(form) {
+    var contenedor = form
+      ? form.querySelector('#nexcert-validation-errors')
+      : document.getElementById('nexcert-validation-errors');
+    if (contenedor) contenedor.style.display = 'none';
+  }
+
+  // Exponer API pública en window.NexCert
+  window.NexCert = window.NexCert || {};
+  window.NexCert.validacion = {
+    validarPayloadCobro: validarPayloadCobro,
+    validarTexto: validarTexto,
+    validarNumerico: validarNumerico,
+    mostrarErroresValidacion: mostrarErroresValidacion,
+    limpiarErroresValidacion: limpiarErroresValidacion
+  };
+
+  /**
+   * Interceptor global: envuelve la función de submit de cobro si existe.
+   * Se ejecuta después de DOMContentLoaded para garantizar que el DOM esté listo.
+   * Busca el formulario de cobro por id='formCobro' o data-nexcert='cobro'.
+   */
+  document.addEventListener('DOMContentLoaded', function() {
+    var formCobro = document.getElementById('formCobro')
+      || document.querySelector('[data-nexcert="cobro"]');
+
+    if (formCobro) {
+      formCobro.addEventListener('submit', function(e) {
+        limpiarErroresValidacion(formCobro);
+
+        // Construir payload desde los inputs del formulario
+        var data = {};
+        ['clienteNombre','servicio','metodoPago','monto','cantidad','descuento','notas','referencia']
+          .forEach(function(campo) {
+            var el = formCobro.querySelector('[name="' + campo + '"]')
+              || formCobro.querySelector('#' + campo);
+            if (el) data[campo] = el.value;
+          });
+
+        var resultado = validarPayloadCobro(data);
+        if (!resultado.ok) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          mostrarErroresValidacion(formCobro, resultado.errores);
+          return false;
+        }
+      }, true); // captura en fase capture para interceptar antes que otros listeners
+    }
+  });
+
+})();
+</script>
+<!-- NEXCERT R-011: Handler de errores frontend + documentación contrato backend -->
+<script>
+(function() {
+  'use strict';
+
+  /**
+   * NEXCERT R-011 — Manejo de errores en producción (capa frontend)
+   *
+   * CONTRATO ESPERADO DEL BACKEND (Apps Script doPost / doGet):
+   * ─────────────────────────────────────────────────────────────
+   * El backend DEBE envolver toda su lógica en try/catch global:
+   *
+   *   function doPost(e) {
+   *     try {
+   *       // lógica de negocio
+   *       return ContentService
+   *         .createTextOutput(JSON.stringify({ ok: true, data: ... }))
+   *         .setMimeType(ContentService.MimeType.JSON);
+   *     } catch(err) {
+   *       // NUNCA exponer err.message, err.stack ni nombres de función al cliente
+   *       console.error('[NexServ][doPost] Error interno:', err);
+   *       return ContentService
+   *         .createTextOutput(JSON.stringify({ ok: false, error: 'ERROR_INTERNO' }))
+   *         .setMimeType(ContentService.MimeType.JSON);
+   *     }
+   *   }
+   *
+   * Respuesta de error genérica hacia el cliente: { ok: false, error: 'ERROR_INTERNO' }
+   * El cliente NO debe recibir stack traces, nombres de función ni rutas internas.
+   * ─────────────────────────────────────────────────────────────
+   *
+   * Este módulo provee:
+   *  - nexFetch(): wrapper de fetch con manejo de errores normalizado.
+   *  - Mensajes de error genéricos hacia el usuario final.
+   *  - Log de errores internos SOLO en consola (no expuesto en UI).
+   */
+
+  // Mensajes genéricos por tipo de error (nunca exponer detalles internos)
+  var MENSAJES_ERROR = {
+    red:        'No se pudo conectar con el servidor. Verifica tu conexión.',
+    servidor:   'Ocurrió un error en el servidor. Intenta nuevamente en unos momentos.',
+    timeout:    'La solicitud tardó demasiado. Intenta nuevamente.',
+    validacion: 'Los datos enviados no son válidos. Revisa el formulario.',
+    sesion:     'Tu sesión ha expirado. Por favor vuelve a iniciar sesión.',
+    generico:   'Ocurrió un error inesperado. Si persiste, contacta soporte.'
+  };
+
+  /**
+   * Determina el mensaje de error a mostrar al usuario según la respuesta.
+   * NUNCA incluye información interna del servidor.
+   * @param {Response|null} response
+   * @param {object|null} body — body parseado de la respuesta
+   * @returns {string}
+   */
+  function resolverMensajeError(response, body) {
+    if (!response) return MENSAJES_ERROR.red;
+    if (response.status === 401 || response.status === 403) return MENSAJES_ERROR.sesion;
+    if (response.status === 400) return MENSAJES_ERROR.validacion;
+    if (response.status >= 500) return MENSAJES_ERROR.servidor;
+    // Backend Apps Script devuelve { ok: false, error: 'ERROR_INTERNO' }
+    if (body && body.ok === false) {
+      // Solo distinguimos tipo de error por código genérico, nunca mostramos body.error crudo
+      if (body.error === 'VALIDACION') return MENSAJES_ERROR.validacion;
+      if (body.error === 'SESION')     return MENSAJES_ERROR.sesion;
+      return MENSAJES_ERROR.servidor;
+    }
+    return MENSAJES_ERROR.generico;
+  }
+
+  /**
+   * Wrapper de fetch con:
+   *  - Timeout configurable (default 20s)
+   *  - Validación previa del payload via NexCert.validacion (si aplica)
+   *  - Normalización de errores (red, HTTP, backend, timeout)
+   *  - Log interno en consola sin exponer detalles al usuario
+   *
+   * @param {string} url
+   * @param {object} opciones — igual que fetch options, más:
+   *   - opciones.timeout {number} ms (default 20000)
+   *   - opciones.payloadCobro {object} si se provee, valida antes de enviar
+   *   - opciones.onError {function(string)} callback con mensaje genérico de error
+   * @returns {Promise<object>} body parseado en caso de éxito
+   * @throws {Error} con message genérico (sin detalles internos)
+   */
+  function nexFetch(url, opciones) {
+    opciones = opciones || {};
+    var timeout  = opciones.timeout  || 20000;
+    var onError  = opciones.onError  || null;
+    var payloadCobro = opciones.payloadCobro || null;
+
+    // R-010: validar payload antes de enviar si se provee
+    if (payloadCobro && window.NexCert && window.NexCert.validacion) {
+      var vResult = window.NexCert.validacion.validarPayloadCobro(payloadCobro);
+      if (!vResult.ok) {
+        var msgValidacion = vResult.errores.join(' | ');
+        if (onError) onError(MENSAJES_ERROR.validacion);
+        // Log interno sin exponer al usuario
+        console.warn('[NexServ][nexFetch] Validación frontend fallida:', msgValidacion);
+        return Promise.reject(new Error(MENSAJES_ERROR.validacion));
+      }
+    }
+
+    // Eliminar propiedades propias de NexCert antes de pasar a fetch
+    var fetchOpts = {};
+    Object.keys(opciones).forEach(function(k) {
+      if (['timeout','onError','payloadCobro'].indexOf(k) === -1) {
+        fetchOpts[k] = opciones[k];
+      }
+    });
+
+    // Controller para timeout
+    var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timeoutId;
+    if (controller) {
+      fetchOpts.signal = controller.signal;
+      timeoutId = setTimeout(function() {
+        controller.abort();
+      }, timeout);
+    }
+
+    return fetch(url, fetchOpts)
+      .then(function(response) {
+        if (timeoutId) clearTimeout(timeoutId);
+
+        // Leer body siempre, incluso en error HTTP
+        return response.text().then(function(text) {
+          var body = null;
+          try { body = JSON.parse(text); } catch(e) { /* body no es JSON */ }
+
+          if (!response.ok || (body && body.ok === false)) {
+            // Log interno SOLO en consola
+            console.error(
+              '[NexServ][nexFetch] Error respuesta:',
+              response.status,
+              // No loguear body completo si puede contener info interna sensible
+              body ? { ok: body.ok, error: body.error } : '(sin body JSON)'
+            );
+            var msgError = resolverMensajeError(response, body);
+            if (onError) onError(msgError);
+            throw new Error(msgError);
+          }
+
+          return body;
+        });
+      })
+      .catch(function(err) {
+        if (timeoutId) clearTimeout(timeoutId);
+
+        // Diferenciar abort (timeout) de error de red
+        var esTimeout = (err.name === 'AbortError');
+        var esRed     = (err.name === 'TypeError' || err.name === 'NetworkError');
+
+        // Log interno sin datos sensibles
+        console.error(
+          '[NexServ][nexFetch] Error capturado:',
+          esTimeout ? 'TIMEOUT' : esRed ? 'RED' : err.name || 'DESCONOCIDO'
+        );
+
+        var msgFinal = esTimeout ? MENSAJES_ERROR.timeout
+                     : esRed    ? MENSAJES_ERROR.red
+                     : (err.message && Object.values(MENSAJES_ERROR).indexOf(err.message) !== -1)
+                       ? err.message  // ya es un mensaje genérico nuestro
+                       : MENSAJES_ERROR.generico;
+
+        if (onError) onError(msgFinal);
+        // Re-lanzar con mensaje genérico, NUNCA con err.message original si no es nuestro
+        throw new Error(msgFinal);
+      });
+  }
+
+  // Exponer en API pública NexCert
+  window.NexCert = window.NexCert || {};
+  window.NexCert.nexFetch = nexFetch;
+  window.NexCert.MENSAJES_ERROR = MENSAJES_ERROR;
+
+  /**
+   * Monkey-patch de seguridad: si existe window.enviarCobro (función principal de cobro),
+   * la envuelve para garantizar manejo de errores aunque el código original no lo tenga.
+   * Se ejecuta después de DOMContentLoaded para que la función original ya esté definida.
+   */
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof window.enviarCobro === 'function') {
+      var _enviarCobroOriginal = window.enviarCobro;
+      window.enviarCobro = function() {
+        try {
+          return _enviarCobroOriginal.apply(this, arguments);
+        } catch(err) {
+          // Log interno
+          console.error('[NexServ][enviarCobro] Error no manejado capturado por wrapper R-011:', err.name || 'Error');
+          // Notificar al usuario con mensaje genérico
+          var msg = MENSAJES_ERROR.generico;
+          if (window.NexCert && window.NexCert.mostrarToast) {
+            window.NexCert.mostrarToast(msg, 'error');
+          } else {
+            alert(msg);
+          }
+        }
+      };
+    }
+  });
+
+})();
+</script>
+</body></html>';
 }
 
 function exportarCierrePDF() {
