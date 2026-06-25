@@ -3341,11 +3341,11 @@ body.rol-staff #confirmSvcClientName::after {
   function _authExpiredShow(titulo, msg) {
     if (_authExpiredVisible) return;
     _authExpiredVisible = true;
-    const modal = document.getElementById('authExpiredModal');
-    if (!modal) return;
-    document.getElementById('authExpiredTitle').textContent = titulo || 'Sesión expirada';
-    document.getElementById('authExpiredMsg').textContent   = msg   || 'Volvé a ingresar para continuar.';
-    modal.style.display = 'flex';
+    // Redirigir al login directamente sin modal bloqueante
+    window._session    = null;
+    window.currentUser = null;
+    localStorage.removeItem('nx_session');
+    if (typeof show === 'function') show('login');
   }
   function _authExpiredRelogin() {
     _authExpiredVisible = false;
