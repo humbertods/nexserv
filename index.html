@@ -12049,13 +12049,12 @@ body.rol-staff #confirmSvcClientName::after {
     const countEl = document.getElementById('porCobrarCount');
 
     // ── PASO 3: switch Lineas / legacy ──────────────────────────────────────
-    // USE_LINEAS_POR_COBRAR = true  → leer desde Lineas (fuente de verdad nueva)
-    // USE_LINEAS_POR_COBRAR = false → leer desde SN/SP/TM/ListaEspera (legacy)
-    // Activar con: localStorage.setItem('NEXSERV_LINEAS_PC', '1') en consola.
-    // Revertir con: localStorage.removeItem('NEXSERV_LINEAS_PC')
-    const USE_LINEAS_POR_COBRAR = localStorage.getItem('NEXSERV_LINEAS_PC') === '1';
+    // USE_LINEAS_POR_COBRAR = true  → leer desde Lineas (fuente de verdad — ACTIVO POR DEFECTO)
+    // Revertir emergencia en consola: localStorage.setItem('NEXSERV_LINEAS_PC', '0')
+    // Volver a activar:              localStorage.removeItem('NEXSERV_LINEAS_PC')
+    const USE_LINEAS_POR_COBRAR = localStorage.getItem('NEXSERV_LINEAS_PC') !== '0';
     const _accion = USE_LINEAS_POR_COBRAR ? 'getPorCobrarDesdeLineas' : 'getPorCobrar';
-    if (USE_LINEAS_POR_COBRAR) console.log('[PorCobrar] 🟢 leyendo desde LINEAS');
+    console.log('[PorCobrar]', USE_LINEAS_POR_COBRAR ? '🟢 LINEAS (activo)' : '🔴 legacy (emergencia)');
 
     try {
       const result = await apiGet(_accion);
