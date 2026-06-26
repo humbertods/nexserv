@@ -2725,13 +2725,13 @@ body.rol-staff #confirmSvcClientName::after {
 
       <!-- Botón REGISTRAR SALIDA (siempre visible) -->
       <button id="staffAsisSalidaBtn" onclick="_staffAsisAccion('salida')"
-        style="width:100%;padding:15px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;background:var(--bg-card);color:var(--ink);display:block;">
+        style="width:100%;padding:15px;border:1.5px solid #cccccc;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;background:#f0f0f0;color:#1a1a1a;display:block;">
         Registrar salida
       </button>
 
       <!-- Permiso Temporal acordeón (siempre visible) -->
       <button id="staffAsisPermisoBtn" onclick="_staffAsisTogglePermiso()"
-        style="width:100%;padding:15px 18px;border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;background:var(--bg-card);color:var(--ink);display:flex;align-items:center;justify-content:space-between;transition:opacity .2s;">
+        style="width:100%;padding:15px 18px;border:1.5px solid #cccccc;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;background:#f0f0f0;color:#1a1a1a;display:flex;align-items:center;justify-content:space-between;">
         <span>Permiso Temporal</span>
         <span id="staffAsisPermisoArrow" style="font-size:14px;transition:transform .2s;">▼</span>
       </button>
@@ -12695,12 +12695,12 @@ body.rol-staff #confirmSvcClientName::after {
     const horaRegEl   = document.getElementById('staffAsisHoraRegreso');
 
     const cfg = {
-      no_iniciada:      { icon:'⬜', label:'Sin registro hoy',    color:'var(--ink)' },
-      activa:           { icon:'🟢', label:'Activa',               color:'var(--success,#2a7)' },
+      no_iniciada:      { icon:'⬜', label:'Sin registro hoy',    color:'#888888' },
+      activa:           { icon:'🟢', label: horaEntrada ? 'Activa desde ' + horaEntrada : 'Activa', color:'#1a9954' },
       en_permiso:       { icon:'🟡', label:'En permiso',           color:'#b8975c' },
-      cerrada:          { icon:'⚫', label:'Jornada cerrada',       color:'var(--ink-soft)' },
-      salida_pendiente: { icon:'🔴', label:'Salida pendiente',      color:'#e53' },
-      ausente:          { icon:'❌', label:'Ausente',               color:'#e53' },
+      cerrada:          { icon:'⚫', label:'Jornada cerrada',       color:'#666666' },
+      salida_pendiente: { icon:'🔴', label:'Salida pendiente',      color:'#e53333' },
+      ausente:          { icon:'❌', label:'Ausente hoy',           color:'#e53333' },
     };
     const c = cfg[estado] || cfg.no_iniciada;
     if (iconEl)  iconEl.textContent  = c.icon;
@@ -12723,9 +12723,13 @@ body.rol-staff #confirmSvcClientName::after {
     }
 
     let infoTxt = '';
-    if (horaEntrada) infoTxt += 'Entrada: ' + horaEntrada;
-    if (yo && yo.minutosPermiso > 0) infoTxt += ' · Permiso: ' + yo.minutosPermiso + ' min';
-    if (yo && yo.minutosTrabajados > 0) infoTxt += ' · ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min trabajados';
+    if (estado === 'no_iniciada') {
+      infoTxt = 'Registrá tu entrada cuando llegues al salón.';
+    } else if (horaEntrada) {
+      infoTxt = 'Entrada: ' + horaEntrada;
+      if (yo && yo.minutosTrabajados > 0) infoTxt += '  ·  ' + Math.floor(yo.minutosTrabajados/60) + 'h ' + (yo.minutosTrabajados%60) + 'min trabajados';
+      if (yo && yo.minutosPermiso > 0) infoTxt += '  ·  Permiso: ' + yo.minutosPermiso + 'min';
+    }
     if (horaEl) horaEl.textContent = infoTxt;
 
     // ── Helpers de habilitado/deshabilitado visual ────────────────────
@@ -12733,25 +12737,29 @@ body.rol-staff #confirmSvcClientName::after {
     // Solo controlar con pointer-events + estilo visual.
     function _setEnabled(btn, enabled, esPrimario) {
       if (!btn) return;
-      btn.disabled            = false;  // siempre false para evitar estilos nativos del browser
+      btn.disabled            = false;
       btn.style.cursor        = enabled ? 'pointer' : 'default';
       btn.style.pointerEvents = enabled ? '' : 'none';
       btn.style.opacity       = '1';
+      btn.style.transition    = 'none';  // eliminar flash de transición
       if (enabled) {
         if (esPrimario) {
           btn.style.background = '#1a1a1a';
-          btn.style.color      = '#fff';
-          btn.style.border     = 'none';
+          btn.style.color      = '#ffffff';
+          btn.style.border     = '1.5px solid #1a1a1a';
+          btn.style.fontWeight = '800';
         } else {
-          btn.style.background = 'var(--bg-card)';
-          btn.style.color      = 'var(--ink)';
-          btn.style.border     = '1.5px solid var(--line)';
+          // Secundario activo: fondo gris muy claro con borde oscuro — siempre visible
+          btn.style.background = '#f0f0f0';
+          btn.style.color      = '#1a1a1a';
+          btn.style.border     = '1.5px solid #cccccc';
           btn.style.fontWeight = '700';
         }
       } else {
-        btn.style.background = 'transparent';
-        btn.style.color      = '#aaaaaa';
-        btn.style.border     = '1.5px solid #d5d5d5';
+        // Deshabilitado: texto gris con borde punteado — visible pero claramente inactivo
+        btn.style.background = '#f8f8f8';
+        btn.style.color      = '#bbbbbb';
+        btn.style.border     = '1.5px dashed #dddddd';
         btn.style.fontWeight = '600';
       }
     }
