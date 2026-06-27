@@ -2725,13 +2725,13 @@ body.rol-staff #confirmSvcClientName::after {
 
       <!-- Botón REGISTRAR SALIDA (siempre visible) -->
       <button id="staffAsisSalidaBtn" onclick="_staffAsisAccion('salida')"
-        style="width:100%;padding:15px;border:1.5px solid #cccccc;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;background:#f0f0f0;color:#1a1a1a;display:block;">
+        style="width:100%;padding:15px;border:1.5px solid #c0c0c0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;margin-bottom:10px;background:transparent;color:#999999;display:block;">
         Registrar salida
       </button>
 
       <!-- Permiso Temporal acordeón (siempre visible) -->
       <button id="staffAsisPermisoBtn" onclick="_staffAsisTogglePermiso()"
-        style="width:100%;padding:15px 18px;border:1.5px solid #cccccc;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:700;cursor:pointer;background:#f0f0f0;color:#1a1a1a;display:flex;align-items:center;justify-content:space-between;">
+        style="width:100%;padding:15px 18px;border:1.5px solid #c0c0c0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;background:transparent;color:#999999;display:flex;align-items:center;justify-content:space-between;">
         <span>Permiso Temporal</span>
         <span id="staffAsisPermisoArrow" style="font-size:14px;transition:transform .2s;">▼</span>
       </button>
@@ -12755,11 +12755,12 @@ body.rol-staff #confirmSvcClientName::after {
           btn.style.fontWeight = '700';
         }
       } else {
-        // Deshabilitado: texto gris con borde punteado — visible pero claramente inactivo
-        btn.style.background = '#f8f8f8';
-        btn.style.color      = '#bbbbbb';
-        btn.style.border     = '1.5px dashed #dddddd';
+        // Deshabilitado: siempre visible — borde sólido gris oscuro, texto gris medio
+        btn.style.background = 'transparent';
+        btn.style.color      = '#999999';
+        btn.style.border     = '1.5px solid #c0c0c0';
         btn.style.fontWeight = '600';
+        btn.style.opacity    = '1';
       }
     }
 
