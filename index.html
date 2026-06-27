@@ -5051,6 +5051,17 @@ body.rol-staff #confirmSvcClientName::after {
         const hoy = new Date(); const m = String(hoy.getMonth()+1).padStart(2,'0'); mesInp.value = m + '/' + hoy.getFullYear();
       }
       _asisCargarHoy();
+      // Auto-refresh cada 30s mientras el panel de asistencia está visible
+      if (window._asisRefreshTimer) clearInterval(window._asisRefreshTimer);
+      window._asisRefreshTimer = setInterval(function() {
+        var panel = document.getElementById('asistenciaPanel');
+        if (panel && panel.style.display !== 'none') {
+          _asisCargarHoy();
+        } else {
+          clearInterval(window._asisRefreshTimer);
+          window._asisRefreshTimer = null;
+        }
+      }, 30000);
     }
     if (id === 'activeService') {
       restoreActivePromos();
