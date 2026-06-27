@@ -37,6 +37,7 @@ body.rol-staff #confirmSvcClientName::after {
   content: attr(data-mask);
   font-size: 16px; font-weight: 700;
 }
+#staffAsisEntradaBtn:focus,#staffAsisSalidaBtn:focus,#staffAsisPermisoBtn:focus{outline:none!important;box-shadow:none!important;}
 </style>
 <meta name="theme-color" content="#1a1a1a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2719,19 +2720,19 @@ body.rol-staff #confirmSvcClientName::after {
 
       <!-- Botón principal: REGISTRAR ENTRADA (siempre visible, disabled según estado) -->
       <button id="staffAsisEntradaBtn" onclick="_staffAsisAccion('entrada')"
-        style="width:100%;padding:16px;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px;background:#1a1a1a;color:#fff;display:block;">
+        style="width:100%;padding:16px;border:1.5px solid #1a1a1a;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:10px;background:#1a1a1a;color:#fff;display:block;outline:none;">
         ✅ Registrar entrada
       </button>
 
       <!-- Botón REGISTRAR SALIDA (siempre visible) -->
       <button id="staffAsisSalidaBtn" onclick="_staffAsisAccion('salida')"
-        style="width:100%;padding:15px;border:1.5px solid #c0c0c0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;margin-bottom:10px;background:transparent;color:#999999;display:block;">
+        style="width:100%;padding:15px;border:1.5px solid #e0e0e0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;margin-bottom:10px;background:#ffffff;color:#b0b0b0;display:block;outline:none;">
         Registrar salida
       </button>
 
       <!-- Permiso Temporal acordeón (siempre visible) -->
       <button id="staffAsisPermisoBtn" onclick="_staffAsisTogglePermiso()"
-        style="width:100%;padding:15px 18px;border:1.5px solid #c0c0c0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;background:transparent;color:#999999;display:flex;align-items:center;justify-content:space-between;">
+        style="width:100%;padding:15px 18px;border:1.5px solid #e0e0e0;border-radius:var(--radius-pill);font-family:inherit;font-size:15px;font-weight:600;cursor:default;background:#ffffff;color:#b0b0b0;display:flex;align-items:center;justify-content:space-between;outline:none;">
         <span>Permiso Temporal</span>
         <span id="staffAsisPermisoArrow" style="font-size:14px;transition:transform .2s;">▼</span>
       </button>
@@ -12681,7 +12682,17 @@ body.rol-staff #confirmSvcClientName::after {
     } catch(e) { console.error('[Asistencia] error:', e); }
   }
 
+  function _normHoraStaff(h) {
+    if (!h) return '';
+    var s = String(h).trim();
+    var m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (m) return m[1].padStart(2,'0') + ':' + m[2];
+    return s;
+  }
+
   function _staffAsisRenderEstado(estado, horaEntrada, horaSalida, yo) {
+    horaEntrada = _normHoraStaff(horaEntrada);
+    horaSalida  = _normHoraStaff(horaSalida);
     const iconEl      = document.getElementById('staffAsisEstadoIcon');
     const labelEl     = document.getElementById('staffAsisEstadoLabel');
     const horaEl      = document.getElementById('staffAsisHoraInfo');
@@ -12737,10 +12748,11 @@ body.rol-staff #confirmSvcClientName::after {
     function _setEnabled(btn, enabled, esPrimario) {
       if (!btn) return;
       btn.disabled            = false;
+      btn.style.outline       = 'none';   // quitar focus ring azul del browser
       btn.style.cursor        = enabled ? 'pointer' : 'default';
       btn.style.pointerEvents = enabled ? '' : 'none';
       btn.style.opacity       = '1';
-      btn.style.transition    = 'none';  // eliminar flash de transición
+      btn.style.transition    = 'none';
       if (enabled) {
         if (esPrimario) {
           btn.style.background = '#1a1a1a';
@@ -12748,19 +12760,18 @@ body.rol-staff #confirmSvcClientName::after {
           btn.style.border     = '1.5px solid #1a1a1a';
           btn.style.fontWeight = '800';
         } else {
-          // Secundario activo: fondo gris muy claro con borde oscuro — siempre visible
-          btn.style.background = '#f0f0f0';
+          // Secundario activo: blanco con borde gris oscuro — igual al mockup
+          btn.style.background = '#ffffff';
           btn.style.color      = '#1a1a1a';
-          btn.style.border     = '1.5px solid #cccccc';
+          btn.style.border     = '1.5px solid #d0d0d0';
           btn.style.fontWeight = '700';
         }
       } else {
-        // Deshabilitado: siempre visible — borde sólido gris oscuro, texto gris medio
-        btn.style.background = 'transparent';
-        btn.style.color      = '#999999';
-        btn.style.border     = '1.5px solid #c0c0c0';
+        // Deshabilitado: blanco con borde gris claro y texto gris — exacto al mockup
+        btn.style.background = '#ffffff';
+        btn.style.color      = '#c0c0c0';
+        btn.style.border     = '1.5px solid #e8e8e8';
         btn.style.fontWeight = '600';
-        btn.style.opacity    = '1';
       }
     }
 
@@ -12893,7 +12904,21 @@ body.rol-staff #confirmSvcClientName::after {
     if (staffFiltrado.length === 0) { el.innerHTML = '<div style="color:var(--ink-faint);padding:20px;text-align:center;">Sin registros hoy.</div>'; return; }
     const estadoBg = { activa:'rgba(34,170,102,0.10)', en_permiso:'rgba(184,151,92,0.12)', cerrada:'rgba(0,0,0,0.04)', salida_pendiente:'rgba(238,85,51,0.09)', no_iniciada:'transparent', ausente:'rgba(238,85,51,0.09)' };
     const estadoBorder = { activa:'1.5px solid rgba(34,170,102,0.25)', en_permiso:'1.5px solid rgba(184,151,92,0.3)', cerrada:'1.5px solid var(--line)', salida_pendiente:'1.5px solid rgba(238,85,51,0.25)', no_iniciada:'1.5px solid var(--line)', ausente:'1.5px solid rgba(238,85,51,0.25)' };
+    // Normalizar horas que pueden venir como Date serializado de Sheets
+    // "Sat Dec 30 1899 07:46:00 GMT-0500" → "07:46"
+    function _normHora(h) {
+      if (!h) return '';
+      var s = String(h).trim();
+      // Si es un Date serializado, extraer HH:mm
+      var m = s.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(GMT|am|pm)?/i);
+      if (m) return m[1].padStart(2,'0') + ':' + m[2];
+      // Si ya es HH:mm limpio
+      if (/^\d{1,2}:\d{2}$/.test(s)) return s;
+      return s;
+    }
     el.innerHTML = staffFiltrado.map(function(s) {
+      s.horaEntrada = _normHora(s.horaEntrada);
+      s.horaSalida  = _normHora(s.horaSalida);
       const e = ASIS_ESTADO_LABELS[s.estadoFinal] || { icon:'\u25a1', label: s.estadoFinal };
       const bg = estadoBg[s.estadoFinal] || 'transparent';
       const border = estadoBorder[s.estadoFinal] || '1.5px solid var(--line)';
