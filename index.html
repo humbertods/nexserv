@@ -3548,7 +3548,7 @@ body.rol-staff #confirmSvcClientName::after {
   const AREA_LABELS_TEXT = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting / Retiro', facial: 'Facial' };
 
   const AREA_COMM = { cejas: '30%', depilacion: '30%', pestanas: '30%', facial: '40%' };
-  const AREA_STAFF = { cejas: 'María / Keyla / Lesly / Rosa', depilacion: 'María / Keyla / Lesly / Rosa', pestanas: 'Yadira / Diana', retiro_lifting: 'María / Keyla / Lesly / Rosa / Yadira / Diana', facial: 'Laura' };
+  const AREA_STAFF = { cejas: 'María / Keyla / Lesly / Rosa', depilacion: 'María / Keyla / Lesly / Rosa', pestanas: 'Yadira / Diana', retiro_lifting: 'María / Keyla / Lesly / Rosa', facial: 'Laura' };
 
   function updatePromoTotal() {
     const selected = getSelectedServices();
@@ -4112,12 +4112,12 @@ body.rol-staff #confirmSvcClientName::after {
   const WAITLIST = [];
 
   // ÁREAS que cada grupo puede tomar:
-  // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
-  // Pestañas (Y/D): pestanas, retiro_lifting
+  // Cejas (M/L/K/R): cejas, depilacion, retiro_lifting (lifting lo atiende cejas)
+  // Pestañas (Y/D): pestanas
   // Facial (L): facial
   const AREA_FILTER = {
     'cejas': ['cejas', 'depilacion', 'retiro_lifting'],
-    'pestanas': ['pestanas', 'retiro_lifting'],
+    'pestanas': ['pestanas'],
     'facial': ['facial'],
   };
 
@@ -8633,8 +8633,8 @@ body.rol-staff #confirmSvcClientName::after {
   // a una clave canónica para comparar de forma confiable.
   function _areaCanon(s) {
     var a = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
-    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0) return 'cejas';
-    if (a.indexOf('pesta') >= 0 || a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'pestanas';
+    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0 || a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'cejas';
+    if (a.indexOf('pesta') >= 0) return 'pestanas';
     if (a.indexOf('facial') >= 0) return 'facial';
     return a;
   }
@@ -8676,8 +8676,8 @@ body.rol-staff #confirmSvcClientName::after {
           .filter(s => s.status === 'aprobado')
           .map(s => {
             const a = String(s.area || '').toLowerCase();
-            if (a.includes('ceja') || a.includes('depil')) return 'cejas';
-            if (a.includes('pesta') || a.includes('lifting') || a.includes('retiro')) return 'pestanas';
+            if (a.includes('ceja') || a.includes('depil') || a.includes('lifting') || a.includes('retiro')) return 'cejas';
+            if (a.includes('pesta')) return 'pestanas';
             if (a.includes('facial')) return 'facial';
             return null;
           })
@@ -9438,8 +9438,8 @@ body.rol-staff #confirmSvcClientName::after {
       svcsAprobados
         .map(s => {
           const a = String(s.area || '').toLowerCase();
-          if (a.includes('ceja') || a.includes('depil')) return 'cejas';
-          if (a.includes('pesta') || a.includes('lifting') || a.includes('retiro')) return 'pestanas';
+          if (a.includes('ceja') || a.includes('depil') || a.includes('lifting') || a.includes('retiro')) return 'cejas';
+          if (a.includes('pesta')) return 'pestanas';
           if (a.includes('facial')) return 'facial';
           return null;
         })
@@ -10597,7 +10597,7 @@ body.rol-staff #confirmSvcClientName::after {
     
     if (!area) return;
     
-    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'pestanas', facial: 'facial' };
+    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'cejas', facial: 'facial' };
     const catKey = catMap[area] || area;
     const services = CATALOGO[catKey] || [];
     
@@ -14976,7 +14976,8 @@ body.rol-staff #confirmSvcClientName::after {
         s.includes('skin') || s.includes('peeling') || s.includes('glow') || s.includes('dermapla') ||
         s.includes('microneedl') || s.includes('punto de rubi')) return 'facial';
     if (s.includes('depil') || s.includes('bigote') || s.includes('bikini')) return 'depilacion';
-    if (s.includes('pest') || s.includes('lifting') || s.includes('retiro')) return 'pestanas';
+    if (s.includes('lifting') || s.includes('retiro')) return 'cejas';
+    if (s.includes('pest')) return 'pestanas';
     return 'cejas';
   }
   window.AREA_KEY_FROM_DIV = AREA_KEY_FROM_DIV;
@@ -16524,8 +16525,8 @@ body.rol-staff #confirmSvcClientName::after {
     'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
     'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
     'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
-    'Yadira': { key: 'yadira', area: 'Pestanas · Lifting/Retiros' },
-    'Diana':  { key: 'diana',  area: 'Pestanas · Lifting/Retiros' },
+    'Yadira': { key: 'yadira', area: 'Pestanas' },
+    'Diana':  { key: 'diana',  area: 'Pestanas' },
     'Laura':  { key: 'laura',  area: 'Facial' },
   };
 
@@ -16550,7 +16551,7 @@ body.rol-staff #confirmSvcClientName::after {
       const nombre = prefNombre[key];
       const a = areaDe[key];
       todos.push(nombre);
-      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); }
+      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); map.retiro_lifting.push(nombre); }
       if (a.includes('pestan')) { map.pestanas.push(nombre); }
       if (a.includes('lifting') || a.includes('retiro')) { map.retiro_lifting.push(nombre); }
       if (a.includes('facial')) { map.facial.push(nombre); }
@@ -17890,7 +17891,7 @@ body.rol-staff #confirmSvcClientName::after {
     
     if (!area) return;
     
-    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'pestanas', facial: 'facial' };
+    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'cejas', facial: 'facial' };
     const catKey = catMap[area] || area;
     const services = CATALOGO[catKey] || [];
     
@@ -18252,7 +18253,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + (codigo||'Clienta') + ' · ' + a.tentativo, isTop);
-          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+a.tentativo);
+          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas'],Diana:['pestanas'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+a.tentativo);
           setTimeout(() => { show('mikaelaHome'); }, 600);
         } else {
           alert('Error: ' + (result?.error || result?.message || 'Error desconocido'));
@@ -18273,7 +18274,7 @@ body.rol-staff #confirmSvcClientName::after {
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
         simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMulti.length + ' servicios', isTop);
         const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
-        const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
+        const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas'],Diana:['pestanas'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
         enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMulti.length+' servicios');
         alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
@@ -18344,8 +18345,8 @@ body.rol-staff #confirmSvcClientName::after {
       { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
-      { name: 'Yadira', area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
-      { name: 'Diana',  area: 'Pestañas', areas: ['pestanas', 'retiro_lifting'] },
+      { name: 'Yadira', area: 'Pestañas', areas: ['pestanas'] },
+      { name: 'Diana',  area: 'Pestañas', areas: ['pestanas'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
     ];
     const _areaMapGTL = { 'Cejas':'cejas','Depilación':'depilacion','Pestañas':'pestanas','Lifting / Retiro':'retiro_lifting','Facial':'facial' };
