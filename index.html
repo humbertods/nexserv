@@ -13205,14 +13205,16 @@ body.rol-staff #confirmSvcClientName::after {
         });
         return !incluidoEnOtra;
       });
-      // Recalcular el precio REGULAR por línea (montoNormal) con el catálogo de promos,
-      // para que la tarjeta recalcule aunque el ticket no haya guardado el regular por área.
-      // CLAVE: el descuento de una promo se cuenta UNA sola vez por TICKET, aunque el combo
-      // aparezca en varias áreas (depilación + pestañas). Antes se sumaba el descuento por
-      // cada área → la tarjeta quedaba inflada en combos multi-área (ej. $65 en vez de $57).
+      // Respetar montoNormal exacto si ya viene desde Lineas/TM. Ahí NexServ guarda la
+      // división regular por área; recalcular aquí puede romper combos multiárea.
       const _vistosPromoTicket = new Set();
       desglose.forEach(function(d){
         const m = Number(d.monto) || 0;
+        const normalExacto = Number(d.montoNormal);
+        if (normalExacto > 0 && (d.regularExacto || normalExacto !== m)) {
+          d.montoNormal = normalExacto;
+          return;
+        }
         let uplift = 0;
         let encontroPromo = false;
         if (typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
@@ -14444,12 +14446,13 @@ body.rol-staff #confirmSvcClientName::after {
       // (Se quitó el reordenamiento "área seleccionada primero": desalineaba los
       //  slots con la staff y hacía caer a la chica en el monto/área equivocada.)
       svc._isComboMultiArea = true;
-      // Precio regular por área: proporcional al regular del combo (para que tarjeta cobre sin promo)
+      // Precio regular por área: usar la división exacta si viene de Paquetes.
       const _promoPrecio  = Number(d.precio || 0);
       const _promoRegular = Number(d.regular || d.precio || 0);
       svc._comboAreas = d.division.map(dv => {
         const _m = Number(dv.monto || 0);
-        const _reg = (_promoPrecio > 0 && _promoRegular > _promoPrecio)
+        const _regExacto = Number(dv.regular || dv.montoRegular || dv.precioRegular || dv.normal || 0);
+        const _reg = _regExacto > 0 ? _regExacto : (_promoPrecio > 0 && _promoRegular > _promoPrecio)
           ? Math.round((_m / _promoPrecio) * _promoRegular * 100) / 100
           : _m;
         const _areaKey = AREA_KEY_FROM_DIV(String(dv.area || dv.servicio || ''));
