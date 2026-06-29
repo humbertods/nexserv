@@ -37,7 +37,7 @@ body.rol-staff #confirmSvcClientName::after {
   content: attr(data-mask);
   font-size: 16px; font-weight: 700;
 }
-#staffAsisEntradaBtn:focus,#staffAsisSalidaBtn:focus,#staffAsisPermisoBtn:focus{outline:none!important;box-shadow:none!important;}
+#staffAsisEntradaBtn:focus,#staffAsisSalidaBtn:focus,#staffAsisPermisoBtn:focus{outline:none!important;box-shadow:none!important;} #staffAsisEntradaBtn,#staffAsisSalidaBtn,#staffAsisPermisoBtn{-webkit-tap-highlight-color:transparent;}
 </style>
 <meta name="theme-color" content="#1a1a1a">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2712,10 +2712,15 @@ body.rol-staff #confirmSvcClientName::after {
     <div style="padding:20px 16px 120px;">
 
       <!-- Estado actual -->
-      <div id="staffAsisCard" style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:24px 16px;text-align:center;margin-bottom:24px;transition:background .3s,border .3s;">
-        <div id="staffAsisEstadoIcon" style="font-size:44px;margin-bottom:10px;">⬜</div>
-        <div id="staffAsisEstadoLabel" style="font-size:17px;font-weight:800;color:var(--ink);margin-bottom:4px;">Sin registro hoy</div>
-        <div id="staffAsisHoraInfo" style="font-size:13px;color:var(--ink-soft);line-height:1.5;"></div>
+      <div id="staffAsisCard" style="background:var(--bg-card);border:1.5px solid var(--line);border-radius:20px;padding:20px 16px;text-align:center;margin-bottom:24px;transition:background .3s,border .3s;">
+        <div id="staffAsisEstadoIcon" style="font-size:36px;margin-bottom:8px;">⬜</div>
+        <div id="staffAsisEstadoLabel" style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:8px;">Sin registro hoy</div>
+        <!-- Hora de entrada prominente -->
+        <div id="staffAsisHoraEntradaDisplay" style="display:none;margin-bottom:6px;">
+          <span style="font-size:28px;font-weight:900;color:var(--ink);letter-spacing:-0.5px;" id="staffAsisHoraGrande"></span>
+          <div style="font-size:11px;color:var(--ink-faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-top:2px;">hora de entrada</div>
+        </div>
+        <div id="staffAsisHoraInfo" style="font-size:12px;color:var(--ink-soft);line-height:1.5;"></div>
       </div>
 
       <!-- Botón principal: REGISTRAR ENTRADA (siempre visible, disabled según estado) -->
@@ -12752,6 +12757,18 @@ body.rol-staff #confirmSvcClientName::after {
       if (yo && yo.minutosPermiso > 0) infoTxt += '  ·  Permiso: ' + yo.minutosPermiso + 'min';
     }
     if (horaEl) horaEl.textContent = infoTxt;
+    // Mostrar hora de entrada en grande cuando está activa o en permiso
+    var horaGrandeEl  = document.getElementById('staffAsisHoraGrande');
+    var horaDisplayEl = document.getElementById('staffAsisHoraEntradaDisplay');
+    if (horaGrandeEl && horaDisplayEl) {
+      if (horaEntrada && (estado === 'activa' || estado === 'en_permiso' || estado === 'cerrada')) {
+        horaGrandeEl.textContent  = horaEntrada;
+        horaDisplayEl.style.display = 'block';
+        if (horaEl) horaEl.textContent = infoTxt.replace('Entrada: ' + horaEntrada, '').replace(/^ · /, '').trim();
+      } else {
+        horaDisplayEl.style.display = 'none';
+      }
+    }
 
     // ── Helpers de habilitado/deshabilitado visual ────────────────────
     // NUNCA usar btn.disabled — el browser aplica opacity nativa que no se puede sobreescribir.
