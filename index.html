@@ -11589,6 +11589,21 @@ body.rol-staff #confirmSvcClientName::after {
           cobrarList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>';
         } else {
           window._mkPorCobrarData = porCobrar;
+
+          // FIX: precargar líneas desde Lineas para todos los TM por cobrar.
+          // Así el desglose visual (quién hizo qué, a qué precio) viene de Lineas
+          // y no de TicketMulti — eliminando los decimales del cálculo proporcional.
+          window._lineasParaCobro = window._lineasParaCobro || {};
+          const _tmsPorCobrar = porCobrar.filter(p => p.fuente === 'TicketMulti');
+          await Promise.all(_tmsPorCobrar.map(async function(p) {
+            try {
+              const _r = await apiGet('getLineasParaCobro', { idTM: p.idEspera });
+              if (_r && _r.success && _r.lineas && _r.lineas.length > 0) {
+                window._lineasParaCobro[p.idEspera] = _r.lineas;
+              }
+            } catch(eLn) { /* falla silenciosa — el backend igual usa Lineas */ }
+          }));
+
           cobrarList.innerHTML = porCobrar.map(p => {
             const esTM = p.fuente === 'TicketMulti';
             let desgloseData = p.serviciosDetalle;
@@ -11602,13 +11617,24 @@ body.rol-staff #confirmSvcClientName::after {
               }));
             }
             if (!desgloseData && esTM && p.areas) {
-              // FIX: NO construir desgloseData desde p.areas (TicketMulti) para TM.
-              // TicketMulti calcula precioNormal proporcionalmente cuando no tiene la
-              // división exacta por área, generando decimales (47.5, 19.5, 80.68...).
-              // El backend ya lee Lineas directamente (getLineasParaCobro) cuando
-              // _fuenteLineas=true — Lineas tiene montoRegular limpio por slot.
-              // Dejar desgloseData=null para que el backend use Lineas como fuente única.
-              desgloseData = null;
+              // FIX: construir desgloseData desde Lineas (montoRegular limpio),
+              // NO desde p.areas de TicketMulti (que tiene decimales por cálculo proporcional).
+              // Usar _lnCobro precargado si existe (ver bloque de carga asíncrona arriba),
+              // si no, usar p.areas como fallback visual pero con precios de Paquetes.
+              const _lnTM = window._lineasParaCobro && window._lineasParaCobro[p.idEspera];
+              if (_lnTM && _lnTM.length > 0) {
+                desgloseData = _lnTM.map(function(l) {
+                  return {
+                    staff:       l.staff,
+                    servicio:    l.servicio,
+                    area:        l.area,
+                    monto:       Number(l.precioPromo   || 0),
+                    montoNormal: Number(l.precioRegular || l.precioPromo || 0)
+                  };
+                });
+              }
+              // Si no hay datos de Lineas aún, desgloseData queda null →
+              // el backend igual usa Lineas en el cobro (getLineasParaCobro server-side)
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
             return `
