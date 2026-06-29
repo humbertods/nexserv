@@ -4112,8 +4112,8 @@ body.rol-staff #confirmSvcClientName::after {
   const WAITLIST = [];
 
   // ÁREAS que cada grupo puede tomar:
-  // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
-  // Pestañas (Y/D): pestanas, retiro_lifting
+  // Cejas (M/L/K/R): cejas, depilacion, retiro_lifting (lifting/retiros)
+  // Pestañas (Y/D): pestanas
   // Facial (L): facial
   const AREA_FILTER = {
     'cejas': ['cejas', 'depilacion', 'retiro_lifting'],
@@ -5417,7 +5417,7 @@ body.rol-staff #confirmSvcClientName::after {
       document.getElementById('pestFichaQuick1').innerHTML = '';
       
       const areaLabel = user.area === 'cejas' ? 'Cejas · Depilación · Lifting/Retiros' :
-                        user.area === 'pestanas' ? 'Pestañas · Lifting/Retiros' :
+                        user.area === 'pestanas' ? 'Pestañas' :
                         user.area === 'facial' ? 'Facial' : '';
       document.getElementById('waitListRole').textContent = areaLabel;
       const allowed = AREA_FILTER[user.area] || [];
@@ -16535,8 +16535,8 @@ body.rol-staff #confirmSvcClientName::after {
     'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
     'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
     'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
-    'Yadira': { key: 'yadira', area: 'Pestanas · Lifting/Retiros' },
-    'Diana':  { key: 'diana',  area: 'Pestanas · Lifting/Retiros' },
+    'Yadira': { key: 'yadira', area: 'Pestanas' },
+    'Diana':  { key: 'diana',  area: 'Pestanas' },
     'Laura':  { key: 'laura',  area: 'Facial' },
   };
 
