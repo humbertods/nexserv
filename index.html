@@ -4112,8 +4112,8 @@ body.rol-staff #confirmSvcClientName::after {
   const WAITLIST = [];
 
   // ÁREAS que cada grupo puede tomar:
-  // Cejas (M/L/K/R): cejas, depilacion, retiro_lifting (lifting lo atiende cejas)
-  // Pestañas (Y/D): pestanas
+  // Cejas (M/L/K): cejas, depilacion, retiro_lifting (retiro de pestañas, lifting, retiro de lifting)
+  // Pestañas (Y/D): pestanas, retiro_lifting
   // Facial (L): facial
   const AREA_FILTER = {
     'cejas': ['cejas', 'depilacion', 'retiro_lifting'],
@@ -7433,7 +7433,7 @@ body.rol-staff #confirmSvcClientName::after {
     function _nombreParte(s) {
       if (s.subtitulo) return s.subtitulo;
       const areaN = String(s.area || '').toLowerCase().replace(/[^a-z]/g, '');
-      const kw = ({ cejas: ['ceja', 'depil'], depilacion: ['ceja', 'depil'], pestanas: ['pesta', 'lifting', 'lash'], retiro_lifting: ['lifting', 'retiro', 'pesta'], facial: ['facial', 'limpieza'] })[areaN] || [areaN];
+      const kw = ({ cejas: ['ceja', 'depil'], depilacion: ['ceja', 'depil'], pestanas: ['pesta', 'lash'], retiro_lifting: ['lifting', 'retiro'], facial: ['facial', 'limpieza'] })[areaN] || [areaN];
       const match = _divPartes.find(function (d) {
         const dn = String(d.servicio || d.area || '').toLowerCase();
         return kw.some(function (k) { return dn.includes(k); });
@@ -8633,7 +8633,8 @@ body.rol-staff #confirmSvcClientName::after {
   // a una clave canónica para comparar de forma confiable.
   function _areaCanon(s) {
     var a = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
-    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0 || a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'cejas';
+    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0) return 'cejas';
+    if (a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'cejas';
     if (a.indexOf('pesta') >= 0) return 'pestanas';
     if (a.indexOf('facial') >= 0) return 'facial';
     return a;
@@ -8676,7 +8677,8 @@ body.rol-staff #confirmSvcClientName::after {
           .filter(s => s.status === 'aprobado')
           .map(s => {
             const a = String(s.area || '').toLowerCase();
-            if (a.includes('ceja') || a.includes('depil') || a.includes('lifting') || a.includes('retiro')) return 'cejas';
+            if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+            if (a.includes('lifting') || a.includes('retiro')) return 'cejas';
             if (a.includes('pesta')) return 'pestanas';
             if (a.includes('facial')) return 'facial';
             return null;
@@ -9091,7 +9093,8 @@ body.rol-staff #confirmSvcClientName::after {
     function fam(x) {
       x = String(x || '').toLowerCase();
       if (x.indexOf('facial') >= 0 || x.indexOf('hidra') >= 0 || x.indexOf('limpieza') >= 0) return 'facial';
-      if (x.indexOf('pest') >= 0 || x.indexOf('lifting') >= 0 || x.indexOf('retiro') >= 0 ||
+      if (x.indexOf('lifting') >= 0 || x.indexOf('retiro') >= 0) return 'retiro_lifting';
+      if (x.indexOf('pest') >= 0 ||
           x.indexOf('volumen') >= 0 || x.indexOf('pelo a pelo') >= 0) return 'pestanas';
       if (x.indexOf('cej') >= 0 || x.indexOf('depil') >= 0 || x.indexOf('bigote') >= 0 ||
           x.indexOf('pigment') >= 0 || x.indexOf('brow') >= 0) return 'cejas';
@@ -9438,7 +9441,8 @@ body.rol-staff #confirmSvcClientName::after {
       svcsAprobados
         .map(s => {
           const a = String(s.area || '').toLowerCase();
-          if (a.includes('ceja') || a.includes('depil') || a.includes('lifting') || a.includes('retiro')) return 'cejas';
+          if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+          if (a.includes('lifting') || a.includes('retiro')) return 'cejas';
           if (a.includes('pesta')) return 'pestanas';
           if (a.includes('facial')) return 'facial';
           return null;
@@ -11018,7 +11022,8 @@ body.rol-staff #confirmSvcClientName::after {
   function _prelistaAreaKey(area) {
     const n = String(area || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (n.includes('ceja') || n.includes('pigment')) return 'cejas';
-    if (n.includes('pesta') || n.includes('lifting') || n.includes('volumen')) return 'pestañas';
+    if (n.includes('lifting') || n.includes('retiro')) return 'cejas';
+    if (n.includes('pesta') || n.includes('volumen')) return 'pestañas';
     if (n.includes('facial')) return 'facial';
     if (n.includes('depil')) return 'depilacion';
     return '';
@@ -13665,9 +13670,14 @@ body.rol-staff #confirmSvcClientName::after {
   function _regularClienta(c) {
     const total = Number(c.total) || 0;
     const reg = Number(c.precioRegular) || 0;
+    // Retornar regular si es diferente al promo (mayor O simplemente distinto y > 0)
+    if (reg > 0 && reg !== total) return reg;
     if (reg > total) return reg;
     if (Array.isArray(c.serviciosDetalle)) {
+      // Sumar montoNormal si existe en el desglose (viene de Lineas con montoRegular)
+      const tieneNormal = c.serviciosDetalle.some(function(d){ return d.montoNormal != null && d.montoNormal !== d.monto; });
       const sumN = c.serviciosDetalle.reduce(function(s,d){ return s + (Number(d.montoNormal != null ? d.montoNormal : d.monto) || 0); }, 0);
+      if (tieneNormal && sumN > 0) return sumN;
       if (sumN > total) return sumN;
     }
     if (c.promoNombre && typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
@@ -16525,8 +16535,8 @@ body.rol-staff #confirmSvcClientName::after {
     'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
     'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
     'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
-    'Yadira': { key: 'yadira', area: 'Pestanas' },
-    'Diana':  { key: 'diana',  area: 'Pestanas' },
+    'Yadira': { key: 'yadira', area: 'Pestanas · Lifting/Retiros' },
+    'Diana':  { key: 'diana',  area: 'Pestanas · Lifting/Retiros' },
     'Laura':  { key: 'laura',  area: 'Facial' },
   };
 
@@ -16551,7 +16561,7 @@ body.rol-staff #confirmSvcClientName::after {
       const nombre = prefNombre[key];
       const a = areaDe[key];
       todos.push(nombre);
-      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); map.retiro_lifting.push(nombre); }
+      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); }
       if (a.includes('pestan')) { map.pestanas.push(nombre); }
       if (a.includes('lifting') || a.includes('retiro')) { map.retiro_lifting.push(nombre); }
       if (a.includes('facial')) { map.facial.push(nombre); }
@@ -17354,7 +17364,7 @@ body.rol-staff #confirmSvcClientName::after {
       // División de mi área en esta promo
       var _myDivPM = p.division.find(function(d) {
         var da = String(d.area||'').toLowerCase();
-        return _myArea_pm === 'pestanas' ? (da.includes('pest') || da.includes('lifting') || da.includes('retiro'))
+        return _myArea_pm === 'pestanas' ? (da.includes('pest'))
           : _myArea_pm === 'facial' ? da.includes('facial')
           : (da.includes('ceja') || da.includes('depil'));
       });
