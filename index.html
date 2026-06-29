@@ -11589,21 +11589,6 @@ body.rol-staff #confirmSvcClientName::after {
           cobrarList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>';
         } else {
           window._mkPorCobrarData = porCobrar;
-
-          // FIX: precargar líneas desde Lineas para todos los TM por cobrar.
-          // Así el desglose visual (quién hizo qué, a qué precio) viene de Lineas
-          // y no de TicketMulti — eliminando los decimales del cálculo proporcional.
-          window._lineasParaCobro = window._lineasParaCobro || {};
-          const _tmsPorCobrar = porCobrar.filter(p => p.fuente === 'TicketMulti');
-          await Promise.all(_tmsPorCobrar.map(async function(p) {
-            try {
-              const _r = await apiGet('getLineasParaCobro', { idTM: p.idEspera });
-              if (_r && _r.success && _r.lineas && _r.lineas.length > 0) {
-                window._lineasParaCobro[p.idEspera] = _r.lineas;
-              }
-            } catch(eLn) { /* falla silenciosa — el backend igual usa Lineas */ }
-          }));
-
           cobrarList.innerHTML = porCobrar.map(p => {
             const esTM = p.fuente === 'TicketMulti';
             let desgloseData = p.serviciosDetalle;
@@ -11617,24 +11602,12 @@ body.rol-staff #confirmSvcClientName::after {
               }));
             }
             if (!desgloseData && esTM && p.areas) {
-              // FIX: construir desgloseData desde Lineas (montoRegular limpio),
-              // NO desde p.areas de TicketMulti (que tiene decimales por cálculo proporcional).
-              // Usar _lnCobro precargado si existe (ver bloque de carga asíncrona arriba),
-              // si no, usar p.areas como fallback visual pero con precios de Paquetes.
-              const _lnTM = window._lineasParaCobro && window._lineasParaCobro[p.idEspera];
-              if (_lnTM && _lnTM.length > 0) {
-                desgloseData = _lnTM.map(function(l) {
-                  return {
-                    staff:       l.staff,
-                    servicio:    l.servicio,
-                    area:        l.area,
-                    monto:       Number(l.precioPromo   || 0),
-                    montoNormal: Number(l.precioRegular || l.precioPromo || 0)
-                  };
-                });
-              }
-              // Si no hay datos de Lineas aún, desgloseData queda null →
-              // el backend igual usa Lineas en el cobro (getLineasParaCobro server-side)
+              // ── MANDAMIENTO #4: incluir precioNormal para que tarjeta recalcule correctamente ──
+              desgloseData = p.areas.map(a => ({
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
+                monto: a.precio,
+                montoNormal: a.precioNormal || a.precio  // precio sin descuento promo
+              }));
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
             return `
@@ -20123,12 +20096,24 @@ function renderCierreMes(d, siraInicial) {
   // ---- Gastos ---- (solo SIRA; caja chica es control diario, no entra al cuadre)
   html += '<div class="section-title" style="margin-top:18px;">Gastos del mes</div>';
   html += '<div class="card" style="padding:14px 16px;font-size:14px;">';
-  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">'
-        +     '<span>SIRA (mes)<br><span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">'
-        +       (d.siraOk
-                  ? '✓ Traído de SIRA · ' + (d.siraCount || 0) + ' gasto' + ((d.siraCount === 1) ? '' : 's') + ' del mes'
-                  : '<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA, ingrésalo manual' + (d.siraError ? ' — ' + String(d.siraError).replace(/[<>]/g,'') : ''))
-        +       '</span></span>'
+  const _siraFuente   = d.siraFuente || '';
+  const _siraProd     = Number(d.siraTotalProductos    || 0);
+  const _siraGastos   = Number(d.siraTotalGastosVarios || 0);
+  const _siraEsCierre = _siraFuente === 'cierre';
+  const _siraSubtit   = d.siraOk
+    ? (_siraEsCierre
+        ? '✓ Cierre de SIRA · productos + gastos varios'
+        : '✓ Gastos varios de SIRA · cierre pendiente en SIRA')
+    : ('<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA — ingrésalo manual'
+      + (d.siraError ? ' · ' + String(d.siraError).replace(/[<>]/g,'') : ''));
+  const _siraDesglose = (d.siraOk && _siraEsCierre)
+    ? '<br><span style="font-size:11px;color:var(--ink-soft);">📦 Productos: <b>$' + _siraProd.toFixed(2) + '</b> &nbsp;·&nbsp; 💸 Gastos varios: <b>$' + _siraGastos.toFixed(2) + '</b></span>'
+    : '';
+  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;">'
+        +     '<span>SIRA — gastos del mes<br>'
+        +       '<span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">' + _siraSubtit + '</span>'
+        +       _siraDesglose
+        +     '</span>'
         +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
         +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
         +       'style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
