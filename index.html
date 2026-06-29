@@ -16561,9 +16561,12 @@ body.rol-staff #confirmSvcClientName::after {
       const nombre = prefNombre[key];
       const a = areaDe[key];
       todos.push(nombre);
-      if (a.includes('cejas')) { map.cejas.push(nombre); map.depilacion.push(nombre); }
-      if (a.includes('pestan')) { map.pestanas.push(nombre); }
-      if (a.includes('lifting') || a.includes('retiro')) { map.retiro_lifting.push(nombre); }
+      if (a.includes('cejas')) {
+        map.cejas.push(nombre);
+        map.depilacion.push(nombre);
+        map.retiro_lifting.push(nombre);  // lifting/retiro es staff de cejas
+      }
+      if (a.includes('pestan')) { map.pestanas.push(nombre); }  // Yadira/Diana solo pestanas
       if (a.includes('facial')) { map.facial.push(nombre); }
     });
     map._todos = todos;
