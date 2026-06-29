@@ -11366,7 +11366,9 @@ body.rol-staff #confirmSvcClientName::after {
             // ── Control de reasignación (multi-servicio / promo-dúo) ──
             const _fuente = w.fuente || '';
             const _esMultiPromo = _fuente === 'TicketMulti' || _fuente === 'ServicioPromo';
-            const _pendKey = _normAreaKey(esContinuacion ? (sigueTxt || w.area) : w.area);
+            const _pendKey = _normAreaKey(esContinuacion
+              ? [sigueTxt, w.area, w.servicio, obs].join(' ')
+              : [w.area, w.servicio, obs].join(' '));
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
             const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
@@ -16579,10 +16581,10 @@ body.rol-staff #confirmSvcClientName::after {
     const x = String(a||'').toLowerCase()
       .replace(/[óòö]/g,'o').replace(/[áàä]/g,'a').replace(/[éèë]/g,'e')
       .replace(/[íìï]/g,'i').replace(/[úùü]/g,'u').replace(/ñ/g,'n').trim();
+    if (x.indexOf('lifting')>=0 || x.indexOf('retiro')>=0) return 'retiro_lifting';
     if (x.indexOf('cej')>=0) return 'cejas';
     if (x.indexOf('depil')>=0) return 'depilacion';
     if (x.indexOf('pest')>=0) return 'pestanas';
-    if (x.indexOf('lifting')>=0 || x.indexOf('retiro')>=0) return 'retiro_lifting';
     if (x.indexOf('facial')>=0 || x.indexOf('hidra')>=0 || x.indexOf('limpieza')>=0) return 'facial';
     return x;
   }
