@@ -11602,12 +11602,13 @@ body.rol-staff #confirmSvcClientName::after {
               }));
             }
             if (!desgloseData && esTM && p.areas) {
-              // ── MANDAMIENTO #4: incluir precioNormal para que tarjeta recalcule correctamente ──
-              desgloseData = p.areas.map(a => ({
-                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
-                monto: a.precio,
-                montoNormal: a.precioNormal || a.precio  // precio sin descuento promo
-              }));
+              // FIX: NO construir desgloseData desde p.areas (TicketMulti) para TM.
+              // TicketMulti calcula precioNormal proporcionalmente cuando no tiene la
+              // división exacta por área, generando decimales (47.5, 19.5, 80.68...).
+              // El backend ya lee Lineas directamente (getLineasParaCobro) cuando
+              // _fuenteLineas=true — Lineas tiene montoRegular limpio por slot.
+              // Dejar desgloseData=null para que el backend use Lineas como fuente única.
+              desgloseData = null;
             }
             const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
             return `
@@ -19054,42 +19055,12 @@ body.rol-staff #confirmSvcClientName::after {
     const slot = window._finishingSlot || 1;
     await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
     const user = window.currentUser;
-    let idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
 
     // Si es SP- (promo individual), delegar a finalizarServicioSP que prepara _finishingData
     if (idEspera && idEspera.startsWith('SP-')) {
       await finalizarServicioSP(slot);
       return;
-    }
-
-    // FIX: cuando la segunda staff de un TM agrega un servicio extra (SN-), el frontend
-    // pisa _as1/2IdEspera con el id del SN- nuevo. Al finalizar, el idEspera local ya no
-    // apunta al TM sino al extra — el backend recibe un SN- y llama handleFinalizarServicioNormal
-    // en lugar de handleCompletarAreaTicketMulti, dejando el slot del TM sin cerrar y
-    // perdiendo el servicio de la primera staff en el cobro.
-    // Solución: si el idEspera local es SN-, buscar en los TM activos si esta staff tiene
-    // un área "En servicio" — ese es el TM padre real y hay que cerrarlo con él.
-    if (idEspera && idEspera.startsWith('SN-')) {
-      try {
-        const tmCheck = await apiGet('getTicketMulti');
-        if (tmCheck.success) {
-          const tmPadre = (tmCheck.activos || []).find(t =>
-            (t.areas || []).some(a =>
-              String(a.staff || '').trim() === (user?.name || '').trim() &&
-              ['en servicio', 'en_servicio'].includes(String(a.estado || '').toLowerCase())
-            )
-          );
-          if (tmPadre) {
-            console.log('[completarAreaMultiFinal] idEspera local era SN-, recuperado TM padre:', tmPadre.idEspera);
-            idEspera = tmPadre.idEspera;
-            // Actualizar la variable global para que el resto del flujo lo use
-            if (slot === 1) window._as1IdEspera = idEspera;
-            else            window._as2IdEspera = idEspera;
-          }
-        }
-      } catch(eTMCheck) {
-        console.warn('[completarAreaMultiFinal] No se pudo recuperar TM padre:', eTMCheck);
-      }
     }
 
     // Construir desglose completo: áreas previas (del TM) + área actual
