@@ -4154,7 +4154,7 @@ body.rol-staff #confirmSvcClientName::after {
   // Facial (L): facial
   const AREA_FILTER = {
     'cejas': ['cejas', 'depilacion', 'retiro_lifting'],
-    'pestanas': ['pestanas'],
+    'pestanas': ['pestanas', 'retiro_lifting'],
     'facial': ['facial'],
   };
 
@@ -4394,9 +4394,8 @@ body.rol-staff #confirmSvcClientName::after {
   function getOtherPromoAreas(promo, myArea) {
     if (!promo || !Array.isArray(promo.division)) return [];
     const AREA_FILTER_MAP = {
-      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
-                   'lifting de pestañas', 'retiro de lifting', 'retiro de pestañas', 'retiro_lifting', 'retiro', 'lifting'],
-      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen',
+      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow'],
+      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen', 'retiro_lifting', 'retiro',
                    'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura', 'brasil'],
       'facial':   ['facial', 'hidra', 'limpieza']
     };
@@ -4424,11 +4423,9 @@ body.rol-staff #confirmSvcClientName::after {
     if (!promo || !promo.division || promo.division.length === 0) return promo ? promo.price : 0;
 
     const AREA_FILTER_MAP = {
-      // cejas hace los 3 compartidos (lifting de pestañas, retiro de pestañas, retiro de
-      // lifting) pero NO las extensiones de pestañas (volumen, pelo a pelo, clásicas...).
-      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
-                   'lifting de pestañas', 'retiro de lifting', 'retiro de pestañas', 'retiro_lifting', 'retiro', 'lifting'],
-      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen',
+      // cejas hace cejas, depilación y pigmentación. NO hace retiro/lifting de pestañas.
+      'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow'],
+      'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen', 'retiro_lifting', 'retiro',
                    'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura'],
       'facial':   ['facial', 'hidra', 'limpieza']
     };
@@ -18311,7 +18308,7 @@ body.rol-staff #confirmSvcClientName::after {
         if (result && result.success) {
           initFormTM();
           simulateNotif('staff', 'Nueva clienta en el salón', (isTop ? '⭐ ' : '') + (codigo||'Clienta') + ' · ' + a.tentativo, isTop);
-          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas'],Diana:['pestanas'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+a.tentativo);
+          enviarPushStaff(Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&m[n].includes(a.area);}), '👤 Clienta en lista de espera', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+a.tentativo);
           setTimeout(() => { show('mikaelaHome'); }, 600);
         } else {
           alert('Error: ' + (result?.error || result?.message || 'Error desconocido'));
@@ -18332,7 +18329,7 @@ body.rol-staff #confirmSvcClientName::after {
         const tienePromo = areasMulti.some(a => a.tipo === 'promo');
         simulateNotif('staff', '🎯 Ticket multi-servicio', (codigo||'Clienta') + ' · ' + areasMulti.length + ' servicios', isTop);
         const _areasKeys = [...new Set(areasMulti.map(a=>a.area))];
-        const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas'],Diana:['pestanas'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
+        const _staffNotif = Object.keys(STAFF_PUSH_MAP).filter(n=>{const m={María:['cejas','depilacion','retiro_lifting'],Keyla:['cejas','depilacion','retiro_lifting'],Lesly:['cejas','depilacion','retiro_lifting'],Rosa:['cejas','depilacion','retiro_lifting'],Yadira:['pestanas','retiro_lifting'],Diana:['pestanas','retiro_lifting'],Laura:['facial']};return m[n]&&_areasKeys.some(k=>m[n].includes(k));});
         enviarPushStaff(_staffNotif, '🎯 Ticket multi en lista', (isTop?'⭐ ':'')+(codigo||'Clienta')+' · '+areasMulti.length+' servicios');
         alert('✅ Ticket creado (' + result.id + ')' + (tienePromo ? ' · Recorda: promos solo en efectivo/transferencia' : ''));
         setTimeout(() => { show('mikaelaHome'); }, 400);
