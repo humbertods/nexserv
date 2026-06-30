@@ -20619,19 +20619,37 @@ function renderInformeServicios(d, pestanasData, tendData) {
     html += '</div>';
   }
 
-  // ---- Top staff por servicios — con diferenciador Retoques vs Monturas nuevas ----
-  html += '<div class="section-title">Top staff</div>';
+  // ---- Top staff — por cantidad de servicios ----
+  // El diferenciador "nuevas/retoques" solo aplica al vistazo general (sin
+  // categoría filtrada): es una métrica de captación vs retención del salón
+  // completo, no tiene sentido por área (ej. en Pestañas confunde más de lo
+  // que ayuda, ya vimos que mezclaba el dato sin aportar nada accionable).
+  const sinCategoriaFiltrada = !categoriaActual;
+  html += '<div class="section-title">Top staff — por servicios</div>';
   if (!d.rankingStaff || !d.rankingStaff.length) {
     html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin datos de staff.</div>';
   } else {
     html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
     d.rankingStaff.slice(0,8).forEach((s,i) => {
-      const tieneDif = (s.retoques !== undefined && s.monturasNuevas !== undefined);
+      const tieneDif = sinCategoriaFiltrada && (s.retoques !== undefined && s.monturasNuevas !== undefined);
       html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
             + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
             + '<span style="flex:1;font-weight:700;">' + s.staff
             + (tieneDif ? '<br><span style="font-size:10px;color:var(--ink-faint);font-weight:400;">' + s.monturasNuevas + ' nuevas · ' + s.retoques + ' retoques</span>' : '')
             + '</span>'
+            + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + ' serv.</span>'
+            + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
+    });
+    html += '</div>';
+
+    // ---- Top staff — por ingreso ($$) ----
+    const rankingPorIngreso = d.rankingStaff.slice().sort((a,b) => b.ingreso - a.ingreso);
+    html += '<div class="section-title">Top staff — por ingreso</div>';
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    rankingPorIngreso.slice(0,8).forEach((s,i) => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
+            + '<span style="flex:1;font-weight:700;">' + s.staff + '</span>'
             + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + ' serv.</span>'
             + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
     });
@@ -20651,6 +20669,21 @@ function renderInformeServicios(d, pestanasData, tendData) {
     html += '</div>';
   }
 
+  // ---- Tiempo promedio por servicio ----
+  // Solo cuenta servicios cobrados a través de Lineas (hora_toma/hora_devuelta);
+  // el histórico previo al 18/06 no tiene esos timestamps, así que esta tarjeta
+  // se va llenando con más datos a medida que pasan los meses.
+  if (d.tiempoPromedioServicio && d.tiempoPromedioServicio.length) {
+    html += '<div class="section-title">Tiempo promedio por servicio</div>';
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    d.tiempoPromedioServicio.forEach(t => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="flex:1;font-weight:600;">' + t.servicio + '<br><span style="font-size:10px;color:var(--ink-faint);">' + t.muestras + ' muestra' + (t.muestras===1?'':'s') + '</span></span>'
+            + '<span style="font-weight:700;">' + t.minutosPromedio + ' min</span></div>';
+    });
+    html += '</div>';
+  }
+
   // ---- Servicios en crecimiento / en baja ----
   if (tendData && tendData.success) {
     if (tendData.enCrecimiento && tendData.enCrecimiento.length) {
@@ -20663,16 +20696,10 @@ function renderInformeServicios(d, pestanasData, tendData) {
       });
       html += '</div>';
     }
-    if (tendData.enBaja && tendData.enBaja.length) {
-      html += '<div class="section-title">📉 Servicios en baja</div>';
-      html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
-      tendData.enBaja.forEach(t => {
-        html += '<div style="display:flex;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line);">'
-              + '<span style="flex:1;font-weight:600;">' + t.servicio + '</span>'
-              + '<span style="color:var(--danger);font-weight:700;">' + t.variacionPct + '%</span></div>';
-      });
-      html += '</div>';
-    }
+    // "Servicios en baja" eliminado a pedido: tendencia decreciente con -100% en
+    // servicios que sencillamente no se repitieron este mes (promo puntual, retoque
+    // de un combo ya vendido) no es una señal útil de negocio — generaba ruido sin
+    // ninguna acción clara que tomar. Se mantiene "en crecimiento", que sí orienta.
   }
 
   // ---- Tabla resumen detallada ----
