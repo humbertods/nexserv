@@ -20139,10 +20139,11 @@ function renderCierreMes(d, siraInicial) {
   const _siraSubtit   = d.siraOk
     ? (_siraEsCierre
         ? '✓ Cierre de SIRA · productos + gastos varios'
-        : '✓ Gastos varios de SIRA · cierre pendiente en SIRA')
+        : '✓ Estimado SIRA · cierre pendiente — se actualizará al cerrar en SIRA')
     : ('<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA — ingrésalo manual'
       + (d.siraError ? ' · ' + String(d.siraError).replace(/[<>]/g,'') : ''));
-  const _siraDesglose = (d.siraOk && _siraEsCierre)
+  // Mostrar desglose productos/gastos tanto para cierre oficial como para estimado del fallback
+  const _siraDesglose = (d.siraOk && (_siraProd > 0 || _siraGastos > 0))
     ? '<br><span style="font-size:11px;color:var(--ink-soft);">📦 Productos: <b>$' + _siraProd.toFixed(2) + '</b> &nbsp;·&nbsp; 💸 Gastos varios: <b>$' + _siraGastos.toFixed(2) + '</b></span>'
     : '';
   html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;">'
