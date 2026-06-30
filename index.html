@@ -539,6 +539,9 @@ body.rol-staff #confirmSvcClientName::after {
     <button class="user-menu-item" id="menuCierreMesBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCierreMes');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1Zm12 7H5v10h14V9Zm-9 2v2H8v-2h2Zm4 0v2h-2v-2h2Zm4 0v2h-2v-2h2Z"/></svg> Cierre mes
     </button>
+    <button class="user-menu-item" id="menuInformeServiciosBtn" style="display:none;" onclick="closeUserMenu(); show('ownerInformeServicios'); cargarInformeServicios();">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 3a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4Zm2 13h2v3H6v-3Zm5-6h2v9h-2V10Zm5-4h2v13h-2V6Z"/></svg> Informe de servicios
+    </button>
     <button class="user-menu-item" id="menuSeguridadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerSesiones');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Zm0 6a2.5 2.5 0 0 1 1 4.78V15a1 1 0 1 1-2 0v-2.22A2.5 2.5 0 0 1 12 8Z"/></svg> Seguridad app
     </button>
@@ -2939,6 +2942,40 @@ body.rol-staff #confirmSvcClientName::after {
 
     <div id="cmBody">
       <div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando cierre…</div>
+    </div>
+  </div>
+
+  <!-- OWNER: INFORME DE SERVICIOS -->
+  <div class="screen" id="ownerInformeServicios">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Informe de servicios</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--ink-faint);letter-spacing:0;text-transform:none;cursor:pointer;" onclick="cargarInformeServicios()">↻ Actualizar</span>
+    </div>
+
+    <!-- Filtros -->
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <select id="isMes" onchange="cargarInformeServicios()" style="flex:1;min-width:90px;padding:11px 10px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+      <select id="isAnio" onchange="cargarInformeServicios()" style="width:90px;padding:11px 10px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <select id="isCategoria" onchange="cargarInformeServicios()" style="flex:1;min-width:110px;padding:11px 10px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;background:var(--bg-card);color:var(--ink);">
+        <option value="">Todas las categorías</option>
+        <option value="Pestañas">Pestañas</option>
+        <option value="Cejas">Cejas</option>
+        <option value="Faciales">Faciales</option>
+        <option value="Depilaciones">Depilaciones</option>
+        <option value="Otros servicios">Otros servicios</option>
+      </select>
+      <select id="isStaff" onchange="cargarInformeServicios()" style="flex:1;min-width:110px;padding:11px 10px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:13px;font-weight:600;background:var(--bg-card);color:var(--ink);">
+        <option value="">Todas las staff</option>
+      </select>
+    </div>
+
+    <div id="isBody">
+      <div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando informe…</div>
     </div>
   </div>
 
@@ -5640,6 +5677,8 @@ body.rol-staff #confirmSvcClientName::after {
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cierreMesBtn = document.getElementById('menuCierreMesBtn');
     if (cierreMesBtn) cierreMesBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const informeServBtn = document.getElementById('menuInformeServiciosBtn');
+    if (informeServBtn) informeServBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const pushBtn = document.getElementById('menuPushTestBtn');
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const histBtn = document.getElementById('menuHistorialBtn');
@@ -20440,6 +20479,224 @@ function irACierre(mes, anio) {
   if (scr) window.scrollTo(0, 0);
 }
 /* ========== /CIERRE DE MES ========== */
+
+/* ========== INFORME DE SERVICIOS (Owner) ========== */
+function initInformeServiciosSelectors() {
+  const selMes  = document.getElementById('isMes');
+  const selAnio = document.getElementById('isAnio');
+  if (!selMes || !selAnio) return;
+  if (selMes.options.length && selAnio.options.length) return; // poblar una sola vez
+
+  const now = new Date();
+  const mesActual  = now.getMonth() + 1;
+  const anioActual = now.getFullYear();
+
+  selMes.innerHTML = CM_MESES.map((m, i) =>
+    '<option value="' + (i + 1) + '"' + ((i + 1) === mesActual ? ' selected' : '') + '>' + m + '</option>'
+  ).join('');
+
+  let aniosHtml = '';
+  for (let a = anioActual; a >= 2024; a--) {
+    aniosHtml += '<option value="' + a + '"' + (a === anioActual ? ' selected' : '') + '>' + a + '</option>';
+  }
+  selAnio.innerHTML = aniosHtml;
+}
+
+async function cargarInformeServicios() {
+  initInformeServiciosSelectors();
+  const body = document.getElementById('isBody');
+  if (!body) return;
+  body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando informe…</div>';
+
+  const mes  = Number(document.getElementById('isMes').value)  || (new Date()).getMonth() + 1;
+  const anio = Number(document.getElementById('isAnio').value) || (new Date()).getFullYear();
+  const categoria = document.getElementById('isCategoria').value || '';
+  const staffSel  = document.getElementById('isStaff').value || '';
+
+  // Rango de fechas del mes elegido
+  const fechaInicio = anio + '-' + String(mes).padStart(2,'0') + '-01';
+  const ultimoDia = new Date(anio, mes, 0).getDate();
+  const fechaFin = anio + '-' + String(mes).padStart(2,'0') + '-' + String(ultimoDia).padStart(2,'0');
+
+  try {
+    const [general, topPestanas, tendencias] = await Promise.all([
+      apiGet('getReporteServicios', { accion: 'general', fechaInicio, fechaFin, categoria, staff: staffSel }),
+      apiGet('getReporteServicios', { accion: 'topModelosPestanas', mes, anio }),
+      apiGet('getReporteServicios', { accion: 'tendencias', mes, anio })
+    ]);
+
+    if (!general || !general.success) {
+      body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">No se pudo cargar el informe' + (general && general.message ? ': ' + general.message : '') + '</div>';
+      return;
+    }
+
+    renderInformeServicios(general, topPestanas, tendencias);
+
+    // Poblar selector de staff con los nombres que aparecen en el ranking (solo una vez por carga de mes)
+    const selStaff = document.getElementById('isStaff');
+    if (selStaff && general.rankingStaff && general.rankingStaff.length) {
+      const valorActual = selStaff.value;
+      const opciones = ['<option value="">Todas las staff</option>']
+        .concat(general.rankingStaff.map(s => '<option value="' + s.staff.replace(/"/g,'') + '">' + s.staff + '</option>'));
+      selStaff.innerHTML = opciones.join('');
+      selStaff.value = valorActual;
+    }
+  } catch (e) {
+    body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderInformeServicios(d, pestanasData, tendData) {
+  const body = document.getElementById('isBody');
+  if (!body) return;
+  const money = n => '$' + (Number(n) || 0).toFixed(2);
+  let html = '';
+
+  // ---- Tarjetas principales ----
+  html += '<div class="stat-grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">';
+  html +=   '<div class="stat"><div class="label">Servicios totales</div><div class="value" style="font-size:20px;">' + d.totalServicios + '</div></div>';
+  html +=   '<div class="stat"><div class="label">Ingreso total</div><div class="value" style="font-size:20px;color:var(--success);">' + money(d.ingresoTotal) + '</div></div>';
+  html += '</div>';
+
+  html += '<div class="card" style="padding:14px 16px;margin-bottom:14px;">';
+  html +=   '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:var(--ink-soft);">Servicio más vendido</span><span style="font-weight:700;">' + (d.servicioMasVendido || '—') + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:var(--ink-soft);">Categoría líder</span><span style="font-weight:700;">' + (d.categoriaLider || '—') + '</span></div>';
+  html +=   '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:var(--ink-soft);">Mayor ingreso</span><span style="font-weight:700;">' + (d.servicioMayorIngreso || '—') + '</span></div>';
+  html += '</div>';
+
+  // ---- Ingreso por categoría ----
+  html += '<div class="section-title">Ingreso por categoría</div>';
+  if (!d.categorias || !d.categorias.length) {
+    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin datos en este período.</div>';
+  } else {
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    d.categorias.forEach(c => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="flex:1;font-weight:700;">' + c.categoria + '</span>'
+            + '<span style="color:var(--ink-soft);margin-right:10px;">' + c.cantidad + ' serv.</span>'
+            + '<span style="font-weight:700;color:var(--success);">' + money(c.ingreso) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- Top 5 servicios del mes ----
+  html += '<div class="section-title">Top 5 servicios</div>';
+  if (!d.topServicios || !d.topServicios.length) {
+    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin servicios registrados.</div>';
+  } else {
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    d.topServicios.slice(0,5).forEach((s,i) => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
+            + '<span style="flex:1;font-weight:600;">' + s.servicio + '<br><span style="font-size:10px;color:var(--ink-faint);">' + s.categoria + '</span></span>'
+            + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + 'x</span>'
+            + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- Top 5 modelos de pestañas ----
+  if (pestanasData && pestanasData.success && pestanasData.modelos && pestanasData.modelos.length) {
+    html += '<div class="section-title">Top 5 modelos de pestañas</div>';
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    pestanasData.modelos.slice(0,5).forEach((m,i) => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
+            + '<span style="flex:1;font-weight:600;">' + m.modelo + '<br><span style="font-size:10px;color:var(--ink-faint);">' + (m.staffQueMasLoRealizo || '—') + '</span></span>'
+            + '<span style="color:var(--ink-soft);margin-right:10px;">' + m.cantidad + 'x</span>'
+            + '<span style="font-weight:700;color:var(--success);">' + money(m.ingreso) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- Top staff por servicios ----
+  html += '<div class="section-title">Top staff</div>';
+  if (!d.rankingStaff || !d.rankingStaff.length) {
+    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin datos de staff.</div>';
+  } else {
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    d.rankingStaff.slice(0,8).forEach((s,i) => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
+            + '<span style="flex:1;font-weight:700;">' + s.staff + '</span>'
+            + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + ' serv.</span>'
+            + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- Ticket promedio por categoría ----
+  if (d.ticketPromedioCategoria && d.ticketPromedioCategoria.length) {
+    html += '<div class="section-title">Ticket promedio por categoría</div>';
+    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+    d.ticketPromedioCategoria.forEach(t => {
+      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="flex:1;font-weight:600;">' + t.categoria + '</span>'
+            + '<span style="font-weight:700;">' + money(t.ticketPromedio) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // ---- Servicios en crecimiento / en baja ----
+  if (tendData && tendData.success) {
+    if (tendData.enCrecimiento && tendData.enCrecimiento.length) {
+      html += '<div class="section-title">📈 Servicios en crecimiento</div>';
+      html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+      tendData.enCrecimiento.forEach(t => {
+        html += '<div style="display:flex;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line);">'
+              + '<span style="flex:1;font-weight:600;">' + t.servicio + '</span>'
+              + '<span style="color:var(--success);font-weight:700;">+' + t.variacionPct + '%</span></div>';
+      });
+      html += '</div>';
+    }
+    if (tendData.enBaja && tendData.enBaja.length) {
+      html += '<div class="section-title">📉 Servicios en baja</div>';
+      html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+      tendData.enBaja.forEach(t => {
+        html += '<div style="display:flex;align-items:center;font-size:13px;padding:8px 0;border-bottom:1px solid var(--line);">'
+              + '<span style="flex:1;font-weight:600;">' + t.servicio + '</span>'
+              + '<span style="color:var(--danger);font-weight:700;">' + t.variacionPct + '%</span></div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  // ---- Tabla resumen detallada ----
+  html += '<div class="section-title">Detalle de servicios (' + (d.tablaResumen ? d.tablaResumen.length : 0) + ')</div>';
+  if (!d.tablaResumen || !d.tablaResumen.length) {
+    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin servicios en este período.</div>';
+  } else {
+    html += '<div class="card" style="padding:0;overflow-x:auto;margin-bottom:20px;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:var(--bg);text-align:left;">'
+          + '<th style="padding:8px 10px;white-space:nowrap;">Fecha</th>'
+          + '<th style="padding:8px 10px;">Cliente</th>'
+          + '<th style="padding:8px 10px;">Categoría</th>'
+          + '<th style="padding:8px 10px;">Servicio</th>'
+          + '<th style="padding:8px 10px;">Staff</th>'
+          + '<th style="padding:8px 10px;text-align:right;">Precio</th>'
+          + '</tr></thead><tbody>';
+    // Limitar a 200 filas en pantalla para no sobrecargar el render; el resto está en el backend si se exporta
+    d.tablaResumen.slice(0, 200).forEach(r => {
+      html += '<tr style="border-top:1px solid var(--line);">'
+            + '<td style="padding:7px 10px;white-space:nowrap;color:var(--ink-soft);">' + r.fecha + '</td>'
+            + '<td style="padding:7px 10px;">' + (r.cliente || '—') + '</td>'
+            + '<td style="padding:7px 10px;">' + r.categoria + '</td>'
+            + '<td style="padding:7px 10px;">' + r.servicio + '</td>'
+            + '<td style="padding:7px 10px;">' + (r.staff || '—') + '</td>'
+            + '<td style="padding:7px 10px;text-align:right;font-weight:700;">' + money(r.precio) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    if (d.tablaResumen.length > 200) {
+      html += '<div style="padding:8px 10px;font-size:11px;color:var(--ink-faint);text-align:center;">Mostrando las primeras 200 de ' + d.tablaResumen.length + ' filas.</div>';
+    }
+    html += '</div>';
+  }
+
+  body.innerHTML = html;
+}
+window.cargarInformeServicios = cargarInformeServicios;
+/* ========== /INFORME DE SERVICIOS ========== */
 
 
 </script>
