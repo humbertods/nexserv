@@ -5071,7 +5071,7 @@ body.rol-staff #confirmSvcClientName::after {
       // configurado, sesión vieja o navegación cruzada), se la manda a su panel y
       // NO se carga nada del panel de Mikaela.
       const _uMH = window.currentUser;
-      const _permitidoMH = _uMH && (_uMH.role === 'admin' || _uMH.role === 'owner' || /mikaela/i.test(_uMH.name || ''));
+      const _permitidoMH = _uMH && (_uMH.role === 'admin' || _uMH.role === 'owner');
       if (_uMH && !_permitidoMH) { show('staffHome'); return; }
       loadMikaelaHome();
     }
@@ -5679,11 +5679,11 @@ body.rol-staff #confirmSvcClientName::after {
     const pushBtn = document.getElementById('menuPushTestBtn');
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const histBtn = document.getElementById('menuHistorialBtn');
-    if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const solBtn = document.getElementById('menuSolucionesBtn');
-    if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const asisBtn = document.getElementById('menuAsistenciaBtn');
-    if (asisBtn) asisBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin' || /mikaela/i.test(user.name || ''))) ? 'flex' : 'none';
+    if (asisBtn) asisBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const asisStaffBtn = document.getElementById('menuAsistenciaStaffBtn');
     if (asisStaffBtn) asisStaffBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
@@ -12717,7 +12717,7 @@ body.rol-staff #confirmSvcClientName::after {
     const u = window.currentUser;
     if (!u) { show('login'); return; }
     if (u.role === 'owner' || u.role === 'dueño') show('ownerHome');
-    else if (u.role === 'admin' || /mikaela/i.test(u.name || '')) show('mikaelaHome');
+    else if (u.role === 'admin') show('mikaelaHome');
     else show('staffHome');
   }
 
@@ -19717,7 +19717,7 @@ async function loadCajaChica() {
   // Guard de rol: la caja chica es exclusiva de Mikaela (admin) y el Owner.
   // Si por cualquier motivo la abre una staff, se oculta y no se carga nada.
   const _uCC = window.currentUser;
-  const _permitidoCaja = _uCC && (_uCC.role === 'admin' || _uCC.role === 'owner' || /mikaela/i.test(_uCC.name || ''));
+  const _permitidoCaja = _uCC && (_uCC.role === 'admin' || _uCC.role === 'owner');
   if (!_permitidoCaja) { panel.style.display = 'none'; return; }
   panel.style.display = '';
   try {
@@ -21129,7 +21129,7 @@ window.eliminarTicketEspera = eliminarTicketEspera;
   function esMikaela() {
     const u = window.currentUser;
     if (!u) return false;
-    return /mikaela/i.test(u.name || '') || u.role === 'admin' || u.area === 'admin';
+    return u.role === 'admin' || u.area === 'admin';
   }
   function start(e) {
     const t = e.target;
