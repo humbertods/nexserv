@@ -2974,6 +2974,18 @@ body.rol-staff #confirmSvcClientName::after {
       </select>
     </div>
 
+    <!-- Toggle vista: Por combo vs Por modelo/servicio -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg-card);">
+      <button id="isToggleCombo" onclick="setIsVista('combo')"
+        style="flex:1;padding:10px;font-family:inherit;font-size:12px;font-weight:700;border:none;cursor:pointer;background:var(--ink);color:var(--bg-card);transition:all .2s;">
+        📦 Por combo
+      </button>
+      <button id="isToggleModelo" onclick="setIsVista('modelo')"
+        style="flex:1;padding:10px;font-family:inherit;font-size:12px;font-weight:700;border:none;cursor:pointer;background:transparent;color:var(--ink);transition:all .2s;">
+        🔍 Por modelo / servicio
+      </button>
+    </div>
+
     <div id="isBody">
       <div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);font-size:13px;">Cargando informe…</div>
     </div>
@@ -20479,6 +20491,20 @@ function irACierre(mes, anio) {
 /* ========== /CIERRE DE MES ========== */
 
 /* ========== INFORME DE SERVICIOS (Owner) ========== */
+var _isVista = 'combo'; // 'combo' | 'modelo'
+
+function setIsVista(v) {
+  _isVista = v;
+  const btnC = document.getElementById('isToggleCombo');
+  const btnM = document.getElementById('isToggleModelo');
+  if (btnC && btnM) {
+    const activeStyle  = 'background:var(--ink);color:var(--bg-card);';
+    const inactiveStyle = 'background:transparent;color:var(--ink);';
+    btnC.style.cssText += v === 'combo'  ? activeStyle : inactiveStyle;
+    btnM.style.cssText += v === 'modelo' ? activeStyle : inactiveStyle;
+  }
+  cargarInformeServicios();
+}
 function initInformeServiciosSelectors() {
   const selMes  = document.getElementById('isMes');
   const selAnio = document.getElementById('isAnio');
@@ -20579,38 +20605,59 @@ function renderInformeServicios(d, pestanasData, tendData) {
     html += '</div>';
   }
 
-  // ---- Top 5: unificado cuando la categoría filtrada es Pestañas ----
-  // Cuando se filtra por Pestañas, "Top servicios" y "Top modelos" miden lo mismo
-  // desde dos ángulos (nombre exacto del paquete vs. técnica/montura) — mostrarlos
-  // por separado duplicaba el análisis sin agregar información nueva.
-  const esVistaPestanas = (d.categorias && d.categorias.length === 1 && d.categorias[0].categoria === 'Pestañas')
-                        || (pestanasData && pestanasData.success && d.topServicios && d.topServicios.every(s => s.categoria === 'Pestañas'));
+  // ---- Top 5 servicios / Top modelos — respeta el toggle ----
+  // Vista "Por combo": muestra el nombre exacto del ticket (Combo 7 Hawaiano, Retoque...)
+  //   → útil para saber qué paquetes se venden más
+  // Vista "Por modelo": agrupa por técnica de pestañas (Hawaiano, Volumen, Clásicas...)
+  //   → útil para entender qué modelos demanda el mercado, independiente del nombre del combo
+  const vistaActual = (typeof _isVista !== 'undefined') ? _isVista : 'combo';
+  const categoriaActual = document.getElementById('isCategoria').value || '';
+  const esPestanas = !categoriaActual || categoriaActual === 'Pestañas';
 
-  html += '<div class="section-title">Top 5 servicios</div>';
-  if (!d.topServicios || !d.topServicios.length) {
-    html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin servicios registrados.</div>';
-  } else {
-    html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
-    d.topServicios.slice(0,5).forEach((s,i) => {
-      html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
-            + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
-            + '<span style="flex:1;font-weight:600;">' + s.servicio + (esVistaPestanas ? '' : '<br><span style="font-size:10px;color:var(--ink-faint);">' + s.categoria + '</span>') + '</span>'
-            + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + 'x</span>'
-            + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
-    });
-    html += '</div>';
+  if (vistaActual === 'combo' || !esPestanas) {
+    // Vista por combo (o cualquier categoría no-pestañas): muestra nombre del servicio
+    html += '<div class="section-title">Top 5 servicios</div>';
+    if (!d.topServicios || !d.topServicios.length) {
+      html += '<div class="card" style="text-align:center;padding:18px;color:var(--ink-faint);font-size:13px;">Sin servicios registrados.</div>';
+    } else {
+      html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
+      d.topServicios.slice(0,5).forEach((s,i) => {
+        html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
+              + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
+              + '<span style="flex:1;font-weight:600;">' + s.servicio + (!categoriaActual ? '<br><span style="font-size:10px;color:var(--ink-faint);">' + s.categoria + '</span>' : '') + '</span>'
+              + '<span style="color:var(--ink-soft);margin-right:10px;">' + s.cantidad + 'x</span>'
+              + '<span style="font-weight:700;color:var(--success);">' + money(s.ingreso) + '</span></div>';
+      });
+      html += '</div>';
+    }
   }
 
-  // ---- Top 5 modelos de pestañas (solo si no se filtró explícitamente otra categoría) ----
-  const categoriaActual = document.getElementById('isCategoria').value || '';
+  // Vista por modelo de pestañas
   const ocultarModelosPestanas = categoriaActual && categoriaActual !== 'Pestañas';
   if (!ocultarModelosPestanas && pestanasData && pestanasData.success && pestanasData.modelos && pestanasData.modelos.length) {
-    html += '<div class="section-title">Top 5 modelos de pestañas</div>';
+    const tituloModelos = vistaActual === 'modelo' ? 'Top modelos de pestañas' : 'Top 5 modelos de pestañas';
+    const limitModelos  = vistaActual === 'modelo' ? pestanasData.modelos.length : 5;
+    html += '<div class="section-title">' + tituloModelos + '</div>';
     html += '<div class="card" style="padding:6px 14px;margin-bottom:14px;">';
-    pestanasData.modelos.slice(0,5).forEach((m,i) => {
+
+    // En vista "modelo" agregamos un sub-detalle de staff debajo de cada modelo
+    pestanasData.modelos.slice(0, limitModelos).forEach((m,i) => {
+      const esPromo = m.enPromo !== undefined ? m.enPromo : '—';
+      const enNormal = m.enPrecioNormal !== undefined ? m.enPrecioNormal : '—';
       html += '<div style="display:flex;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line);">'
             + '<span style="width:20px;color:var(--ink-faint);font-weight:700;">' + (i+1) + '</span>'
-            + '<span style="flex:1;font-weight:600;">' + m.modelo + '<br><span style="font-size:10px;color:var(--ink-faint);">' + (m.staffQueMasLoRealizo || '—') + '</span></span>'
+            + '<span style="flex:1;font-weight:600;">' + m.modelo;
+      if (vistaActual === 'modelo' && m.porStaff) {
+        // Mostrar desglose por staff con promo vs precio normal
+        const staffLines = Object.entries(m.porStaff)
+          .sort((a,b) => b[1] - a[1])
+          .map(([st, cnt]) => st + ': ' + cnt)
+          .join(' · ');
+        html += '<br><span style="font-size:10px;color:var(--ink-faint);">' + staffLines + '</span>';
+      } else {
+        html += '<br><span style="font-size:10px;color:var(--ink-faint);">' + (m.staffQueMasLoRealizo || '—') + '</span>';
+      }
+      html += '</span>'
             + '<span style="color:var(--ink-soft);margin-right:10px;">' + m.cantidad + 'x</span>'
             + '<span style="font-weight:700;color:var(--success);">' + money(m.ingreso) + '</span></div>';
     });
