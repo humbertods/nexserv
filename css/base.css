@@ -1,0 +1,71 @@
+/* ================================================
+   NEXSERV base.css — Variables CSS + Privacy mask
+   Auto-extraído de index.html · Fase 1 partición
+   ================================================ */
+
+  :root {
+    --bg: #f5f5f3;
+    --bg-card: #ffffff;
+    --ink: #0f0f0f;
+    --ink-soft: #6b6b6b;
+    --ink-faint: #a8a8a8;
+    --line: #ececec;
+    --accent: #d4a574;
+    --accent-deep: #b8895a;
+    --success: #4a7c59;
+    --success-bg: #e8f3eb;
+    --danger: #c65d5d;
+    --danger-bg: #fce8e8;
+    --warning: #b8701c;
+    --warning-bg: #fff4e0;
+    --info: #2b5aa0;
+    --info-bg: #e6f0ff;
+    --top-purple: #7c3aed;
+    --top-purple-bg: #f3e8ff;
+    --chip: #f4f0ea;
+    --radius-pill: 100px;
+    --radius-card: 24px;
+    --radius-sm: 14px;
+    --shadow-card: 0 4px 16px rgba(0,0,0,0.04);
+    --shadow-soft: 0 8px 30px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg); color: var(--ink);
+    min-height: 100vh; display: flex; justify-content: center;
+    padding: 20px; -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.01em;
+  }
+  .phone {
+    width: 100%; max-width: 420px; background: var(--bg);
+    overflow-x: hidden; overflow-y: auto; position: relative; min-height: 100vh; min-height: 100dvh;
+  }
+  @media (min-width: 500px) {
+    .phone { border-radius: 32px; box-shadow: 0 20px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.03); min-height: 820px; }
+  }
+  .screen { display: none; padding: 32px 24px 100px; }
+  .screen.active { display: block; animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  @keyframes slideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+
+/* ── Privacy mask: staff ve código, no nombre real ── */
+/* Privacidad: la staff (body.rol-staff) ve el código·iniciales (data-mask), no el nombre real */
+body.rol-staff #as1Name,
+body.rol-staff #as2Name,
+body.rol-staff #confirmSvcClientName { font-size: 0 !important; }
+body.rol-staff #as1Name::after,
+body.rol-staff #as2Name::after {
+  content: attr(data-mask);
+  font-size: 22px; font-weight: 800; letter-spacing: -0.03em;
+}
+body.rol-staff #confirmSvcClientName::after {
+  content: attr(data-mask);
+  font-size: 16px; font-weight: 700;
+}
+#staffAsisEntradaBtn:focus,#staffAsisSalidaBtn:focus,#staffAsisPermisoBtn:focus{outline:none!important;box-shadow:none!important;} #staffAsisEntradaBtn,#staffAsisSalidaBtn,#staffAsisPermisoBtn{-webkit-tap-highlight-color:transparent;}
