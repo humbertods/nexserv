@@ -3337,7 +3337,7 @@ body.rol-staff #confirmSvcClientName::after {
       bar.id = 'nxUpdateBanner';
       bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;background:#b45309;color:#fff;font:600 13px sans-serif;padding:10px 14px;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
       var txt = document.createElement('span');
-      txt.textContent = '🔄 Hay una versión nueva (v' + serverV + '). Recargá para actualizar.';
+      txt.textContent = '🆕 Nueva versión v' + serverV + ' disponible. Actualizá la app para continuar.';
       var btn = document.createElement('button');
       btn.textContent = 'Recargar';
       btn.style.cssText = 'background:#fff;color:#b45309;border:none;border-radius:8px;font:700 13px sans-serif;padding:6px 14px;cursor:pointer;';
@@ -3362,6 +3362,11 @@ body.rol-staff #confirmSvcClientName::after {
   document.addEventListener('DOMContentLoaded', function () {
     _mostrarVersionLabel();
     _checkVersion();
+    // Chequeo periódico: cada 15 minutos mientras la app está abierta.
+    // Si tú subís una versión nueva, la chica ve el banner sin tener que
+    // cerrar y volver a abrir la app. El banner solo aparece una vez
+    // (nxUpdateBanner ya existe → _avisarActualizar() no lo duplica).
+    setInterval(function () { _checkVersion(); }, 15 * 60 * 1000);
   });
   
   // ── INTERCEPTOR CENTRAL DE AUTH (P1 — AUTH_ENFORCE) ──────────────────────
