@@ -913,6 +913,8 @@ body.rol-staff #confirmSvcClientName::after {
             <input id="factCorreo" type="email" placeholder="Correo electrónico"
               style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box; margin-bottom: 8px;">
             <input id="factTelefono" type="tel" placeholder="Teléfono (opcional)"
+              style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box; margin-bottom: 8px;">
+            <input id="factDireccion" type="text" placeholder="Dirección (opcional)"
               style="width: 100%; padding: 11px 12px; border-radius: 12px; border: 1.5px solid var(--line); font-family: inherit; font-size: 14px; font-weight: 600; background: var(--bg-card); color: var(--ink); box-sizing: border-box;">
           </div>
 
@@ -12581,7 +12583,7 @@ body.rol-staff #confirmSvcClientName::after {
     ['factResumen', 'factForm', 'factRecordarWrap', 'factHint'].forEach(function(id) {
       const el = document.getElementById(id); if (el) el.style.display = 'none';
     });
-    ['factTipo', 'factNumero', 'factRazon', 'factCorreo', 'factTelefono'].forEach(function(id) {
+    ['factTipo', 'factNumero', 'factRazon', 'factCorreo', 'factTelefono', 'factDireccion'].forEach(function(id) {
       const el = document.getElementById(id); if (el) { el.value = ''; el.disabled = false; }
     });
     const rec = document.getElementById('factRecordar'); if (rec) rec.checked = true;
@@ -12623,6 +12625,9 @@ body.rol-staff #confirmSvcClientName::after {
         document.getElementById('factRazon').value = nombre || '';
         if (String(correo).trim()) document.getElementById('factCorreo').value = correo;
         if (String(tel).trim())    document.getElementById('factTelefono').value = tel;
+        const dirEl = document.getElementById('factDireccion');
+        if (dirEl && window._cobroClienteFiscal && window._cobroClienteFiscal.direccion)
+          dirEl.value = window._cobroClienteFiscal.direccion || '';
         return;
       }
       const tipo = (String(ident).replace(/\D/g, '').length === 13) ? 'RUC' : 'Cédula';
@@ -12665,17 +12670,19 @@ body.rol-staff #confirmSvcClientName::after {
     const razon  = String(document.getElementById('factRazon').value || '').trim();
     const correo = String(document.getElementById('factCorreo').value || '').trim();
     const tel    = String(document.getElementById('factTelefono').value || '').trim();
+    const dir    = String((document.getElementById('factDireccion') || {}).value || '').trim();
     const recordar = !!(document.getElementById('factRecordar') || {}).checked;
     if (!tipo) return { ok: false, msg: 'Elegí el tipo de identificación.' };
     if (tipo === 'Consumidor final') {
       return { ok: true, fact: { modo: 'otros_datos', tipoIdentificacion: 'Consumidor final',
-        identificacion: '9999999999999', razonSocial: 'CONSUMIDOR FINAL', correo: correo, telefono: tel, recordarDatos: recordar } };
+        identificacion: '9999999999999', razonSocial: 'CONSUMIDOR FINAL', correo: correo,
+        telefono: tel, direccion: dir, recordarDatos: recordar } };
     }
     if (!numero) return { ok: false, msg: 'Ingresá el número de identificación.' };
     if (!razon)  return { ok: false, msg: 'Ingresá el nombre o razón social.' };
     if (!_factEmailValido(correo)) return { ok: false, msg: 'Ingresá un correo electrónico válido.' };
     return { ok: true, fact: { modo: 'otros_datos', tipoIdentificacion: tipo, identificacion: numero,
-      razonSocial: razon, correo: correo, telefono: tel, recordarDatos: recordar } };
+      razonSocial: razon, correo: correo, telefono: tel, direccion: dir, recordarDatos: recordar } };
   }
 
   // Validación final antes de cobrar → {ok, fact, msg}
