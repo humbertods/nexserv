@@ -11286,9 +11286,41 @@ body.rol-staff #confirmSvcClientName::after {
       }
     }
   }
+  // PARCHE-02: en teléfono el iframe embebido de SYNA no puede cargar su sesión
+  // (iOS/Android aíslan el almacenamiento del iframe) y SYNA muestra
+  // "no se pudo cargar el resumen". SYNA abierta sola sí funciona en el móvil,
+  // así que en móvil la abrimos en su propia pestaña. En PC se conserva el iframe.
+  function _esMovilSyna_() {
+    try {
+      var ua = navigator.userAgent || '';
+      if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
+      return !!(window.innerWidth && window.innerWidth <= 820);
+    } catch (e) { return false; }
+  }
+
   function loadSynaDashboard(force) {
     var slot = document.getElementById('synaFullFrame');
     if (!slot) return;
+
+    // En móvil: no embeber. Mostrar una tarjeta con botón que abre SYNA en pestaña propia.
+    if (_esMovilSyna_()) {
+      slot.innerHTML =
+        '<div style="padding:36px 24px;text-align:center;">' +
+          '<div style="font-size:15px;line-height:1.5;color:#666;margin-bottom:18px;">' +
+            'La agenda SYNA se abre en su propia pantalla en el teléfono.' +
+          '</div>' +
+          '<button id="btnAbrirSynaMovil" ' +
+            'style="background:#6C4CE0;color:#fff;border:0;border-radius:14px;' +
+            'padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;">' +
+            'Abrir SYNA' +
+          '</button>' +
+        '</div>';
+      var _b = document.getElementById('btnAbrirSynaMovil');
+      if (_b) _b.onclick = function () { window.open(SYNA_URL_PWA, '_blank'); };
+      return;
+    }
+
+    // PC: iframe embebido (comportamiento original).
     // Sin force: si ya está cargado, conservar el estado de SYNA al cambiar de tab.
     // force=true (re-tap del botón "Syna") → recarga a la pantalla principal de SYNA.
     if (!force && slot.querySelector('iframe')) return;
