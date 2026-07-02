@@ -27,7 +27,8 @@ if ('serviceWorker' in navigator) {
 /* Privacidad: la staff (body.rol-staff) ve el código·iniciales (data-mask), no el nombre real */
 body.rol-staff #as1Name,
 body.rol-staff #as2Name,
-body.rol-staff #confirmSvcClientName { font-size: 0 !important; }
+body.rol-staff #confirmSvcClientName,
+body.rol-staff #staffAtendiendoList .client-name { font-size: 0 !important; }
 body.rol-staff #as1Name::after,
 body.rol-staff #as2Name::after {
   content: attr(data-mask);
@@ -36,6 +37,10 @@ body.rol-staff #as2Name::after {
 body.rol-staff #confirmSvcClientName::after {
   content: attr(data-mask);
   font-size: 16px; font-weight: 700;
+}
+body.rol-staff #staffAtendiendoList .client-name::after {
+  content: attr(data-mask);
+  font-size: inherit; font-weight: inherit;
 }
 #staffAsisEntradaBtn:focus,#staffAsisSalidaBtn:focus,#staffAsisPermisoBtn:focus{outline:none!important;box-shadow:none!important;} #staffAsisEntradaBtn,#staffAsisSalidaBtn,#staffAsisPermisoBtn{-webkit-tap-highlight-color:transparent;}
 </style>
@@ -5537,7 +5542,9 @@ body.rol-staff #confirmSvcClientName::after {
               window._as2Client = a2.codigo;
               window._as2IdEspera = a2.idEspera || ''; // ID del ticket de la 2ª clienta
               activeClients[user.name].push({ name: a2.nombre, code: a2.codigo, service: a2.servicio });
-              const initials2 = a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+              const initials2 = (user.role === 'staff')
+                ? (String(a2.codigo || '').replace(/[^0-9]/g, '').slice(-2) || '··')
+                : a2.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
               const _as2av = document.getElementById('as2Avatar'); if (_as2av) _as2av.textContent = initials2;
               pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
               const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + (a2.horaLlegada ? ' · Llegó ' + a2.horaLlegada : '');
@@ -9869,7 +9876,10 @@ body.rol-staff #confirmSvcClientName::after {
         }
         
         list.innerHTML = result.atenciones.map((a, idx) => {
-          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const isStaff = user.role === 'staff';
+          const initials = isStaff
+            ? (String(a.codigo || '').replace(/[^0-9]/g, '').slice(-2) || '··')
+            : a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           const slot = idx === 0 ? 'activeService' : 'activeService2';
           return `
           <div class="card" style="margin-bottom: 8px; padding: 16px; border-left: 4px solid var(--accent); cursor: pointer;" onclick="loadActiveService(${idx}); show('${slot}');">
@@ -9895,7 +9905,11 @@ body.rol-staff #confirmSvcClientName::after {
         window._as1IdEspera = a1.idEspera || window._as1IdEspera || '';
         
         window._as1Client = a1.codigo;
-        document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+        // Avatar: staff solo ve los últimos 2 dígitos del código (nunca iniciales del nombre)
+        const _as1Initials = (user.role === 'staff')
+          ? (String(a1.codigo || '').replace(/[^0-9]/g, '').slice(-2) || '··')
+          : a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+        document.getElementById('as1Avatar').textContent = _as1Initials;
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
         document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
