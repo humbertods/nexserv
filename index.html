@@ -11223,7 +11223,7 @@ body.rol-staff #confirmSvcClientName::after {
     var _phoneEl = document.querySelector('.phone');
     if (_phoneEl) _phoneEl.style.background = _synaBg;
     window._currentApp = app;
-    if (app === 'syna') loadSynaDashboard(yaEnSyna); // si ya estaba en Syna, recarga a su pantalla principal
+    if (app === 'syna') loadSynaDashboard(true); // cada toque en Syna fuerza recarga y evita cache viejo en teléfono
     // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
   }
   window.switchApp = switchApp;
@@ -11235,7 +11235,8 @@ body.rol-staff #confirmSvcClientName::after {
   var SYNA_EMBED_VERSION = '119';
   function synaUrl_(params) {
     var sep = SYNA_URL_PWA.indexOf('?') >= 0 ? '&' : '?';
-    return SYNA_URL_PWA + sep + 'v=' + encodeURIComponent(SYNA_EMBED_VERSION) + (params ? '&' + params : '');
+    var bust = Date.now ? Date.now() : new Date().getTime();
+    return SYNA_URL_PWA + sep + 'v=' + encodeURIComponent(SYNA_EMBED_VERSION) + '&r=' + encodeURIComponent(bust) + (params ? '&' + params : '');
   }
   function _synaMock() {
     return {
