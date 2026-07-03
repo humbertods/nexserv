@@ -4134,26 +4134,31 @@ async function renderEvidenciasPanel() {
 
 function _evFotoSlot(key, label, url, codigo, staff) {
   var inputId = 'evInput_' + key;
-  var imgId   = 'evImg_' + key;
-  var btnId   = 'evBtn_' + key;
+  var imgId   = 'evImg_'   + key;
 
-  var slotContent = url
-    ? '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">' +
-      '<button onclick="evCambiarFoto('' + key + '','' + inputId + '')" ' +
-        'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">Cambiar foto</button>'
-    : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-        'height:130px;border:2px dashed #d0d0cc;border-radius:12px;cursor:pointer;background:#fafaf8;">' +
-        '<span style="font-size:28px;color:#999;">+</span>' +
-        '<span style="font-size:11px;color:#999;margin-top:4px;">Agregar foto</span>' +
-      '</label>';
+  // Build slot content avoiding complex string escaping
+  // The file input triggers evSubirFoto via onchange
+  // The change-photo button triggers a click on the hidden input
+  var imgHtml = url
+    ? '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
+      + '<button data-input="' + inputId + '" data-key="' + key + '" '
+      + 'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;" '
+      + 'onclick="document.getElementById(this.dataset.input).click()">Cambiar foto</button>'
+    : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      + 'height:130px;border:2px dashed #d0d0cc;border-radius:12px;cursor:pointer;background:#fafaf8;">'
+      + '<span style="font-size:28px;color:#999;">+</span>'
+      + '<span style="font-size:11px;color:#999;margin-top:4px;">Agregar foto</span>'
+      + '</label>';
 
-  return '<div>' +
-    '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>' +
-    '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;" ' +
-      'onchange="evSubirFoto(this,'' + key + '','' + codigo + '','' + staff + '')">' +
-    slotContent +
-    '<div id="evStatus_' + key + '" style="font-size:10px;text-align:center;color:#888;margin-top:3px;min-height:14px;"></div>' +
-  '</div>';
+  // Store codigo and staff as data attributes on the input to avoid inline escaping
+  return '<div>'
+    + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
+    + '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;"'
+    + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
+    + ' onchange="evSubirFotoDesdeInput(this)">'
+    + imgHtml
+    + '<div id="evStatus_' + key + '" style="font-size:10px;text-align:center;color:#888;margin-top:3px;min-height:14px;"></div>'
+    + '</div>';
 }
 
 function evCambiarFoto(key, inputId) {
@@ -4229,3 +4234,20 @@ window.evCambiarFoto           = evCambiarFoto;
 // y necesitan estar en window antes de que main-2 y main-4 se ejecuten.
 window.confirmarServicioObligatorio = showConfirmServiceModal;
 window.finishAndSendAll             = finishAndSendAll;
+
+
+
+// Helper para evSubirFoto que lee el key/codigo/staff desde data-attributes
+// evita el problema de escapado de strings en onclick
+function evSubirFotoDesdeInput(input) {
+  var key    = input.dataset.key;
+  var codigo = input.dataset.codigo;
+  var staff  = input.dataset.staff;
+  evSubirFoto(input, key, codigo, staff);
+}
+window.evSubirFotoDesdeInput = evSubirFotoDesdeInput;
+
+// Additional aliases for functions called from other modules
+window.cobrarPromoCompleta = cobrarPromoCompleta;
+window.finishAndContinueSameStaff = finishAndContinueSameStaff;
+window.compartirSiguienteServicio = compartirSiguienteServicio;
