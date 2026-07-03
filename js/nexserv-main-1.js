@@ -742,7 +742,7 @@
           var btnsBaseTM = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
-            + (typeof miAreaActual !== 'undefined' && String(miAreaActual||'').indexOf('pesta') >= 0 ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window[\'_as\'+slotN+\'Client\'']||window._as1Client||\'\'),(window.currentUser&&window.currentUser.name)||\'staff\')">📸 Evidencia del trabajo realizado</button>' : '')
+            + (typeof miAreaActual !== 'undefined' && String(miAreaActual||'').indexOf('pesta') >= 0 ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas(window._as1Client||window._as2Client||\'\',(window.currentUser&&window.currentUser.name)||\'staff\')">📸 Evidencia del trabajo realizado</button>' : '')
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           // ── REGLA IRREVOCABLE: el botón "Cobrar promo completa" es EXCLUSIVO de la
           // staff de PESTAÑAS y SOLO para la promo "pestañas + depilación de cejas"
@@ -4223,3 +4223,9 @@ function _evComprimirImagen(file, maxPx, quality) {
 window.abrirEvidenciasPestanas = abrirEvidenciasPestanas;
 window.evSubirFoto             = evSubirFoto;
 window.evCambiarFoto           = evCambiarFoto;
+
+// ── Aliases de funciones definidas en este archivo ──────────────
+// Estas funciones son referenciadas desde otros archivos de la partición
+// y necesitan estar en window antes de que main-2 y main-4 se ejecuten.
+window.confirmarServicioObligatorio = showConfirmServiceModal;
+window.finishAndSendAll             = finishAndSendAll;
