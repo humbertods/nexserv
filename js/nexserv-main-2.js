@@ -160,9 +160,8 @@
     }
   }
 
-  // Alias: confirmarServicioObligatorio se llama en varios sitios pero la función real
-  // es showConfirmServiceModal (abre el modal de confirmación con sus botones).
-  window.confirmarServicioObligatorio = showConfirmServiceModal;
+  // Alias movido a nexserv-main-1.js donde está definida showConfirmServiceModal
+  // window.confirmarServicioObligatorio = showConfirmServiceModal; // ← en main-1
 
   function changeServiceFromModal() {
     closeModal();
