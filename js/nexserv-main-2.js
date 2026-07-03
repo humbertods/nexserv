@@ -1722,7 +1722,8 @@
         // CRÍTICO: actualizar _as1IdEspera con el ID real del ticket activo (puede ser SP- o LE-)
         window._as1IdEspera = a1.idEspera || window._as1IdEspera || '';
         
-        window._as1Client = a1.codigo;
+        window._as1Client     = a1.codigo;
+        window._as1ClientName = a1.nombre || '';
         document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
