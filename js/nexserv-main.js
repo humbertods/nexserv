@@ -7730,7 +7730,9 @@
       window._historialItems = []; // guardar todos los items para poder eliminarlos por índice
 
       result.historial.forEach(function(h, globalIdx) {
-        if (!h.nombre && !h.clienteNombre) return;
+        const esProducto = String(h.area || '').toLowerCase() === 'producto'
+                        || String(h.metodoPago || '').toLowerCase() === 'producto';
+        if (!h.nombre && !h.clienteNombre && !esProducto) return;
         const parts = String(h.fecha || '').split('/');
         if (parts.length !== 3) return;
         const fechaDate = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
@@ -7739,6 +7741,9 @@
         const diaN = DIAS_LABEL[fechaDate.getDay()] || 'Otro';
         const diaSortKey = fechaDate.getDay();
         const staff = String(h.chica || '—');
+        const staffDisplay = (staff === 'admin' && esProducto)
+          ? (String(h.chica || '') || 'Admin')
+          : staff;
         const valor = Number(h.precio || 0);
         const cliente = clienteDisplay(String(h.nombre || h.clienteNombre || ''), String(h.codigo || h.code || '')) || '—';
         const servicio = String(h.servicio || '—');
@@ -7748,9 +7753,9 @@
         window._historialItems.push({ ...h, _idx: itemIdx });
 
         if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, count: 0, staff: {} };
-        if (!porDia[diaN].staff[staff]) porDia[diaN].staff[staff] = { nombre: staff, total: 0, servicios: [] };
-        porDia[diaN].staff[staff].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
-        porDia[diaN].staff[staff].total += valor;
+        if (!porDia[diaN].staff[staffDisplay]) porDia[diaN].staff[staffDisplay] = { nombre: staffDisplay, total: 0, servicios: [] };
+        porDia[diaN].staff[staffDisplay].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
+        porDia[diaN].staff[staffDisplay].total += valor;
         porDia[diaN].total += valor;
         porDia[diaN].count++;
         totalSemana += valor;
