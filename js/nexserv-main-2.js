@@ -298,8 +298,13 @@
           // congelado → "Ticket SP no encontrado". El SN- debe finalizarse por su propio camino.
           const allSP = [...(spData2.enServicio || [])];
           // Buscar SP ticket para esta clienta (puede tener desglose de la staff previa)
+          // FIX: solo vincular SP que tiene a ESTA staff en serviciosDetalle.
+          // Sin este filtro, el SN de María (piernas $30) encontraba el SP de Laura (facial $32)
+          // para la misma clienta, sumaba los montos y mostraba precio incorrecto en cobro grupal.
           const linkedSP = allSP.find(t =>
-            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client)) &&
+            t.serviciosDetalle && t.serviciosDetalle.length > 0 &&
+            t.serviciosDetalle.some(d => d.staff === (user && user.name))
           );
           if (linkedSP && linkedSP.serviciosDetalle && linkedSP.serviciosDetalle.length > 0) {
             miTicketSheet = linkedSP;
@@ -3139,21 +3144,23 @@
     var slot = document.getElementById('synaFullFrame');
     if (!slot) return;
 
-    // En móvil: no embeber. Mostrar una tarjeta con botón que abre SYNA en pestaña propia.
+    // En móvil: no embeber. Mostrar tarjeta con botón que abre SYNA en pestaña propia.
+    // FIX iOS: el onclick debe estar en el atributo HTML del botón (no asignado con .onclick=)
+    // porque iOS Safari bloquea window.open cuando se llama desde un listener asignado
+    // programáticamente después del render — solo permite la apertura desde onclick inline.
     if (_esMovilSyna_()) {
+      var synaDest = synaUrl_('embed=1&user=mikaela&view=reservar');
       slot.innerHTML =
         '<div style="padding:36px 24px;text-align:center;">' +
           '<div style="font-size:15px;line-height:1.5;color:#666;margin-bottom:18px;">' +
             'La agenda SYNA se abre en su propia pantalla en el teléfono.' +
           '</div>' +
-          '<button id="btnAbrirSynaMovil" ' +
+          '<button onclick="window.open(\'' + synaDest.replace(/'/g, "\\'") + '\',\'_blank\')" ' +
             'style="background:#6C4CE0;color:#fff;border:0;border-radius:14px;' +
             'padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;">' +
             'Abrir SYNA' +
           '</button>' +
         '</div>';
-      var _b = document.getElementById('btnAbrirSynaMovil');
-      if (_b) _b.onclick = function () { window.open(synaUrl_('embed=1&user=mikaela&view=reservar'), '_blank'); };
       return;
     }
 
