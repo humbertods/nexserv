@@ -3524,15 +3524,15 @@
   window.completarYTomarSiguiente = completarYTomarSiguiente;
   window.finishAndSend         = finishAndSend;
   // window.finishAndSendAll alias moved to nexserv-main-1.js
-  window.cobrarPromoCompleta   = cobrarPromoCompleta;
+  // window.cobrarPromoCompleta alias moved to nexserv-main-1.js
   window.finishAndContinue     = finishAndContinue;
-  window.finishAndContinueSameStaff = finishAndContinueSameStaff;
+  // window.finishAndContinueSameStaff alias moved to nexserv-main-1.js
   window.finishSlotAndContinue = finishSlotAndContinue;
   window.finishAndNextPromo    = finishAndNextPromo;
   window.finishAndRetire       = finishAndRetire;
   window.finishAndReturn       = finishAndReturn;
   window.confirmServiceAndClose = confirmServiceAndClose;
-  window.compartirSiguienteServicio = compartirSiguienteServicio;
+  // window.compartirSiguienteServicio alias moved to nexserv-main-1.js
   window.finishSlot1           = finishSlot1;
   window.prepararYFinalizar     = prepararYFinalizar;
   window.finishSlot2           = finishSlot2;
