@@ -772,6 +772,7 @@
       const _slotNP = slot1 ? 1 : 2;
       // Usar user.area como fuente confiable del área de esta staff
       const _areaSlotNP = String((user && user.area) || '').toLowerCase();
+      const _evBtnNP = _areaSlotNP.indexOf('pesta') >= 0
         ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
             onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
         : '';
