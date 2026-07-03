@@ -3523,7 +3523,7 @@
   window.completarAreaMultiFinal = completarAreaMultiFinal;
   window.completarYTomarSiguiente = completarYTomarSiguiente;
   window.finishAndSend         = finishAndSend;
-  window.finishAndSendAll      = finishAndSendAll;
+  // window.finishAndSendAll alias moved to nexserv-main-1.js
   window.cobrarPromoCompleta   = cobrarPromoCompleta;
   window.finishAndContinue     = finishAndContinue;
   window.finishAndContinueSameStaff = finishAndContinueSameStaff;
