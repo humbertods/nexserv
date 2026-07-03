@@ -691,7 +691,11 @@
           + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')">💰 Lo hice todo yo — cobrar todo</button>';
         return;
       }
-      btnContainer.innerHTML = `
+      // Botón de evidencia solo para pestañas
+      var _evBtnSP = (String(_myAreaSP||"").indexOf("pesta") >= 0)
+        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window['_as'+${_slotSP}+'Client']||window._as1Client||''),(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+        : "";
+      btnContainer.innerHTML = _evBtnSP + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
           ✅ Terminé — enviar a cobro con Mikaela
         </button>`;
@@ -738,6 +742,7 @@
           var btnsBaseTM = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
+            + (typeof miAreaActual !== 'undefined' && String(miAreaActual||'').indexOf('pesta') >= 0 ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window[\'_as\'+slotN+\'Client\'']||window._as1Client||\'\'),(window.currentUser&&window.currentUser.name)||\'staff\')">📸 Evidencia del trabajo realizado</button>' : '')
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           // ── REGLA IRREVOCABLE: el botón "Cobrar promo completa" es EXCLUSIVO de la
           // staff de PESTAÑAS y SOLO para la promo "pestañas + depilación de cejas"
@@ -4046,3 +4051,175 @@
 
     document.getElementById('confirmServiceModal').classList.add('active');
   }
+
+
+// ============================================
+// MÓDULO EVIDENCIAS DE PESTAÑAS
+// Permite a la staff fotografiar el trabajo antes/después
+// para protección ante reclamos de la clienta.
+// Solo aparece en el panel de atención de pestañas.
+// ============================================
+
+// Abre la vista de evidencias en una nueva pestaña/overlay
+// codigo = código de la clienta, nombre = nombre, staff = nombre de la staff
+function abrirEvidenciasPestanas(codigo, nombre, staff) {
+  if (!codigo) return;
+  // Abrir en ventana nueva para no interrumpir el flujo de atención
+  var url = location.origin + location.pathname +
+    '?evidencias=1&codigo=' + encodeURIComponent(codigo) +
+    '&nombre=' + encodeURIComponent(nombre || '') +
+    '&staff=' + encodeURIComponent(staff || '');
+  window.open(url, '_blank');
+}
+
+// Renderiza el panel de evidencias completo (se llama al cargar si ?evidencias=1)
+async function renderEvidenciasPanel() {
+  var params = new URLSearchParams(location.search);
+  if (params.get('evidencias') !== '1') return;
+
+  var codigo = params.get('codigo') || '';
+  var nombre = params.get('nombre') || '';
+  var staffParam = params.get('staff') || '';
+
+  document.title = 'Evidencias · ' + nombre;
+  document.body.style.cssText = 'margin:0;padding:0;background:#f8f8f6;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+
+  document.body.innerHTML =
+    '<div id="evRoot" style="max-width:480px;margin:0 auto;padding:16px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">' +
+        '<button onclick="window.close()" style="background:#1a1a1a;color:#fff;border:0;border-radius:10px;padding:8px 14px;font-size:13px;cursor:pointer;">← Cerrar</button>' +
+        '<div>' +
+          '<div style="font-size:17px;font-weight:800;">Evidencias del trabajo</div>' +
+          '<div style="font-size:12px;color:#666;">' + nombre + ' · ' + new Date().toLocaleDateString('es-EC') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="evLoading" style="text-align:center;padding:40px;color:#888;">Cargando evidencias…</div>' +
+    '</div>';
+
+  // Cargar fotos existentes
+  var r = await apiGet('getEvidenciasPestanas', { codigo: codigo });
+  var fotos = (r && r.fotos) ? r.fotos : {};
+
+  var secciones = [
+    { titulo: 'Antes del servicio', fotos: [
+      { key: 'antes_izq', label: 'Ojo Izquierdo' },
+      { key: 'antes_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Después del servicio', fotos: [
+      { key: 'despues_izq', label: 'Ojo Izquierdo' },
+      { key: 'despues_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Separación línea de agua', fotos: [
+      { key: 'linea_izq', label: 'Ojo Izquierdo' },
+      { key: 'linea_der', label: 'Ojo Derecho'   }
+    ]}
+  ];
+
+  var html = '';
+  secciones.forEach(function(sec) {
+    html += '<div style="background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);">';
+    html += '<div style="font-size:15px;font-weight:800;margin-bottom:12px;color:#1a1a1a;">' + sec.titulo + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    sec.fotos.forEach(function(f) {
+      var urlFoto = fotos[f.key] || '';
+      html += _evFotoSlot(f.key, f.label, urlFoto, codigo, staffParam);
+    });
+    html += '</div></div>';
+  });
+
+  html += '<div style="text-align:center;padding:8px;color:#aaa;font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
+
+  document.getElementById('evLoading').outerHTML = html;
+}
+
+function _evFotoSlot(key, label, url, codigo, staff) {
+  var inputId = 'evInput_' + key;
+  var imgId   = 'evImg_' + key;
+  var btnId   = 'evBtn_' + key;
+
+  var slotContent = url
+    ? '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">' +
+      '<button onclick="evCambiarFoto('' + key + '','' + inputId + '')" ' +
+        'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;">Cambiar foto</button>'
+    : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+        'height:130px;border:2px dashed #d0d0cc;border-radius:12px;cursor:pointer;background:#fafaf8;">' +
+        '<span style="font-size:28px;color:#999;">+</span>' +
+        '<span style="font-size:11px;color:#999;margin-top:4px;">Agregar foto</span>' +
+      '</label>';
+
+  return '<div>' +
+    '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>' +
+    '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;" ' +
+      'onchange="evSubirFoto(this,'' + key + '','' + codigo + '','' + staff + '')">' +
+    slotContent +
+    '<div id="evStatus_' + key + '" style="font-size:10px;text-align:center;color:#888;margin-top:3px;min-height:14px;"></div>' +
+  '</div>';
+}
+
+function evCambiarFoto(key, inputId) {
+  var el = document.getElementById(inputId);
+  if (el) el.click();
+}
+
+async function evSubirFoto(input, key, codigo, staff) {
+  var file = input.files[0];
+  if (!file) return;
+  var statusEl = document.getElementById('evStatus_' + key);
+  if (statusEl) statusEl.textContent = 'Subiendo…';
+
+  // Comprimir imagen a max 1200px y calidad 0.75 antes de subir
+  var base64 = await _evComprimirImagen(file, 1200, 0.75);
+  // Remover prefijo data:image/jpeg;base64,
+  var b64data = base64.split(',')[1] || base64;
+
+  var r = await apiPost('subirEvidenciaPestanas', {
+    codigo: codigo, tipo: key, imagen: b64data, staff: staff
+  });
+
+  if (r && r.success) {
+    if (statusEl) statusEl.textContent = '✓ Guardado';
+    // Actualizar preview sin recargar
+    var imgEl = document.getElementById('evImg_' + key);
+    if (imgEl) {
+      imgEl.src = r.url + '&t=' + Date.now();
+    } else {
+      // Recargar el slot completo para mostrar la imagen nueva
+      setTimeout(function() { location.reload(); }, 800);
+    }
+  } else {
+    if (statusEl) statusEl.textContent = '✗ Error al subir';
+  }
+}
+
+function _evComprimirImagen(file, maxPx, quality) {
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var ratio = Math.min(maxPx / img.width, maxPx / img.height, 1);
+        canvas.width  = Math.round(img.width  * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Verifica al cargar si estamos en modo evidencias
+(function() {
+  if (location.search.indexOf('evidencias=1') >= 0) {
+    document.addEventListener('DOMContentLoaded', function() {
+      renderEvidenciasPanel();
+    });
+  }
+})();
+
+// Exponer globalmente
+window.abrirEvidenciasPestanas = abrirEvidenciasPestanas;
+window.evSubirFoto             = evSubirFoto;
+window.evCambiarFoto           = evCambiarFoto;
