@@ -770,7 +770,12 @@
     if (!promoData || !promoData.promo) {
       // Sin promo — botón directo sin abrir modal de opciones
       const _slotNP = slot1 ? 1 : 2;
-      btnContainer.innerHTML = `
+      const _areaSlotNP = String(_idEsperaSlot.startsWith('SN-') ? (user && user.area || '') : (promoData && promoData.area || user && user.area || '')).toLowerCase();
+      const _evBtnNP = _areaSlotNP.indexOf('pesta') >= 0
+        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
+            onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+        : '';
+      btnContainer.innerHTML = _evBtnNP + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotNP})">
           Finalizar servicio
@@ -781,7 +786,12 @@
     // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData
     if (_idEsperaSlot.startsWith('SN-')) {
       const _slotSN = slot1 ? 1 : 2;
-      btnContainer.innerHTML = `
+      const _areaSlotSN = String(user && user.area || '').toLowerCase();
+      const _evBtnSN = _areaSlotSN.indexOf('pesta') >= 0
+        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
+            onclick="abrirEvidenciasPestanas(window._as${_slotSN}Client||'',window._as${_slotSN}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+        : '';
+      btnContainer.innerHTML = _evBtnSN + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotSN})">
           Finalizar servicio
@@ -829,6 +839,11 @@
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — Yo sigo: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente)</button>`;
       } else {
+        const _userAreaFS = String(user && user.area || '').toLowerCase();
+        if (_userAreaFS.indexOf('pesta') >= 0) {
+          html += `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
+            onclick="abrirEvidenciasPestanas(window._as${slotActual}Client||'',window._as${slotActual}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`;
+        }
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
       }
     } else if (puedeTodo) {
