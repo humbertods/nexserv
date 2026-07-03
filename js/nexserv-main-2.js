@@ -3698,11 +3698,16 @@
         const diaN = DIAS_LABEL[fechaDate.getDay()] || 'Otro';
         const diaSortKey = fechaDate.getDay();
         const staff = String(h.chica || '—');
-        const staffDisplay = (staff === 'admin' && esProducto)
-          ? (String(h.chica || '') || 'Admin')
+        // Productos registrados con chica='admin' → mostrar como 'Mikaela'
+        const staffDisplay = (esProducto && (staff === 'admin' || staff === '—' || staff === ''))
+          ? 'Mikaela'
           : staff;
         const valor = Number(h.precio || 0);
-        const cliente = clienteDisplay(String(h.nombre || h.clienteNombre || ''), String(h.codigo || h.code || '')) || '—';
+        // Para productos: el nombre de clienta está en col C (h.codigo), no col D (h.nombre='admin')
+        const clienteRaw = esProducto
+          ? (String(h.codigo || h.nombre || '') || 'Venta directa')
+          : String(h.nombre || h.clienteNombre || '');
+        const cliente = clienteDisplay(clienteRaw, String(h.codigo || h.code || '')) || '—';
         const servicio = String(h.servicio || '—');
         const hora = String(h.hora || '');
         const metodo = String(h.metodoPago || 'Efectivo');
