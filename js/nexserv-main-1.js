@@ -691,11 +691,7 @@
           + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')">💰 Lo hice todo yo — cobrar todo</button>';
         return;
       }
-      // Botón de evidencia solo para pestañas
-      var _evBtnSP = (String(_myAreaSP||"").indexOf("pesta") >= 0)
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window['_as'+${_slotSP}+'Client']||window._as1Client||''),(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
-        : "";
-      btnContainer.innerHTML = _evBtnSP + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
           ✅ Terminé — enviar a cobro con Mikaela
         </button>`;
@@ -739,10 +735,7 @@
           // BTN A: yo sigo con el siguiente servicio del TM
           // BTN B: el siguiente servicio va a otra staff de la misma área
           // BTN C: terminé todo lo mío — enviar a cobro con Mikaela ahora
-          var _evBtnTM = (user && String(user.area||'').toLowerCase().indexOf('pesta') >= 0)
-            ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="abrirEvidenciasPestanas(window[\'_as\'+' + slotN + '+\'Client\')||\'\',window[\'_as\'+' + slotN + '+\'ClientName\')||\'\',(window.currentUser&&window.currentUser.name)||\'staff\')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>'
-            : '';
-          var btnsBaseTM = _evBtnTM
+          var btnsBaseTM = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
@@ -772,13 +765,7 @@
     if (!promoData || !promoData.promo) {
       // Sin promo — botón directo sin abrir modal de opciones
       const _slotNP = slot1 ? 1 : 2;
-      // Usar user.area como fuente confiable del área de esta staff
-      const _areaSlotNP = String((user && user.area) || '').toLowerCase();
-      const _evBtnNP = _areaSlotNP.indexOf('pesta') >= 0
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
-        : '';
-      btnContainer.innerHTML = _evBtnNP + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotNP})">
           Finalizar servicio
@@ -789,12 +776,7 @@
     // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData
     if (_idEsperaSlot.startsWith('SN-')) {
       const _slotSN = slot1 ? 1 : 2;
-      const _areaSlotSN = String(user && user.area || '').toLowerCase();
-      const _evBtnSN = _areaSlotSN.indexOf('pesta') >= 0
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotSN}Client||'',window._as${_slotSN}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
-        : '';
-      btnContainer.innerHTML = _evBtnSN + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotSN})">
           Finalizar servicio
@@ -842,11 +824,6 @@
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — Yo sigo: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente)</button>`;
       } else {
-        const _userAreaFS = String(user && user.area || '').toLowerCase();
-        if (_userAreaFS.indexOf('pesta') >= 0) {
-          html += `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${slotActual}Client||'',window._as${slotActual}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`;
-        }
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
       }
     } else if (puedeTodo) {
