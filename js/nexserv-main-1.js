@@ -4229,7 +4229,7 @@ function _evFotoSlot(key, label, url, codigo, staff) {
   // Store codigo and staff as data attributes on the input to avoid inline escaping
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
-    + '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;"'
+    + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
     + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
     + ' onchange="evSubirFotoDesdeInput(this)">'
     + imgHtml
