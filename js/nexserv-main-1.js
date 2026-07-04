@@ -4244,7 +4244,7 @@ function _evVerFoto(url) {
     lb.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;';
     lb.onclick = function() { lb.style.display = 'none'; };
     lb.innerHTML = '<img id="evLightboxImg" style="max-width:95vw;max-height:90vh;border-radius:12px;object-fit:contain;">'
-      + '<button onclick="document.getElementById('evLightbox').style.display='none'" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;">✕</button>';
+      + '<button onclick="document.getElementById(&quot;evLightbox&quot;).style.display=&quot;none&quot;" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;">✕</button>';
     document.body.appendChild(lb);
   }
   document.getElementById('evLightboxImg').src = url;
