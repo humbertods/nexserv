@@ -381,7 +381,7 @@
     <div class="modal-bg" id="cobrarModal">
       <div class="modal" style="max-height: 92%; overflow-y: auto;">
         <div class="modal-handle"></div>
-        <div class="modal-title">💵 Cobrar servicio</div>
+        <div class="modal-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="vertical-align:-2px;margin-right:6px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar servicio</div>
 
         <!-- Nombre clienta -->
         <div style="text-align: center; margin-bottom: 14px;">
@@ -395,9 +395,9 @@
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
             <button type="button" id="factBtnMismos" onclick="factSetModo('mismos_datos')"
-              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;">👤 Mismos datos</button>
+              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>Mismos datos</button>
             <button type="button" id="factBtnOtros" onclick="factSetModo('otros_datos')"
-              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;">✏️ Otros datos</button>
+              style="padding: 12px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z"/></svg>Otros datos</button>
           </div>
 
           <!-- Resumen de la clienta registrada (modo "mismos_datos") -->
@@ -469,22 +469,22 @@
         <!-- ABONO (depósito de reserva) — el total completo va a caja; acá se muestra el neto a cobrar en mano -->
         <div id="cobrarAbonoRow" style="display:none;margin:-8px 0 16px;padding:12px 14px;background:var(--bg-soft,#f6f2ec);border-radius:14px;">
           <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);">
-            <span>💰 Abono ya pagado</span><span id="cobrarAbonoMonto" style="font-weight:800;color:var(--accent-deep);"></span>
+            <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Abono ya pagado</span><span id="cobrarAbonoMonto" style="font-weight:800;color:var(--accent-deep);"></span>
           </div>
           <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:800;margin-top:6px;border-top:1px solid var(--line);padding-top:6px;">
             <span>A cobrar ahora</span><span id="cobrarAbonoNeto" style="color:var(--success);"></span>
           </div>
         </div>
         <div style="text-align:center;margin:-6px 0 16px;">
-          <span onclick="_cobroRegistrarAbono()" style="font-size:12px;font-weight:700;color:var(--accent-deep);cursor:pointer;">💰 Registrar / editar abono</span>
+          <span onclick="_cobroRegistrarAbono()" style="font-size:12px;font-weight:700;color:var(--accent-deep);cursor:pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Registrar / editar abono</span>
         </div>
         
         <div style="font-size: 13px; font-weight: 700; margin-bottom: 10px;">Método de pago</div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;">
-          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💵 Efectivo</button>
-          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">💳 Tarjeta</button>
-          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">📱 Transfer.</button>
-          <button onclick="selectPago('Pago mixto', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">🔀 Pago mixto</button>
+          <button onclick="selectPago('Efectivo', this)" class="pago-btn selected" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--success); background: var(--success); color: white; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</button>
+          <button onclick="selectPago('Tarjeta', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</button>
+          <button onclick="selectPago('Transferencia', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>Transfer.</button>
+          <button onclick="selectPago('Pago mixto', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M16 3h5v5l-1.5-1.5-4.5 4.5-3-3-6 6-1.5-1.5 7.5-7.5 3 3 3-3L16 3zM4.5 16.5 3 18v3h3l8.5-8.5-3-3-7 7z"/></svg>Pago mixto</button>
         </div>
 
         <!-- Panel desglose pago mixto -->
@@ -493,9 +493,9 @@
           <!-- Fila 1 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
             <select id="mixtoMetodo1" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
-              <option value="Efectivo">💵 Efectivo</option>
-              <option value="Transferencia">📱 Transferencia</option>
-              <option value="Tarjeta">💳 Tarjeta</option>
+              <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
             </select>
             <input type="number" id="mixtoMonto1" min="0" step="0.01" placeholder="$0.00"
               oninput="onMixtoInput()"
@@ -504,9 +504,9 @@
           <!-- Fila 2 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
             <select id="mixtoMetodo2" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
-              <option value="Transferencia">📱 Transferencia</option>
-              <option value="Efectivo">💵 Efectivo</option>
-              <option value="Tarjeta">💳 Tarjeta</option>
+              <option value="Transferencia">Transferencia</option>
+              <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
+              <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
             </select>
             <input type="number" id="mixtoMonto2" min="0" step="0.01" placeholder="$0.00"
               oninput="onMixtoInput()"
@@ -515,9 +515,9 @@
           <!-- Fila 3 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
             <select id="mixtoMetodo3" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
-              <option value="Tarjeta">💳 Tarjeta</option>
-              <option value="Efectivo">💵 Efectivo</option>
-              <option value="Transferencia">📱 Transferencia</option>
+              <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
+              <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
+              <option value="Transferencia">Transferencia</option>
             </select>
             <input type="number" id="mixtoMonto3" min="0" step="0.01" placeholder="$0.00 (opcional)"
               oninput="onMixtoInput()"
@@ -1083,7 +1083,7 @@
       <label style="font-size:12px;font-weight:700;color:var(--ink-soft);display:block;margin-top:12px;">¿Cómo se pagó?</label>
       <div style="display:flex;gap:8px;margin-top:6px;">
         <button type="button" id="gvMetEfectivo" onclick="setGastoMetodo('efectivo')"
-                style="flex:1;padding:11px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">💵 Efectivo</button>
+                style="flex:1;padding:11px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</button>
         <button type="button" id="gvMetTransfer" onclick="setGastoMetodo('transferencia')"
                 style="flex:1;padding:11px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink-soft);border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">🏦 Transferencia</button>
       </div>
