@@ -4332,13 +4332,17 @@ async function evSubirFoto(input, key, codigo, staff) {
   }
   if (statusEl) statusEl.textContent = 'Guardando…';
   var b64data = base64.split(',')[1] || base64;
+  console.log('[Evidencias] Subiendo foto — codigo:', codigo, '| tipo:', key, '| staff:', staff, '| b64 length:', b64data.length);
   var r = await apiPost('subirEvidenciaPestanas', { codigo: codigo, tipo: key, imagen: b64data, staff: staff });
+  console.log('[Evidencias] Respuesta backend:', JSON.stringify(r));
   if (r && r.success) {
     if (statusEl) { statusEl.textContent = '✓ Guardado'; statusEl.style.color = 'var(--success,#2d6a4f)'; }
     var imgEl = document.getElementById(imgId);
     if (imgEl) { imgEl.src = r.url + '&t=' + Date.now(); imgEl.style.opacity = '1'; }
   } else {
-    if (statusEl) { statusEl.textContent = '✗ Error al guardar'; statusEl.style.color = 'var(--danger,#c0392b)'; }
+    var _errMsg = (r && r.message) ? r.message : (r && r.error) ? r.error : 'sin respuesta';
+    console.error('[Evidencias] ERROR:', _errMsg, '| respuesta completa:', JSON.stringify(r));
+    if (statusEl) { statusEl.textContent = '✗ ' + _errMsg.substring(0, 40); statusEl.style.color = 'var(--danger,#c0392b)'; }
     var imgEl2 = document.getElementById(imgId);
     if (imgEl2) imgEl2.style.opacity = '0.3';
   }
