@@ -4207,7 +4207,7 @@ function _evFotoSlot(key, label, url, codigo, staff) {
   // Store codigo and staff as data attributes on the input to avoid inline escaping
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
-    + '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;"'
+    + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
     + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
     + ' onchange="evSubirFotoDesdeInput(this)">'
     + imgHtml
@@ -4224,29 +4224,47 @@ async function evSubirFoto(input, key, codigo, staff) {
   var file = input.files[0];
   if (!file) return;
   var statusEl = document.getElementById('evStatus_' + key);
-  if (statusEl) statusEl.textContent = 'Subiendo…';
+  var slotDiv  = input.parentElement; // el <div> contenedor del slot
 
-  // Comprimir imagen a max 1200px y calidad 0.75 antes de subir
+  // Preview inmediato con el base64 local (antes de subir)
   var base64 = await _evComprimirImagen(file, 1200, 0.75);
-  // Remover prefijo data:image/jpeg;base64,
-  var b64data = base64.split(',')[1] || base64;
+  var inputId = 'evInput_' + key;
+  var imgId   = 'evImg_'   + key;
 
+  // Mostrar preview local inmediatamente
+  var existingImg = document.getElementById(imgId);
+  if (!existingImg && slotDiv) {
+    // Reemplazar el label (+) por la imagen preview
+    var label = slotDiv.querySelector('label');
+    if (label) {
+      label.outerHTML =
+        '<img id="' + imgId + '" src="' + base64 + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;opacity:0.7;">'
+        + '<button data-input="' + inputId + '" data-key="' + key + '" '
+        + 'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;" '
+        + 'onclick="document.getElementById(this.dataset.input).click()">Cambiar foto</button>';
+    }
+  }
+  if (statusEl) statusEl.textContent = 'Guardando…';
+
+  // Subir al backend
+  var b64data = base64.split(',')[1] || base64;
   var r = await apiPost('subirEvidenciaPestanas', {
     codigo: codigo, tipo: key, imagen: b64data, staff: staff
   });
 
   if (r && r.success) {
-    if (statusEl) statusEl.textContent = '✓ Guardado';
-    // Actualizar preview sin recargar
-    var imgEl = document.getElementById('evImg_' + key);
+    if (statusEl) { statusEl.textContent = '✓ Guardado'; statusEl.style.color = 'var(--success,#2d6a4f)'; }
+    // Confirmar con la URL real del Drive
+    var imgEl = document.getElementById(imgId);
     if (imgEl) {
       imgEl.src = r.url + '&t=' + Date.now();
-    } else {
-      // Recargar el slot completo para mostrar la imagen nueva
-      setTimeout(function() { location.reload(); }, 800);
+      imgEl.style.opacity = '1';
     }
   } else {
-    if (statusEl) statusEl.textContent = '✗ Error al subir';
+    if (statusEl) { statusEl.textContent = '✗ Error al guardar'; statusEl.style.color = 'var(--danger,#c0392b)'; }
+    // Revertir preview si falló
+    var imgEl2 = document.getElementById(imgId);
+    if (imgEl2) imgEl2.style.opacity = '0.3';
   }
 }
 
