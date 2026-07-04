@@ -693,7 +693,7 @@
       }
       // Botón de evidencia solo para pestañas
       var _evBtnSP = (String(_myAreaSP||"").indexOf("pesta") >= 0)
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window['_as'+${_slotSP}+'Client']||window._as1Client||''),(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window['_as'+${_slotSP}+'Client']||window._as1Client||''),(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
         : "";
       btnContainer.innerHTML = _evBtnSP + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
@@ -739,10 +739,12 @@
           // BTN A: yo sigo con el siguiente servicio del TM
           // BTN B: el siguiente servicio va a otra staff de la misma área
           // BTN C: terminé todo lo mío — enviar a cobro con Mikaela ahora
-          var btnsBaseTM = ''
+          var _evBtnTM = (user && String(user.area||'').toLowerCase().indexOf('pesta') >= 0)
+            ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="abrirEvidenciasPestanas(window[\'_as\'+' + slotN + '+\'Client\')||\'\',window[\'_as\'+' + slotN + '+\'ClientName\')||\'\',(window.currentUser&&window.currentUser.name)||\'staff\')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>'
+            : '';
+          var btnsBaseTM = _evBtnTM
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
-            + (user && String(user.area||'').toLowerCase().indexOf('pesta') >= 0 ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas(window._as1Client||window._as2Client||\'\',(window.currentUser&&window.currentUser.name)||\'staff\')">📸 Evidencia del trabajo realizado</button>' : '')
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           // ── REGLA IRREVOCABLE: el botón "Cobrar promo completa" es EXCLUSIVO de la
           // staff de PESTAÑAS y SOLO para la promo "pestañas + depilación de cejas"
@@ -774,7 +776,7 @@
       const _areaSlotNP = String((user && user.area) || '').toLowerCase();
       const _evBtnNP = _areaSlotNP.indexOf('pesta') >= 0
         ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+            onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
         : '';
       btnContainer.innerHTML = _evBtnNP + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
@@ -790,7 +792,7 @@
       const _areaSlotSN = String(user && user.area || '').toLowerCase();
       const _evBtnSN = _areaSlotSN.indexOf('pesta') >= 0
         ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotSN}Client||'',window._as${_slotSN}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
+            onclick="abrirEvidenciasPestanas(window._as${_slotSN}Client||'',window._as${_slotSN}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`
         : '';
       btnContainer.innerHTML = _evBtnSN + `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
@@ -843,7 +845,7 @@
         const _userAreaFS = String(user && user.area || '').toLowerCase();
         if (_userAreaFS.indexOf('pesta') >= 0) {
           html += `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${slotActual}Client||'',window._as${slotActual}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`;
+            onclick="abrirEvidenciasPestanas(window._as${slotActual}Client||'',window._as${slotActual}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>`;
         }
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
       }
@@ -4076,16 +4078,69 @@
 // Solo aparece en el panel de atención de pestañas.
 // ============================================
 
-// Abre la vista de evidencias en una nueva pestaña/overlay
-// codigo = código de la clienta, nombre = nombre, staff = nombre de la staff
+// Abre el panel de evidencias como overlay integrado (no pestaña nueva)
 function abrirEvidenciasPestanas(codigo, nombre, staff) {
   if (!codigo) return;
-  // Abrir en ventana nueva para no interrumpir el flujo de atención
-  var url = location.origin + location.pathname +
-    '?evidencias=1&codigo=' + encodeURIComponent(codigo) +
-    '&nombre=' + encodeURIComponent(nombre || '') +
-    '&staff=' + encodeURIComponent(staff || '');
-  window.open(url, '_blank');
+  // Crear overlay si no existe
+  var overlay = document.getElementById('evOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'evOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg,#f8f8f6);overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'block';
+  overlay.innerHTML =
+    '<div style="max-width:480px;margin:0 auto;padding:16px 16px 32px;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-top:8px;">' +
+        '<button onclick="cerrarEvidenciasOverlay()" style="background:var(--ink,#1a1a1a);color:#fff;border:0;border-radius:var(--radius-pill,24px);padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
+        '<div>' +
+          '<div style="font-size:17px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
+          '<div style="font-size:12px;color:var(--ink-soft,#666);">' + (nombre||'') + ' · ' + new Date().toLocaleDateString('es-EC') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="evLoading" style="text-align:center;padding:40px;color:#888;">Cargando evidencias…</div>' +
+    '</div>';
+  // Cargar fotos
+  _renderEvidenciasEnOverlay(codigo, nombre, staff);
+}
+
+function cerrarEvidenciasOverlay() {
+  var overlay = document.getElementById('evOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
+  var r = await apiGet('getEvidenciasPestanas', { codigo: codigo });
+  var fotos = (r && r.fotos) ? r.fotos : {};
+  var secciones = [
+    { titulo: 'Antes del servicio', fotos: [
+      { key: 'antes_izq', label: 'Ojo Izquierdo' },
+      { key: 'antes_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Después del servicio', fotos: [
+      { key: 'despues_izq', label: 'Ojo Izquierdo' },
+      { key: 'despues_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Separación línea de agua', fotos: [
+      { key: 'linea_izq', label: 'Ojo Izquierdo' },
+      { key: 'linea_der', label: 'Ojo Derecho'   }
+    ]}
+  ];
+  var html = '';
+  secciones.forEach(function(sec) {
+    html += '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);">';
+    html += '<div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--ink);">' + sec.titulo + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    sec.fotos.forEach(function(f) {
+      var urlFoto = fotos[f.key] || '';
+      html += _evFotoSlot(f.key, f.label, urlFoto, codigo, staff || '');
+    });
+    html += '</div></div>';
+  });
+  html += '<div style="text-align:center;padding:8px;color:var(--ink-faint,#aaa);font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
+  var loading = document.getElementById('evLoading');
+  if (loading) loading.outerHTML = html;
 }
 
 // Renderiza el panel de evidencias completo (se llama al cargar si ?evidencias=1)
@@ -4169,7 +4224,7 @@ function _evFotoSlot(key, label, url, codigo, staff) {
   // Store codigo and staff as data attributes on the input to avoid inline escaping
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
-    + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
+    + '<input type="file" id="' + inputId + '" accept="image/*" capture="environment" style="display:none;"'
     + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
     + ' onchange="evSubirFotoDesdeInput(this)">'
     + imgHtml
@@ -4242,6 +4297,7 @@ function _evComprimirImagen(file, maxPx, quality) {
 
 // Exponer globalmente
 window.abrirEvidenciasPestanas = abrirEvidenciasPestanas;
+window.cerrarEvidenciasOverlay = cerrarEvidenciasOverlay;
 window.evSubirFoto             = evSubirFoto;
 window.evCambiarFoto           = evCambiarFoto;
 
