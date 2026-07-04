@@ -2938,11 +2938,16 @@
     });
     window._cobroPago = 'Efectivo';
 
-    // El cobro grupal no usa abono (v1): limpiar para que no quede una fila pegada
-    window._cobrarCodigo = '';
+    // Cobro grupal: usar el código de la clienta principal para abono
+    window._cobrarCodigo = (clientas[0] && clientas[0].codigo) ? clientas[0].codigo : '';
     window._cobrarAbonoMonto = 0;
-    var _abRowG = document.getElementById('cobrarAbonoRow');
-    if (_abRowG) _abRowG.style.display = 'none';
+    // Cargar abono activo de la clienta principal si tiene código
+    if (window._cobrarCodigo && typeof _cobroCargarAbono === 'function') {
+      setTimeout(function() { _cobroCargarAbono(); }, 200);
+    } else {
+      var _abRowG = document.getElementById('cobrarAbonoRow');
+      if (_abRowG) _abRowG.style.display = 'none';
+    }
 
     document.getElementById('cobrarModal').classList.add('active');
   }
