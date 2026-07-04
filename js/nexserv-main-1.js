@@ -4315,7 +4315,7 @@ async function evSubirFoto(input, key, codigo, staff) {
   if (!file) return;
   var statusEl = document.getElementById('evStatus_' + key);
   var slotDiv  = input.parentElement;
-  var base64 = await _evComprimirImagen(file, 1200, 0.75);
+  var base64 = await _evComprimirImagen(file, 800, 0.65);
   var inputId = 'evInput_' + key;
   var imgId   = 'evImg_'   + key;
   // Preview inmediato local
