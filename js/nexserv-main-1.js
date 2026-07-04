@@ -4096,24 +4096,27 @@
 // Solo aparece en el panel de atención de pestañas.
 // ============================================
 
-// Abre el panel de evidencias desplegándose hacia abajo dentro del pestFichaQuick
+// Abre el panel de evidencias desplegándose hacia abajo dentro del evPanelSlot
 function abrirEvidenciasPestanas(codigo, nombre, staff) {
   if (!codigo) return;
   var slot = (window._as2Client && window._as2Client === codigo) ? 2 : 1;
-  var container = document.getElementById('pestFichaQuick' + slot);
-  if (!container) return;
   window._evFichaSlot = slot;
 
-  // Si ya está abierto, cerrar (toggle)
-  var existing = document.getElementById('evInlinePanel_' + slot);
-  if (existing) { existing.remove(); return; }
+  // Buscar el slot dedicado (cuando existe la ficha activa)
+  var panelSlot = document.getElementById('evPanelSlot_' + slot);
+  // Fallback: si no hay slot dedicado, usar el pestFichaQuick completo
+  var container = panelSlot || document.getElementById('pestFichaQuick' + slot);
+  if (!container) return;
 
-  // Crear panel debajo del contenido existente de la ficha
+  // Toggle: si ya está abierto cerrar
+  var existing = document.getElementById('evInlinePanel_' + slot);
+  if (existing) { cerrarEvidenciasOverlay(); return; }
+
   var panel = document.createElement('div');
   panel.id = 'evInlinePanel_' + slot;
-  panel.style.cssText = 'margin-top:12px;';
+  panel.style.cssText = 'margin-bottom:10px;';
   panel.innerHTML =
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-top:4px;">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">' +
       '<button onclick="cerrarEvidenciasOverlay()" style="background:var(--ink);color:#fff;border:0;border-radius:var(--radius-pill);padding:9px 16px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
       '<div>' +
         '<div style="font-size:14px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
@@ -4121,7 +4124,14 @@ function abrirEvidenciasPestanas(codigo, nombre, staff) {
       '</div>' +
     '</div>' +
     '<div id="evLoading" style="text-align:center;padding:30px;color:#888;">Cargando…</div>';
-  container.appendChild(panel);
+
+  if (panelSlot) {
+    // Insertar en el slot dedicado (entre evidencias y botones Mantener/Nueva)
+    panelSlot.appendChild(panel);
+  } else {
+    // Fallback: append al contenedor general
+    container.appendChild(panel);
+  }
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   _renderEvidenciasEnOverlay(codigo, nombre, staff);
 }
