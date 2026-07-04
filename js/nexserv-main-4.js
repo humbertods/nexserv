@@ -1951,6 +1951,18 @@
     });
     
     try {
+      // Detectar si es un REEMPLAZO de promo o un EXTRA adicional
+      // Reemplazo: hay SP- en el slot Y el staff borró el servicio original
+      //   → slotServices solo tiene el nuevo servicio pendiente (sin servicios aprobados previos)
+      // Extra: hay SP- pero el servicio original sigue en slotServices
+      const _idEsperaSlot = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const _esSP = _idEsperaSlot.startsWith('SP-');
+      // Contar servicios aprobados (sin status o status !== pendiente/rechazado) excluyendo el nuevo
+      const _svcsAprobados = (slotServices[slot] || []).filter(function(s) {
+        return s !== service && s.status !== 'pendiente' && s.status !== 'rechazado';
+      });
+      // Es reemplazo si: hay SP- activo Y no quedan servicios aprobados (el original fue borrado)
+      const _esCambioPromo = _esSP && _svcsAprobados.length === 0;
       const payload = {
         clienteCodigo: clientCode,
         clienteNombre: clientName,
@@ -1958,7 +1970,10 @@
         servicioNombre: service.name,
         servicioArea: service.area,
         servicioPrecio: service.price,
-        nota: service.note
+        nota: service.note,
+        idEsperaSP: _esCambioPromo ? _idEsperaSlot : '',
+        esCambioPromo: _esCambioPromo,
+        staffArea: user?.area || ''
       };
       
       console.log('📤 Sending to backend:', payload);
