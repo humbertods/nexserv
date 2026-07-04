@@ -74,31 +74,31 @@
       if (cambiarBtn) cambiarBtn.style.display = '';
     }
 
-    // Confirmar al backend que la staff aceptó el servicio → volver a "En servicio"
-    try {
-      const slot = window._confirmSvcSlot || 1;
-      const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-      if (idEspera) {
-        await apiPost('confirmarServicioStaff', { idEspera });
+    // Confirmar al backend — NO bloqueamos la UI, se lanza en background
+    const slot = window._confirmSvcSlot || 1;
+    const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    showToast('✅ Servicio confirmado');  // ← inmediato, no espera al backend
 
-        // Si es SP ticket (promo compartida/enganche): actualizar servicio en el sheet
-        if (idEspera.startsWith('SP-')) {
-          const svcsConf = (slotServices[slot] || []).filter(s =>
-            s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
-          );
-          const svcNuevo = svcsConf.map(s => s.name).join(' + ');
-          const precioNuevo = svcsConf.reduce((s,v) => s + Number(v.price||0), 0);
-          if (svcNuevo) {
-            await apiPost('actualizarServicioSP', {
-              idEspera,
-              nuevoServicio: svcNuevo,
-              nuevoPrecio: precioNuevo
-            });
-          }
+    // Backend en paralelo — no await, no bloquea
+    (async function() {
+      try {
+        if (!idEspera) return;
+        // Lanzar confirmar + actualizar SP en paralelo si aplica
+        const svcsConf = (slotServices[slot] || []).filter(s =>
+          s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
+        );
+        const svcNuevo = svcsConf.map(s => s.name).join(' + ');
+        const precioNuevo = svcsConf.reduce((s,v) => s + Number(v.price||0), 0);
+
+        const promises = [ apiPost('confirmarServicioStaff', { idEspera }) ];
+        if (idEspera.startsWith('SP-') && svcNuevo) {
+          promises.push(apiPost('actualizarServicioSP', {
+            idEspera, nuevoServicio: svcNuevo, nuevoPrecio: precioNuevo
+          }));
         }
-      }
-    } catch(e) {}
-    showToast('✅ Servicio confirmado');
+        await Promise.all(promises);  // ambas llamadas en paralelo
+      } catch(e) { console.warn('[confirmService] backend error:', e); }
+    })();
 
     const user = window.currentUser;
 
@@ -415,12 +415,11 @@
           serviciosDetalle: desgloseAcumulado
         });
       } else {
-        const _clientCodigoSlot = slot === 2 ? (window._as2Client || '') : (window._as1Client || '');
         _finResp = await apiPost('finalizarAtencion', {
           idEspera: idEsperaActual,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
-          clienteCodigo: _clientCodigoSlot,
+          clienteCodigo: window._as1Client || '',
           servicio: svcNamesFresh,
           total: totalFresh,
           promoNombre: data.promoNombre,
@@ -603,12 +602,11 @@
                         : idEsperaActual.startsWith('SP-') ? 'finalizarServicioPromo'
                         : 'finalizarAtencion';
 
-        const _clientCodigoFS = slot === 2 ? (window._as2Client || '') : (window._as1Client || '');
         const result = await apiPost(accionFin, {
           idEspera: idEsperaActual,
           chicaNombre: user && user.name ? user.name : '',
           clienteNombre: displayName,
-          clienteCodigo: _clientCodigoFS,
+          clienteCodigo: window._as1Client || '',
           servicio: servicioHistorial || servicioSiguiente,
           servicioSiguiente: servicioSiguiente,
           total: String(totalSiguiente || 0),
@@ -776,12 +774,11 @@
       // Las promasExtra restantes son las que vienen despues de la que se activa ahora
       const promasExtraRestantes = data.promasExtraPendientes.slice(1);
 
-      const _slotFNP = window._finishingSlot || 1;
       const result = await apiPost('finalizarAtencion', {
-        idEspera: (_slotFNP===2?window._as2IdEspera:window._as1IdEspera) || '',
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
-        clienteCodigo: (_slotFNP===2?(window._as2Client||''):(window._as1Client||'')),
+        clienteCodigo: window._as1Client || '',
         servicio: data.svcNames,
         total: data.total,
         promoNombre: data.promoNombre,
@@ -846,10 +843,10 @@
     try {
       // Finalizar la atención con el total parcial y marcar como "Por cobrar"
       const result = await apiPost('finalizarAtencion', {
-        idEspera: (window._finishingSlot===2?window._as2IdEspera:window._as1IdEspera) || '',
+        idEspera: window._as1IdEspera || '',
         chicaNombre: user?.name || '',
         clienteNombre: data.clientName,
-        clienteCodigo: (window._finishingSlot===2?(window._as2Client||''):(window._as1Client||'')),
+        clienteCodigo: window._as1Client || '',
         servicio: nombresRealizados,
         total: String(totalRealizado),
         promoNombre: '',
@@ -1970,7 +1967,24 @@
 
   function loadPestFichaQuick(clientKey, slot) {
     const el = document.getElementById('pestFichaQuick' + slot);
+    if (!el) return;
     const client = CLIENT_PROFILES[clientKey];
+    // Si el cliente no está en memoria aún, mostrar el estado sin ficha con el botón de evidencias
+    if (!client) {
+      el.style.display = 'block';
+      const _clientNameFallback = (window['_as' + slot + 'ClientName'] || clientKey || '');
+      const _clientCodeFallback = (window['_as' + slot + 'Client'] || '');
+      el.innerHTML = \`
+        <div style="background: var(--bg-card); border: 2px dashed var(--top-purple); border-radius: 20px; padding: 18px; text-align: center;">
+          <div style="font-size: 24px; margin-bottom: 6px;">👁</div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--top-purple);">Sin ficha de pestañas</div>
+          <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px;">Esta clienta no tiene ficha registrada</div>
+          <button onclick="openNewPestFicha('\${clientKey}', \${slot})" style="padding: 14px 24px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Crear ficha de pestañas</button>
+        </div>
+        <button onclick="abrirEvidenciasPestanas('\${_clientCodeFallback}','\${_clientNameFallback}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>Evidencia del trabajo realizado</button>
+      \`;
+      return;
+    }
     const fichas = client?.pestanas?.fichas;
     const fichaActiva = getFichaActiva(clientKey);
     
@@ -2000,15 +2014,11 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
-        <div id="evPanelSlot_${slot}"></div>
-        <div id="evMantenerBtns_${slot}">
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
           <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.')" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
-        </div>
       `;
     } else {
       el.style.display = 'block';
@@ -2019,7 +2029,6 @@
           <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px;">Esta clienta no tiene ficha registrada</div>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="padding: 14px 24px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Crear ficha de pestañas</button>
         </div>
-        <button onclick="abrirEvidenciasPestanas(\'${clientKey}\',\'${client.name}\',(window.currentUser&&window.currentUser.name)||\'staff\')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
       `;
     }
   }
