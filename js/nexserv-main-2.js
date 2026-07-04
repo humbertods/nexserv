@@ -1972,17 +1972,18 @@
     // Si el cliente no está en memoria aún, mostrar el estado sin ficha con el botón de evidencias
     if (!client) {
       el.style.display = 'block';
-      const _clientNameFallback = (window['_as' + slot + 'ClientName'] || clientKey || '');
-      const _clientCodeFallback = (window['_as' + slot + 'Client'] || '');
-      el.innerHTML = \`
-        <div style="background: var(--bg-card); border: 2px dashed var(--top-purple); border-radius: 20px; padding: 18px; text-align: center;">
-          <div style="font-size: 24px; margin-bottom: 6px;">👁</div>
-          <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--top-purple);">Sin ficha de pestañas</div>
-          <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px;">Esta clienta no tiene ficha registrada</div>
-          <button onclick="openNewPestFicha('\${clientKey}', \${slot})" style="padding: 14px 24px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Crear ficha de pestañas</button>
-        </div>
-        <button onclick="abrirEvidenciasPestanas('\${_clientCodeFallback}','\${_clientNameFallback}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>Evidencia del trabajo realizado</button>
-      \`;
+      var _cfn = (window['_as' + slot + 'ClientName'] || clientKey || '');
+      var _cfc = (window['_as' + slot + 'Client'] || '');
+      el.innerHTML =
+        '<div style="background:var(--bg-card);border:2px dashed var(--top-purple);border-radius:20px;padding:18px;text-align:center;">'
+        + '<div style="font-size:24px;margin-bottom:6px;">👁</div>'
+        + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--top-purple);">Sin ficha de pestañas</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Esta clienta no tiene ficha registrada</div>'
+        + '<button onclick="openNewPestFicha(\'' + clientKey + '\', ' + slot + ')" style="padding:14px 24px;background:var(--top-purple);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha de pestañas</button>'
+        + '</div>'
+        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\' staff\')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
+        + 'Evidencia del trabajo realizado</button>';
       return;
     }
     const fichas = client?.pestanas?.fichas;
