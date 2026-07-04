@@ -691,11 +691,7 @@
           + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')">💰 Lo hice todo yo — cobrar todo</button>';
         return;
       }
-      // Botón de evidencia solo para pestañas
-      var _evBtnSP = (String(_myAreaSP||"").indexOf("pesta") >= 0)
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas((window['_as'+${_slotSP}+'Client']||window._as1Client||''),(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
-        : "";
-      btnContainer.innerHTML = _evBtnSP + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;" onclick="finalizarServicioSP(${_slotSP})">
           ✅ Terminé — enviar a cobro con Mikaela
         </button>`;
@@ -742,7 +738,6 @@
           var btnsBaseTM = ''
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarYTomarSiguiente();">Yo sigo — tomar ahora: ' + lbl + '</button>'
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMulti();">Pasar ' + lbl + ' a otra staff (queda en espera)</button>'
-            + (typeof miAreaActual !== 'undefined' && String(miAreaActual||'').indexOf('pesta') >= 0 ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="abrirEvidenciasPestanas(window._as1Client||window._as2Client||\'\',(window.currentUser&&window.currentUser.name)||\'staff\')">📸 Evidencia del trabajo realizado</button>' : '')
             + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + slotN + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
           // ── REGLA IRREVOCABLE: el botón "Cobrar promo completa" es EXCLUSIVO de la
           // staff de PESTAÑAS y SOLO para la promo "pestañas + depilación de cejas"
@@ -770,13 +765,7 @@
     if (!promoData || !promoData.promo) {
       // Sin promo — botón directo sin abrir modal de opciones
       const _slotNP = slot1 ? 1 : 2;
-      // Usar user.area como fuente confiable del área de esta staff
-      const _areaSlotNP = String((user && user.area) || '').toLowerCase();
-      const _evBtnNP = _areaSlotNP.indexOf('pesta') >= 0
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotNP}Client||'',window._as${_slotNP}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
-        : '';
-      btnContainer.innerHTML = _evBtnNP + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotNP})">
           Finalizar servicio
@@ -787,12 +776,7 @@
     // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData
     if (_idEsperaSlot.startsWith('SN-')) {
       const _slotSN = slot1 ? 1 : 2;
-      const _areaSlotSN = String(user && user.area || '').toLowerCase();
-      const _evBtnSN = _areaSlotSN.indexOf('pesta') >= 0
-        ? `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${_slotSN}Client||'',window._as${_slotSN}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`
-        : '';
-      btnContainer.innerHTML = _evBtnSN + `
+      btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
           onclick="prepararYFinalizar(${_slotSN})">
           Finalizar servicio
@@ -840,11 +824,6 @@
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — Yo sigo: ${sigNombre}</button>`;
         html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente)</button>`;
       } else {
-        const _userAreaFS = String(user && user.area || '').toLowerCase();
-        if (_userAreaFS.indexOf('pesta') >= 0) {
-          html += `<button style="margin-bottom:8px;width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"
-            onclick="abrirEvidenciasPestanas(window._as${slotActual}Client||'',window._as${slotActual}ClientName||'',(window.currentUser&&window.currentUser.name)||'staff')">📸 Evidencia del trabajo realizado</button>`;
-        }
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
       }
     } else if (puedeTodo) {
@@ -1981,54 +1960,36 @@
   }
   window.histToggle = histToggle;
 
-  // Acordeón de evidencias en historial — carga fotos al primer toque
   window._histToggleEvidencias = async function(accId, codigo, nombre) {
     var panel = document.getElementById(accId);
     if (!panel) return;
-    var isOpen = panel.style.display === 'block';
-    if (isOpen) { panel.style.display = 'none'; return; }
-
-    // Abrir y cargar si aún no se cargó
+    if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
     panel.style.display = 'block';
     if (panel.dataset.loaded === '1') return;
     panel.dataset.loaded = '1';
     panel.innerHTML = '<div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">Cargando evidencias…</div>';
-
     var r = await apiGet('getEvidenciasPestanas', { codigo: codigo });
     var fotos = (r && r.fotos) ? r.fotos : {};
-
     var secciones = [
       { titulo: 'Antes del servicio',       keys: [['antes_izq','Ojo Izquierdo'],['antes_der','Ojo Derecho']] },
       { titulo: 'Después del servicio',     keys: [['despues_izq','Ojo Izquierdo'],['despues_der','Ojo Derecho']] },
       { titulo: 'Separación línea de agua', keys: [['linea_izq','Ojo Izquierdo'],['linea_der','Ojo Derecho']] }
     ];
-
     var hayFotos = Object.keys(fotos).some(function(k){ return fotos[k]; });
-    if (!hayFotos) {
-      panel.innerHTML = '<div style="color:var(--ink-faint);font-size:13px;padding:8px 0;">Sin evidencias registradas.</div>';
-      return;
-    }
-
+    if (!hayFotos) { panel.innerHTML = '<div style="color:var(--ink-faint);font-size:13px;padding:8px 0;">Sin evidencias registradas.</div>'; return; }
     var html = '';
     secciones.forEach(function(sec) {
-      var fotosHtml = sec.keys.map(function(pair) {
+      html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:6px;">' + sec.titulo + '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+      sec.keys.forEach(function(pair) {
         var url = fotos[pair[0]];
-        return '<div style="text-align:center;">'
-          + '<div style="font-size:10px;font-weight:700;color:#888;margin-bottom:4px;">' + pair[1] + '</div>'
-          + (url
-            ? '<img src="' + url + '" onclick="_evVerFoto(\'' + url + '\')" style="width:100%;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;">'
-            : '<div style="height:100px;border:1.5px dashed #ddd;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:11px;">Sin foto</div>')
+        html += '<div style="text-align:center;"><div style="font-size:10px;font-weight:700;color:#888;margin-bottom:4px;">' + pair[1] + '</div>'
+          + (url ? '<img src="' + url + '" onclick="_evVerFoto(\'' + url + '\')" style="width:100%;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;">'
+                 : '<div style="height:100px;border:1.5px dashed #ddd;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:11px;">Sin foto</div>')
           + '</div>';
-      }).join('');
-      html += '<div style="margin-bottom:12px;">'
-        + '<div style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:6px;">' + sec.titulo + '</div>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + fotosHtml + '</div>'
-        + '</div>';
+      });
+      html += '</div></div>';
     });
-
-    if (r && r.fecha) {
-      html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:4px;">Registrado: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
-    }
+    if (r && r.fecha) html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:4px;">Registrado: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
     panel.innerHTML = html;
   };
 
@@ -2110,14 +2071,13 @@
     html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:6px 4px;">Fichas</div>';
     html += _histAcordeon('Ficha facial', facial ? _histGenericFicha(facial) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha facial.</div>', '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg>');
     html += _histAcordeon('Ficha pestañas', pest.length ? pest.map(_histFichaPestHTML).join('') : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pestañas.</div>', '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z"/><path d="M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z"/></svg>');
-    // Acordeón de evidencias — se carga al abrir por primera vez
     var _evAccId = 'histAcc_ev_' + (c.codigo||'').replace(/[^\w]/g,'');
     html += '<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden;">'
       + '<div onclick="_histToggleEvidencias(\'' + _evAccId + '\',\'' + (c.codigo||'') + '\',\'' + (c.nombre||'') + '\')" style="padding:13px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;">'
       + '<span style="font-size:16px;"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg></span>'
       + '<span style="font-weight:700;font-size:14px;flex:1;">Evidencia del trabajo realizado</span>'
       + '<span style="color:var(--ink-faint);">▾</span></div>'
-      + '<div id="' + _evAccId + '" style="display:none;padding:0 14px 12px;"><div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">Toca para cargar evidencias…</div></div></div>';
+      + '<div id="' + _evAccId + '" style="display:none;padding:0 14px 12px;"><div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">Toca para cargar…</div></div></div>';
 
     html += _histAcordeon('Ficha pigmento / cejas', pig ? _histGenericFicha(pig) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pigmento.</div>', '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M10.9,17.1c.2,2.5-1.8,4.6-4.3,4.7-2.5,0-4.5-2.1-4.4-4.6s1.2-3.4,1.9-4.5,1.6-2.5,2.4-3.8c1.4,2.1,2.8,4.1,3.8,6.4.2.6.5,1.2.5,1.8Z"/><path d="M16.5,14.4c0,2.5-2.1,4.6-4.7,4.4.3-1,.3-2,0-2.9-.2-.7-.5-1.3-.8-1.9-.5-1.1-1.1-2.2-1.8-3.2.9-1.7,1.9-3.2,3-4.8l2,3.1c.5.9,1,1.7,1.5,2.7.3.7.8,1.9.9,2.7Z"/><path d="M21.7,10.7c0,2.4-1.8,4.4-4.1,4.5,0-.7,0-1.3-.2-2-.2-.8-.5-1.5-.9-2.3-.6-1.3-1.4-2.5-2.2-3.8.9-1.7,1.9-3.3,3-4.9l1.7,2.6c.6,1,1.1,1.9,1.7,2.9.4.8,1,2.1,1,3Z"/></svg>');
 
@@ -4136,16 +4096,71 @@
 // Solo aparece en el panel de atención de pestañas.
 // ============================================
 
-// Abre la vista de evidencias en una nueva pestaña/overlay
-// codigo = código de la clienta, nombre = nombre, staff = nombre de la staff
+// Abre el panel de evidencias inline dentro del pestFichaQuick del slot activo
 function abrirEvidenciasPestanas(codigo, nombre, staff) {
   if (!codigo) return;
-  // Abrir en ventana nueva para no interrumpir el flujo de atención
-  var url = location.origin + location.pathname +
-    '?evidencias=1&codigo=' + encodeURIComponent(codigo) +
-    '&nombre=' + encodeURIComponent(nombre || '') +
-    '&staff=' + encodeURIComponent(staff || '');
-  window.open(url, '_blank');
+  var slot = (window._as2Client && window._as2Client === codigo) ? 2 : 1;
+  var container = document.getElementById('pestFichaQuick' + slot);
+  if (!container) return;
+  window._evFichaBackup = window._evFichaBackup || {};
+  window._evFichaBackup[slot] = container.innerHTML;
+  window._evFichaSlot = slot;
+  container.innerHTML =
+    '<div id="evInlinePanel">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+        '<button onclick="cerrarEvidenciasOverlay()" style="background:var(--ink);color:#fff;border:0;border-radius:var(--radius-pill);padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
+        '<div>' +
+          '<div style="font-size:15px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
+          '<div style="font-size:12px;color:var(--ink-soft);">' + (nombre||'') + ' · ' + new Date().toLocaleDateString('es-EC') + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="evLoading" style="text-align:center;padding:40px;color:#888;">Cargando evidencias…</div>' +
+    '</div>';
+  container.style.display = 'block';
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  _renderEvidenciasEnOverlay(codigo, nombre, staff);
+}
+
+function cerrarEvidenciasOverlay() {
+  var slot = window._evFichaSlot || 1;
+  var container = document.getElementById('pestFichaQuick' + slot);
+  if (container && window._evFichaBackup && window._evFichaBackup[slot] !== undefined) {
+    container.innerHTML = window._evFichaBackup[slot];
+    window._evFichaBackup[slot] = null;
+  }
+}
+
+async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
+  var r = await apiGet('getEvidenciasPestanas', { codigo: codigo });
+  var fotos = (r && r.fotos) ? r.fotos : {};
+  var secciones = [
+    { titulo: 'Antes del servicio', fotos: [
+      { key: 'antes_izq', label: 'Ojo Izquierdo' },
+      { key: 'antes_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Después del servicio', fotos: [
+      { key: 'despues_izq', label: 'Ojo Izquierdo' },
+      { key: 'despues_der', label: 'Ojo Derecho'  }
+    ]},
+    { titulo: 'Separación línea de agua', fotos: [
+      { key: 'linea_izq', label: 'Ojo Izquierdo' },
+      { key: 'linea_der', label: 'Ojo Derecho'   }
+    ]}
+  ];
+  var html = '';
+  secciones.forEach(function(sec) {
+    html += '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08);">';
+    html += '<div style="font-size:15px;font-weight:800;margin-bottom:12px;color:var(--ink);">' + sec.titulo + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">';
+    sec.fotos.forEach(function(f) {
+      var urlFoto = fotos[f.key] || '';
+      html += _evFotoSlot(f.key, f.label, urlFoto, codigo, staff || '');
+    });
+    html += '</div></div>';
+  });
+  html += '<div style="text-align:center;padding:8px;color:var(--ink-faint,#aaa);font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
+  var loading = document.getElementById('evLoading');
+  if (loading) loading.outerHTML = html;
 }
 
 // Renderiza el panel de evidencias completo (se llama al cargar si ?evidencias=1)
@@ -4211,22 +4226,16 @@ async function renderEvidenciasPanel() {
 function _evFotoSlot(key, label, url, codigo, staff) {
   var inputId = 'evInput_' + key;
   var imgId   = 'evImg_'   + key;
-
-  // Build slot content avoiding complex string escaping
-  // The file input triggers evSubirFoto via onchange
-  // The change-photo button triggers a click on the hidden input
   var imgHtml = url
-    ? '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
-      + '<button data-input="' + inputId + '" data-key="' + key + '" '
-      + 'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;" '
-      + 'onclick="document.getElementById(this.dataset.input).click()">Cambiar foto</button>'
+    ? '<div style="position:relative;cursor:pointer;" onclick="_evMenuFoto(\'' + key + '\',\'' + url + '\',\'' + inputId + '\')">'
+        + '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
+        + '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#fff;">⋯</div>'
+      + '</div>'
     : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
       + 'height:130px;border:2px dashed #d0d0cc;border-radius:12px;cursor:pointer;background:#fafaf8;">'
       + '<span style="font-size:28px;color:#999;">+</span>'
       + '<span style="font-size:11px;color:#999;margin-top:4px;">Agregar foto</span>'
       + '</label>';
-
-  // Store codigo and staff as data attributes on the input to avoid inline escaping
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
     + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
@@ -4237,6 +4246,53 @@ function _evFotoSlot(key, label, url, codigo, staff) {
     + '</div>';
 }
 
+function _evMenuFoto(key, url, inputId) {
+  var modal = document.getElementById('evFotoModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'evFotoModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background:rgba(0,0,0,0.45);';
+    modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML =
+    '<div style="width:100%;max-width:480px;background:var(--bg-card,#fff);border-radius:24px 24px 0 0;padding:20px 16px 32px;">'
+      + '<div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 20px;"></div>'
+      + '<button onclick="_evVerFoto(\'' + url + '\')" style="width:100%;padding:16px;background:var(--bg,#f8f8f6);border:1.5px solid var(--line,#e8e8e4);border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5ZM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>'
+        + 'Ver foto ampliada'
+      + '</button>'
+      + '<button onclick="document.getElementById(\'' + inputId + '\').click();document.getElementById(\'evFotoModal\').style.display=\'none\';" style="width:100%;padding:16px;background:var(--ink,#1a1a1a);border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:8px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
+        + 'Cambiar foto'
+      + '</button>'
+    + '</div>';
+  modal.style.display = 'flex';
+}
+
+function _evVerFoto(url) {
+  var modal = document.getElementById('evFotoModal');
+  if (modal) modal.style.display = 'none';
+  var lb = document.getElementById('evLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'evLightbox';
+    lb.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;';
+    lb.onclick = function(e) { if (e.target === lb) lb.style.display = 'none'; };
+    var closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;';
+    closeBtn.onclick = function() { lb.style.display = 'none'; };
+    var img = document.createElement('img');
+    img.id = 'evLightboxImg';
+    img.style.cssText = 'max-width:95vw;max-height:90vh;border-radius:12px;object-fit:contain;';
+    lb.appendChild(img);
+    lb.appendChild(closeBtn);
+    document.body.appendChild(lb);
+  }
+  document.getElementById('evLightboxImg').src = url;
+  lb.style.display = 'flex';
+}
 function evCambiarFoto(key, inputId) {
   var el = document.getElementById(inputId);
   if (el) el.click();
@@ -4246,29 +4302,33 @@ async function evSubirFoto(input, key, codigo, staff) {
   var file = input.files[0];
   if (!file) return;
   var statusEl = document.getElementById('evStatus_' + key);
-  if (statusEl) statusEl.textContent = 'Subiendo…';
-
-  // Comprimir imagen a max 1200px y calidad 0.75 antes de subir
+  var slotDiv  = input.parentElement;
   var base64 = await _evComprimirImagen(file, 1200, 0.75);
-  // Remover prefijo data:image/jpeg;base64,
-  var b64data = base64.split(',')[1] || base64;
-
-  var r = await apiPost('subirEvidenciaPestanas', {
-    codigo: codigo, tipo: key, imagen: b64data, staff: staff
-  });
-
-  if (r && r.success) {
-    if (statusEl) statusEl.textContent = '✓ Guardado';
-    // Actualizar preview sin recargar
-    var imgEl = document.getElementById('evImg_' + key);
-    if (imgEl) {
-      imgEl.src = r.url + '&t=' + Date.now();
-    } else {
-      // Recargar el slot completo para mostrar la imagen nueva
-      setTimeout(function() { location.reload(); }, 800);
+  var inputId = 'evInput_' + key;
+  var imgId   = 'evImg_'   + key;
+  // Preview inmediato local
+  var existingImg = document.getElementById(imgId);
+  if (!existingImg && slotDiv) {
+    var label = slotDiv.querySelector('label');
+    if (label) {
+      label.outerHTML =
+        '<img id="' + imgId + '" src="' + base64 + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;opacity:0.7;">'
+        + '<button data-input="' + inputId + '" data-key="' + key + '" '
+        + 'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;" '
+        + 'onclick="document.getElementById(this.dataset.input).click()">Cambiar foto</button>';
     }
+  }
+  if (statusEl) statusEl.textContent = 'Guardando…';
+  var b64data = base64.split(',')[1] || base64;
+  var r = await apiPost('subirEvidenciaPestanas', { codigo: codigo, tipo: key, imagen: b64data, staff: staff });
+  if (r && r.success) {
+    if (statusEl) { statusEl.textContent = '✓ Guardado'; statusEl.style.color = 'var(--success,#2d6a4f)'; }
+    var imgEl = document.getElementById(imgId);
+    if (imgEl) { imgEl.src = r.url + '&t=' + Date.now(); imgEl.style.opacity = '1'; }
   } else {
-    if (statusEl) statusEl.textContent = '✗ Error al subir';
+    if (statusEl) { statusEl.textContent = '✗ Error al guardar'; statusEl.style.color = 'var(--danger,#c0392b)'; }
+    var imgEl2 = document.getElementById(imgId);
+    if (imgEl2) imgEl2.style.opacity = '0.3';
   }
 }
 
@@ -4301,7 +4361,10 @@ function _evComprimirImagen(file, maxPx, quality) {
 })();
 
 // Exponer globalmente
-window.abrirEvidenciasPestanas = abrirEvidenciasPestanas;
+window.abrirEvidenciasPestanas  = abrirEvidenciasPestanas;
+window.cerrarEvidenciasOverlay  = cerrarEvidenciasOverlay;
+window._evMenuFoto              = _evMenuFoto;
+window._evVerFoto               = _evVerFoto;
 window.evSubirFoto             = evSubirFoto;
 window.evCambiarFoto           = evCambiarFoto;
 
