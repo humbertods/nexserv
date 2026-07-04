@@ -4058,33 +4058,39 @@
 // Abre el panel de evidencias como overlay integrado (no pestaña nueva)
 function abrirEvidenciasPestanas(codigo, nombre, staff) {
   if (!codigo) return;
-  // Crear overlay si no existe
-  var overlay = document.getElementById('evOverlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'evOverlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg,#f8f8f6);overflow-y:auto;font-family:-apple-system,BlinkMacSystemFont,sans-serif;';
-    document.body.appendChild(overlay);
-  }
-  overlay.style.display = 'block';
-  overlay.innerHTML =
-    '<div style="max-width:480px;margin:0 auto;padding:16px 16px 32px;">' +
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-top:8px;">' +
-        '<button onclick="cerrarEvidenciasOverlay()" style="background:var(--ink,#1a1a1a);color:#fff;border:0;border-radius:var(--radius-pill,24px);padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
+  // Buscar el pestFichaQuick del slot activo (1 o 2)
+  var slot = (window._as2Client && window._as2Client === codigo) ? 2 : 1;
+  var container = document.getElementById('pestFichaQuick' + slot);
+  if (!container) return;
+  // Guardar HTML original para restaurar al cerrar
+  window._evFichaBackup = window._evFichaBackup || {};
+  window._evFichaBackup[slot] = container.innerHTML;
+  window._evFichaSlot = slot;
+  // Renderizar panel inline dentro del mismo contenedor
+  container.innerHTML =
+    '<div id="evInlinePanel">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">' +
+        '<button onclick="cerrarEvidenciasOverlay()" style="background:var(--ink);color:#fff;border:0;border-radius:var(--radius-pill);padding:10px 18px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
         '<div>' +
-          '<div style="font-size:17px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
-          '<div style="font-size:12px;color:var(--ink-soft,#666);">' + (nombre||'') + ' · ' + new Date().toLocaleDateString('es-EC') + '</div>' +
+          '<div style="font-size:15px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
+          '<div style="font-size:12px;color:var(--ink-soft);">' + (nombre||'') + ' · ' + new Date().toLocaleDateString('es-EC') + '</div>' +
         '</div>' +
       '</div>' +
       '<div id="evLoading" style="text-align:center;padding:40px;color:#888;">Cargando evidencias…</div>' +
     '</div>';
-  // Cargar fotos
+  container.style.display = 'block';
+  // Scroll suave al contenedor
+  container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   _renderEvidenciasEnOverlay(codigo, nombre, staff);
 }
 
 function cerrarEvidenciasOverlay() {
-  var overlay = document.getElementById('evOverlay');
-  if (overlay) overlay.style.display = 'none';
+  var slot = window._evFichaSlot || 1;
+  var container = document.getElementById('pestFichaQuick' + slot);
+  if (container && window._evFichaBackup && window._evFichaBackup[slot] !== undefined) {
+    container.innerHTML = window._evFichaBackup[slot];
+    window._evFichaBackup[slot] = null;
+  }
 }
 
 async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
