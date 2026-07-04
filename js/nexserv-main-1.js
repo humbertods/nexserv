@@ -4190,21 +4190,17 @@ function _evFotoSlot(key, label, url, codigo, staff) {
   var inputId = 'evInput_' + key;
   var imgId   = 'evImg_'   + key;
 
-  // Build slot content avoiding complex string escaping
-  // The file input triggers evSubirFoto via onchange
-  // The change-photo button triggers a click on the hidden input
   var imgHtml = url
-    ? '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
-      + '<button data-input="' + inputId + '" data-key="' + key + '" '
-      + 'style="width:100%;margin-top:6px;padding:6px;background:#f0f0ee;border:0;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;" '
-      + 'onclick="document.getElementById(this.dataset.input).click()">Cambiar foto</button>'
+    ? '<div style="position:relative;cursor:pointer;" onclick="_evMenuFoto(\'' + key + '\',\'' + url + '\',\'' + inputId + '\')">'
+        + '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
+        + '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#fff;">⋯</div>'
+      + '</div>'
     : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
       + 'height:130px;border:2px dashed #d0d0cc;border-radius:12px;cursor:pointer;background:#fafaf8;">'
       + '<span style="font-size:28px;color:#999;">+</span>'
       + '<span style="font-size:11px;color:#999;margin-top:4px;">Agregar foto</span>'
       + '</label>';
 
-  // Store codigo and staff as data attributes on the input to avoid inline escaping
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
     + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
@@ -4215,6 +4211,45 @@ function _evFotoSlot(key, label, url, codigo, staff) {
     + '</div>';
 }
 
+function _evMenuFoto(key, url, inputId) {
+  var modal = document.getElementById('evFotoModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'evFotoModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;background:rgba(0,0,0,0.45);';
+    modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML =
+    '<div style="width:100%;max-width:480px;background:var(--bg-card,#fff);border-radius:24px 24px 0 0;padding:20px 16px 32px;">'
+      + '<div style="width:40px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 20px;"></div>'
+      + '<button onclick="_evVerFoto(\'' + url + '\')" style="width:100%;padding:16px;background:var(--bg,#f8f8f6);border:1.5px solid var(--line,#e8e8e4);border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink);margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5ZM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>'
+        + 'Ver foto ampliada'
+      + '</button>'
+      + '<button onclick="document.getElementById(\'' + inputId + '\').click();document.getElementById(\'evFotoModal\').style.display=\'none\';" style="width:100%;padding:16px;background:var(--ink,#1a1a1a);border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:8px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
+        + 'Cambiar foto'
+      + '</button>'
+    + '</div>';
+  modal.style.display = 'flex';
+}
+
+function _evVerFoto(url) {
+  document.getElementById('evFotoModal').style.display = 'none';
+  var lb = document.getElementById('evLightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = 'evLightbox';
+    lb.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;';
+    lb.onclick = function() { lb.style.display = 'none'; };
+    lb.innerHTML = '<img id="evLightboxImg" style="max-width:95vw;max-height:90vh;border-radius:12px;object-fit:contain;">'
+      + '<button onclick="document.getElementById('evLightbox').style.display='none'" style="position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.15);color:#fff;border:0;border-radius:50%;width:40px;height:40px;font-size:20px;cursor:pointer;">✕</button>';
+    document.body.appendChild(lb);
+  }
+  document.getElementById('evLightboxImg').src = url;
+  lb.style.display = 'flex';
+}
 function evCambiarFoto(key, inputId) {
   var el = document.getElementById(inputId);
   if (el) el.click();
@@ -4319,6 +4354,8 @@ function evSubirFotoDesdeInput(input) {
   evSubirFoto(input, key, codigo, staff);
 }
 window.evSubirFotoDesdeInput = evSubirFotoDesdeInput;
+window._evMenuFoto = _evMenuFoto;
+window._evVerFoto  = _evVerFoto;
 
 // Additional aliases for functions called from other modules
 window.cobrarPromoCompleta = cobrarPromoCompleta;
