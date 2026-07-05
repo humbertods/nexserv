@@ -2085,7 +2085,7 @@
     // Limpiar botones dinámicos del modal de finalización para evitar duplicados
     // Restaurar título del cobrarModal por si fue cobro grupal
     const modalTitleEl = document.querySelector('#cobrarModal .modal-title');
-    if (modalTitleEl) modalTitleEl.textContent = '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar servicio';
+    if (modalTitleEl) modalTitleEl.innerHTML = '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar servicio';
     const btnDoAllEl = document.getElementById('finishDoAllBtn');
     if (btnDoAllEl) btnDoAllEl.remove();
     const btnContSameEl = document.getElementById('finishContinueSameBtn');
@@ -2897,7 +2897,7 @@
 
     // Abrir modal con desglose combinado
     const modalTitle = document.querySelector('#cobrarModal .modal-title');
-    if (modalTitle) modalTitle.textContent = '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobro grupal';
+    if (modalTitle) modalTitle.innerHTML = '<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:6px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobro grupal';
 
     const nameEl = document.getElementById('cobrarClientName');
     if (nameEl) nameEl.innerHTML = clientas.map(c => `<span style="font-weight:800;">${c.nombre.split(' ')[0]}</span>`).join(' <span style="color:var(--ink-faint)">+</span> ');
