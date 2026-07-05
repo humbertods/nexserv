@@ -32,6 +32,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
 <script src="nexserv-mandamientos.js"></script>
+<style>
+  #resumenSemanaModal.active { display: flex !important; flex-direction: column; overflow: hidden; padding: 0; }
+</style>
 </head>
 <body>
 
@@ -2881,11 +2884,14 @@
 
   <!-- Modal Resumen Semana Staff - global para acceder desde cualquier pantalla -->
   <!-- Vista comisiones acumuladas — screen nativa del sistema -->
-  <div class="screen" id="resumenSemanaModal">
-    <button class="back-btn" onclick="closeResumenSemana()">← Mi panel</button>
-    <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:16px;">Comisiones acumuladas</div>
-    <div id="resumenSemanaContent">
-      <div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div>
+  <div class="screen" id="resumenSemanaModal" style="padding:0;overflow:hidden;">
+    <!-- Zona scrolleable: back-btn + título + contenido -->
+    <div style="flex:1;overflow-y:auto;padding:16px 16px 0;">
+      <button class="back-btn" onclick="closeResumenSemana()" style="margin-bottom:12px;">← Mi panel</button>
+      <div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:16px;">Comisiones acumuladas</div>
+      <div id="resumenSemanaContent">
+        <div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div>
+      </div>
     </div>
     <nav class="nav">
       <button onclick="closeResumenSemana()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span></button>
