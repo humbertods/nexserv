@@ -2445,7 +2445,7 @@
 
       // Total semana — card destacada
       var html =
-        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;box-sizing:border-box;">' +
           '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">Total semana</div>' +
           '<div style="font-size:22px;font-weight:900;color:var(--success);white-space:nowrap;">$' + totalSemana.toFixed(2) + '</div>' +
         '</div>';
@@ -2459,7 +2459,7 @@
         var colorTotal = total > 0 ? 'var(--success)' : 'var(--ink-faint)';
 
         html +=
-          '<div style="margin-bottom:8px;">' +
+          '<div style="margin-bottom:8px;width:100%;box-sizing:border-box;">' +
             // Fila principal — toca para abrir/cerrar
             '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card,#fff);border-radius:14px;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.07);">' +
               '<div style="font-size:15px;font-weight:700;color:var(--ink);">' + nombre + '</div>' +
