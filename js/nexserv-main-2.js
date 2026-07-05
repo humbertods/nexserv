@@ -2445,9 +2445,9 @@
 
       // Total semana — card destacada
       var html =
-        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:16px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">' +
-          '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Total semana</div>' +
-          '<div style="font-size:24px;font-weight:900;color:var(--success);">$' + totalSemana.toFixed(2) + '</div>' +
+        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">Total semana</div>' +
+          '<div style="font-size:22px;font-weight:900;color:var(--success);white-space:nowrap;">$' + totalSemana.toFixed(2) + '</div>' +
         '</div>';
 
       // Un acordeón por cada día — siempre los 6 días, con $0 si no hay datos
@@ -2461,7 +2461,7 @@
         html +=
           '<div style="margin-bottom:8px;">' +
             // Fila principal — toca para abrir/cerrar
-            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card,#fff);border-radius:14px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.07);">' +
+            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card,#fff);border-radius:14px;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.07);">' +
               '<div style="font-size:15px;font-weight:700;color:var(--ink);">' + nombre + '</div>' +
               '<div style="display:flex;align-items:center;gap:10px;">' +
                 '<div style="font-size:17px;font-weight:800;color:' + colorTotal + ';">$' + total.toFixed(1) + '</div>' +
@@ -2488,7 +2488,7 @@
           '</div>';
       });
 
-      container.innerHTML = '<div style="padding:0 0 80px;">' + html + '</div>';
+      container.innerHTML = html;
     } catch (err) {
       container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
     }
