@@ -2413,20 +2413,38 @@
   // Días de la semana siempre presentes (Lunes→Sábado)
   var _DIAS_SEMANA = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
 
+  // Backup del contenido original de la screen activa
+  window._resumenBackup = null;
+  window._resumenScreenId = null;
+
   function closeResumenSemana() {
-    // Volver a la vista anterior (staffHome o mikaelHome según el usuario)
-    var user = window.currentUser;
-    var home = (user && user.role === 'admin') ? 'mikaelHome'
-             : (user && user.role === 'owner')  ? 'ownerHome'
-             : 'staffHome';
-    if (typeof show === 'function') show(home);
+    var screenId = window._resumenScreenId;
+    var screen = screenId ? document.getElementById(screenId) : null;
+    if (screen && window._resumenBackup !== null) {
+      screen.innerHTML = window._resumenBackup;
+      window._resumenBackup = null;
+    }
   }
 
   async function openResumenSemana() {
-    if (typeof show === 'function') show('resumenSemanaModal');
-    var container = document.getElementById('resumenSemanaContent');
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div>';
+    // Detectar la screen activa actual
     var user = window.currentUser;
+    var screenId = (user && user.role === 'admin') ? 'mikaelHome'
+                 : (user && user.role === 'owner')  ? 'ownerHome'
+                 : 'staffHome';
+    window._resumenScreenId = screenId;
+    var screen = document.getElementById(screenId);
+    if (!screen) return;
+
+    // Guardar contenido original
+    window._resumenBackup = screen.innerHTML;
+    // Inyectar la vista de comisiones dentro de la screen activa
+    screen.innerHTML =
+      '<button class="back-btn" onclick="closeResumenSemana()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:16px;">Comisiones acumuladas</div>'
+      + '<div id="resumenSemanaContent"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div></div>'
+      + screen.innerHTML.match(/<nav class="nav">[\s\S]*?<\/nav>/)?.[0] || '';
+    var container = document.getElementById('resumenSemanaContent');
     if (!user) return;
     try {
       var result = await apiGet('getServiciosSemana', { chica: user.name });
