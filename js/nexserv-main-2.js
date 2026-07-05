@@ -4055,3 +4055,38 @@
   }
   
   window.closeResumenSemana = closeResumenSemana;
+
+  // ── Módulo Inventario Staff (SIRA Engine — Fase 1) ──
+  window.abrirInventarioStaff = function() {
+    var screenId = 'staffHome';
+    var screen = document.getElementById(screenId);
+    if (!screen) return;
+    var navEl = screen.querySelector('nav.nav');
+    var navHtml = navEl ? navEl.outerHTML : '';
+    window._siraBackup = screen.innerHTML;
+    window._siraScreenId = screenId;
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioStaff()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:4px;">Inventario</div>'
+      + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px;">SIRA · Gestión de insumos</div>'
+      + '<div id="siraStaffContent"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando…</div></div>'
+      + navHtml;
+    if (typeof cargarInventarioStaff === 'function') {
+      cargarInventarioStaff();
+    } else {
+      document.getElementById('siraStaffContent').innerHTML =
+        '<div style="background:var(--bg-card);border-radius:16px;padding:24px;text-align:center;margin-bottom:12px;">'
+        + '<div style="font-size:36px;margin-bottom:10px;">📦</div>'
+        + '<div style="font-size:15px;font-weight:700;margin-bottom:6px;">Módulo Inventario</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft);">Próximamente disponible aquí.</div>'
+        + '</div>';
+    }
+  };
+
+  window.cerrarInventarioStaff = function() {
+    var screen = document.getElementById(window._siraScreenId || 'staffHome');
+    if (screen && window._siraBackup) {
+      screen.innerHTML = window._siraBackup;
+      window._siraBackup = null;
+    }
+  };
