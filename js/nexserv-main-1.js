@@ -1575,6 +1575,8 @@
     if (asisBtn) asisBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const asisStaffBtn = document.getElementById('menuAsistenciaStaffBtn');
     if (asisStaffBtn) asisStaffBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
+    const comisionesBtn = document.getElementById('menuComisionesBtn');
+    if (comisionesBtn) comisionesBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
