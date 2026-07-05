@@ -2418,11 +2418,15 @@
   window._resumenScreenId = null;
 
   function closeResumenSemana() {
-    var screenId = window._resumenScreenId;
-    var screen = screenId ? document.getElementById(screenId) : null;
+    var screenId = window._resumenScreenId || 'staffHome';
+    var screen = document.getElementById(screenId);
     if (screen && window._resumenBackup !== null) {
+      // Restaurar innerHTML original — los event handlers inline (onclick) siguen funcionando
       screen.innerHTML = window._resumenBackup;
       window._resumenBackup = null;
+      window._resumenScreenId = null;
+      // NO llamar loadStaffHome ni show() — evita errores de DOM
+      // El usuario ve el home exactamente como lo dejó
     }
   }
 
@@ -2438,12 +2442,15 @@
 
     // Guardar contenido original
     window._resumenBackup = screen.innerHTML;
+    // Guardar el nav antes de reemplazar (para mantenerlo visible)
+    var _navEl = screen.querySelector('nav.nav');
+    var _navHtml = _navEl ? _navEl.outerHTML : '';
     // Inyectar la vista de comisiones dentro de la screen activa
     screen.innerHTML =
       '<button class="back-btn" onclick="closeResumenSemana()">← Mi panel</button>'
       + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:16px;">Comisiones acumuladas</div>'
       + '<div id="resumenSemanaContent"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div></div>'
-      + screen.innerHTML.match(/<nav class="nav">[\s\S]*?<\/nav>/)?.[0] || '';
+      + _navHtml;
     var container = document.getElementById('resumenSemanaContent');
     if (!user) return;
     try {
