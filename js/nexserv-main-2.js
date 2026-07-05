@@ -2445,7 +2445,7 @@
 
       // Total semana — card destacada
       var html =
-        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:16px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">' +
+        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:16px 18px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">' +
           '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Total semana</div>' +
           '<div style="font-size:24px;font-weight:900;color:var(--success);">$' + totalSemana.toFixed(2) + '</div>' +
         '</div>';
@@ -2488,7 +2488,7 @@
           '</div>';
       });
 
-      container.innerHTML = html;
+      container.innerHTML = '<div style="padding:0 0 80px;">' + html + '</div>';
     } catch (err) {
       container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
     }
