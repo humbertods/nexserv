@@ -2414,16 +2414,16 @@
   var _DIAS_SEMANA = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
 
   function closeResumenSemana() {
-    var el = document.getElementById('resumenSemanaModal');
-    if (el) el.style.display = 'none';
-    document.body.style.overflow = '';
+    // Volver a la vista anterior (staffHome o mikaelHome según el usuario)
+    var user = window.currentUser;
+    var home = (user && user.role === 'admin') ? 'mikaelHome'
+             : (user && user.role === 'owner')  ? 'ownerHome'
+             : 'staffHome';
+    if (typeof show === 'function') show(home);
   }
 
   async function openResumenSemana() {
-    var el = document.getElementById('resumenSemanaModal');
-    if (!el) return;
-    el.style.display = 'block';
-    document.body.style.overflow = 'hidden';
+    if (typeof show === 'function') show('resumenSemanaModal');
     var container = document.getElementById('resumenSemanaContent');
     container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div>';
     var user = window.currentUser;
