@@ -2410,47 +2410,85 @@
     if (listMulti) listMulti.innerHTML = '';
   }
 
+  // Días de la semana siempre presentes (Lunes→Sábado)
+  var _DIAS_SEMANA = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+
+  function closeResumenSemana() {
+    var el = document.getElementById('resumenSemanaModal');
+    if (el) el.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
   async function openResumenSemana() {
-    document.getElementById('resumenSemanaModal').classList.add('active');
-    const container = document.getElementById('resumenSemanaContent');
-    container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Cargando...</div>';
-    const user = window.currentUser;
+    var el = document.getElementById('resumenSemanaModal');
+    if (!el) return;
+    el.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    var container = document.getElementById('resumenSemanaContent');
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div>';
+    var user = window.currentUser;
     if (!user) return;
     try {
-      const result = await apiGet('getServiciosSemana', { chica: user.name });
-      if (!result.success || !result.dias || result.dias.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">Sin servicios esta semana</div>';
-        return;
+      var result = await apiGet('getServiciosSemana', { chica: user.name });
+
+      // Construir mapa de días con datos del backend
+      var diasMap = {};
+      if (result.success && result.dias) {
+        result.dias.forEach(function(d) { diasMap[d.dia] = d; });
       }
-      const totalSemana = result.dias.reduce(function(s, d) { return s + d.total; }, 0);
-      container.innerHTML =
-        '<div style="background:var(--chip);border-radius:14px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">' +
+
+      // Calcular total sumando solo los días con datos
+      var totalSemana = 0;
+      _DIAS_SEMANA.forEach(function(nombre) {
+        if (diasMap[nombre]) totalSemana += diasMap[nombre].total || 0;
+      });
+
+      // Total semana — card destacada
+      var html =
+        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:16px 18px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">' +
           '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);">Total semana</div>' +
-          '<div style="font-size:22px;font-weight:800;color:var(--success);">$' + totalSemana.toFixed(2) + '</div>' +
-        '</div>' +
-        result.dias.map(function(dia, idx) {
-          return '<div style="margin-bottom:8px;">' +
-            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
-              '<div style="font-size:15px;font-weight:700;">' + dia.dia + '</div>' +
+          '<div style="font-size:24px;font-weight:900;color:var(--success);">$' + totalSemana.toFixed(2) + '</div>' +
+        '</div>';
+
+      // Un acordeón por cada día — siempre los 6 días, con $0 si no hay datos
+      _DIAS_SEMANA.forEach(function(nombre, idx) {
+        var dia = diasMap[nombre];
+        var total = dia ? (dia.total || 0) : 0;
+        var servicios = dia ? (dia.servicios || []) : [];
+        var tieneServicios = servicios.length > 0;
+        var colorTotal = total > 0 ? 'var(--success)' : 'var(--ink-faint)';
+
+        html +=
+          '<div style="margin-bottom:8px;">' +
+            // Fila principal — toca para abrir/cerrar
+            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card,#fff);border-radius:14px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.07);">' +
+              '<div style="font-size:15px;font-weight:700;color:var(--ink);">' + nombre + '</div>' +
               '<div style="display:flex;align-items:center;gap:10px;">' +
-                '<div style="font-size:17px;font-weight:800;color:var(--success);">$' + dia.total.toFixed(1) + '</div>' +
-                '<div id="arrow-sem-' + idx + '" style="color:var(--ink-faint);font-size:12px;transition:transform 0.2s;">▼</div>' +
+                '<div style="font-size:17px;font-weight:800;color:' + colorTotal + ';">$' + total.toFixed(1) + '</div>' +
+                (tieneServicios
+                  ? '<div id="arrow-sem-' + idx + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>'
+                  : '<div style="width:14px;"></div>') +
               '</div>' +
             '</div>' +
-            '<div id="dia-detail-' + idx + '" style="display:none;background:var(--bg-card);border-radius:0 0 14px 14px;margin-top:-8px;padding:8px 16px 14px;border-top:1px solid var(--line);">' +
-              dia.servicios.map(function(s, si) {
-                return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;' + (si < dia.servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
-                  '<div style="flex:1;">' +
-                    '<div style="font-size:13px;font-weight:700;">' + clienteDisplay(s.cliente, s.codigo) + '</div>' +
-                    '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + s.hora + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
-                    '<div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">' + s.servicio + '</div>' +
-                  '</div>' +
-                  '<div style="font-size:15px;font-weight:800;color:var(--success);margin-left:12px;">$' + Number(s.comision || 0).toFixed(2) + '</div>' +
-                '</div>';
-              }).join('') +
-            '</div>' +
+            // Panel desplegable — solo si hay servicios
+            (tieneServicios
+              ? '<div id="dia-detail-' + idx + '" style="display:none;background:var(--bg-card,#fff);border-radius:0 0 14px 14px;margin-top:-8px;padding:4px 18px 14px;border-top:1px solid var(--line,#eee);">' +
+                  servicios.map(function(s, si) {
+                    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;' + (si < servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                      '<div style="flex:1;">' +
+                        '<div style="font-size:13px;font-weight:700;color:var(--ink);">' + clienteDisplay(s.cliente, s.codigo) + '</div>' +
+                        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + s.hora + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
+                        '<div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">' + s.servicio + '</div>' +
+                      '</div>' +
+                      '<div style="font-size:15px;font-weight:800;color:var(--success);margin-left:12px;">$' + Number(s.comision || 0).toFixed(2) + '</div>' +
+                    '</div>';
+                  }).join('') +
+                '</div>'
+              : '<div id="dia-detail-' + idx + '" style="display:none;"></div>') +
           '</div>';
-        }).join('');
+      });
+
+      container.innerHTML = html;
     } catch (err) {
       container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
     }
@@ -3990,3 +4028,5 @@
       document.getElementById('authorizationsSection').style.display = 'none';
     }
   }
+  
+  window.closeResumenSemana = closeResumenSemana;
