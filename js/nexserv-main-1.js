@@ -688,7 +688,7 @@
         const _nombresSP = _otrasSP.map(s => s.name).join(', ');
         btnContainer.innerHTML =
           '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:13px;padding:15px;" onclick="finalizarYPasarOtraArea(' + _slotSP + ')">✅ Terminé mi parte — enviar ' + _nombresSP + ' a otra staff</button>'
-          + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')">💰 Lo hice todo yo — cobrar todo</button>';
+          + '<button class="btn-primary outline" style="margin-bottom:10px;font-size:13px;" onclick="finalizarServicioSP(' + _slotSP + ')"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Lo hice todo yo — cobrar todo</button>';
         return;
       }
       btnContainer.innerHTML = `
@@ -749,7 +749,7 @@
           var _comboTienePestanas = _areasComboTM.some(function(n){ return n.indexOf('pesta') >= 0; });
           var _comboTieneCejas    = _areasComboTM.some(function(n){ return n.indexOf('cej') >= 0; });
           if (tienePromoEnTM && _staffEsPestanas && _comboTienePestanas && _comboTieneCejas) {
-            btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')">🎁 Cobrar promo completa — todo el valor a mi nombre ($' + Number(totalPromoComboTM).toFixed(2) + ')</button>'
+            btnsBaseTM = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="window._finishingSlot=' + slotN + '; cobrarPromoCompletaTM(' + slotN + ')"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar promo completa — todo el valor a mi nombre ($' + Number(totalPromoComboTM).toFixed(2) + ')</button>'
               + btnsBaseTM;
           }
           btnContainer.innerHTML = btnsBaseTM;
@@ -822,7 +822,7 @@
       if (promasExtraPendientes.length > 0) {
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — Yo sigo: ${sigNombre}</button>`;
-        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente)</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar todo ahora (sin siguiente)</button>`;
       } else {
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Finalizar servicio — mandar a cobrar</button>`;
       }
@@ -831,7 +831,7 @@
         // Hay otra promo independiente pendiente
         const sigNombre = promasExtraPendientes[0].nombre || 'siguiente servicio';
         html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#1a6b4a,#0f4a33);" onclick="window._finishingSlot=${slotActual}; finishAndNextPromo()">🏁 Lista mi promo — continuar siguiente: ${sigNombre}</button>`;
-        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">💰 Cobrar todo ahora (sin siguiente promo)</button>`;
+        html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar todo ahora (sin siguiente promo)</button>`;
       } else {
         // Promo multi-área que esta staff puede hacer toda
         html += `<button class="btn-primary" style="margin-bottom:10px;background:var(--success);" onclick="window._finishingSlot=${slotActual}; finishAndSendAll()">✅ Terminé todo el combo — mandar a cobrar</button>`;
@@ -865,9 +865,9 @@
       }
       // REGLA IRREVOCABLE: "Cobrar promo completa" solo para staff de PESTAÑAS (ver bloque TM).
       if (String((window.currentUser && window.currentUser.area) || '').toLowerCase().indexOf('pesta') >= 0) {
-        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})">🎁 Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
+        html += `<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#7b2d8b,#5a1f6e);" onclick="cobrarPromoCompleta(${slotActual})"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Cobrar promo completa ($${Number(promo.price || 0)})</button>`;
       }
-      html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()">💰 Mandar a cobrar (solo mi parte)</button>`;
+      html += `<button class="btn-primary outline" style="margin-bottom:10px;" onclick="finishAndSend()"><svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"currentColor\" style=\"vertical-align:-2px;margin-right:5px;\"><path d=\"M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z\"/></svg>Mandar a cobrar (solo mi parte)</button>`;
     }
     btnContainer.innerHTML = html;
   }
