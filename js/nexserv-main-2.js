@@ -2488,7 +2488,7 @@
           '</div>';
       });
 
-      container.innerHTML = html;
+      container.innerHTML = '<div style="width:100%;box-sizing:border-box;">' + html + '</div>';
     } catch (err) {
       container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
     }
