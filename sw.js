@@ -1,21 +1,28 @@
-const CACHE_NAME = 'nexserv-v2';
+const CACHE_NAME = 'nexserv-v20260706';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(clients.claim());
+  // Borrar cachés viejos al activar nueva versión
+  e.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(k => k !== CACHE_NAME && !k.includes('firebase'))
+          .map(k => caches.delete(k))
+      )
+    ).then(() => clients.claim())
+  );
 });
 
 self.addEventListener('push', e => {
-  // FCM puede enviar sin payload (notificación solo display)
   let data = { title: 'NexServ', body: 'Nueva actualización' };
 
   if (e.data) {
     try {
       data = e.data.json();
-      // FCM v1 entrega el contenido dentro de "notification" (y a veces dentro de "data").
       const n = data.notification || data.data || {};
       data = {
         title: data.title || n.title || 'NexServ',
@@ -57,7 +64,6 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
-// Manejar mensajes del cliente
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
