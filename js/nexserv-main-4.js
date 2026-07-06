@@ -426,7 +426,7 @@
         `}
         
         ${canEdit && numSesiones > 0 ? `
-          <button onclick="openCejasPigmentoModal('${codigo}', '${clientName}')" class="btn-primary" style="width: 100%; margin-top: 16px;">+ Registrar nueva sesión</button>
+          <button data-action="abrir-pigmento" data-cod="${codigo}" data-nombre="${clientName.replace(/\"/g,'&quot;')}" class="btn-primary" style="width: 100%; margin-top: 16px;">+ Registrar nueva sesión</button>
         ` : ''}
       `;
     } catch (err) {
@@ -651,9 +651,9 @@
         <div style="background:var(--bg);border-radius:12px;padding:8px 12px;">${buildDesgloseHTML(c)}</div>
         ${totalStr}
         <div style="display:flex;gap:6px;margin-top:10px;">
-          <button onclick="agregarServicioExtra('${c.idEspera}','${c.codigo||''}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
-          <button onclick="mandarACobro('${c.idEspera}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
-          <button onclick="eliminarTicketEspera('${c.idEspera}','${nombreSafe}')" title="Borrar ticket" style="padding:11px 13px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">🗑</button>
+          <button data-action="agregar-extra" data-id="${c.idEspera}" data-cod="${c.codigo||''}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
+          <button data-action="mandar-cobro" data-id="${c.idEspera}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
+          <button data-action="eliminar-ticket" data-id="${c.idEspera}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" title="Borrar ticket" style="padding:11px 13px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">🗑</button>
         </div>
       </div>`;
   }
@@ -844,7 +844,7 @@
     return staffList.map((s, si) => {
       const id = pfx + '-s' + si;
       return '<div style="margin-top:4px;">' +
-        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
+        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
           '<div><div style="font-size:13px;font-weight:700;">' + s.nombre + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);">' + s.servicios.length + ' servicio' + (s.servicios.length !== 1 ? 's' : '') + '</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div style="text-align:right;">' +
@@ -879,7 +879,7 @@
       const total = dd.recs.reduce((s, r) => s + r.valor, 0);
       const comm = dd.recs.reduce((s, r) => s + r.comision, 0);
       return '<div style="margin-top:6px;">' +
-        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:15px;font-weight:700;">' + _owFmtDia(dd.d) + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + staffList.length + ' staff · ' + dd.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -918,7 +918,7 @@
       const fechas = sm.recs.map(r => r.d).sort((a, b) => a - b);
       const rango = fechas.length ? (String(fechas[0].getDate()).padStart(2, '0') + '–' + String(fechas[fechas.length - 1].getDate()).padStart(2, '0')) : '';
       return '<div style="margin-top:6px;">' +
-        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:16px;font-weight:800;">Semana ' + sm.w + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (rango ? rango + ' · ' : '') + nStaff + ' staff · ' + sm.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -948,7 +948,7 @@
       const comm = mm.recs.reduce((s, r) => s + r.comision, 0);
       const nStaff = new Set(mm.recs.map(r => r.staff)).size;
       return '<div style="margin-top:6px;">' +
-        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:16px;font-weight:800;">' + _OW_MESES[mm.mo] + ' ' + mm.y + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + nStaff + ' staff · ' + mm.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -2344,7 +2344,7 @@
             : `${staff.area} · Disponible`);
       const initials = staff.name[0];
       const html = `
-        <div class="client-row" onclick="goAssign('${staff.name}')">
+        <div class="client-row" data-action="go-assign" data-nombre="${staff.name.replace(/\"/g,'&quot;')}">
           <div class="client-avatar">${initials}</div>
           <div class="client-info">
             <div class="client-name">${staff.name}</div>
@@ -2635,7 +2635,7 @@
     const found = lista.filter(c => (c.name||'').toLowerCase().includes(q.toLowerCase())).slice(0, 8);
     if (found.length === 0) { sug.style.display = 'none'; return; }
     sug.innerHTML = found.map(c =>
-      `<div onclick="vdSeleccionarCliente('${(c.name||'').replace(/'/g,"\\'")}',this)"
+      `<div data-action="vd-sel-cliente" data-nombre="${(c.name||'').replace(/"/g,'&quot;')}"
         style="padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--line);"
         onmouseover="this.style.background='var(--accent-bg)'" onmouseout="this.style.background=''">
         ${c.name}
@@ -2776,7 +2776,7 @@
           <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${c.servicio} · $${c.total.toFixed(2)}</div>
           <div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">Esperando asignación de cobro</div>
         </div>
-        <button onclick="mkQuitarEsperaCobro(${idx})" style="background:none;border:none;color:var(--danger,#e53);font-size:20px;cursor:pointer;padding:4px;">✕</button>
+        <button data-action="mk-quitar" data-idx="${idx}" style="background:none;border:none;color:var(--danger,#e53);font-size:20px;cursor:pointer;padding:4px;">✕</button>
       </div>
     `).join('');
   }
@@ -2800,7 +2800,7 @@
       }
       row.style.display = 'block';
       opcionesEl.innerHTML = lista.map((c, idx) => `
-        <button onclick="mkAsignarAlCobroById('${idEspera}', '${c.idEspera}')"
+        <button data-action="mk-asignar" data-id="${idEspera}" data-target="${c.idEspera}"
           style="padding:7px 12px;background:var(--accent-bg);color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">
           + ${c.nombre.split(' ')[0]}
         </button>
@@ -2916,7 +2916,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="font-size:14px;font-weight:800;${c._editado ? 'color:var(--accent-deep);' : ''}">$${(Number(c.total)||0).toFixed(2)}</div>
-          <button onclick="cobrarEditarMontoGrupal(${idx})" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
+          <button data-action="cobrar-editar-monto" data-idx="${idx}" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
         </div>
       </div>
     `).join('');
@@ -4696,188 +4696,73 @@ function renderInformeServicios(d, pestanasData, tendData) {
 
   body.innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT DELEGATION HUB — nexserv-main-4
+// ═══════════════════════════════════════════════════════════════
+(function _installDelegationHub4() {
+  document.addEventListener('click', function(e) {
+    var target = e.target.closest('[data-action]');
+    if (!target) return;
+    var action = target.dataset.action;
+    var id     = target.dataset.id     || '';
+    var nombre = target.dataset.nombre || '';
+    var cod    = target.dataset.cod    || '';
+    var idx    = parseInt(target.dataset.idx  || '0', 10);
+    var target2= target.dataset.target || '';
+    var val    = target.dataset.val;
+
+    switch (action) {
+      // ── En Atención / WaitList (Owner/Mikaela) ──
+      case 'agregar-extra':
+        e.stopPropagation();
+        if (typeof agregarServicioExtra === 'function') agregarServicioExtra(id, cod, nombre);
+        break;
+      case 'mandar-cobro':
+        e.stopPropagation();
+        if (typeof mandarACobro === 'function') mandarACobro(id, nombre);
+        break;
+      case 'eliminar-ticket':
+        // shared with main-2 delegation
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function') eliminarTicketEspera(id, nombre);
+        break;
+      // ── Owner historial ──
+      case 'ow-toggle':
+        e.stopPropagation();
+        if (typeof owToggle === 'function') owToggle(id);
+        break;
+      // ── Pigmento ──
+      case 'abrir-pigmento':
+        e.stopPropagation();
+        if (typeof openCejasPigmentoModal === 'function') openCejasPigmentoModal(cod, nombre);
+        break;
+      // ── Cobro grupal (Mikaela) ──
+      case 'mk-quitar':
+        e.stopPropagation();
+        if (typeof mkQuitarEsperaCobro === 'function') mkQuitarEsperaCobro(idx);
+        break;
+      case 'mk-asignar':
+        e.stopPropagation();
+        if (typeof mkAsignarAlCobroById === 'function') mkAsignarAlCobroById(id, target2);
+        break;
+      case 'cobrar-editar-monto':
+        e.stopPropagation();
+        if (typeof cobrarEditarMontoGrupal === 'function') cobrarEditarMontoGrupal(idx);
+        break;
+      // ── Venta directa ──
+      case 'vd-sel-cliente':
+        e.stopPropagation();
+        if (typeof vdSeleccionarCliente === 'function') vdSeleccionarCliente(nombre, target);
+        break;
+      // ── Asignación staff ──
+      case 'go-assign':
+        e.stopPropagation();
+        if (typeof goAssign === 'function') goAssign(nombre);
+        break;
+    }
+  });
+})();
+
 window.cargarInformeServicios = cargarInformeServicios;
-
-// ── Exponer funciones de cobro grupal globalmente ──────────────────────────
-window.mkEsperarAsignacion      = mkEsperarAsignacion;
-window.mkRenderEsperandoCobro   = mkRenderEsperandoCobro;
-window.mkQuitarEsperaCobro      = mkQuitarEsperaCobro;
-window.mkActualizarAsignarOpciones = mkActualizarAsignarOpciones;
-window.mkAsignarAlCobroById     = mkAsignarAlCobroById;
-window.mkAsignarAlCobro         = mkAsignarAlCobro;
-
-// ── Modal "Agregar producto al ticket" ─────────────────────────────────────
-// openAgregarProducto(idEspera, nombre, totalActual)
-// Abre el modal agregarProductoModal y carga los productos del catálogo SIRA.
-// Reutiliza window._productosMarca (mismo cache que Venta Directa).
-// Al confirmar llama registrarVentaProductos con idEspera para asociar al ticket.
-
-window._apIdEspera  = '';
-window._apNombre    = '';
-window._apItems     = [];   // [{nombre, precio, cantidad}]
-
-function openAgregarProducto(idEspera, nombre, totalActual) {
-  window._apIdEspera = idEspera || '';
-  window._apNombre   = nombre   || '';
-  window._apItems    = [];
-
-  var el = document.getElementById('apClienteName');
-  if (el) el.textContent = nombre || '';
-
-  var search = document.getElementById('apSearch');
-  if (search) search.value = '';
-
-  _apRenderTicket();
-
-  // Cargar productos si no están en cache
-  if (!window._productosMarca || window._productosMarca.length === 0) {
-    var SIRA_URL   = window.SIRA_URL   || '';
-    var SIRA_TOKEN = window.SIRA_TOKEN || '';
-    if (SIRA_URL) {
-      fetch(SIRA_URL + '?action=getProductos&token=' + SIRA_TOKEN + '&_t=' + Date.now())
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          window._productosMarca = (d && d.productos) ? d.productos : [];
-          _apRenderLista('');
-        })
-        .catch(function(){ _apRenderLista(''); });
-    }
-  }
-  _apRenderLista('');
-
-  var modal = document.getElementById('agregarProductoModal');
-  if (modal) modal.classList.add('active');
-}
-window.openAgregarProducto = openAgregarProducto;
-
-function filtrarProductosAP() {
-  var q = (document.getElementById('apSearch') && document.getElementById('apSearch').value) || '';
-  _apRenderLista(q);
-}
-window.filtrarProductosAP = filtrarProductosAP;
-
-function _apRenderLista(query) {
-  var list = document.getElementById('apProductList');
-  if (!list) return;
-  var productos = window._productosMarca || [];
-  var q = (query || '').toLowerCase().trim();
-  var filtrados = q ? productos.filter(function(p){ return p.nombre.toLowerCase().includes(q); }) : productos;
-
-  if (!filtrados.length) {
-    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-faint);font-size:13px;">'
-      + (productos.length === 0 ? 'Cargando productos...' : 'Sin resultados') + '</div>';
-    return;
-  }
-
-  list.innerHTML = filtrados.map(function(p) {
-    var inTicket = window._apItems.find(function(i){ return i.nombre === p.nombre; });
-    return '<div data-pnombre="' + p.nombre.replace(/"/g, '&quot;') + '" data-pprecio="' + (p.precio||0) + '" onclick="apToggleProducto(this.dataset.pnombre, Number(this.dataset.pprecio))" '
-      + 'style="display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;">'
-      + '<div>'
-        + '<div style="font-size:13px;font-weight:700;">' + p.nombre + '</div>'
-        + '<div style="font-size:11px;color:var(--ink-soft);">$' + (p.precio||0).toFixed(2) + '</div>'
-      + '</div>'
-      + '<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;'
-        + (inTicket ? 'background:var(--success);color:white;' : 'background:var(--line);color:var(--ink-soft);') + '">'
-        + (inTicket ? '✓' : '+') + '</div>'
-      + '</div>';
-  }).join('');
-}
-window._apRenderLista = _apRenderLista;
-
-function apToggleProducto(nombre, precio) {
-  var idx = window._apItems.findIndex(function(i){ return i.nombre === nombre; });
-  if (idx >= 0) {
-    window._apItems.splice(idx, 1);
-  } else {
-    window._apItems.push({ nombre: nombre, precio: precio || 0, cantidad: 1 });
-  }
-  var q = document.getElementById('apSearch') ? document.getElementById('apSearch').value : '';
-  _apRenderLista(q);
-  _apRenderTicket();
-}
-window.apToggleProducto = apToggleProducto;
-
-function _apRenderTicket() {
-  var container = document.getElementById('apTicketItems');
-  var ticketList = document.getElementById('apTicketList');
-  var totalEl    = document.getElementById('apTicketTotal');
-  if (!container || !ticketList) return;
-
-  if (!window._apItems || window._apItems.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-  container.style.display = 'block';
-
-  var total = 0;
-  ticketList.innerHTML = window._apItems.map(function(item, idx) {
-    var sub = item.precio * (item.cantidad || 1);
-    total += sub;
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);">'
-      + '<div style="flex:1;">'
-        + '<div style="font-size:12px;font-weight:700;">' + item.nombre + '</div>'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
-          + '<button onclick="apCambiarCantidad(' + idx + ',-1)" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>'
-          + '<span style="font-size:12px;font-weight:700;">' + (item.cantidad||1) + '</span>'
-          + '<button onclick="apCambiarCantidad(' + idx + ',1)" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>'
-        + '</div>'
-      + '</div>'
-      + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + sub.toFixed(2) + '</div>'
-      + '</div>';
-  }).join('');
-
-  if (totalEl) totalEl.textContent = '$' + total.toFixed(2);
-}
-
-function apCambiarCantidad(idx, delta) {
-  if (!window._apItems[idx]) return;
-  window._apItems[idx].cantidad = Math.max(1, (window._apItems[idx].cantidad || 1) + delta);
-  _apRenderTicket();
-}
-window.apCambiarCantidad = apCambiarCantidad;
-
-async function confirmarProductosTicket() {
-  if (!window._apItems || window._apItems.length === 0) {
-    if (typeof showToast === 'function') showToast('⚠ No hay productos en el ticket');
-    return;
-  }
-  var idEspera = window._apIdEspera || '';
-  var nombre   = window._apNombre   || 'Clienta';
-  var total    = window._apItems.reduce(function(s, i){ return s + i.precio * (i.cantidad||1); }, 0);
-  var productos = window._apItems.map(function(i){ return { nombre: i.nombre, precio: i.precio, cantidad: i.cantidad||1, subtotal: i.precio*(i.cantidad||1) }; });
-
-  try {
-    if (typeof showToast === 'function') showToast('⏳ Registrando productos...');
-    await apiPost('registrarVentaProductos', {
-      idEspera: idEspera,
-      clienteNombre: nombre,
-      productos: productos,
-      total: total,
-      esVentaDirecta: false,
-      metodoPago: 'Producto'
-    });
-
-    // Actualizar la línea visual del ticket en Por Cobrar
-    var ticketEl = document.getElementById('productos-ticket-' + idEspera);
-    if (ticketEl) {
-      ticketEl.innerHTML = '<div style="background:var(--success-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">'
-        + '<div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:4px;">+ PRODUCTOS AGREGADOS</div>'
-        + productos.map(function(p){ return '<div style="font-size:12px;">• ' + p.nombre + ' x' + p.cantidad + ' — $' + p.subtotal.toFixed(2) + '</div>'; }).join('')
-        + '<div style="font-size:12px;font-weight:800;color:var(--success);margin-top:4px;">Total productos: $' + total.toFixed(2) + '</div>'
-        + '</div>';
-    }
-
-    if (typeof showToast === 'function') showToast('✅ Productos agregados al ticket de ' + nombre);
-    var modal = document.getElementById('agregarProductoModal');
-    if (modal) modal.classList.remove('active');
-    window._apItems = [];
-
-  } catch(e) {
-    console.error('confirmarProductosTicket:', e);
-    if (typeof showToast === 'function') showToast('⚠ Error al registrar productos');
-  }
-}
-window.confirmarProductosTicket = confirmarProductosTicket;
-
 /* ========== /INFORME DE SERVICIOS ========== */
