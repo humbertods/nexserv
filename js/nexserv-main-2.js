@@ -4057,36 +4057,110 @@
   window.closeResumenSemana = closeResumenSemana;
 
   // ── Módulo Inventario Staff (SIRA Engine — Fase 1) ──
+  // ══════════════════════════════════════════════════════════════
+  // SIRA ENGINE — Módulo Inventario integrado en NexServ
+  // ══════════════════════════════════════════════════════════════
+  var SIRA_URL = 'https://script.google.com/macros/s/AKfycbzyEBabD-2BXhSd1tmIXpWXwzHPWE5CoF4VcGD1c5ILkACl8FmWbQRTL0juM70sxZnw/exec';
+  var SIRA_TOKEN = 'sira_2026_nexserv_bridge_7f4c9a';
+
+  async function _siraPost(action, data) {
+    data.token = SIRA_TOKEN;
+    data.action = action;
+    try {
+      var r = await fetch(SIRA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return await r.json();
+    } catch(e) { return { success: false, error: String(e) }; }
+  }
+
   window.abrirInventarioStaff = function() {
-    var screenId = 'staffHome';
-    var screen = document.getElementById(screenId);
+    var user = window.currentUser;
+    if (!user) return;
+    var screen = document.getElementById('staffHome');
     if (!screen) return;
     var navEl = screen.querySelector('nav.nav');
     var navHtml = navEl ? navEl.outerHTML : '';
     window._siraBackup = screen.innerHTML;
-    window._siraScreenId = screenId;
+    window._siraScreenId = 'staffHome';
+    var area = String(user.area || '').toLowerCase();
+    var esPestanas = area.indexOf('pest') >= 0;
     screen.innerHTML =
       '<button class="back-btn" onclick="cerrarInventarioStaff()">← Mi panel</button>'
-      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:4px;">Inventario</div>'
-      + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:16px;">SIRA · Gestión de insumos</div>'
-      + '<div id="siraStaffContent"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando…</div></div>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
       + navHtml;
-    if (typeof cargarInventarioStaff === 'function') {
-      cargarInventarioStaff();
-    } else {
-      document.getElementById('siraStaffContent').innerHTML =
-        '<div style="background:var(--bg-card);border-radius:16px;padding:24px;text-align:center;margin-bottom:12px;">'
-        + '<div style="font-size:36px;margin-bottom:10px;">📦</div>'
-        + '<div style="font-size:15px;font-weight:700;margin-bottom:6px;">Módulo Inventario</div>'
-        + '<div style="font-size:13px;color:var(--ink-soft);">Próximamente disponible aquí.</div>'
+  };
+
+  function _siraRenderSecciones(esPestanas) {
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_B = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M20 3H4l2 10.5V20H6a1 1 0 0 0 0 2h12a1 1 0 0 0 0-2h-.5v-6.5L20 3Zm-2.24 2-1.14 6H7.38L6.24 5h11.52Z"/></svg>';
+    var SVG_K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M20 6h-2.18c.07-.31.18-.62.18-1a3 3 0 0 0-3-3 2.9 2.9 0 0 0-2 .78L12 3.5l-1-.72A2.9 2.9 0 0 0 9 2a3 3 0 0 0-3 3c0 .38.11.69.18 1H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2ZM9 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM4 19V8h7v11H4Zm9 0V8h7v11h-7Z"/></svg>';
+    function btn(svg, label, tipo, bg) {
+      return '<button onclick="_siraAccion(\"' + tipo + '\")" style="width:100%;padding:14px 16px;background:' + bg + ';border:none;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1);">' + svg + '<span>' + label + '</span></button>';
+    }
+    var CARD = 'background:var(--bg-card,#fff);border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);';
+    var html = '<div style="' + CARD + '">'
+      + '<div style="padding:11px 16px;font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line,#eee);">Movimientos</div>'
+      + btn(SVG_E, 'Registrar Entrada', 'entrada', '#2d6a4f')
+      + btn(SVG_S, 'Registrar Salida',  'salida',  '#1a1a1a')
+      + btn(SVG_B, 'Registrar Bebida',  'bebida',  '#8b7355')
+      + '</div>';
+    if (esPestanas) {
+      html += '<div style="' + CARD + '">'
+        + '<div style="padding:11px 16px;font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line,#eee);">Pestañas</div>'
+        + btn(SVG_K, 'Registrar Kit de Pestañas', 'kit', '#7c3aed')
         + '</div>';
+    }
+    return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>';
+  }
+
+  window._siraAccion = function(tipo) {
+    var c2 = document.getElementById('siraFormContainer');
+    if (!c2) return;
+    if (c2.dataset.tipo === tipo && c2.innerHTML) { c2.innerHTML = ''; c2.dataset.tipo = ''; return; }
+    c2.dataset.tipo = tipo;
+    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Registrar Kit de Pestañas' };
+    var ph = tipo === 'kit' ? 'Ej: Kit 9-11 Volumen' : tipo === 'bebida' ? 'Ej: Agua, Café' : tipo === 'entrada' ? 'Ej: Adhesivo negro' : 'Ej: Parches gel';
+    var quienRow = tipo === 'bebida' ? '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Quién la tomó</div><input id="siraQuien" placeholder="Clienta o staff" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>' : '';
+    c2.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);">'
+      + '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:14px;">' + labels[tipo] + '</div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Producto / Insumo</div><input id="siraProducto" placeholder="' + ph + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
+      + '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Cantidad</div><input id="siraCantidad" type="number" min="1" value="1" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
+      + quienRow
+      + '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Nota (opcional)</div><input id="siraNota" placeholder="Observación..." style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
+      + '<button onclick="_siraEnviar(\"' + tipo + '\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Confirmar registro</button>'
+      + '</div>';
+    c2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  window._siraEnviar = async function(tipo) {
+    var producto = (document.getElementById('siraProducto')?.value || '').trim();
+    var cantidad = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
+    var nota     = (document.getElementById('siraNota')?.value || '').trim();
+    var quien    = (document.getElementById('siraQuien')?.value || '').trim();
+    var user     = window.currentUser;
+    if (!producto) { if (typeof showToast === 'function') showToast('Escribe el nombre del producto'); return; }
+    var btn2 = document.getElementById('siraEnviarBtn');
+    if (btn2) { btn2.textContent = 'Registrando…'; btn2.disabled = true; }
+    var r = await _siraPost('registrarMovimientoStaff', { tipo, producto, cantidad, nota, quien, staff: user ? user.name : '', area: user ? user.area : '' });
+    var fb = document.getElementById('siraFeedback');
+    var c3 = document.getElementById('siraFormContainer');
+    if (r && r.success) {
+      if (c3) { c3.innerHTML = ''; c3.dataset.tipo = ''; }
+      if (fb) { fb.innerHTML = '<div style="background:#2d6a4f22;border:1.5px solid #2d6a4f55;border-radius:14px;padding:14px;text-align:center;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;color:#2d6a4f;">✅ ' + producto + ' registrado</div></div>'; setTimeout(function(){ if(fb) fb.innerHTML=''; }, 3000); }
+      if (typeof showToast === 'function') showToast('✅ ' + producto + ' registrado en SIRA');
+    } else {
+      if (btn2) { btn2.textContent = 'Confirmar registro'; btn2.disabled = false; }
+      if (typeof showToast === 'function') showToast('⚠ ' + ((r && r.error) || 'Error al registrar'));
     }
   };
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
-    if (screen && window._siraBackup) {
-      screen.innerHTML = window._siraBackup;
-      window._siraBackup = null;
-    }
+    if (screen && window._siraBackup) { screen.innerHTML = window._siraBackup; window._siraBackup = null; }
   };
