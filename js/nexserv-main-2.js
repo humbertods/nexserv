@@ -4239,12 +4239,15 @@
     } else {
       var fb = document.getElementById('siraFormContainer');
       if (fb) fb.appendChild(panel);
+    }
 
-    // Animar apertura
+    // Animar apertura — doble rAF para que la transición CSS arranque
     requestAnimationFrame(function() {
-      panel.style.maxHeight = '600px';
-      panel.style.opacity = '1';
-      setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 150);
+      requestAnimationFrame(function() {
+        panel.style.maxHeight = '600px';
+        panel.style.opacity = '1';
+        setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 200);
+      });
     });
   };
 
@@ -4317,4 +4320,3 @@
       window._siraActivo = false;
     }
   };
-}
