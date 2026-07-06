@@ -4072,13 +4072,21 @@
     data.token = SIRA_TOKEN;
     data.action = action;
     try {
+      // Google Apps Script requiere seguir redirects con credentials omit
       var r = await fetch(SIRA_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain' },  // GAS acepta text/plain para evitar preflight
         body: JSON.stringify(data)
       });
+      if (!r.ok) {
+        // Intentar leer el cuerpo del error
+        var errText = '';
+        try { errText = await r.text(); } catch(_){}
+        return { ok: false, success: false, error: 'HTTP ' + r.status + ': ' + errText.substring(0,100) };
+      }
       return await r.json();
-    } catch(e) { return { success: false, error: String(e) }; }
+    } catch(e) { return { success: false, ok: false, error: String(e) }; }
   }
 
   window.abrirInventarioStaff = function() {
@@ -4227,23 +4235,12 @@
     } else if (tipo === 'bebida') {
       // Bebida: lista de productos Coffee de SIRA
       html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Bebida servida</div>';
-      if (prodsFiltrados.length > 0) {
-        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-        prodsFiltrados.forEach(function(p){
-          html += '<button data-beb="' + p.nombre + '" onclick="_siraSelectBebida(this)" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + p.nombre + '</button>';
-        });
-        html += '</div>';
-      } else {
-        // Fallback chips si no hay productos Coffee
-        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
-        ['Agua','Café','Té','Aromática','Jugo'].forEach(function(b){
-          html += '<button data-beb="' + b + '" onclick="_siraSelectBebida(this)" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + b + '</button>';
-        });
-        html += '</div>';
-      }
-      html += '<input id="siraProducto" type="hidden" value="">';
-      html += '<button onclick="_siraEnviar(\\"bebida\\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
-
+            var bebOpciones = prodsFiltrados.length > 0 ? prodsFiltrados : [{nombre:'Agua'},{nombre:'Café'},{nombre:'Té'},{nombre:'Aromática'},{nombre:'Jugo'}];
+      html += '<select id="siraProducto" onchange="_siraBebidaSelect(this)" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;margin-bottom:16px;">';
+      html += '<option value="">— Seleccionar bebida —</option>';
+      bebOpciones.forEach(function(p){ html += '<option value="' + p.nombre + '">' + p.nombre + '</option>'; });
+      html += '</select>';
+      html += '<button onclick="_siraEnviar(\"bebida\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
     } else {
       // Entrada / Salida: búsqueda de producto + área + contador
       html += '<div style="margin-bottom:12px;">';
@@ -4325,6 +4322,11 @@
     if (hid) hid.value = n;
     var btn = document.getElementById('siraEnviarBtn');
     if (btn) { btn.disabled=false; btn.style.opacity='1'; }
+  };
+
+  window._siraBebidaSelect = function(sel) {
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled = !sel.value; btn.style.opacity = sel.value ? '1' : '.4'; }
   };
 
   window._siraSelectBebida = function(el) {
