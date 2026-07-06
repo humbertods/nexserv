@@ -4697,4 +4697,187 @@ function renderInformeServicios(d, pestanasData, tendData) {
   body.innerHTML = html;
 }
 window.cargarInformeServicios = cargarInformeServicios;
+
+// ── Exponer funciones de cobro grupal globalmente ──────────────────────────
+window.mkEsperarAsignacion      = mkEsperarAsignacion;
+window.mkRenderEsperandoCobro   = mkRenderEsperandoCobro;
+window.mkQuitarEsperaCobro      = mkQuitarEsperaCobro;
+window.mkActualizarAsignarOpciones = mkActualizarAsignarOpciones;
+window.mkAsignarAlCobroById     = mkAsignarAlCobroById;
+window.mkAsignarAlCobro         = mkAsignarAlCobro;
+
+// ── Modal "Agregar producto al ticket" ─────────────────────────────────────
+// openAgregarProducto(idEspera, nombre, totalActual)
+// Abre el modal agregarProductoModal y carga los productos del catálogo SIRA.
+// Reutiliza window._productosMarca (mismo cache que Venta Directa).
+// Al confirmar llama registrarVentaProductos con idEspera para asociar al ticket.
+
+window._apIdEspera  = '';
+window._apNombre    = '';
+window._apItems     = [];   // [{nombre, precio, cantidad}]
+
+function openAgregarProducto(idEspera, nombre, totalActual) {
+  window._apIdEspera = idEspera || '';
+  window._apNombre   = nombre   || '';
+  window._apItems    = [];
+
+  var el = document.getElementById('apClienteName');
+  if (el) el.textContent = nombre || '';
+
+  var search = document.getElementById('apSearch');
+  if (search) search.value = '';
+
+  _apRenderTicket();
+
+  // Cargar productos si no están en cache
+  if (!window._productosMarca || window._productosMarca.length === 0) {
+    var SIRA_URL   = window.SIRA_URL   || '';
+    var SIRA_TOKEN = window.SIRA_TOKEN || '';
+    if (SIRA_URL) {
+      fetch(SIRA_URL + '?action=getProductos&token=' + SIRA_TOKEN + '&_t=' + Date.now())
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          window._productosMarca = (d && d.productos) ? d.productos : [];
+          _apRenderLista('');
+        })
+        .catch(function(){ _apRenderLista(''); });
+    }
+  }
+  _apRenderLista('');
+
+  var modal = document.getElementById('agregarProductoModal');
+  if (modal) modal.classList.add('active');
+}
+window.openAgregarProducto = openAgregarProducto;
+
+function filtrarProductosAP() {
+  var q = (document.getElementById('apSearch') && document.getElementById('apSearch').value) || '';
+  _apRenderLista(q);
+}
+window.filtrarProductosAP = filtrarProductosAP;
+
+function _apRenderLista(query) {
+  var list = document.getElementById('apProductList');
+  if (!list) return;
+  var productos = window._productosMarca || [];
+  var q = (query || '').toLowerCase().trim();
+  var filtrados = q ? productos.filter(function(p){ return p.nombre.toLowerCase().includes(q); }) : productos;
+
+  if (!filtrados.length) {
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-faint);font-size:13px;">'
+      + (productos.length === 0 ? 'Cargando productos...' : 'Sin resultados') + '</div>';
+    return;
+  }
+
+  list.innerHTML = filtrados.map(function(p) {
+    var inTicket = window._apItems.find(function(i){ return i.nombre === p.nombre; });
+    return '<div onclick="apToggleProducto('' + p.nombre.replace(/'/g, "\'") + '',' + (p.precio||0) + ')" '
+      + 'style="display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;">'
+      + '<div>'
+        + '<div style="font-size:13px;font-weight:700;">' + p.nombre + '</div>'
+        + '<div style="font-size:11px;color:var(--ink-soft);">$' + (p.precio||0).toFixed(2) + '</div>'
+      + '</div>'
+      + '<div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;'
+        + (inTicket ? 'background:var(--success);color:white;' : 'background:var(--line);color:var(--ink-soft);') + '">'
+        + (inTicket ? '✓' : '+') + '</div>'
+      + '</div>';
+  }).join('');
+}
+window._apRenderLista = _apRenderLista;
+
+function apToggleProducto(nombre, precio) {
+  var idx = window._apItems.findIndex(function(i){ return i.nombre === nombre; });
+  if (idx >= 0) {
+    window._apItems.splice(idx, 1);
+  } else {
+    window._apItems.push({ nombre: nombre, precio: precio || 0, cantidad: 1 });
+  }
+  var q = document.getElementById('apSearch') ? document.getElementById('apSearch').value : '';
+  _apRenderLista(q);
+  _apRenderTicket();
+}
+window.apToggleProducto = apToggleProducto;
+
+function _apRenderTicket() {
+  var container = document.getElementById('apTicketItems');
+  var ticketList = document.getElementById('apTicketList');
+  var totalEl    = document.getElementById('apTicketTotal');
+  if (!container || !ticketList) return;
+
+  if (!window._apItems || window._apItems.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'block';
+
+  var total = 0;
+  ticketList.innerHTML = window._apItems.map(function(item, idx) {
+    var sub = item.precio * (item.cantidad || 1);
+    total += sub;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line);">'
+      + '<div style="flex:1;">'
+        + '<div style="font-size:12px;font-weight:700;">' + item.nombre + '</div>'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
+          + '<button onclick="apCambiarCantidad(' + idx + ',-1)" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>'
+          + '<span style="font-size:12px;font-weight:700;">' + (item.cantidad||1) + '</span>'
+          + '<button onclick="apCambiarCantidad(' + idx + ',1)" style="width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>'
+        + '</div>'
+      + '</div>'
+      + '<div style="font-size:13px;font-weight:800;color:var(--success);">$' + sub.toFixed(2) + '</div>'
+      + '</div>';
+  }).join('');
+
+  if (totalEl) totalEl.textContent = '$' + total.toFixed(2);
+}
+
+function apCambiarCantidad(idx, delta) {
+  if (!window._apItems[idx]) return;
+  window._apItems[idx].cantidad = Math.max(1, (window._apItems[idx].cantidad || 1) + delta);
+  _apRenderTicket();
+}
+window.apCambiarCantidad = apCambiarCantidad;
+
+async function confirmarProductosTicket() {
+  if (!window._apItems || window._apItems.length === 0) {
+    if (typeof showToast === 'function') showToast('⚠ No hay productos en el ticket');
+    return;
+  }
+  var idEspera = window._apIdEspera || '';
+  var nombre   = window._apNombre   || 'Clienta';
+  var total    = window._apItems.reduce(function(s, i){ return s + i.precio * (i.cantidad||1); }, 0);
+  var productos = window._apItems.map(function(i){ return { nombre: i.nombre, precio: i.precio, cantidad: i.cantidad||1, subtotal: i.precio*(i.cantidad||1) }; });
+
+  try {
+    if (typeof showToast === 'function') showToast('⏳ Registrando productos...');
+    await apiPost('registrarVentaProductos', {
+      idEspera: idEspera,
+      clienteNombre: nombre,
+      productos: productos,
+      total: total,
+      esVentaDirecta: false,
+      metodoPago: 'Producto'
+    });
+
+    // Actualizar la línea visual del ticket en Por Cobrar
+    var ticketEl = document.getElementById('productos-ticket-' + idEspera);
+    if (ticketEl) {
+      ticketEl.innerHTML = '<div style="background:var(--success-bg);border-radius:10px;padding:8px 12px;margin-top:4px;">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--success);margin-bottom:4px;">+ PRODUCTOS AGREGADOS</div>'
+        + productos.map(function(p){ return '<div style="font-size:12px;">• ' + p.nombre + ' x' + p.cantidad + ' — $' + p.subtotal.toFixed(2) + '</div>'; }).join('')
+        + '<div style="font-size:12px;font-weight:800;color:var(--success);margin-top:4px;">Total productos: $' + total.toFixed(2) + '</div>'
+        + '</div>';
+    }
+
+    if (typeof showToast === 'function') showToast('✅ Productos agregados al ticket de ' + nombre);
+    var modal = document.getElementById('agregarProductoModal');
+    if (modal) modal.classList.remove('active');
+    window._apItems = [];
+
+  } catch(e) {
+    console.error('confirmarProductosTicket:', e);
+    if (typeof showToast === 'function') showToast('⚠ Error al registrar productos');
+  }
+}
+window.confirmarProductosTicket = confirmarProductosTicket;
+
 /* ========== /INFORME DE SERVICIOS ========== */
