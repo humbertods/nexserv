@@ -1673,6 +1673,8 @@
   // === RETIRO GRATIS / $10 ===
 
   async function loadStaffHome() {
+    // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
+    if (window._siraActivo || window._resumenBackup) return;
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
     
@@ -4081,10 +4083,13 @@
     if (!user) return;
     var screen = document.getElementById('staffHome');
     if (!screen) return;
+    // Guardar nav antes de reemplazar
     var navEl = screen.querySelector('nav.nav');
     var navHtml = navEl ? navEl.outerHTML : '';
     window._siraBackup = screen.innerHTML;
     window._siraScreenId = 'staffHome';
+    // Marcar que SIRA está activo para que loadStaffHome no crashee
+    window._siraActivo = true;
     var area = String(user.area || '').toLowerCase();
     var esPestanas = area.indexOf('pest') >= 0;
     screen.innerHTML =
@@ -4096,26 +4101,32 @@
   };
 
   function _siraRenderSecciones(esPestanas) {
-    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
-    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
-    var SVG_B = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M20 3H4l2 10.5V20H6a1 1 0 0 0 0 2h12a1 1 0 0 0 0-2h-.5v-6.5L20 3Zm-2.24 2-1.14 6H7.38L6.24 5h11.52Z"/></svg>';
-    var SVG_K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" style="flex-shrink:0;"><path d="M20 6h-2.18c.07-.31.18-.62.18-1a3 3 0 0 0-3-3 2.9 2.9 0 0 0-2 .78L12 3.5l-1-.72A2.9 2.9 0 0 0 9 2a3 3 0 0 0-3 3c0 .38.11.69.18 1H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2ZM9 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2ZM4 19V8h7v11H4Zm9 0V8h7v11h-7Z"/></svg>';
-    function btn(svg, label, tipo, bg) {
-      return '<button onclick="_siraAccion(\"' + tipo + '\")" style="width:100%;padding:14px 16px;background:' + bg + ';border:none;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:#fff;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1);">' + svg + '<span>' + label + '</span></button>';
+    // SVGs grandes para las cards
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_B = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M18.5 3h-13L3 14.5V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5.5L18.5 3Zm-1.74 3-1.5 7H8.74l-1.5-7h9.52ZM5 20v-4.5l.5-2.5h13l.5 2.5V20H5Z"/></svg>';
+    var SVG_K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5ZM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
+
+    function card(svg, titulo, desc, tipo, bgCard, colorIcon) {
+      return '<button onclick="_siraAccion(\"' + tipo + '\")" style="'
+        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
+        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
+        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
+        + '</button>';
     }
-    var CARD = 'background:var(--bg-card,#fff);border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);';
-    var html = '<div style="' + CARD + '">'
-      + '<div style="padding:11px 16px;font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line,#eee);">Movimientos</div>'
-      + btn(SVG_E, 'Registrar Entrada', 'entrada', '#2d6a4f')
-      + btn(SVG_S, 'Registrar Salida',  'salida',  '#1a1a1a')
-      + btn(SVG_B, 'Registrar Bebida',  'bebida',  '#8b7355')
-      + '</div>';
+
+    var html =
+      card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',      'entrada', '#edf7f1', '#2d6a4f')
+      + card(SVG_S, 'Registrar Salida', 'Usé un producto en un servicio',        'salida',  '#f5f0e8', '#8b7355')
+      + card(SVG_B, 'Registrar Bebida', 'Café o té servido a una clienta',       'bebida',  '#fdf8ed', '#a07830');
+
     if (esPestanas) {
-      html += '<div style="' + CARD + '">'
-        + '<div style="padding:11px 16px;font-size:10px;font-weight:800;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--line,#eee);">Pestañas</div>'
-        + btn(SVG_K, 'Registrar Kit de Pestañas', 'kit', '#7c3aed')
-        + '</div>';
+      html += card(SVG_K, 'Kit Lashista', 'Frasco + Funda + Tarjeta pestaña', 'kit', '#eef2ff', '#5b4fd4');
     }
+
     return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>';
   }
 
@@ -4162,5 +4173,9 @@
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
-    if (screen && window._siraBackup) { screen.innerHTML = window._siraBackup; window._siraBackup = null; }
+    if (screen && window._siraBackup) {
+      screen.innerHTML = window._siraBackup;
+      window._siraBackup = null;
+      window._siraActivo = false;
+    }
   };
