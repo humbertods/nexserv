@@ -2,6 +2,18 @@
 <html lang="es">
 <head>
   <!-- Service Worker registration → js/app.js -->
+  <script>
+    // Limpiar cache del Service Worker para forzar archivos frescos
+    if ('serviceWorker' in navigator && 'caches' in window) {
+      caches.keys().then(function(names) {
+        names.forEach(function(name) {
+          if (name.indexOf('firebase') === -1) { // mantener FCM
+            caches.delete(name);
+          }
+        });
+      });
+    }
+  </script>
 <meta charset="UTF-8">
 <!-- NexServ v96 - Módulo Asistencia y Permisos + AUTH interceptor (24/06/2026) -->
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
