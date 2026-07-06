@@ -2020,10 +2020,10 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff)" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.)" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
@@ -3291,8 +3291,6 @@
   window.synaAbrirEmbed = synaAbrirEmbed;
 
   async function loadMikaelaHome() {
-    // Guard: si el inventario admin está abierto, no sobreescribir los elementos del DOM
-    if (window._siraActivo && window._siraAdminBackup) return;
     loadCajaChica();
     loadPrelista();
     const priBadge = {
@@ -3387,26 +3385,51 @@
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
             const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
-            const reassignHTML = `
-              <div style="margin-top:8px;">
-                <select id="reSel_${_uid}" onchange="document.getElementById('reBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
-                  ${_staffOpcionesReasignar(_pendKey, busyStaff)}
-                </select>
-                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''})" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
-              </div>
-              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe})" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
+            const reassignHTML = (() => {
+              const selId   = 'reSel_'    + _uid;
+              const btnId   = 'reBtn_'    + _uid;
+              const retId   = 'retirar_'  + _uid;
+              return '<div style="margin-top:8px;">'
+                + '<select id="' + selId + '" data-btnid="' + btnId + '" data-action="toggleReasignar" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">'
+                + _staffOpcionesReasignar(_pendKey, busyStaff)
+                + '</select>'
+                + '<button id="' + btnId + '"'
+                + ' data-action="reasignar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-area-idx="' + (_areaIdxAttr||'') + '"'
+                + ' data-sel-id="' + selId + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
+                + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>'
+                + '</div>'
+                + '<button id="' + retId + '"'
+                + ' data-action="retirar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>';
+            })();
             // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
             // así que se asigna staff directo con el mismo dropdown que usa multi-área
             // (no hace falta re-elegir el servicio). Si igual quiere cambiarlo, abajo
             // quedan los botones Servicio/Promo. ──
-            const _syncAssignHTML = `
-              <div style="margin-top:10px;">
-                <div style="font-size:11px;color:var(--ink-soft);font-weight:700;margin-bottom:5px;">👤 Asignar a la chica:</div>
-                <select id="syncSel_${_uid}" onchange="document.getElementById('syncBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
-                  ${_staffOpcionesReasignar(_pendKey, busyStaff)}
-                </select>
-                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''})" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
-              </div>`;
+            const _syncAssignHTML = (() => {
+              const selId = 'syncSel_' + _uid;
+              const btnId = 'syncBtn_' + _uid;
+              return '<div style="margin-top:10px;">'
+                + '<div style="font-size:11px;color:var(--ink-soft);font-weight:700;margin-bottom:5px;">👤 Asignar a la chica:</div>'
+                + '<select id="' + selId + '" data-btnid="' + btnId + '" data-action="toggleReasignar" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">'
+                + _staffOpcionesReasignar(_pendKey, busyStaff)
+                + '</select>'
+                + '<button id="' + btnId + '"'
+                + ' data-action="reasignar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-area-idx=""'
+                + ' data-sel-id="' + selId + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
+                + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>'
+                + '</div>';
+            })();
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
               ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
@@ -3426,8 +3449,8 @@
                 ${hechasHTML}
                 ${reassignHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
-                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre})" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
-                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre})" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
+                  <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
+                  <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
                 </div>
               </div>`;
             }
@@ -3445,11 +3468,48 @@
               ${estadoHTML}
               ${_desgloseMultiHTML}
               ${_esMultiPromo ? reassignHTML : `${esSyna ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
-                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre})" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
-                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre})" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+                <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
               </div>`}
             </div>`;
           }).join('');
+          // ── Event delegation para botones de reasignación (sin onclick inline) ──
+          const _esperaListEl = document.getElementById('mkEsperaList');
+          if (_esperaListEl && !_esperaListEl._reasignarBound) {
+            _esperaListEl._reasignarBound = true;
+            _esperaListEl.addEventListener('change', function(e) {
+              const sel = e.target;
+              if (!sel || sel.getAttribute('data-action') !== 'toggleReasignar') return;
+              const btnId = sel.getAttribute('data-btnid');
+              const btn = document.getElementById(btnId);
+              if (btn) btn.style.display = sel.value ? 'block' : 'none';
+            });
+            _esperaListEl.addEventListener('click', function(e) {
+              const btn = e.target.closest('button[data-action]');
+              if (!btn) return;
+              const action = btn.getAttribute('data-action');
+              if (action === 'reasignar') {
+                const idEspera = btn.getAttribute('data-id-espera') || '';
+                const areaIdx  = btn.getAttribute('data-area-idx')  || '';
+                const selId    = btn.getAttribute('data-sel-id')    || '';
+                const nombre   = btn.getAttribute('data-nombre')    || '';
+                const codigo   = btn.getAttribute('data-codigo')    || '';
+                reasignarStaff(idEspera, areaIdx, selId, nombre, codigo);
+              } else if (action === 'retirar') {
+                const idEspera = btn.getAttribute('data-id-espera') || '';
+                const nombre   = btn.getAttribute('data-nombre')    || '';
+                retirarYCobrar(idEspera, nombre);
+              } else if (action === 'asignarServicio') {
+                const codigo = btn.getAttribute('data-codigo') || '';
+                const nombre = btn.getAttribute('data-nombre') || '';
+                openAssignServiceModal(codigo, nombre);
+              } else if (action === 'asignarPromo') {
+                const codigo = btn.getAttribute('data-codigo') || '';
+                const nombre = btn.getAttribute('data-nombre') || '';
+                openAssignPromoModal(codigo, nombre);
+              }
+            });
+          }
         }
 
         // En atención — fichas en vivo con historial de áreas
@@ -3644,11 +3704,11 @@
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                     data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc})"
+                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}\")"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
-                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'})"
+                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}\")"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
-                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")})"
+                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}\")"
                     style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
                 </div>
               </div>
@@ -3995,50 +4055,69 @@
   }
 
     async function renderAuthorizations() {
-    // Guard: si el inventario admin está activo los elementos del DOM no existen
-    if (window._siraActivo && window._siraAdminBackup) return;
-    const authSection = document.getElementById('authorizationsSection');
-    const authList    = document.getElementById('authorizationsList');
-    const authCount   = document.getElementById('authCount');
-    if (!authSection || !authList || !authCount) return;
+    console.log('🔍 renderAuthorizations called');
     try {
+      // Cargar autorizaciones desde el backend
+      console.log('📡 Calling apiGet(getAutorizaciones)...');
       const result = await apiGet('getAutorizaciones');
+      
+      console.log('📥 Backend response:', result);
+      
       if (!result.success) {
-        authSection.style.display = 'none';
+        console.error('❌ Error cargando autorizaciones:', result.message);
+        document.getElementById('authorizationsSection').style.display = 'none';
         return;
       }
+      
       const requests = result.autorizaciones || [];
+      console.log('📋 Total autorizaciones recibidas:', requests.length);
+      console.log('📋 Autorizaciones:', requests);
+      
+      // Mikaela solo ve los PENDIENTES para aprobar/rechazar
       const pendingRequests = requests.filter(r => r.estado === 'pendiente');
+      console.log('⏳ Autorizaciones PENDIENTES:', pendingRequests.length);
+      console.log('⏳ Pendientes:', pendingRequests);
+      
+      const authSection = document.getElementById('authorizationsSection');
+      const authList = document.getElementById('authorizationsList');
+      const authCount = document.getElementById('authCount');
+      
       if (pendingRequests.length === 0) {
         authSection.style.display = 'none';
         return;
       }
+      
       authSection.style.display = 'block';
       authCount.textContent = pendingRequests.length;
       
-      authList.innerHTML = pendingRequests.map((req) => {
-        const _esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        const idSafe = String(req.id||'').replace(/[^A-Za-z0-9_\-]/g,'');
-        return '<div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">'
-          + '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">'
-          + '<div><div style="font-size: 16px; font-weight: 800; color: #856404;">' + _esc(req.clienteNombre) + '</div>'
-          + '<div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>' + _esc(req.staffNombre) + '</strong> · ' + _esc(req.fecha) + '</div></div>'
-          + '<div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div></div>'
-          + '<div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">'
-          + '<div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">' + _esc(req.servicioNombre) + '</div>'
-          + '<div style="font-size: 11px; color: #666; margin-bottom: 6px;">' + _esc(req.servicioArea) + ' · <strong style="font-size: 14px; color: #28a745;">$' + _esc(req.servicioPrecio) + '</strong></div>'
-          + '<div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">'
-          + '<div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">&#x1F4AC; NOTA DEL STAFF:</div>'
-          + '<div style="font-size: 11px; color: #333; font-style: italic;">&quot;' + (_esc(req.nota) || 'Sin nota') + '&quot;</div>'
-          + '</div></div>'
-          + '<div style="display: flex; gap: 8px;">'
-          + '<button onclick="approveAuthorization(\'' + idSafe + '\')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">&#10003; Aprobar</button>'
-          + '<button onclick="rejectAuthorization(\'' + idSafe + '\')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">&#10005; Rechazar</button>'
-          + '</div></div>';
-      }).join('');
+      authList.innerHTML = pendingRequests.map((req, idx) => `
+        <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.clienteNombre}</div>
+              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.staffNombre}</strong> · ${req.fecha}</div>
+            </div>
+            <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
+          </div>
+          
+          <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.servicioNombre}</div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.servicioArea} · <strong style="font-size: 14px; color: #28a745;">$${req.servicioPrecio}</strong></div>
+            <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
+              <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
+              <div style="font-size: 11px; color: #333; font-style: italic;">"${req.nota || 'Sin nota'}"</div>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <button onclick="approveAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button onclick="rejectAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+          </div>
+        </div>
+      `).join('');
     } catch (err) {
       console.error('Error rendering authorizations:', err);
-      if(document.getElementById('authorizationsSection')) document.getElementById('authorizationsSection').style.display = 'none';
+      document.getElementById('authorizationsSection').style.display = 'none';
     }
   }
   
@@ -4091,13 +4170,7 @@
       + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
       + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
-      + '<div style="margin-top:24px;padding-bottom:90px;">'
-      + '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Mis movimientos de hoy</div>'
-      + '<div id="siraStaffMovsHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
-      + '</div>'
       + navHtml;
-    // Cargar historial del día para esta staff
-    setTimeout(function(){ if(typeof _siraStaffCargarMovsHoy==='function') _siraStaffCargarMovsHoy(); }, 100);
   };
 
   function _siraRenderSecciones(esPestanas) {
@@ -4244,23 +4317,22 @@
       html += '<input type="hidden" id="siraProducto" value="">';
       html += '</div>';
 
-      // Cantidad (input numérico) + Área (select) — fila única
-      html += '<div style="margin-bottom:14px;">';
-      html += '<div style="display:flex;gap:10px;align-items:flex-end;">';
-      // Columna cantidad
-      html += '<div style="display:flex;flex-direction:column;gap:6px;">';
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Cantidad</div>';
-      html += '<input type="number" id="siraCantidad" value="1" min="1" oninput="this.value=Math.max(1,parseInt(this.value)||1)" style="width:80px;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);text-align:center;box-sizing:border-box;-moz-appearance:textfield;">';
-      html += '</div>';
-      // Columna área
-      html += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Área</div>';
-      html += '<select id="siraArea" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
-      html += '<option value="">Seleccionar área…</option>';
-      areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
-      html += '</select>';
-      html += '</div>';
+      // Cantidad con +/-
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>';
+      html += '<div style="display:flex;gap:10px;align-items:center;">';
+      html += '<button onclick="_siraCambiarCantidad(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">−</button>';
+      html += '<div id="siraCantidadVal" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--ink);">1</div>';
+      html += '<input type="hidden" id="siraCantidad" value="1">';
+      html += '<button onclick="_siraCambiarCantidad(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">+</button>';
       html += '</div></div>';
+
+      // Área
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Área</div>';
+      html += '<select id="siraArea" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
+      html += '</select></div>';
 
       // Responsable (auto)
       html += '<div style="margin-bottom:14px;">';
@@ -4273,7 +4345,7 @@
     }
 
     // Cancelar
-    html += '<button onclick="_siraAccion(\\"' + tipo + ')" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '<button onclick="_siraAccion(\\"' + tipo + '\\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
     html += '</div>';
     panel.innerHTML = html;
 
@@ -4370,7 +4442,7 @@
     }
 
     producto   = (document.getElementById('siraProducto')?.value || '').trim();
-    cantidad   = Math.max(1, parseInt(document.getElementById('siraCantidad')?.value || '1', 10));
+    cantidad   = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
     area       = (document.getElementById('siraArea')?.value || (user ? user.area : '')).trim();
     responsable= (document.getElementById('siraResponsable')?.value || (user ? user.name : 'Staff')).trim();
 
@@ -4378,7 +4450,7 @@
       if (!producto) { if (typeof showToast==='function') showToast('Selecciona un combo'); return; }
       var btn2b = document.getElementById('siraEnviarBtn');
       if (btn2b) { btn2b.textContent='Registrando…'; btn2b.disabled=true; }
-      var COMBOS_MAP = {'Capuccino frío':['Capuccino frío','Servilleta logo','Galleta'],'Capuccino caliente':['Capuccino caliente','Servilleta logo','Galleta'],'Café negro':['Café negro','Servilleta logo','Galleta'],'Té de manzanilla c/m':['Té de manzanilla c/m','Servilleta logo','Galleta'],'Té de manzanilla':['Té de manzanilla','Servilleta logo','Galleta'],'Té de anís':['Té de anis','Servilleta logo','Galleta'],'Té de frutos rojos':['Té de frutos rojos','Servilleta logo','Galleta'],'Té de frutos rojos c/J':['Té de frutos rojos c/J','Servilleta logo','Galleta'],'Té relajante':['Té relajante','Servilleta logo','Galleta'],'Té de manzana con canela':['Té de manzana con canela','Servilleta logo','Galleta'],'Té de hierva luisa':['Té de hierva luisa','Servilleta logo','Galleta'],'Té de jamaica':['Té de jamaica','Servilleta logo','Galleta'],'Champagne':['Champagne','Servilleta logo','Galleta'],'Vino tinto':['Vino tinto','Servilleta logo','Galleta'],'Vino rosado':['Vino rosado','Servilleta logo','Galleta']};
+      var COMBOS_MAP = {'Capuccino frío':['Capuccino frio','Servilleta logo','Galleta'],'Capuccino caliente':['Capuccino caliente','Servilleta logo','Galleta'],'Café negro':['Cafe negro','Servilleta logo','Galleta'],'Té de manzanilla c/m':['Te de manzanilla c/m','Servilleta logo','Galleta'],'Té de manzanilla':['Te de manzanilla','Servilleta logo','Galleta'],'Té de anís':['Te de anis','Servilleta logo','Galleta'],'Té de frutos rojos':['Te de frutos rojos','Servilleta logo','Galleta'],'Té de frutos rojos c/J':['Te de frutos rojos c/J','Servilleta logo','Galleta'],'Té relajante':['Te relajante','Servilleta logo','Galleta'],'Té de manzana con canela':['Te de manzana con canela','Servilleta logo','Galleta'],'Té de hierva luisa':['Te de hierva luisa','Servilleta logo','Galleta'],'Té de jamaica':['Te de jamaica','Servilleta logo','Galleta'],'Champagne':['Champagne','Servilleta logo','Galleta'],'Vino tinto':['Vino tinto','Servilleta logo','Galleta'],'Vino rosado':['Vino rosado','Servilleta logo','Galleta']};
       var staffNomB = user ? user.name : 'Staff';
       var grupoB = staffNomB.replace(/ /g,'_') + '_combo_' + Date.now();
       var nowB = new Date();
@@ -4398,11 +4470,8 @@
         if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
         window._siraProductos = null;
       } else {
-        // Siempre restaurar el botón para que se pueda reintentar
         if (btn2b) { btn2b.textContent='Confirmar combo'; btn2b.disabled=false; btn2b.style.opacity='1'; }
-        var errMsg = (rb && rb.error) ? rb.error : (rb && rb.message) ? rb.message : 'Sin respuesta del servidor';
-        if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
-        console.error('[SIRA bebida] Error batch:', rb);
+        if (typeof showToast==='function') showToast('⚠ ' + ((rb&&rb.error)||'Error al registrar'));
       }
       return;
     }
@@ -4443,487 +4512,5 @@
       screen.innerHTML = window._siraBackup;
       window._siraBackup = null;
       window._siraActivo = false;
-    }
-  };
-
-  // ── MÓDULO INVENTARIO ADMIN (Mikaela) ──────────────────────────────────────
-  window.abrirInventarioAdmin = function() {
-    var screen = document.getElementById('mikaelaHome');
-    if (!screen) return;
-    if (window._siraActivo) return;
-    window._siraAdminBackup = screen.innerHTML;
-    window._siraActivo = true;
-
-    var navHtml = '';
-
-    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
-    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
-    var SVG_LIST = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM4 5h16V4H4v1Zm2-3h12V1H6v1ZM12 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>';
-    var SVG_G = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Zm10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
-
-    function card(svg, titulo, desc, tipo, bgCard, colorIcon) {
-      return '<button data-siraadmin="' + tipo + '" onclick="_siraAdminAccion(this.dataset.siraadmin)" style="'
-        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
-        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
-        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
-        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
-        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
-        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
-        + '</button>';
-    }
-
-    var cardsHtml =
-        card(SVG_E,    'Registrar Entrada',  'Llegó material o producto nuevo',    'entrada',    '#edf7f1', '#2d6a4f')
-      + card(SVG_S,    'Registrar Salida',   'Usé un producto en un servicio',     'salida',     '#f5f0e8', '#8b7355')
-      + card(SVG_LIST, 'Ver Inventario',     'Lista completa de productos SIRA',   'inventario', '#e8f0fe', '#1a56db')
-      + card(SVG_G,    'Gastos Varios',      'Envíos, reparaciones u otros gastos','gastos',     '#fdf3f3', '#c0392b');
-
-    screen.innerHTML =
-      '<button class="back-btn" onclick="cerrarInventarioAdmin()">← Mi panel</button>'
-      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
-      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
-      + '<div id="siraAdminContent">' + cardsHtml + '</div>'
-      + '<div id="siraAdminFormContainer" style="padding-bottom:90px;"></div>'
-      + navHtml;
-  };
-
-  window.cerrarInventarioAdmin = function() {
-    var screen = document.getElementById('mikaelaHome');
-    if (screen && window._siraAdminBackup) {
-      screen.innerHTML = window._siraAdminBackup;
-      window._siraAdminBackup = null;
-      window._siraActivo = false;
-    }
-  };
-
-  window._siraAdminAccion = function(tipo) {
-    var user = window.currentUser;
-    var responsable = user ? user.name : 'Mikaela';
-    var container = document.getElementById('siraAdminFormContainer');
-    if (!container) return;
-
-    // Ocultar cards y mostrar formulario
-    var cardsEl = document.getElementById('siraAdminContent');
-    if (cardsEl) cardsEl.style.display = 'none';
-
-    if (tipo === 'inventario') {
-      _siraAdminMostrarInventario(container, responsable);
-      return;
-    }
-    if (tipo === 'gastos') {
-      _siraAdminMostrarGastos(container, responsable);
-      return;
-    }
-    // entrada / salida — reutilizar el mismo renderizador de staff
-    _siraAdminMostrarForm(tipo, container, responsable);
-  };
-
-  // -- Formulario entrada/salida para admin (mismo que staff) --
-  function _siraAdminMostrarForm(tipo, container, responsable) {
-    var colores = SIRA_COLORS[tipo] || SIRA_COLORS.salida;
-    var titulo = tipo === 'entrada' ? 'Registrar Entrada' : 'Registrar Salida';
-    var areas = ['Cejas','Pestañas','Facial','Coffee','Local','Depilaciones','Limpieza'];
-
-    var html = '<div id="siraAdminPanel_' + tipo + '" style="background:' + colores.bg + ';border-radius:18px;padding:20px;margin-bottom:12px;">'
-      + '<div style="font-size:17px;font-weight:800;color:' + colores.color + ';margin-bottom:16px;">' + titulo + '</div>';
-
-    // Buscador de productos
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>';
-    html += '<input type="text" id="siraAdminSearch_' + tipo + '" placeholder="Buscar producto..." oninput="_siraAdminFiltrar(\'' + tipo + '\')" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
-    html += '<div id="siraAdminSugg_' + tipo + '" style="background:var(--bg-card,#fff);border-radius:12px;margin-top:4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>';
-    html += '</div>';
-
-    // Cantidad + Área en fila única
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="display:flex;gap:10px;align-items:flex-end;">';
-    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Cantidad</div>';
-    html += '<input type="number" id="siraAdminCantidad_' + tipo + '" value="1" min="1" oninput="this.value=Math.max(1,parseInt(this.value)||1)" style="width:80px;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);text-align:center;box-sizing:border-box;-moz-appearance:textfield;">';
-    html += '</div>';
-    html += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Área</div>';
-    html += '<select id="siraAdminArea_' + tipo + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
-    html += '<option value="">Seleccionar área…</option>';
-    areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
-    html += '</select></div></div></div>';
-
-    // Responsable
-    html += '<div style="margin-bottom:16px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
-    html += '<input type="text" id="siraAdminResp_' + tipo + '" value="' + responsable + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
-    html += '</div>';
-
-    html += '<button id="siraAdminBtn_' + tipo + '" onclick="_siraAdminEnviar(\'' + tipo + '\')" style="width:100%;padding:15px;background:' + colores.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,100px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + tipo + '</button>';
-    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
-    html += '</div>';
-
-    container.innerHTML = html;
-    container.style.display = '';
-    _siraCargarProductos();
-  }
-
-  function _siraAdminFiltrar(tipo) {
-    var val = (document.getElementById('siraAdminSearch_' + tipo) || {}).value || '';
-    var sugg = document.getElementById('siraAdminSugg_' + tipo);
-    if (!sugg) return;
-    if (!val.trim()) { sugg.innerHTML = ''; return; }
-    var prods = window._siraProductos || [];
-    var norm = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    var matches = prods.filter(function(p){
-      return (p.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(norm) >= 0;
-    }).slice(0,6);
-    sugg.innerHTML = matches.map(function(p){
-      return '<div onclick="_siraAdminSelProd(\'' + tipo + '\',\'' + (p.nombre||'').replace(/'/g,"\\'") + '\')" style="padding:11px 14px;border-bottom:1px solid var(--line,#eee);cursor:pointer;font-size:14px;font-weight:600;">'
-        + p.nombre + ' <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">' + (p.area||'') + '</span></div>';
-    }).join('');
-  }
-
-  function _siraAdminSelProd(tipo, nombre) {
-    var inp = document.getElementById('siraAdminSearch_' + tipo);
-    if (inp) inp.value = nombre;
-    var sugg = document.getElementById('siraAdminSugg_' + tipo);
-    if (sugg) sugg.innerHTML = '';
-  }
-
-  async function _siraAdminEnviar(tipo) {
-    var producto  = (document.getElementById('siraAdminSearch_'   + tipo) || {}).value || '';
-    var cantidad  = Math.max(1, parseInt((document.getElementById('siraAdminCantidad_' + tipo) || {}).value || '1', 10));
-    var area      = ((document.getElementById('siraAdminArea_'    + tipo) || {}).value || '').trim();
-    var responsable = ((document.getElementById('siraAdminResp_'  + tipo) || {}).value || 'Mikaela').trim();
-    var btn = document.getElementById('siraAdminBtn_' + tipo);
-
-    if (!producto.trim()) { if (typeof showToast==='function') showToast('⚠ Selecciona un producto'); return; }
-    if (!area) { if (typeof showToast==='function') showToast('⚠ Selecciona un área'); return; }
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = 'Registrando…'; }
-
-    var r = await _siraPost('movimientoNexserv', { tipo: tipo, producto: producto, cantidad: cantidad, responsable: responsable, area: area, nota: 'Desde NexServ Admin' });
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Confirmar ' + tipo; }
-
-    if (r && (r.ok || r.success)) {
-      if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado (' + tipo + ')');
-      window._siraProductos = null;
-      _siraAdminVolver();
-    } else {
-      var errMsg = (r && r.error) ? r.error : 'Sin respuesta del servidor';
-      if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
-      console.error('[SIRA admin]', r);
-    }
-  }
-
-  function _siraAdminVolver() {
-    var container = document.getElementById('siraAdminFormContainer');
-    if (container) { container.innerHTML = ''; container.style.display = 'none'; }
-    var cardsEl = document.getElementById('siraAdminContent');
-    if (cardsEl) cardsEl.style.display = '';
-  }
-
-  // -- Ver Inventario: select desplegable + lista con fotos (diseño mockup) --
-  async function _siraAdminMostrarInventario(container, responsable) {
-    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Cargando inventario…</div>';
-    container.style.display = '';
-    // Forzar recarga para obtener stock actualizado
-    window._siraProductos = null;
-    await _siraCargarProductos();
-    var prods = window._siraProductos || [];
-    var areas = ['Todas las áreas'].concat([...new Set(prods.map(function(p){ return p.area||'Sin área'; }))].sort());
-
-    window._siraInvAreaActiva = '';
-    window._siraInvSearchVal = '';
-
-    var html = '<div style="padding-bottom:20px;">';
-
-    // Buscador con ícono lupa
-    html += '<div style="position:relative;margin-bottom:12px;">';
-    html += '<svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-soft)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>';
-    html += '<input type="text" id="siraInvSearch" placeholder="Buscar producto..." oninput="_siraAdminFiltrarInv()" style="width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--line,#eee);border-radius:var(--radius-pill,100px);font-family:inherit;font-size:14px;background:var(--bg-card,#fff);box-sizing:border-box;">';
-    html += '</div>';
-
-    // Select desplegable con flecha alineada a la derecha
-    html += '<div style="position:relative;margin-bottom:16px;">';
-    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 48px 14px 20px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;box-sizing:border-box;appearance:none;-webkit-appearance:none;">';
-    areas.forEach(function(a){
-      html += '<option value="' + (a === 'Todas las áreas' ? '' : a) + '">' + a + '</option>';
-    });
-    html += '</select>';
-    // Flecha SVG alineada a la derecha
-    html += '<svg style="position:absolute;right:18px;top:50%;transform:translateY(-50%);pointer-events:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M7 10l5 5 5-5z"/></svg>';
-    html += '</div>';
-
-    // Lista de productos
-    html += '<div id="siraInvLista">' + _siraAdminBuildListaProds(prods) + '</div>';
-
-    // ── Historial de movimientos de hoy ──────────────────────
-    html += '<div style="margin-top:28px;">';
-    html += '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Movimientos de hoy</div>';
-    html += '<div id="siraAdminMovsHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando…</div></div>';
-    html += '</div>';
-
-    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:16px;margin-bottom:20px;">← Volver</button>';
-    html += '</div>';
-
-    container.innerHTML = html;
-    // Cargar movimientos de hoy en paralelo
-    _siraAdminCargarMovsHoy(responsable);
-  }
-
-  function _siraAdminBuildListaProds(prods) {
-    if (!prods.length) return '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:14px;">Sin productos</div>';
-    return prods.map(function(p){
-      // Normalizar campo de stock (SIRA puede usar stockActual, stock_actual, stock, cantidad)
-      var stock = p.stockActual !== undefined ? p.stockActual
-                : p.stock_actual !== undefined ? p.stock_actual
-                : p.stock !== undefined ? p.stock
-                : p.cantidad !== undefined ? p.cantidad : 0;
-      stock = Number(stock) || 0;
-      var min = Number(p.stockMin || p.stock_min || p.minimo || 0);
-      var stockColor = stock <= min ? '#c0392b' : stock <= min * 2 ? '#e67e22' : '#27ae60';
-      var dot        = stockColor;
-      var fotoHtml = p.foto
-        ? '<img src="' + p.foto + '" style="width:44px;height:44px;border-radius:12px;object-fit:cover;flex-shrink:0;">'
-        : '<div style="width:44px;height:44px;border-radius:12px;background:var(--bg,#f8f8f6);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">📦</div>';
-      return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.05);">'
-        + fotoHtml
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
-        + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (p.area||'') + ' · ' + (p.unidad||'Unidad') + '</div>'
-        + '</div>'
-        + '<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;">'
-        + '<div style="font-size:22px;font-weight:800;color:' + stockColor + ';line-height:1;">' + stock + '</div>'
-        + '<div style="font-size:10px;color:var(--ink-faint);">unid.</div>'
-        + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';margin-top:2px;"></div>'
-        + '</div>'
-        + '</div>';
-    }).join('');
-  }
-
-  // ── Historial movimientos de hoy (admin/staff) ──────────────────────────
-  async function _siraAdminCargarMovsHoy(responsableActual) {
-    var el = document.getElementById('siraAdminMovsHoy');
-    if (!el) return;
-    try {
-      var r = await fetch(SIRA_URL + '?action=getMovimientos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
-      var data = await r.json();
-      var movs = (data.ok && data.movimientos) ? data.movimientos : [];
-      // Fecha de hoy en formato YYYY-MM-DD
-      var hoy = (function(){
-        var d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-      })();
-      // Filtrar por responsable y fecha hoy
-      var mios = movs.filter(function(m){
-        var resp = String(m.responsable || m.resp || '').trim();
-        var fecha = String(m.fecha || '').trim();
-        return resp === responsableActual && fecha === hoy;
-      }).reverse();
-      if (!mios.length) {
-        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
-        return;
-      }
-      el.innerHTML = mios.map(function(m){
-        var esEntrada = String(m.tipo||'').toLowerCase() === 'entrada';
-        var qty = Number(m.cantidad || m.cant || 1);
-        var prod = String(m.producto || m.nombreProducto || '');
-        var unidad = String(m.tipoUnidad || m.unidad || 'unid.');
-        var hora = String(m.hora || '');
-        var bgColor = esEntrada ? '#edf7f1' : '#f5f0e8';
-        var color   = esEntrada ? '#2d6a4f' : '#8b7355';
-        var icon    = esEntrada ? '📥' : '📤';
-        var qtyStr  = (esEntrada ? '+' : '−') + qty;
-        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);">'
-          + '<div style="width:40px;height:40px;border-radius:12px;background:' + bgColor + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + icon + '</div>'
-          + '<div style="flex:1;min-width:0;">'
-          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
-          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + qty + ' ' + unidad + (hora ? ' · ' + hora : '') + '</div>'
-          + '</div>'
-          + '<div style="font-size:18px;font-weight:800;color:' + color + ';flex-shrink:0;">' + qtyStr + '</div>'
-          + '</div>';
-      }).join('');
-    } catch(e) {
-      var el2 = document.getElementById('siraAdminMovsHoy');
-      if (el2) el2.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">No se pudo cargar</div>';
-    }
-  }
-
-  // Historial para staff (inyectado bajo los botones del hub SIRA)
-  async function _siraStaffCargarMovsHoy() {
-    var el = document.getElementById('siraStaffMovsHoy');
-    if (!el) return;
-    var user = window.currentUser;
-    var responsableActual = user ? user.name : '';
-    if (!responsableActual) return;
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Cargando…</div>';
-    try {
-      var r = await fetch(SIRA_URL + '?action=getMovimientos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
-      var data = await r.json();
-      var movs = (data.ok && data.movimientos) ? data.movimientos : [];
-      var hoy = (function(){
-        var d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-      })();
-      var mios = movs.filter(function(m){
-        var resp = String(m.responsable || m.resp || '').trim();
-        var fecha = String(m.fecha || '').trim();
-        return resp === responsableActual && fecha === hoy;
-      }).reverse();
-      if (!mios.length) {
-        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
-        return;
-      }
-      el.innerHTML = mios.map(function(m){
-        var esEntrada = String(m.tipo||'').toLowerCase() === 'entrada';
-        var qty = Number(m.cantidad || m.cant || 1);
-        var prod = String(m.producto || '');
-        var unidad = String(m.tipoUnidad || m.unidad || 'unid.');
-        var hora = String(m.hora || '');
-        var bgColor = esEntrada ? '#edf7f1' : '#f5f0e8';
-        var color   = esEntrada ? '#2d6a4f' : '#8b7355';
-        var icon    = esEntrada ? '📥' : '📤';
-        var qtyStr  = (esEntrada ? '+' : '−') + qty;
-        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);">'
-          + '<div style="width:40px;height:40px;border-radius:12px;background:' + bgColor + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + icon + '</div>'
-          + '<div style="flex:1;min-width:0;">'
-          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
-          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + qty + ' ' + unidad + (hora ? ' · ' + hora : '') + '</div>'
-          + '</div>'
-          + '<div style="font-size:18px;font-weight:800;color:' + color + ';flex-shrink:0;">' + qtyStr + '</div>'
-          + '</div>';
-      }).join('');
-    } catch(e) {
-      var el3 = document.getElementById('siraStaffMovsHoy');
-      if (el3) el3.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-faint);font-size:13px;">No se pudo cargar</div>';
-    }
-  }
-  window._siraStaffCargarMovsHoy = _siraStaffCargarMovsHoy;
-
-  window._siraAdminFiltrarInv = function(area) {
-    if (area !== undefined) window._siraInvAreaActiva = area;
-    var prods = window._siraProductos || [];
-    var searchVal = ((document.getElementById('siraInvSearch')||{}).value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    var filtrados = prods.filter(function(p){
-      var matchArea   = !window._siraInvAreaActiva || (p.area||'') === window._siraInvAreaActiva;
-      var matchSearch = !searchVal || (p.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(searchVal) >= 0;
-      return matchArea && matchSearch;
-    });
-    var lista = document.getElementById('siraInvLista');
-    if (lista) lista.innerHTML = _siraAdminBuildListaProds(filtrados);
-    // Sincronizar select si se llamó desde búsqueda
-    var sel = document.getElementById('siraInvAreaSelect');
-    if (sel && area !== undefined) sel.value = area || '';
-  };
-
-  // -- Gastos Varios para Mikaela --
-  function _siraAdminMostrarGastos(container, responsable) {
-    // Categorías exactas de SIRA con emojis
-    var CATEGORIAS_GASTO = [
-      { key: 'Envío',        emoji: '🚚' },
-      { key: 'Reparación',   emoji: '🔧' },
-      { key: 'Servicio',     emoji: '⚡' },
-      { key: 'Transporte',   emoji: '🚕' },
-      { key: 'Insumo extra', emoji: '🛒' },
-      { key: 'Otro',         emoji: '📎' }
-    ];
-
-    var html = '<div style="background:#fdf3f3;border-radius:18px;padding:20px;margin-bottom:12px;">';
-    html += '<div style="font-size:17px;font-weight:800;color:#c0392b;margin-bottom:16px;">Registrar Gasto Varios</div>';
-
-    // Categoría con emojis
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Categoría</div>';
-    html += '<select id="siraGastoCat" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
-    CATEGORIAS_GASTO.forEach(function(c){ html += '<option value="' + c.key + '">' + c.emoji + ' ' + c.key + '</option>'; });
-    html += '</select></div>';
-
-    // Descripción
-    html += '<div style="margin-bottom:14px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Descripción</div>';
-    html += '<input type="text" id="siraGastoDesc" placeholder="Ej: Envío de cera desde Quito" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
-    html += '</div>';
-
-    // Monto + Responsable en fila
-    html += '<div style="display:flex;gap:10px;margin-bottom:14px;">';
-    html += '<div style="flex:1;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Monto ($)</div>';
-    html += '<input type="number" id="siraGastoMonto" value="0.00" min="0" step="0.01" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);box-sizing:border-box;-moz-appearance:textfield;">';
-    html += '</div>';
-    html += '<div style="flex:1;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
-    html += '<select id="siraGastoResp" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
-    html += '<option value="Mikaela"' + (responsable === 'Mikaela' ? ' selected' : '') + '>Mikaela</option>';
-    html += '<option value="Humberto"' + (responsable === 'Humberto' ? ' selected' : '') + '>Humberto</option>';
-    html += '</select>';
-    html += '</div></div>';
-
-    // Notas
-    html += '<div style="margin-bottom:16px;">';
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Notas (opcional)</div>';
-    html += '<input type="text" id="siraGastoNota" placeholder="Detalle adicional" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
-    html += '</div>';
-
-    html += '<button id="siraGastoBtn" onclick="_siraAdminEnviarGasto()" style="width:100%;padding:15px;background:#c0392b;color:#fff;border:none;border-radius:var(--radius-pill,100px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar gasto</button>';
-    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
-    html += '</div>';
-
-    container.innerHTML = html;
-    container.style.display = '';
-  }
-
-  window._siraAdminEnviarGasto = async function() {
-    var cat         = ((document.getElementById('siraGastoCat')  ||{}).value||'Otro').trim();
-    var desc        = ((document.getElementById('siraGastoDesc') ||{}).value||'').trim();
-    var monto       = parseFloat((document.getElementById('siraGastoMonto')||{}).value||'0')||0;
-    var responsable = ((document.getElementById('siraGastoResp') ||{}).value||'Mikaela').trim();
-    var nota        = ((document.getElementById('siraGastoNota') ||{}).value||'').trim();
-    var btn = document.getElementById('siraGastoBtn');
-
-    if (!desc) { if (typeof showToast==='function') showToast('⚠ Agrega una descripción'); return; }
-    if (monto <= 0) { if (typeof showToast==='function') showToast('⚠ El monto debe ser mayor a 0'); return; }
-    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = 'Registrando…'; }
-
-    // Fecha y hora en formato requerido por SIRA
-    var now = new Date();
-    var fecha = now.getFullYear() + '-'
-      + String(now.getMonth()+1).padStart(2,'0') + '-'
-      + String(now.getDate()).padStart(2,'0');
-    var hora = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-
-    // Usar sessionToken del usuario (no el bridge token) — acción "gastoVarios"
-    var user = window.currentUser;
-    var sessionToken = (user && user.sessionToken) ? user.sessionToken : '';
-
-    var payload = {
-      action: 'gastoVarios',
-      sessionToken: sessionToken,
-      fecha: fecha,
-      hora: hora,
-      categoria: cat,
-      descripcion: desc,
-      monto: monto,
-      responsable: responsable,
-      notas: nota
-    };
-
-    // gastoVarios usa sessionToken → POST directo a SIRA_URL (no _siraPost que inyecta bridge token)
-    var r = null;
-    try {
-      var res = await fetch(SIRA_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
-      r = await res.json();
-    } catch(e) {
-      r = { ok: false, error: e.message };
-    }
-
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Confirmar gasto'; }
-
-    if (r && (r.ok || r.success)) {
-      if (typeof showToast==='function') showToast('✅ Gasto registrado: $' + monto.toFixed(2));
-      _siraAdminVolver();
-    } else {
-      var errMsg = (r && r.error) ? r.error : 'Sin respuesta del servidor';
-      if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
-      console.error('[SIRA gastos]', r);
     }
   };
