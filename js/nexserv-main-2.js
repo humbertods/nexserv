@@ -4111,7 +4111,7 @@
     var SVG_K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5ZM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
 
     function card(svg, titulo, desc, tipo, bgCard, colorIcon) {
-      return '<button onclick="_siraAccion(\"' + tipo + '\")" style="'
+      return '<button data-sira="' + tipo + '" onclick="_siraAccion(this.dataset.sira)" style="'
         + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
         + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
         + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
@@ -4141,7 +4141,7 @@
     kit:     { bg:'#eef2ff', color:'#5b4fd4', btnBg:'#5b4fd4' }
   };
 
-  window._siraAccion = function(tipo) {
+  window._siraAccion = function(tipo, srcBtn) {
     var panelId = 'siraPanel_' + tipo;
     var existing = document.getElementById(panelId);
 
@@ -4233,13 +4233,12 @@
     panel.innerHTML = contenido;
 
     // Insertar DEBAJO de la card tocada
-    var cardBtn = document.querySelector('[onclick*="_siraAccion(\"' + tipo + '\")"]');
+    var cardBtn = document.querySelector('[data-sira="' + tipo + '"]');
     if (cardBtn && cardBtn.parentNode) {
       cardBtn.parentNode.insertBefore(panel, cardBtn.nextSibling);
     } else {
       var fb = document.getElementById('siraFormContainer');
       if (fb) fb.appendChild(panel);
-    }
 
     // Animar apertura
     requestAnimationFrame(function() {
@@ -4318,3 +4317,4 @@
       window._siraActivo = false;
     }
   };
+}
