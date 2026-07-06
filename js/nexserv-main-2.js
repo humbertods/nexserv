@@ -3291,6 +3291,8 @@
   window.synaAbrirEmbed = synaAbrirEmbed;
 
   async function loadMikaelaHome() {
+    // Guard: si el inventario admin está abierto, no sobreescribir los elementos del DOM
+    if (window._siraActivo && window._siraAdminBackup) return;
     loadCajaChica();
     loadPrelista();
     const priBadge = {
@@ -4631,47 +4633,61 @@
     if (cardsEl) cardsEl.style.display = '';
   }
 
-  // -- Ver Inventario: lista de productos SIRA --
+  // -- Ver Inventario: select desplegable + lista con fotos (diseño mockup) --
   async function _siraAdminMostrarInventario(container, responsable) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Cargando inventario…</div>';
     container.style.display = '';
     await _siraCargarProductos();
     var prods = window._siraProductos || [];
-    var areas = [...new Set(prods.map(function(p){ return p.area||'Sin área'; }))].sort();
+    var areas = ['Todas las áreas'].concat([...new Set(prods.map(function(p){ return p.area||'Sin área'; }))].sort());
 
-    var html = '<div style="margin-bottom:12px;">';
-    html += '<input type="text" id="siraInvSearch" placeholder="Buscar producto..." oninput="_siraAdminFiltrarInv()" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    window._siraInvAreaActiva = '';
+    window._siraInvSearchVal = '';
+
+    var html = '<div style="padding-bottom:90px;">';
+
+    // Buscador con ícono lupa
+    html += '<div style="position:relative;margin-bottom:12px;">';
+    html += '<svg style="position:absolute;left:14px;top:50%;transform:translateY(-50%);pointer-events:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-soft)" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>';
+    html += '<input type="text" id="siraInvSearch" placeholder="Buscar producto..." oninput="_siraAdminFiltrarInv()" style="width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--line,#eee);border-radius:var(--radius-pill,100px);font-family:inherit;font-size:14px;background:var(--bg-card,#fff);box-sizing:border-box;">';
     html += '</div>';
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">';
-    html += '<button onclick="_siraAdminFiltrarInv(\'\')" style="padding:6px 14px;border-radius:100px;border:1.5px solid var(--line);background:var(--ink);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;" id="siraInvTabTodos">Todos</button>';
+
+    // Select desplegable de áreas
+    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 18px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;margin-bottom:16px;appearance:none;-webkit-appearance:none;background-image:url(\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22 fill=%22white%22><path d=%22M7 10l5 5 5-5z%22/></svg>\');background-repeat:no-repeat;background-position:right 16px center;box-sizing:border-box;">';
     areas.forEach(function(a){
-      html += '<button onclick="_siraAdminFiltrarInv(\'' + a + '\')" style="padding:6px 14px;border-radius:100px;border:1.5px solid var(--line);background:var(--bg-card);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;" class="siraInvTab">' + a + '</button>';
+      html += '<option value="' + (a === 'Todas las áreas' ? '' : a) + '">' + a + '</option>';
     });
+    html += '</select>';
+
+    // Lista de productos
+    html += '<div id="siraInvLista">' + _siraAdminBuildListaProds(prods) + '</div>';
+
+    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:8px;">← Volver</button>';
     html += '</div>';
-    html += '<div id="siraInvLista">';
-    html += _siraAdminBuildListaProds(prods);
-    html += '</div>';
-    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;padding-bottom:80px;">← Volver</button>';
 
     container.innerHTML = html;
-    window._siraInvAreaActiva = '';
   }
 
   function _siraAdminBuildListaProds(prods) {
-    if (!prods.length) return '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin productos</div>';
+    if (!prods.length) return '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:14px;">Sin productos</div>';
     return prods.map(function(p){
-      var stockColor = p.stockActual <= (p.stockMin||0) ? '#c0392b' : p.stockActual <= (p.stockMin||0)*2 ? '#e67e22' : '#2d6a4f';
-      var dot = p.stockActual <= (p.stockMin||0) ? '#c0392b' : p.stockActual <= (p.stockMin||0)*2 ? '#e67e22' : '#27ae60';
-      return '<div style="display:flex;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line,#eee);">'
-        + (p.foto ? '<img src="' + p.foto + '" style="width:36px;height:36px;border-radius:10px;object-fit:cover;margin-right:10px;flex-shrink:0;">' : '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg);margin-right:10px;flex-shrink:0;"></div>')
+      var stock = p.stockActual || 0;
+      var min   = p.stockMin || 0;
+      var stockColor = stock <= min ? '#c0392b' : stock <= min * 2 ? '#e67e22' : '#27ae60';
+      var dot        = stockColor;
+      var fotoHtml = p.foto
+        ? '<img src="' + p.foto + '" style="width:44px;height:44px;border-radius:12px;object-fit:cover;flex-shrink:0;">'
+        : '<div style="width:44px;height:44px;border-radius:12px;background:var(--bg,#f8f8f6);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' width=\'20\' height=\'20\' fill=\'var(--ink-faint,#ccc)\'><path d=\'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM5 5h14v9.586l-3-3-4.293 4.293-2.293-2.293L5 17.586V5Zm2 3a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z\'/></svg></div>';
+      return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.05);">'
+        + fotoHtml
         + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
-        + '<div style="font-size:12px;color:var(--ink-soft);">' + (p.area||'') + ' · ' + (p.unidad||'Unidad') + '</div>'
+        + '<div style="font-size:15px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (p.area||'') + ' · ' + (p.unidad||'Unidad') + '</div>'
         + '</div>'
-        + '<div style="text-align:right;flex-shrink:0;">'
-        + '<div style="font-size:18px;font-weight:800;color:' + stockColor + ';">' + (p.stockActual||0) + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px;">'
+        + '<div style="font-size:22px;font-weight:800;color:' + stockColor + ';line-height:1;">' + stock + '</div>'
         + '<div style="font-size:10px;color:var(--ink-faint);">unid.</div>'
-        + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';margin:2px auto 0;"></div>'
+        + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';margin-top:2px;"></div>'
         + '</div>'
         + '</div>';
     }).join('');
@@ -4682,19 +4698,15 @@
     var prods = window._siraProductos || [];
     var searchVal = ((document.getElementById('siraInvSearch')||{}).value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     var filtrados = prods.filter(function(p){
-      var matchArea = !window._siraInvAreaActiva || (p.area||'') === window._siraInvAreaActiva;
+      var matchArea   = !window._siraInvAreaActiva || (p.area||'') === window._siraInvAreaActiva;
       var matchSearch = !searchVal || (p.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(searchVal) >= 0;
       return matchArea && matchSearch;
     });
     var lista = document.getElementById('siraInvLista');
     if (lista) lista.innerHTML = _siraAdminBuildListaProds(filtrados);
-    // Actualizar estilo tabs
-    document.querySelectorAll('.siraInvTab').forEach(function(b){
-      b.style.background = (b.textContent.trim() === window._siraInvAreaActiva) ? 'var(--ink)' : 'var(--bg-card)';
-      b.style.color = (b.textContent.trim() === window._siraInvAreaActiva) ? '#fff' : 'var(--ink-soft)';
-    });
-    var todosBtn = document.getElementById('siraInvTabTodos');
-    if (todosBtn) { todosBtn.style.background = window._siraInvAreaActiva ? 'var(--bg-card)' : 'var(--ink)'; todosBtn.style.color = window._siraInvAreaActiva ? 'var(--ink-soft)' : '#fff'; }
+    // Sincronizar select si se llamó desde búsqueda
+    var sel = document.getElementById('siraInvAreaSelect');
+    if (sel && area !== undefined) sel.value = area || '';
   };
 
   // -- Gastos Varios para Mikaela --
