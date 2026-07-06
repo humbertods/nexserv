@@ -1672,13 +1672,114 @@
 
   // === RETIRO GRATIS / $10 ===
 
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT DELEGATION HUB — nexserv-main-2
+// Todos los data-action generados dinámicamente se procesan aquí.
+// Esto elimina los onclick inline con datos de usuario.
+// ═══════════════════════════════════════════════════════════════
+(function _installDelegationHub() {
+  document.addEventListener('click', function _delegationHandler(e) {
+    // Encontrar el elemento con data-action más cercano
+    var target = e.target.closest('[data-action]');
+    if (!target) return;
+
+    var action  = target.dataset.action;
+    var id      = target.dataset.id      || '';
+    var nombre  = target.dataset.nombre  || '';
+    var total   = target.dataset.total   || '0';
+    var servicio= target.dataset.servicio|| '';
+    var tomada  = target.dataset.tomada  || '';
+    var regular = target.dataset.regular || total;
+    var promo   = target.dataset.promo   || '';
+    var desglose= target.dataset.desglose|| '';
+    var key     = target.dataset.key     || id;
+    var staff   = target.dataset.staff;
+    var cod     = target.dataset.cod     || id;
+
+    switch (action) {
+
+      // ── Por Cobrar (lista de Mikaela) ──
+      case 'esperar-cobro':
+        e.stopPropagation();
+        if (typeof mkEsperarAsignacion === 'function')
+          mkEsperarAsignacion(id, nombre, servicio, total, tomada, regular, promo, desglose);
+        break;
+
+      case 'agregar-producto':
+        e.stopPropagation();
+        if (typeof openAgregarProducto === 'function')
+          openAgregarProducto(id, nombre, total);
+        break;
+
+      case 'eliminar-ticket':
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function')
+          eliminarTicketEspera(id, nombre);
+        break;
+
+      // ── Evidencias pestañas ──
+      case 'abrir-evidencias':
+        e.stopPropagation();
+        if (typeof abrirEvidenciasPestanas === 'function') {
+          var staffName = (staff !== undefined && staff !== '')
+            ? staff
+            : ((window.currentUser && window.currentUser.name) || 'staff');
+          abrirEvidenciasPestanas(key, nombre, staffName);
+        }
+        break;
+
+      // ── Mantener ficha ──
+      case 'mantener-ficha':
+        e.stopPropagation();
+        if (typeof showToast === 'function')
+          showToast('✅ Se mantiene la ficha actual para este servicio.');
+        break;
+
+      // ── Autorizaciones ──
+      case 'approve-auth':
+        e.stopPropagation();
+        if (typeof approveAuthorization === 'function')
+          approveAuthorization(id);
+        break;
+
+      case 'reject-auth':
+        e.stopPropagation();
+        if (typeof rejectAuthorization === 'function')
+          rejectAuthorization(id);
+        break;
+
+      // ── Autocompletar clienta ──
+      case 'ac-select':
+        e.stopPropagation();
+        if (typeof acSelectCliente === 'function')
+          acSelectCliente(cod);
+        break;
+
+      // ── Prelista SYNA ──
+      case 'confirmar-cita':
+        e.stopPropagation();
+        if (typeof confirmarLlegadaCita === 'function')
+          confirmarLlegadaCita(id);
+        break;
+
+      case 'cancelar-cita':
+        e.stopPropagation();
+        if (typeof cancelarCitaSyna === 'function')
+          cancelarCitaSyna(id, nombre);
+        break;
+
+      case 'sira-accion':
+        e.stopPropagation();
+        var tipo = target.dataset.tipo || '';
+        if (typeof _siraAccion === 'function') _siraAccion(tipo);
+        break;
+    }
+  });
+})();
+
   async function loadStaffHome() {
     // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
-    // Auto-reset: si _siraActivo=true pero el DOM de SIRA ya no existe, limpiar el flag
-    if (window._siraActivo && !document.getElementById('siraStaffContent')) {
-      window._siraActivo = false;
-      window._siraBackup = null;
-    }
     if (window._siraActivo || window._resumenBackup) return;
     // Guard adicional: verificar que los elementos clave existen antes de continuar
     const _sectionCheck = document.getElementById('as1Section') || document.getElementById('as2Section');
@@ -1899,20 +2000,6 @@
           items: []
         };
       }
-      // Auto-refresh para staff: 12s con clienta activa, 20s en espera
-      if (window._staffAutoRefresh) clearInterval(window._staffAutoRefresh);
-      const _hasClient = !!window._as1Client;
-      window._staffAutoRefresh = setInterval(function() {
-        if (window._siraActivo || window._resumenBackup) return;
-        var cur = document.querySelector('.screen.active');
-        if (cur && cur.id === 'staffHome') {
-          loadStaffHome();
-        } else {
-          clearInterval(window._staffAutoRefresh);
-          window._staffAutoRefresh = null;
-        }
-      }, _hasClient ? 12000 : 20000);
-
     } catch (err) {
       console.error('Error cargando staff home:', err);
     }
@@ -2005,7 +2092,7 @@
         + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Esta clienta no tiene ficha registrada</div>'
         + '<button onclick="openNewPestFicha(\'' + clientKey + '\', ' + slot + ')" style="padding:14px 24px;background:var(--top-purple);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha de pestañas</button>'
         + '</div>'
-        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\'staff\')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
+        + '<button data-action="abrir-evidencias" data-key=\''+_cfc+'\' data-nombre=\''+_cfn+'\' data-staff="" '
         + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
         + 'Evidencia del trabajo realizado</button>';
       return;
@@ -2039,10 +2126,10 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button data-action="abrir-evidencias" data-key="${clientKey}" data-nombre="${client.name.replace(/"/g,'&quot;')}" data-staff="" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button data-action="mantener-ficha" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
@@ -2852,7 +2939,7 @@
     if (!res.length){ cont.innerHTML='<div style="padding:10px;color:var(--ink-faint);font-size:12px;">Sin resultados</div>'; return; }
     cont.innerHTML = res.map(function(c){
       const cod=_acEsc(c.codigo), nom=_acEsc(c.nombre);
-      return '<div onclick="acSelectCliente(\''+cod+')" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
+      return '<div data-action="ac-select" data-cod="'+cod+'" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
     }).join('');
   }
   function acSelectCliente(cod){
@@ -3087,8 +3174,8 @@
           '<div style="font-size:11px;color:var(--ink-faint);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;">Área que la atiende</div>' +
           '<div style="display:flex;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
           '<div style="display:flex;gap:8px;">' +
-            '<button onclick="confirmarLlegadaCita(\'' + c.id + ')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
-            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + ')" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
+            '<button data-action="confirmar-cita" data-id="'+c.id+'" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
+            '<button data-action="cancelar-cita" data-id="'+c.id+'" data-nombre="'+nombreSafe+'" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -3723,11 +3810,24 @@
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                     data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}')"
+                  <button data-action="esperar-cobro"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||''). replace(/"/g,'&quot;')}" 
+                    data-servicio="${(p.servicio||''). replace(/"/g,'&quot;')}" 
+                    data-total="${p.total||'0'}"
+                    data-tomada="${(p.tomadaPor||''). replace(/"/g,'&quot;')}" 
+                    data-regular="${p.precioRegular||p.total||'0'}"
+                    data-promo="${(p.promoNombre||''). replace(/"/g,'&quot;')}" 
+                    data-desglose="${desgloseEnc}"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
-                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}')"
+                  <button data-action="agregar-producto"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||''). replace(/"/g,'&quot;')}" 
+                    data-total="${p.total||'0'}"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
-                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")})'"
+                  <button data-action="eliminar-ticket"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||''). replace(/"/g,'&quot;')}" 
                     style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
                 </div>
               </div>
@@ -4129,8 +4229,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button data-action="approve-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -4364,7 +4464,7 @@
     }
 
     // Cancelar
-    html += '<button onclick="_siraAccion(\\"' + tipo + '\\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '<button data-action="sira-accion" data-tipo="' + tipo + '" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
     html += '</div>';
     panel.innerHTML = html;
 
@@ -4527,13 +4627,9 @@
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
-    // Siempre resetear el flag, incluso si el backup no existe
-    window._siraActivo = false;
     if (screen && window._siraBackup) {
       screen.innerHTML = window._siraBackup;
+      window._siraBackup = null;
+      window._siraActivo = false;
     }
-    window._siraBackup = null;
-    window._siraScreenId = null;
-    // Recargar datos frescos del panel
-    setTimeout(function() { if (typeof loadStaffHome === 'function') loadStaffHome(); }, 100);
   };
