@@ -4141,98 +4141,39 @@
     kit:     { bg:'#eef2ff', color:'#5b4fd4', btnBg:'#5b4fd4' }
   };
 
-  window._siraAccion = function(tipo, srcBtn) {
+  // Cache de productos de SIRA
+  window._siraProductos = null;
+
+  async function _siraCargarProductos() {
+    if (window._siraProductos) return window._siraProductos;
+    try {
+      var r = await fetch(SIRA_URL + '?action=getProductos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      window._siraProductos = (data.ok && data.productos) ? data.productos : [];
+    } catch(e) { window._siraProductos = []; }
+    return window._siraProductos;
+  }
+
+  window._siraAccion = function(tipo) {
     var panelId = 'siraPanel_' + tipo;
     var existing = document.getElementById(panelId);
-
-    // Toggle: si ya está abierto, cerrarlo
     if (existing) {
       existing.style.maxHeight = '0';
       existing.style.opacity = '0';
       setTimeout(function() { if (existing.parentNode) existing.parentNode.removeChild(existing); }, 250);
       return;
     }
-
-    // Cerrar cualquier otro panel abierto
     ['entrada','salida','bebida','kit'].forEach(function(t) {
       var p = document.getElementById('siraPanel_' + t);
-      if (p && t !== tipo) {
-        p.style.maxHeight = '0'; p.style.opacity = '0';
-        setTimeout(function() { if (p.parentNode) p.parentNode.removeChild(p); }, 200);
-      }
+      if (p && t !== tipo) { p.style.maxHeight='0'; p.style.opacity='0'; setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},200); }
     });
 
-    var col = SIRA_COLORS[tipo] || SIRA_COLORS.entrada;
-    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Kit Lashista' };
+    var col = { entrada:{btn:'#2d6a4f'}, salida:{btn:'#8b7355'}, bebida:{btn:'#a07830'}, kit:{btn:'#5b4fd4'} }[tipo] || {btn:'#1a1a1a'};
     var panel = document.createElement('div');
     panel.id = panelId;
     panel.style.cssText = 'overflow:hidden;max-height:0;opacity:0;transition:max-height .3s ease,opacity .25s ease;margin-bottom:10px;';
+    panel.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);"><div style="text-align:center;padding:16px;color:var(--ink-soft);">Cargando…</div></div>';
 
-    var contenido = '';
-
-    if (tipo === 'kit') {
-      // Kit: solo selector de cantidad 1-5
-      contenido =
-        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
-        + '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Frasco para shampo · Funda kit pestaña · Tarjeta pestaña</div>'
-        + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">¿Cuántos kits?</div>'
-        + '<div style="display:flex;gap:8px;margin-bottom:16px;">'
-        + [1,2,3,4,5].map(function(n){
-            return '<button onclick="_siraSelectKit(' + n + ')" id="siraKitBtn' + n + '" style="flex:1;padding:14px 0;border-radius:12px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--ink);">' + n + '</button>';
-          }).join('')
-        + '</div>'
-        + '<button onclick="_siraEnviar(\"kit\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.5;" disabled>Confirmar kit</button>'
-        + '<button onclick="_siraAccion(\"kit\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
-        + '<input type="hidden" id="siraKitCantidad" value="">'
-        + '</div>';
-
-    } else if (tipo === 'bebida') {
-      // Bebida: selector de tipo de bebida
-      var bebidas = ['Agua','Café','Té','Aromática','Jugo'];
-      contenido =
-        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
-        + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Bebida servida</div>'
-        + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
-        + bebidas.map(function(b){
-            return '<button onclick="_siraSelectBebida(this,\"' + b + '\")" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + b + '</button>';
-          }).join('')
-        + '</div>'
-        + '<input id="siraProducto" type="hidden" value="">'
-        + '<input id="siraCantidad" type="hidden" value="1">'
-        + '<button onclick="_siraEnviar(\"bebida\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.5;" disabled>Confirmar bebida</button>'
-        + '<button onclick="_siraAccion(\"bebida\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
-        + '</div>';
-
-    } else {
-      // Entrada / Salida: input de producto + cantidad
-      var ph = tipo === 'entrada' ? 'Ej: Adhesivo negro' : 'Ej: Parches gel';
-      contenido =
-        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
-        + '<div style="margin-bottom:12px;">'
-          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>'
-          + '<input id="siraProducto" placeholder="' + ph + '" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">'
-        + '</div>'
-        + '<div style="margin-bottom:14px;">'
-          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>'
-          + '<div style="display:flex;gap:10px;align-items:center;">'
-            + '<button onclick="_siraCambiarCantidad(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">−</button>'
-            + '<div id="siraCantidadVal" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--ink);">1</div>'
-            + '<input type="hidden" id="siraCantidad" value="1">'
-            + '<button onclick="_siraCambiarCantidad(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">+</button>'
-          + '</div>'
-        + '</div>'
-        + '<div style="margin-bottom:14px;">'
-          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Nota (opcional)</div>'
-          + '<input id="siraNota" placeholder="Observación..." style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">'
-        + '</div>'
-        + '<button onclick="_siraEnviar(\"' + tipo + '\")" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo === 'entrada' ? 'entrada' : 'salida') + '</button>'
-        + '<button onclick="_siraAccion(\"' + tipo + '\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
-        + '</div>';
-    }
-
-    panel.innerHTML = contenido;
-
-    // Insertar DEBAJO de la card tocada
     var cardBtn = document.querySelector('[data-sira="' + tipo + '"]');
     if (cardBtn && cardBtn.parentNode) {
       cardBtn.parentNode.insertBefore(panel, cardBtn.nextSibling);
@@ -4241,76 +4182,229 @@
       if (fb) fb.appendChild(panel);
     }
 
-    // Animar apertura — doble rAF para que la transición CSS arranque
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
-        panel.style.maxHeight = '600px';
+        panel.style.maxHeight = '800px';
         panel.style.opacity = '1';
-        setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 200);
+        setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 150);
       });
+    });
+
+    // Cargar productos y renderizar el formulario correcto
+    _siraCargarProductos().then(function(prods) {
+      _siraRenderForm(panel, tipo, prods, col.btn);
     });
   };
 
-  // Helpers para Kit y Bebida
+  function _siraRenderForm(panel, tipo, prods, btnColor) {
+    var user = window.currentUser;
+    var staffNombre = user ? user.name : 'Staff';
+    var areas = ['Cejas','Pestañas','Depilaciones','Limpieza Facial','Coffee','Local','General'];
+
+    // Filtrar productos por tipo
+    var prodsFiltrados = tipo === 'bebida'
+      ? prods.filter(function(p){ return String(p.area||'').toLowerCase().indexOf('coffee') >= 0 || String(p.area||'').toLowerCase().indexOf('bebida') >= 0; })
+      : tipo === 'kit'
+      ? prods.filter(function(p){ return String(p.area||'').toLowerCase().indexOf('pesta') >= 0; })
+      : prods;
+
+    var html = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">';
+    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Kit Lashista' };
+    html += '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:16px;">' + labels[tipo] + '</div>';
+
+    if (tipo === 'kit') {
+      // Kit: mostrar componentes y selector de cantidad
+      html += '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Frasco para shampo · Funda kit pestaña · Tarjeta pestaña</div>';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">¿Cuántos kits?</div>';
+      html += '<div style="display:flex;gap:8px;margin-bottom:16px;">';
+      [1,2,3,4,5].forEach(function(n){
+        html += '<button onclick="_siraSelectKit(' + n + ')" id="siraKitBtn' + n + '" style="flex:1;padding:14px 0;border-radius:12px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--ink);">' + n + '</button>';
+      });
+      html += '</div>';
+      html += '<input type="hidden" id="siraKitCantidad" value="">';
+      html += '<button onclick="_siraEnviar(\\"kit\\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar kit</button>';
+
+    } else if (tipo === 'bebida') {
+      // Bebida: lista de productos Coffee de SIRA
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Bebida servida</div>';
+      if (prodsFiltrados.length > 0) {
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
+        prodsFiltrados.forEach(function(p){
+          html += '<button data-beb="' + p.nombre + '" onclick="_siraSelectBebida(this)" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + p.nombre + '</button>';
+        });
+        html += '</div>';
+      } else {
+        // Fallback chips si no hay productos Coffee
+        html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">';
+        ['Agua','Café','Té','Aromática','Jugo'].forEach(function(b){
+          html += '<button data-beb="' + b + '" onclick="_siraSelectBebida(this)" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + b + '</button>';
+        });
+        html += '</div>';
+      }
+      html += '<input id="siraProducto" type="hidden" value="">';
+      html += '<button onclick="_siraEnviar(\\"bebida\\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
+
+    } else {
+      // Entrada / Salida: búsqueda de producto + área + contador
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>';
+      html += '<input id="siraProductoBuscar" placeholder="Buscar producto..." oninput="_siraFiltrarProds(this.value)" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px 12px 0 0;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      html += '<div id="siraProdLista" style="border:1.5px solid var(--line,#eee);border-top:none;border-radius:0 0 12px 12px;background:var(--bg-card,#fff);max-height:160px;overflow-y:auto;">';
+      // Mostrar todos al inicio
+      prodsFiltrados.slice(0, 15).forEach(function(p){
+        html += '<div onclick="_siraSelProd(\'' + p.nombre.replace(/'/g,"&#39;") + '\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line,#eee);color:var(--ink);" onmouseover="this.style.background=\'var(--bg,#f8f8f6)\'" onmouseout="this.style.background=\'\'">' + p.nombre + '<span style="font-size:11px;color:var(--ink-soft);margin-left:8px;">' + (p.area||'') + '</span></div>';
+      });
+      html += '</div>';
+      html += '<input type="hidden" id="siraProducto" value="">';
+      html += '</div>';
+
+      // Cantidad con +/-
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>';
+      html += '<div style="display:flex;gap:10px;align-items:center;">';
+      html += '<button onclick="_siraCambiarCantidad(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">−</button>';
+      html += '<div id="siraCantidadVal" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--ink);">1</div>';
+      html += '<input type="hidden" id="siraCantidad" value="1">';
+      html += '<button onclick="_siraCambiarCantidad(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">+</button>';
+      html += '</div></div>';
+
+      // Área
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Área</div>';
+      html += '<select id="siraArea" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
+      html += '</select></div>';
+
+      // Responsable (auto)
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
+      html += '<div style="padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;background:var(--bg,#f8f8f6);font-size:15px;color:var(--ink);">' + staffNombre + '</div>';
+      html += '<input type="hidden" id="siraResponsable" value="' + staffNombre + '">';
+      html += '</div>';
+
+      html += '<button onclick="_siraEnviar(\\"' + tipo + '\\")" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo==='entrada'?'entrada':'salida') + '</button>';
+    }
+
+    // Cancelar
+    html += '<button onclick="_siraAccion(\\"' + tipo + '\\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '</div>';
+    panel.innerHTML = html;
+
+    // Guardar productos para filtrado
+    window._siraProdsActuales = prodsFiltrados;
+  }
+
+  // Filtrar productos mientras se escribe
+  window._siraFiltrarProds = function(q) {
+    var lista = document.getElementById('siraProdLista');
+    if (!lista) return;
+    var prods = window._siraProdsActuales || [];
+    var filtrados = q.length < 1 ? prods.slice(0,15) : prods.filter(function(p){ return p.nombre.toLowerCase().indexOf(q.toLowerCase()) >= 0; });
+    lista.innerHTML = filtrados.length === 0
+      ? '<div style="padding:10px 14px;font-size:13px;color:var(--ink-soft);">Sin resultados</div>'
+      : filtrados.slice(0,15).map(function(p){
+          return '<div onclick="_siraSelProd(\'' + p.nombre.replace(/'/g,"&#39;") + '\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line,#eee);color:var(--ink);">' + p.nombre + '<span style="font-size:11px;color:var(--ink-soft);margin-left:8px;">' + (p.area||'') + '</span></div>';
+        }).join('');
+  };
+
+  window._siraSelProd = function(nombre) {
+    var inp = document.getElementById('siraProducto');
+    var buscar = document.getElementById('siraProductoBuscar');
+    var lista = document.getElementById('siraProdLista');
+    if (inp) inp.value = nombre;
+    if (buscar) buscar.value = nombre;
+    if (lista) lista.style.display = 'none';
+  };
+
   window._siraSelectKit = function(n) {
     [1,2,3,4,5].forEach(function(i) {
       var b = document.getElementById('siraKitBtn' + i);
-      if (b) { b.style.background = i === n ? '#5b4fd4' : 'var(--bg,#f8f8f6)'; b.style.color = i === n ? '#fff' : 'var(--ink)'; b.style.borderColor = i === n ? '#5b4fd4' : 'var(--line,#eee)'; }
+      if (b) { b.style.background = i===n?'#5b4fd4':'var(--bg,#f8f8f6)'; b.style.color=i===n?'#fff':'var(--ink)'; b.style.borderColor=i===n?'#5b4fd4':'var(--line,#eee)'; }
     });
     var hid = document.getElementById('siraKitCantidad');
     if (hid) hid.value = n;
     var btn = document.getElementById('siraEnviarBtn');
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    if (btn) { btn.disabled=false; btn.style.opacity='1'; }
   };
 
   window._siraSelectBebida = function(el) {
     var nombre = el.dataset.beb || '';
-    el.parentNode.querySelectorAll('button').forEach(function(b) {
-      b.style.background = 'var(--bg,#f8f8f6)'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line,#eee)';
-    });
-    el.style.background = '#a07830'; el.style.color = '#fff'; el.style.borderColor = '#a07830';
+    el.parentNode.querySelectorAll('button').forEach(function(b){ b.style.background='var(--bg,#f8f8f6)'; b.style.color='var(--ink)'; b.style.borderColor='var(--line,#eee)'; });
+    el.style.background='#a07830'; el.style.color='#fff'; el.style.borderColor='#a07830';
     var inp = document.getElementById('siraProducto');
     if (inp) inp.value = nombre;
     var btn = document.getElementById('siraEnviarBtn');
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    if (btn) { btn.disabled=false; btn.style.opacity='1'; }
   };
 
   window._siraCambiarCantidad = function(delta) {
     var hid = document.getElementById('siraCantidad');
     var val = document.getElementById('siraCantidadVal');
     if (!hid || !val) return;
-    var n = Math.max(1, parseInt(hid.value || '1', 10) + delta);
-    hid.value = n; val.textContent = n;
+    var n = Math.max(1, parseInt(hid.value||'1',10)+delta);
+    hid.value=n; val.textContent=n;
   };
 
   window._siraEnviar = async function(tipo) {
-    var producto = (document.getElementById('siraProducto')?.value || '').trim();
-    var cantidad = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
-    var nota     = (document.getElementById('siraNota')?.value || '').trim();
-    var quien    = (document.getElementById('siraQuien')?.value || '').trim();
-    var user     = window.currentUser;
-    if (!producto) { if (typeof showToast === 'function') showToast('Escribe el nombre del producto'); return; }
+    var user = window.currentUser;
+    var producto, cantidad, area, responsable;
+
+    if (tipo === 'kit') {
+      cantidad   = parseInt(document.getElementById('siraKitCantidad')?.value || '0', 10);
+      if (!cantidad) { if (typeof showToast==='function') showToast('Selecciona la cantidad de kits'); return; }
+      // Registrar los 3 componentes del kit
+      var kitItems = ['Frasco para shampo','Funda kit pestaña','Tarjeta pestaña'];
+      var btn2 = document.getElementById('siraEnviarBtn');
+      if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
+      var errores = 0;
+      for (var ki = 0; ki < kitItems.length; ki++) {
+        var rk = await _siraPost('movimientoNexserv', {
+          tipo:'salida', producto:kitItems[ki], cantidad:cantidad,
+          responsable: user ? user.name : 'Staff',
+          area: user ? user.area : 'Pestañas', nota:'Kit Lashista'
+        });
+        if (!rk || (!rk.ok && !rk.success)) errores++;
+      }
+      if (errores === 0) {
+        var p = document.getElementById('siraPanel_kit');
+        if (p) { p.style.maxHeight='0'; setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},300); }
+        if (typeof showToast==='function') showToast('✅ Kit Lashista ×' + cantidad + ' registrado en SIRA');
+        window._siraProductos = null; // invalidar cache
+      } else {
+        if (btn2) { btn2.textContent='Confirmar kit'; btn2.disabled=false; btn2.style.opacity='1'; }
+        if (typeof showToast==='function') showToast('⚠ Error al registrar algunos componentes del kit');
+      }
+      return;
+    }
+
+    producto   = (document.getElementById('siraProducto')?.value || '').trim();
+    cantidad   = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
+    area       = (document.getElementById('siraArea')?.value || (user ? user.area : '')).trim();
+    responsable= (document.getElementById('siraResponsable')?.value || (user ? user.name : 'Staff')).trim();
+
+    if (tipo === 'bebida') {
+      responsable = user ? user.name : 'Staff';
+      area        = user ? user.area : '';
+    }
+
+    if (!producto) { if (typeof showToast==='function') showToast('Selecciona o escribe el producto'); return; }
+
     var btn2 = document.getElementById('siraEnviarBtn');
-    if (btn2) { btn2.textContent = 'Registrando…'; btn2.disabled = true; }
-    var r = await _siraPost('movimientoNexserv', {
-      tipo:        tipo,
-      producto:    producto,
-      cantidad:    cantidad,
-      responsable: user ? user.name : 'Staff',
-      area:        user ? user.area : '',
-      nota:        nota + (quien ? ' · Para: ' + quien : '')
-    });
-    var fb = document.getElementById('siraFeedback');
-    var c3 = document.getElementById('siraFormContainer');
-    if (r && r.success) {
-      if (c3) { c3.innerHTML = ''; c3.dataset.tipo = ''; }
-      if (fb) { fb.innerHTML = '<div style="background:#2d6a4f22;border:1.5px solid #2d6a4f55;border-radius:14px;padding:14px;text-align:center;margin-bottom:12px;"><div style="font-size:15px;font-weight:700;color:#2d6a4f;">✅ ' + producto + ' registrado</div></div>'; setTimeout(function(){ if(fb) fb.innerHTML=''; }, 3000); }
-      if (typeof showToast === 'function') showToast('✅ ' + producto + ' registrado en SIRA');
+    if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
+
+    var r = await _siraPost('movimientoNexserv', { tipo:tipo==='bebida'?'salida':tipo, producto:producto, cantidad:cantidad, responsable:responsable, area:area, nota:tipo==='bebida'?'Bebida servida':'' });
+
+    if (r && (r.ok || r.success)) {
+      var p2 = document.getElementById('siraPanel_' + tipo);
+      if (p2) { p2.style.maxHeight='0'; setTimeout(function(){if(p2.parentNode)p2.parentNode.removeChild(p2);},300); }
+      if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
+      window._siraProductos = null;
     } else {
-      if (btn2) { btn2.textContent = 'Confirmar registro'; btn2.disabled = false; }
-      if (typeof showToast === 'function') showToast('⚠ ' + ((r && r.error) || 'Error al registrar'));
+      if (btn2) { btn2.textContent='Confirmar'; btn2.disabled=false; btn2.style.opacity='1'; }
+      if (typeof showToast==='function') showToast('⚠ ' + ((r&&r.error)||'Error al registrar'));
     }
   };
+
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
