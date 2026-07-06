@@ -4677,7 +4677,7 @@
       var dot        = stockColor;
       var fotoHtml = p.foto
         ? '<img src="' + p.foto + '" style="width:44px;height:44px;border-radius:12px;object-fit:cover;flex-shrink:0;">'
-        : '<div style="width:44px;height:44px;border-radius:12px;background:var(--bg,#f8f8f6);flex-shrink:0;display:flex;align-items:center;justify-content:center;"><svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' width=\'20\' height=\'20\' fill=\'var(--ink-faint,#ccc)\'><path d=\'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM5 5h14v9.586l-3-3-4.293 4.293-2.293-2.293L5 17.586V5Zm2 3a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z\'/></svg></div>';
+        : '<div style="width:44px;height:44px;border-radius:12px;background:var(--bg,#f8f8f6);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;">📦</div>';
       return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:16px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.05);">'
         + fotoHtml
         + '<div style="flex:1;min-width:0;">'
