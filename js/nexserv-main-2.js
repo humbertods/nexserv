@@ -3995,38 +3995,24 @@
   }
 
     async function renderAuthorizations() {
-    console.log('🔍 renderAuthorizations called');
+    // Guard: si el inventario admin está activo los elementos del DOM no existen
+    if (window._siraActivo && window._siraAdminBackup) return;
+    const authSection = document.getElementById('authorizationsSection');
+    const authList    = document.getElementById('authorizationsList');
+    const authCount   = document.getElementById('authCount');
+    if (!authSection || !authList || !authCount) return;
     try {
-      // Cargar autorizaciones desde el backend
-      console.log('📡 Calling apiGet(getAutorizaciones)...');
       const result = await apiGet('getAutorizaciones');
-      
-      console.log('📥 Backend response:', result);
-      
       if (!result.success) {
-        console.error('❌ Error cargando autorizaciones:', result.message);
-        document.getElementById('authorizationsSection').style.display = 'none';
+        authSection.style.display = 'none';
         return;
       }
-      
       const requests = result.autorizaciones || [];
-      console.log('📋 Total autorizaciones recibidas:', requests.length);
-      console.log('📋 Autorizaciones:', requests);
-      
-      // Mikaela solo ve los PENDIENTES para aprobar/rechazar
       const pendingRequests = requests.filter(r => r.estado === 'pendiente');
-      console.log('⏳ Autorizaciones PENDIENTES:', pendingRequests.length);
-      console.log('⏳ Pendientes:', pendingRequests);
-      
-      const authSection = document.getElementById('authorizationsSection');
-      const authList = document.getElementById('authorizationsList');
-      const authCount = document.getElementById('authCount');
-      
       if (pendingRequests.length === 0) {
         authSection.style.display = 'none';
         return;
       }
-      
       authSection.style.display = 'block';
       authCount.textContent = pendingRequests.length;
       
@@ -4052,7 +4038,7 @@
       }).join('');
     } catch (err) {
       console.error('Error rendering authorizations:', err);
-      document.getElementById('authorizationsSection').style.display = 'none';
+      if(document.getElementById('authorizationsSection')) document.getElementById('authorizationsSection').style.display = 'none';
     }
   }
   
@@ -4105,7 +4091,10 @@
       + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
       + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
-      + '<div style="margin-top:24px;padding-bottom:90px;">'      + '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Mis movimientos de hoy</div>'      + '<div id="siraStaffMovsHoy"><div style=\'text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;\'>Cargando…</div></div>'      + '</div>'
+      + '<div style="margin-top:24px;padding-bottom:90px;">'
+      + '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Mis movimientos de hoy</div>'
+      + '<div id="siraStaffMovsHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
+      + '</div>'
       + navHtml;
     // Cargar historial del día para esta staff
     setTimeout(function(){ if(typeof _siraStaffCargarMovsHoy==='function') _siraStaffCargarMovsHoy(); }, 100);
