@@ -4030,31 +4030,26 @@
       authSection.style.display = 'block';
       authCount.textContent = pendingRequests.length;
       
-      authList.innerHTML = pendingRequests.map((req, idx) => `
-        <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-            <div>
-              <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.clienteNombre}</div>
-              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.staffNombre}</strong> · ${req.fecha}</div>
-            </div>
-            <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
-          </div>
-          
-          <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
-            <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.servicioNombre}</div>
-            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.servicioArea} · <strong style="font-size: 14px; color: #28a745;">$${req.servicioPrecio}</strong></div>
-            <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
-              <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
-              <div style="font-size: 11px; color: #333; font-style: italic;">"${req.nota || 'Sin nota'}"</div>
-            </div>
-          </div>
-          
-          <div style="display: flex; gap: 8px;">
-            <button onclick="approveAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button onclick="rejectAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
-          </div>
-        </div>
-      `).join('');
+      authList.innerHTML = pendingRequests.map((req) => {
+        const _esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const idSafe = String(req.id||'').replace(/[^A-Za-z0-9_\-]/g,'');
+        return '<div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">'
+          + '<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">'
+          + '<div><div style="font-size: 16px; font-weight: 800; color: #856404;">' + _esc(req.clienteNombre) + '</div>'
+          + '<div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>' + _esc(req.staffNombre) + '</strong> · ' + _esc(req.fecha) + '</div></div>'
+          + '<div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div></div>'
+          + '<div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">'
+          + '<div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">' + _esc(req.servicioNombre) + '</div>'
+          + '<div style="font-size: 11px; color: #666; margin-bottom: 6px;">' + _esc(req.servicioArea) + ' · <strong style="font-size: 14px; color: #28a745;">$' + _esc(req.servicioPrecio) + '</strong></div>'
+          + '<div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">'
+          + '<div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">&#x1F4AC; NOTA DEL STAFF:</div>'
+          + '<div style="font-size: 11px; color: #333; font-style: italic;">&quot;' + (_esc(req.nota) || 'Sin nota') + '&quot;</div>'
+          + '</div></div>'
+          + '<div style="display: flex; gap: 8px;">'
+          + '<button onclick="approveAuthorization(\'' + idSafe + '\')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">&#10003; Aprobar</button>'
+          + '<button onclick="rejectAuthorization(\'' + idSafe + '\')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">&#10005; Rechazar</button>'
+          + '</div></div>';
+      }).join('');
     } catch (err) {
       console.error('Error rendering authorizations:', err);
       document.getElementById('authorizationsSection').style.display = 'none';
