@@ -1970,38 +1970,6 @@
       + '</div>';
   }
 
-
-// ── Helpers de formato para ficha de pestañas ──────────────────────────────
-// Convierte ISO date string a formato legible DD/MM/AAAA
-function _fmtFecha(val) {
-  if (!val) return '—';
-  var s = String(val);
-  // Si es ISO string (2026-06-05T...) convertir a fecha local
-  if (s.match(/^\d{4}-\d{2}-\d{2}T/)) {
-    var d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('es-EC', { day:'2-digit', month:'2-digit', year:'numeric' });
-    }
-  }
-  // Si ya es legible (DD/MM/AAAA) devolver tal cual
-  return s;
-}
-
-// Formatea el campo Tallas: si viene como ISO date (Sheets lo convirtió),
-// intenta extraer el valor original. Si es texto, devuelve tal cual.
-function _fmtTallas(val) {
-  if (!val) return '—';
-  var s = String(val);
-  // Si Sheets guardó la talla como fecha ISO, probablemente era un número de talla
-  // Ej: "2026-12-09T..." no tiene sentido como talla → devolver vacío con aviso
-  if (s.match(/^\d{4}-\d{2}-\d{2}T/)) {
-    // Es una fecha ISO - el campo se corrompió en Sheets al confundir texto con fecha
-    // No mostrar el ISO, mostrar placeholder
-    return '(ver ficha)';
-  }
-  return s;
-}
-
   function loadPestFichaQuick(clientKey, slot) {
     const el = document.getElementById('pestFichaQuick' + slot);
     if (!el) return;
@@ -2033,7 +2001,7 @@ function _fmtTallas(val) {
         <div style="background: linear-gradient(135deg, var(--top-purple) 0%, #5b21b6 100%); color: white; border-radius: 20px; padding: 16px; margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <div style="font-size: 11px; font-weight: 600; opacity: 0.8;">👁 Ficha activa · ${client.name}</div>
-            <div style="background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700;">${_fmtFecha(fichaActiva.fecha)}</div>
+            <div style="background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700;">${fichaActiva.fecha || '—'}</div>
           </div>
           <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
             <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
@@ -2046,13 +2014,13 @@ function _fmtTallas(val) {
             </div>
             <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
               <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Tallas</div>
-              <div style="font-size: 12px; font-weight: 800; margin-top: 2px;">${_fmtTallas(fichaActiva.tallas)}</div>
+              <div style="font-size: 12px; font-weight: 800; margin-top: 2px;">${fichaActiva.tallas}</div>
             </div>
           </div>
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button data-action="abrir-evidencias" data-key="${client.code||clientKey}" data-nombre="${client.name.replace(/"/g,'&quot;')}" data-staff="" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
           <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
@@ -4545,4 +4513,30 @@ function _fmtTallas(val) {
       window._siraBackup = null;
       window._siraActivo = false;
     }
+  };
+
+  // ── Inventario para Mikaela/Admin ────────────────────────────────────────
+  window.abrirInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    var navEl = screen.querySelector('nav.nav');
+    var navHtml = navEl ? navEl.outerHTML : '';
+    window._siraAdminBackup = screen.innerHTML;
+    window._siraAdminActivo = true;
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioAdmin()">\u2190 Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraAdminContent">' + _siraRenderSecciones(true) + '</div>'
+      + navHtml;
+  };
+
+  window.cerrarInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    window._siraAdminActivo = false;
+    if (screen && window._siraAdminBackup) {
+      screen.innerHTML = window._siraAdminBackup;
+    }
+    window._siraAdminBackup = null;
+    setTimeout(function() { if (typeof loadMikaelaHome === 'function') loadMikaelaHome(); }, 100);
   };
