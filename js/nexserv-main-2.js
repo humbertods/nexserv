@@ -4105,7 +4105,10 @@
       + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
       + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
+      + '<div style="margin-top:24px;padding-bottom:90px;">'      + '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Mis movimientos de hoy</div>'      + '<div id="siraStaffMovsHoy"><div style=\'text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;\'>Cargando…</div></div>'      + '</div>'
       + navHtml;
+    // Cargar historial del día para esta staff
+    setTimeout(function(){ if(typeof _siraStaffCargarMovsHoy==='function') _siraStaffCargarMovsHoy(); }, 100);
   };
 
   function _siraRenderSecciones(esPestanas) {
@@ -4462,9 +4465,7 @@
     window._siraAdminBackup = screen.innerHTML;
     window._siraActivo = true;
 
-    var navHtml = '<nav class="nav" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:100;">'
-      + '<button onclick="cerrarInventarioAdmin()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Inicio</span></button>'
-      + '</nav>';
+    var navHtml = '';
 
     var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
     var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
@@ -4632,6 +4633,8 @@
   async function _siraAdminMostrarInventario(container, responsable) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Cargando inventario…</div>';
     container.style.display = '';
+    // Forzar recarga para obtener stock actualizado
+    window._siraProductos = null;
     await _siraCargarProductos();
     var prods = window._siraProductos || [];
     var areas = ['Todas las áreas'].concat([...new Set(prods.map(function(p){ return p.area||'Sin área'; }))].sort());
@@ -4639,7 +4642,7 @@
     window._siraInvAreaActiva = '';
     window._siraInvSearchVal = '';
 
-    var html = '<div style="padding-bottom:90px;">';
+    var html = '<div style="padding-bottom:20px;">';
 
     // Buscador con ícono lupa
     html += '<div style="position:relative;margin-bottom:12px;">';
@@ -4647,27 +4650,44 @@
     html += '<input type="text" id="siraInvSearch" placeholder="Buscar producto..." oninput="_siraAdminFiltrarInv()" style="width:100%;padding:12px 14px 12px 40px;border:1.5px solid var(--line,#eee);border-radius:var(--radius-pill,100px);font-family:inherit;font-size:14px;background:var(--bg-card,#fff);box-sizing:border-box;">';
     html += '</div>';
 
-    // Select desplegable de áreas
-    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 18px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;margin-bottom:16px;box-sizing:border-box;">';
+    // Select desplegable con flecha alineada a la derecha
+    html += '<div style="position:relative;margin-bottom:16px;">';
+    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 48px 14px 20px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;box-sizing:border-box;appearance:none;-webkit-appearance:none;">';
     areas.forEach(function(a){
       html += '<option value="' + (a === 'Todas las áreas' ? '' : a) + '">' + a + '</option>';
     });
     html += '</select>';
+    // Flecha SVG alineada a la derecha
+    html += '<svg style="position:absolute;right:18px;top:50%;transform:translateY(-50%);pointer-events:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M7 10l5 5 5-5z"/></svg>';
+    html += '</div>';
 
     // Lista de productos
     html += '<div id="siraInvLista">' + _siraAdminBuildListaProds(prods) + '</div>';
 
-    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:8px;">← Volver</button>';
+    // ── Historial de movimientos de hoy ──────────────────────
+    html += '<div style="margin-top:28px;">';
+    html += '<div style="font-size:13px;font-weight:800;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Movimientos de hoy</div>';
+    html += '<div id="siraAdminMovsHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando…</div></div>';
+    html += '</div>';
+
+    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:14px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:16px;margin-bottom:20px;">← Volver</button>';
     html += '</div>';
 
     container.innerHTML = html;
+    // Cargar movimientos de hoy en paralelo
+    _siraAdminCargarMovsHoy(responsable);
   }
 
   function _siraAdminBuildListaProds(prods) {
     if (!prods.length) return '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:14px;">Sin productos</div>';
     return prods.map(function(p){
-      var stock = p.stockActual || 0;
-      var min   = p.stockMin || 0;
+      // Normalizar campo de stock (SIRA puede usar stockActual, stock_actual, stock, cantidad)
+      var stock = p.stockActual !== undefined ? p.stockActual
+                : p.stock_actual !== undefined ? p.stock_actual
+                : p.stock !== undefined ? p.stock
+                : p.cantidad !== undefined ? p.cantidad : 0;
+      stock = Number(stock) || 0;
+      var min = Number(p.stockMin || p.stock_min || p.minimo || 0);
       var stockColor = stock <= min ? '#c0392b' : stock <= min * 2 ? '#e67e22' : '#27ae60';
       var dot        = stockColor;
       var fotoHtml = p.foto
@@ -4687,6 +4707,105 @@
         + '</div>';
     }).join('');
   }
+
+  // ── Historial movimientos de hoy (admin/staff) ──────────────────────────
+  async function _siraAdminCargarMovsHoy(responsableActual) {
+    var el = document.getElementById('siraAdminMovsHoy');
+    if (!el) return;
+    try {
+      var r = await fetch(SIRA_URL + '?action=getMovimientos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      var movs = (data.ok && data.movimientos) ? data.movimientos : [];
+      // Fecha de hoy en formato YYYY-MM-DD
+      var hoy = (function(){
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      })();
+      // Filtrar por responsable y fecha hoy
+      var mios = movs.filter(function(m){
+        var resp = String(m.responsable || m.resp || '').trim();
+        var fecha = String(m.fecha || '').trim();
+        return resp === responsableActual && fecha === hoy;
+      }).reverse();
+      if (!mios.length) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
+        return;
+      }
+      el.innerHTML = mios.map(function(m){
+        var esEntrada = String(m.tipo||'').toLowerCase() === 'entrada';
+        var qty = Number(m.cantidad || m.cant || 1);
+        var prod = String(m.producto || m.nombreProducto || '');
+        var unidad = String(m.tipoUnidad || m.unidad || 'unid.');
+        var hora = String(m.hora || '');
+        var bgColor = esEntrada ? '#edf7f1' : '#f5f0e8';
+        var color   = esEntrada ? '#2d6a4f' : '#8b7355';
+        var icon    = esEntrada ? '📥' : '📤';
+        var qtyStr  = (esEntrada ? '+' : '−') + qty;
+        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);">'
+          + '<div style="width:40px;height:40px;border-radius:12px;background:' + bgColor + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + icon + '</div>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + qty + ' ' + unidad + (hora ? ' · ' + hora : '') + '</div>'
+          + '</div>'
+          + '<div style="font-size:18px;font-weight:800;color:' + color + ';flex-shrink:0;">' + qtyStr + '</div>'
+          + '</div>';
+      }).join('');
+    } catch(e) {
+      var el2 = document.getElementById('siraAdminMovsHoy');
+      if (el2) el2.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">No se pudo cargar</div>';
+    }
+  }
+
+  // Historial para staff (inyectado bajo los botones del hub SIRA)
+  async function _siraStaffCargarMovsHoy() {
+    var el = document.getElementById('siraStaffMovsHoy');
+    if (!el) return;
+    var user = window.currentUser;
+    var responsableActual = user ? user.name : '';
+    if (!responsableActual) return;
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Cargando…</div>';
+    try {
+      var r = await fetch(SIRA_URL + '?action=getMovimientos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      var movs = (data.ok && data.movimientos) ? data.movimientos : [];
+      var hoy = (function(){
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      })();
+      var mios = movs.filter(function(m){
+        var resp = String(m.responsable || m.resp || '').trim();
+        var fecha = String(m.fecha || '').trim();
+        return resp === responsableActual && fecha === hoy;
+      }).reverse();
+      if (!mios.length) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
+        return;
+      }
+      el.innerHTML = mios.map(function(m){
+        var esEntrada = String(m.tipo||'').toLowerCase() === 'entrada';
+        var qty = Number(m.cantidad || m.cant || 1);
+        var prod = String(m.producto || '');
+        var unidad = String(m.tipoUnidad || m.unidad || 'unid.');
+        var hora = String(m.hora || '');
+        var bgColor = esEntrada ? '#edf7f1' : '#f5f0e8';
+        var color   = esEntrada ? '#2d6a4f' : '#8b7355';
+        var icon    = esEntrada ? '📥' : '📤';
+        var qtyStr  = (esEntrada ? '+' : '−') + qty;
+        return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);">'
+          + '<div style="width:40px;height:40px;border-radius:12px;background:' + bgColor + ';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">' + icon + '</div>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + qty + ' ' + unidad + (hora ? ' · ' + hora : '') + '</div>'
+          + '</div>'
+          + '<div style="font-size:18px;font-weight:800;color:' + color + ';flex-shrink:0;">' + qtyStr + '</div>'
+          + '</div>';
+      }).join('');
+    } catch(e) {
+      var el3 = document.getElementById('siraStaffMovsHoy');
+      if (el3) el3.innerHTML = '<div style="padding:16px;text-align:center;color:var(--ink-faint);font-size:13px;">No se pudo cargar</div>';
+    }
+  }
+  window._siraStaffCargarMovsHoy = _siraStaffCargarMovsHoy;
 
   window._siraAdminFiltrarInv = function(area) {
     if (area !== undefined) window._siraInvAreaActiva = area;
