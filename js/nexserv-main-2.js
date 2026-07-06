@@ -2020,10 +2020,10 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff)" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.)" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
@@ -3392,9 +3392,9 @@
                 <select id="reSel_${_uid}" onchange="document.getElementById('reBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''}\")" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
+                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''})" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
               </div>
-              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe}\")" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
+              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe})" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
             // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
             // así que se asigna staff directo con el mismo dropdown que usa multi-área
             // (no hace falta re-elegir el servicio). Si igual quiere cambiarlo, abajo
@@ -3405,7 +3405,7 @@
                 <select id="syncSel_${_uid}" onchange="document.getElementById('syncBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''}\")" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
+                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''})" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
               </div>`;
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
@@ -3426,8 +3426,8 @@
                 ${hechasHTML}
                 ${reassignHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
-                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}\")" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
-                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}\")" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
+                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre})" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
+                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre})" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
                 </div>
               </div>`;
             }
@@ -3445,8 +3445,8 @@
               ${estadoHTML}
               ${_desgloseMultiHTML}
               ${_esMultiPromo ? reassignHTML : `${esSyna ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
-                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}\")" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
-                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}\")" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre})" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre})" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
               </div>`}
             </div>`;
           }).join('');
@@ -3644,11 +3644,11 @@
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                     data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}\")"
+                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc})"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
-                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}\")"
+                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'})"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
-                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}\")"
+                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")})"
                     style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
                 </div>
               </div>
@@ -4273,7 +4273,7 @@
     }
 
     // Cancelar
-    html += '<button onclick="_siraAccion(\\"' + tipo + '\\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '<button onclick="_siraAccion(\\"' + tipo + ')" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
     html += '</div>';
     panel.innerHTML = html;
 
