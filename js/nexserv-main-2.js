@@ -1821,7 +1821,7 @@
           }).catch(() => loadPestFichaQuick(_pk4, 1));
         }
       } else {
-        section.style.display = 'none';
+        if (section) section.style.display = 'none';
       }
       
       // Actualizar contadores
@@ -4396,7 +4396,19 @@
 
     if (r && (r.ok || r.success)) {
       var p2 = document.getElementById('siraPanel_' + tipo);
-      if (p2) { p2.style.maxHeight='0'; setTimeout(function(){if(p2.parentNode)p2.parentNode.removeChild(p2);},300); }
+      if (p2) {
+        // Mostrar confirmación visual 1.8 segundos antes de cerrar
+        p2.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:24px 16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
+          + '<div style="font-size:36px;margin-bottom:8px;">✅</div>'
+          + '<div style="font-size:16px;font-weight:800;color:#2d6a4f;">Registrado en SIRA</div>'
+          + '<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">' + producto + '</div>'
+          + '</div>';
+        p2.style.maxHeight = '200px';
+        setTimeout(function(){
+          if (p2 && p2.style) { p2.style.maxHeight='0'; p2.style.opacity='0'; }
+          setTimeout(function(){if(p2&&p2.parentNode)p2.parentNode.removeChild(p2);},300);
+        }, 1800);
+      }
       if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
       window._siraProductos = null;
     } else {
