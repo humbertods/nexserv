@@ -4233,14 +4233,14 @@
       html += '<button onclick="_siraEnviar(\x27kit\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar kit</button>';
 
     } else if (tipo === 'bebida') {
-      // Bebida: lista de productos Coffee de SIRA
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Bebida servida</div>';
-            var bebOpciones = prodsFiltrados.length > 0 ? prodsFiltrados : [{nombre:'Agua'},{nombre:'Café'},{nombre:'Té'},{nombre:'Aromática'},{nombre:'Jugo'}];
-      html += '<select id="siraProducto" onchange="_siraBebidaSelect(this)" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;margin-bottom:16px;">';
-      html += '<option value="">— Seleccionar bebida —</option>';
-      bebOpciones.forEach(function(p){ html += '<option value="' + p.nombre + '">' + p.nombre + '</option>'; });
+      // Combos de bebida — select desplegable
+      var COMBOS_BEBIDA = ['Capuccino frío','Capuccino caliente','Café negro','Té de manzanilla c/m','Té de manzanilla','Té de anís','Té de frutos rojos','Té de frutos rojos c/J','Té relajante','Té de manzana con canela','Té de hierva luisa','Té de jamaica','Champagne','Vino tinto','Vino rosado'];
+      html += '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Cada combo descuenta bebida + servilleta + galleta</div>';
+      html += '<select id="siraProducto" onchange="_siraBebidaSelect(this)" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">';
+      html += '<option value="">— Seleccionar combo —</option>';
+      COMBOS_BEBIDA.forEach(function(b){ html += '<option value="' + b + '">' + b + '</option>'; });
       html += '</select>';
-      html += '<button onclick="_siraEnviar(\x27bebida\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
+      html += '<button onclick="_siraEnviar(\x27bebida\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar combo</button>';
     } else {
       // Entrada / Salida: búsqueda de producto + área + contador
       html += '<div style="margin-bottom:12px;">';
@@ -4385,9 +4385,33 @@
     responsable= (document.getElementById('siraResponsable')?.value || (user ? user.name : 'Staff')).trim();
 
     if (tipo === 'bebida') {
-      responsable = user ? user.name : 'Staff';
-      area        = 'Coffee';
-      cantidad    = 1;  // bebida siempre es 1 unidad
+      if (!producto) { if (typeof showToast==='function') showToast('Selecciona un combo'); return; }
+      var btn2b = document.getElementById('siraEnviarBtn');
+      if (btn2b) { btn2b.textContent='Registrando…'; btn2b.disabled=true; }
+      var COMBOS_MAP = {'Capuccino frío':['Capuccino frio','Servilleta logo','Galleta'],'Capuccino caliente':['Capuccino caliente','Servilleta logo','Galleta'],'Café negro':['Cafe negro','Servilleta logo','Galleta'],'Té de manzanilla c/m':['Te de manzanilla c/m','Servilleta logo','Galleta'],'Té de manzanilla':['Te de manzanilla','Servilleta logo','Galleta'],'Té de anís':['Te de anis','Servilleta logo','Galleta'],'Té de frutos rojos':['Te de frutos rojos','Servilleta logo','Galleta'],'Té de frutos rojos c/J':['Te de frutos rojos c/J','Servilleta logo','Galleta'],'Té relajante':['Te relajante','Servilleta logo','Galleta'],'Té de manzana con canela':['Te de manzana con canela','Servilleta logo','Galleta'],'Té de hierva luisa':['Te de hierva luisa','Servilleta logo','Galleta'],'Té de jamaica':['Te de jamaica','Servilleta logo','Galleta'],'Champagne':['Champagne','Servilleta logo','Galleta'],'Vino tinto':['Vino tinto','Servilleta logo','Galleta'],'Vino rosado':['Vino rosado','Servilleta logo','Galleta']};
+      var staffNomB = user ? user.name : 'Staff';
+      var grupoB = staffNomB.replace(/ /g,'_') + '_combo_' + Date.now();
+      var nowB = new Date();
+      var fechaB = nowB.getFullYear() + '-' + String(nowB.getMonth()+1).padStart(2,'0') + '-' + String(nowB.getDate()).padStart(2,'0');
+      var horaB  = String(nowB.getHours()).padStart(2,'0') + ':' + String(nowB.getMinutes()).padStart(2,'0');
+      var itemsB = (COMBOS_MAP[producto] || [producto]).map(function(prod) {
+        return { tipo:'salida', producto:prod, cantidad:1, responsable:staffNomB, area:'Coffee', fecha:fechaB, hora:horaB, tipoUnidad:'Unidad', grupo:grupoB, esCombo:true, nombreCombo:producto };
+      });
+      var rb = await _siraPost('movimientoBatchNexserv', { movimientos: itemsB });
+      var p2b = document.getElementById('siraPanel_bebida');
+      if (rb && (rb.ok || rb.success)) {
+        if (p2b) {
+          p2b.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:24px 16px;text-align:center;"><div style="font-size:36px;margin-bottom:8px;">✅</div><div style="font-size:16px;font-weight:800;color:#2d6a4f;">Registrado en SIRA</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">' + producto + '</div></div>';
+          p2b.style.maxHeight = '200px';
+          setTimeout(function(){ if(p2b&&p2b.style){p2b.style.maxHeight='0';p2b.style.opacity='0';} setTimeout(function(){if(p2b&&p2b.parentNode)p2b.parentNode.removeChild(p2b);},300); }, 1800);
+        }
+        if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
+        window._siraProductos = null;
+      } else {
+        if (btn2b) { btn2b.textContent='Confirmar combo'; btn2b.disabled=false; btn2b.style.opacity='1'; }
+        if (typeof showToast==='function') showToast('⚠ ' + ((rb&&rb.error)||'Error al registrar'));
+      }
+      return;
     }
     if (!producto) { if (typeof showToast==='function') showToast('Selecciona o escribe el producto'); return; }
 
