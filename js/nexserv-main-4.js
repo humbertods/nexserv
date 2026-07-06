@@ -4771,7 +4771,7 @@ function _apRenderLista(query) {
 
   list.innerHTML = filtrados.map(function(p) {
     var inTicket = window._apItems.find(function(i){ return i.nombre === p.nombre; });
-    return '<div onclick="apToggleProducto('' + p.nombre.replace(/'/g, "\'") + '',' + (p.precio||0) + ')" '
+    return '<div data-pnombre="' + p.nombre.replace(/"/g, '&quot;') + '" data-pprecio="' + (p.precio||0) + '" onclick="apToggleProducto(this.dataset.pnombre, Number(this.dataset.pprecio))" '
       + 'style="display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer;">'
       + '<div>'
         + '<div style="font-size:13px;font-weight:700;">' + p.nombre + '</div>'
