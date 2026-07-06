@@ -4240,7 +4240,7 @@
       html += '<option value="">— Seleccionar bebida —</option>';
       bebOpciones.forEach(function(p){ html += '<option value="' + p.nombre + '">' + p.nombre + '</option>'; });
       html += '</select>';
-      html += '<button onclick="_siraEnviar(\"bebida\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
+      html += '<button onclick="_siraEnviar(\x27bebida\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar bebida</button>';
     } else {
       // Entrada / Salida: búsqueda de producto + área + contador
       html += '<div style="margin-bottom:12px;">';
@@ -4386,9 +4386,9 @@
 
     if (tipo === 'bebida') {
       responsable = user ? user.name : 'Staff';
-      area        = user ? user.area : '';
+      area        = 'Coffee';
+      cantidad    = 1;  // bebida siempre es 1 unidad
     }
-
     if (!producto) { if (typeof showToast==='function') showToast('Selecciona o escribe el producto'); return; }
 
     var btn2 = document.getElementById('siraEnviarBtn');
