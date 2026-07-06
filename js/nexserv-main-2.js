@@ -4255,22 +4255,23 @@
       html += '<input type="hidden" id="siraProducto" value="">';
       html += '</div>';
 
-      // Cantidad con +/-
-      html += '<div style="margin-bottom:12px;">';
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>';
-      html += '<div style="display:flex;gap:10px;align-items:center;">';
-      html += '<button onclick="_siraCambiarCantidad(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">−</button>';
-      html += '<div id="siraCantidadVal" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--ink);">1</div>';
-      html += '<input type="hidden" id="siraCantidad" value="1">';
-      html += '<button onclick="_siraCambiarCantidad(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">+</button>';
-      html += '</div></div>';
-
-      // Área
+      // Cantidad (input numérico) + Área (select) — fila única
       html += '<div style="margin-bottom:14px;">';
-      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Área</div>';
+      html += '<div style="display:flex;gap:10px;align-items:flex-end;">';
+      // Columna cantidad
+      html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Cantidad</div>';
+      html += '<input type="number" id="siraCantidad" value="1" min="1" oninput="this.value=Math.max(1,parseInt(this.value)||1)" style="width:80px;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);text-align:center;box-sizing:border-box;-moz-appearance:textfield;">';
+      html += '</div>';
+      // Columna área
+      html += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Área</div>';
       html += '<select id="siraArea" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      html += '<option value="">Seleccionar área…</option>';
       areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
-      html += '</select></div>';
+      html += '</select>';
+      html += '</div>';
+      html += '</div></div>';
 
       // Responsable (auto)
       html += '<div style="margin-bottom:14px;">';
@@ -4380,7 +4381,7 @@
     }
 
     producto   = (document.getElementById('siraProducto')?.value || '').trim();
-    cantidad   = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
+    cantidad   = Math.max(1, parseInt(document.getElementById('siraCantidad')?.value || '1', 10));
     area       = (document.getElementById('siraArea')?.value || (user ? user.area : '')).trim();
     responsable= (document.getElementById('siraResponsable')?.value || (user ? user.name : 'Staff')).trim();
 
@@ -4408,8 +4409,11 @@
         if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
         window._siraProductos = null;
       } else {
+        // Siempre restaurar el botón para que se pueda reintentar
         if (btn2b) { btn2b.textContent='Confirmar combo'; btn2b.disabled=false; btn2b.style.opacity='1'; }
-        if (typeof showToast==='function') showToast('⚠ ' + ((rb&&rb.error)||'Error al registrar'));
+        var errMsg = (rb && rb.error) ? rb.error : (rb && rb.message) ? rb.message : 'Sin respuesta del servidor';
+        if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
+        console.error('[SIRA bebida] Error batch:', rb);
       }
       return;
     }
