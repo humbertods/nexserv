@@ -1577,6 +1577,8 @@
     if (asisStaffBtn) asisStaffBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
     const comisionesBtn = document.getElementById('menuComisionesBtn');
     if (comisionesBtn) comisionesBtn.style.display = (user && user.role === 'staff') ? 'flex' : 'none';
+    const siraAdminBtn = document.getElementById('menuSiraAdminBtn');
+    if (siraAdminBtn) siraAdminBtn.style.display = (user && user.role === 'admin') ? 'flex' : 'none';
     document.getElementById('userMenu').classList.add('active');
     document.getElementById('userMenuOverlay').classList.add('active');
   }
