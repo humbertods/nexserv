@@ -4653,7 +4653,7 @@
     html += '</div>';
 
     // Select desplegable de áreas
-    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 18px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;margin-bottom:16px;appearance:none;-webkit-appearance:none;background-image:url(\'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2216%22 height=%2216%22 fill=%22white%22><path d=%22M7 10l5 5 5-5z%22/></svg>\');background-repeat:no-repeat;background-position:right 16px center;box-sizing:border-box;">';
+    html += '<select id="siraInvAreaSelect" onchange="_siraAdminFiltrarInv(this.value)" style="width:100%;padding:14px 18px;border-radius:var(--radius-pill,100px);border:none;font-family:inherit;font-size:15px;font-weight:800;color:#fff;background:var(--ink,#1a1a1a);cursor:pointer;margin-bottom:16px;box-sizing:border-box;">';
     areas.forEach(function(a){
       html += '<option value="' + (a === 'Todas las áreas' ? '' : a) + '">' + a + '</option>';
     });
