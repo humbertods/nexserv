@@ -1674,6 +1674,11 @@
 
   async function loadStaffHome() {
     // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
+    // Auto-reset: si _siraActivo=true pero el DOM de SIRA ya no existe, limpiar el flag
+    if (window._siraActivo && !document.getElementById('siraStaffContent')) {
+      window._siraActivo = false;
+      window._siraBackup = null;
+    }
     if (window._siraActivo || window._resumenBackup) return;
     // Guard adicional: verificar que los elementos clave existen antes de continuar
     const _sectionCheck = document.getElementById('as1Section') || document.getElementById('as2Section');
@@ -1894,6 +1899,20 @@
           items: []
         };
       }
+      // Auto-refresh para staff: 12s con clienta activa, 20s en espera
+      if (window._staffAutoRefresh) clearInterval(window._staffAutoRefresh);
+      const _hasClient = !!window._as1Client;
+      window._staffAutoRefresh = setInterval(function() {
+        if (window._siraActivo || window._resumenBackup) return;
+        var cur = document.querySelector('.screen.active');
+        if (cur && cur.id === 'staffHome') {
+          loadStaffHome();
+        } else {
+          clearInterval(window._staffAutoRefresh);
+          window._staffAutoRefresh = null;
+        }
+      }, _hasClient ? 12000 : 20000);
+
     } catch (err) {
       console.error('Error cargando staff home:', err);
     }
@@ -4508,9 +4527,13 @@
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
+    // Siempre resetear el flag, incluso si el backup no existe
+    window._siraActivo = false;
     if (screen && window._siraBackup) {
       screen.innerHTML = window._siraBackup;
-      window._siraBackup = null;
-      window._siraActivo = false;
     }
+    window._siraBackup = null;
+    window._siraScreenId = null;
+    // Recargar datos frescos del panel
+    setTimeout(function() { if (typeof loadStaffHome === 'function') loadStaffHome(); }, 100);
   };
