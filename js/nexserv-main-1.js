@@ -478,7 +478,7 @@
                   </div>
                   <div style="display:flex;align-items:center;gap:8px;">
                     <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Math.round(Number(sv.precio || 0))}</div>
-                    <button onclick="confirmarEliminarOwner('${svSafe}')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
+                    <button data-action="owner-eliminar" data-sv="${svSafe.replace(/"/g,'&quot;')}" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:13px;flex-shrink:0;">🗑</button>
                   </div>
                 </div>`;
               }).join('')}
@@ -1707,7 +1707,7 @@
     const cod    = _solEsc(t.codigo || id);
     const total  = (grupo === 'cobrar' && t.total != null) ? ('<span style="font-weight:800;color:var(--success);">$' + Number(t.total).toFixed(2) + '</span>') : '';
     const idJs   = id.replace(/'/g, "\\'");
-    return '<div class="card" onclick="solVerDetalle(\'' + idJs + '\')" style="cursor:pointer;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+    return '<div class="card" data-action="sol-ver" data-id="' + id + '" style="cursor:pointer;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
       + '<div style="min-width:0;">'
       +   '<div style="font-weight:800;font-size:15px;">' + nombre + '</div>'
       +   '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + area + ' · ' + (staff ? (_solIcon('person',13) + ' ' + staff) : 'sin asignar') + '</div>'
@@ -1762,15 +1762,15 @@
 
     const staffAll = ['María','Keyla','Lesly','Rosa','Yadira','Diana','Laura'];
     const picker = staffAll.map(function(s){
-      return '<button onclick="solReasignar(\'' + idJs + '\',\'' + aIdxJs + '\',\'' + s + '\',\'' + nomJs + '\',\'' + codJs + '\')" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
+      return '<button data-action="sol-reasignar" data-id="'+idJs+'" data-aidx="'+aIdxJs+'" data-staff="'+s+'" data-nombre="'+nomJs+'" data-cod="'+codJs+'" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
     }).join('');
 
     let acc = '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:18px 0 8px;">Acciones</div>';
-    acc += '<button onclick="solDevolver(\'' + idJs + '\',\'' + nomJs + '\',\'' + staffJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('undo',16) + ' Devolver a la lista de espera<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Para que otra staff la tome desde cero</div></button>';
-    acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
+    acc += '<button data-action="sol-devolver" data-id="'+idJs+'" data-nombre="'+nomJs+'" data-staff="'+staffJs+'" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('undo',16) + ' Devolver a la lista de espera<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Para que otra staff la tome desde cero</div></button>';
+    acc += '<button data-action="sol-retirar" data-id="'+idJs+'" data-nombre="'+nomJs+'" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
     acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">' + _solIcon('refresh',16) + ' Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
-    acc += '<button onclick="solAbrirConsulta(\'' + nomJs + '\',\'' + idJs + '\')" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
-    acc += '<button onclick="solEliminarTicket(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;margin-top:14px;padding:13px;border:1px solid var(--danger-bg);border-radius:12px;background:var(--bg-card);color:var(--danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('trash',16) + ' Eliminar ticket (permanente)<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Solo si está roto y no se puede mover ni cobrar</div></button>';
+    acc += '<button data-action="sol-consulta" data-nombre="'+nomJs+'" data-id="'+idJs+'" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
+    acc += '<button data-action="sol-eliminar" data-id="'+idJs+'" data-nombre="'+nomJs+'" style="width:100%;margin-top:14px;padding:13px;border:1px solid var(--danger-bg);border-radius:12px;background:var(--bg-card);color:var(--danger);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('trash',16) + ' Eliminar ticket (permanente)<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Solo si está roto y no se puede mover ni cobrar</div></button>';
 
     body.innerHTML = '<div class="card" style="padding:14px;">' + info + desg + acc + '</div>'
       + '<div style="font-size:11px;color:var(--ink-faint);text-align:center;margin-top:10px;line-height:1.5;">Para cobrar normalmente usá la pantalla “Por cobrar”. Para deshacer un servicio ya cobrado usá “Historial de servicios”.</div>';
@@ -2194,7 +2194,7 @@
     res.innerHTML = m.map(function(c){
       const ini = String(c.nombre||'?').split(' ').map(function(n){return n[0];}).join('').slice(0,2);
       const cod = String(c.codigo||'').replace(/'/g,'');
-      return '<div onclick="histSeleccionarClienta(\'' + cod + '\')" class="card" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;">'
+      return '<div data-action="hist-sel" data-cod="'+cod+'" class="card" style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;">'
         + '<div class="client-avatar" style="flex-shrink:0;">' + ini + '</div>'
         + '<div style="flex:1;"><div style="font-weight:700;font-size:14px;">' + (c.nombre||'') + '</div>'
         + '<div style="font-size:11px;color:var(--ink-soft);">' + (c.codigo||'') + (c.ultimaVisita ? ' · última: ' + _histFecha(c.ultimaVisita) : '') + '</div></div>'
@@ -3870,8 +3870,8 @@
       const blocked = cfg[n] === true;
       html += '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line);">'
         + '<div style="flex:1;font-size:14px;font-weight:600;color:var(--ink);">' + n + '</div>'
-        + '<button onclick="setDescansoStaff(\'' + n + '\',true)" title="Bloquear acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (blocked ? '#e5484d' : 'var(--bg)') + ';color:' + (blocked ? '#fff' : 'var(--ink-faint)') + ';">🔒</button>'
-        + '<button onclick="setDescansoStaff(\'' + n + '\',false)" title="Permitir acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (!blocked ? '#2d9d5a' : 'var(--bg)') + ';color:' + (!blocked ? '#fff' : 'var(--ink-faint)') + ';">🔓</button>'
+        + '<button data-action="set-descanso" data-staff="'+n+'" data-val="true" title="Bloquear acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (blocked ? '#e5484d' : 'var(--bg)') + ';color:' + (blocked ? '#fff' : 'var(--ink-faint)') + ';">🔒</button>'
+        + '<button data-action="set-descanso" data-staff="'+n+'" data-val="false" title="Permitir acceso" style="width:38px;height:34px;border-radius:10px;border:none;cursor:pointer;font-size:15px;background:' + (!blocked ? '#2d9d5a' : 'var(--bg)') + ';color:' + (!blocked ? '#fff' : 'var(--ink-faint)') + ';">🔓</button>'
         + '</div>';
     });
     html += '</div>';
@@ -4378,6 +4378,68 @@ function _evComprimirImagen(file, maxPx, quality) {
       renderEvidenciasPanel();
     });
   }
+})();
+
+
+// ═══════════════════════════════════════════════════════════════
+// EVENT DELEGATION HUB — nexserv-main-1
+// ═══════════════════════════════════════════════════════════════
+(function _installDelegationHub1() {
+  document.addEventListener('click', function(e) {
+    var target = e.target.closest('[data-action]');
+    if (!target) return;
+    var action = target.dataset.action;
+    var id     = target.dataset.id     || '';
+    var nombre = target.dataset.nombre || '';
+    var cod    = target.dataset.cod    || id;
+    var staff  = target.dataset.staff  || '';
+    var aidx   = target.dataset.aidx   || '0';
+    var sv     = target.dataset.sv     || '';
+    var val    = target.dataset.val;
+
+    switch (action) {
+      case 'sol-ver':
+        e.stopPropagation();
+        if (typeof solVerDetalle === 'function') solVerDetalle(id);
+        break;
+      case 'sol-reasignar':
+        e.stopPropagation();
+        if (typeof solReasignar === 'function') solReasignar(id, aidx, staff, nombre, cod);
+        break;
+      case 'sol-devolver':
+        e.stopPropagation();
+        if (typeof solDevolver === 'function') solDevolver(id, nombre, staff);
+        break;
+      case 'sol-retirar':
+        e.stopPropagation();
+        if (typeof solRetirarCobrar === 'function') solRetirarCobrar(id, nombre);
+        break;
+      case 'sol-consulta':
+        e.stopPropagation();
+        if (typeof solAbrirConsulta === 'function') solAbrirConsulta(nombre, id);
+        break;
+      case 'sol-eliminar':
+        e.stopPropagation();
+        if (typeof solEliminarTicket === 'function') solEliminarTicket(id, nombre);
+        break;
+      case 'owner-eliminar':
+        e.stopPropagation();
+        if (typeof confirmarEliminarOwner === 'function') confirmarEliminarOwner(sv);
+        break;
+      case 'hist-toggle':
+        e.stopPropagation();
+        if (typeof histToggle === 'function') histToggle(id);
+        break;
+      case 'hist-sel':
+        e.stopPropagation();
+        if (typeof histSeleccionarClienta === 'function') histSeleccionarClienta(cod);
+        break;
+      case 'set-descanso':
+        e.stopPropagation();
+        if (typeof setDescansoStaff === 'function') setDescansoStaff(staff, val === 'true');
+        break;
+    }
+  });
 })();
 
 // Exponer globalmente
