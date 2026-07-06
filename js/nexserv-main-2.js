@@ -4129,8 +4129,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button onclick="approveAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button onclick="rejectAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
