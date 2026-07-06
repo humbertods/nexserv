@@ -4230,7 +4230,7 @@
       });
       html += '</div>';
       html += '<input type="hidden" id="siraKitCantidad" value="">';
-      html += '<button onclick="_siraEnviar(\\"kit\\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar kit</button>';
+      html += '<button onclick="_siraEnviar(\x27kit\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar kit</button>';
 
     } else if (tipo === 'bebida') {
       // Bebida: lista de productos Coffee de SIRA
@@ -4279,7 +4279,7 @@
       html += '<input type="hidden" id="siraResponsable" value="' + staffNombre + '">';
       html += '</div>';
 
-      html += '<button onclick="_siraEnviar(\\"' + tipo + '\\")" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo==='entrada'?'entrada':'salida') + '</button>';
+      html += '<button onclick="_siraEnviar(\x27' + tipo + '\x27)" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo==='entrada'?'entrada':'salida') + '</button>';
     }
 
     // Cancelar
