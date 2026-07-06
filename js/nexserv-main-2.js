@@ -4456,3 +4456,359 @@
       window._siraActivo = false;
     }
   };
+
+  // ── MÓDULO INVENTARIO ADMIN (Mikaela) ──────────────────────────────────────
+  window.abrirInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    if (window._siraActivo) return;
+    window._siraAdminBackup = screen.innerHTML;
+    window._siraActivo = true;
+
+    var navHtml = '<nav class="nav" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:100;">'
+      + '<button onclick="cerrarInventarioAdmin()"><span class="icon"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10.55 2.533a2.25 2.25 0 0 1 2.9 0l7.25 6.327A2.25 2.25 0 0 1 21.5 10.7V19a2 2 0 0 1-2 2h-4a1 1 0 0 1-1-1v-4h-3v4a1 1 0 0 1-1 1H6.5a2 2 0 0 1-2-2v-8.3a2.25 2.25 0 0 1 .8-1.74l5.25-4.427Z"/></svg></span><span class="label-dock">Inicio</span></button>'
+      + '</nav>';
+
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_LIST = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM4 5h16V4H4v1Zm2-3h12V1H6v1ZM12 14a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>';
+    var SVG_G = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Zm10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
+
+    function card(svg, titulo, desc, tipo, bgCard, colorIcon) {
+      return '<button data-siraadmin="' + tipo + '" onclick="_siraAdminAccion(this.dataset.siraadmin)" style="'
+        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
+        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
+        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
+        + '</button>';
+    }
+
+    var cardsHtml =
+        card(SVG_E,    'Registrar Entrada',  'Llegó material o producto nuevo',    'entrada',    '#edf7f1', '#2d6a4f')
+      + card(SVG_S,    'Registrar Salida',   'Usé un producto en un servicio',     'salida',     '#f5f0e8', '#8b7355')
+      + card(SVG_LIST, 'Ver Inventario',     'Lista completa de productos SIRA',   'inventario', '#e8f0fe', '#1a56db')
+      + card(SVG_G,    'Gastos Varios',      'Envíos, reparaciones u otros gastos','gastos',     '#fdf3f3', '#c0392b');
+
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioAdmin()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraAdminContent">' + cardsHtml + '</div>'
+      + '<div id="siraAdminFormContainer" style="padding-bottom:90px;"></div>'
+      + navHtml;
+  };
+
+  window.cerrarInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    if (screen && window._siraAdminBackup) {
+      screen.innerHTML = window._siraAdminBackup;
+      window._siraAdminBackup = null;
+      window._siraActivo = false;
+    }
+  };
+
+  window._siraAdminAccion = function(tipo) {
+    var user = window.currentUser;
+    var responsable = user ? user.name : 'Mikaela';
+    var container = document.getElementById('siraAdminFormContainer');
+    if (!container) return;
+
+    // Ocultar cards y mostrar formulario
+    var cardsEl = document.getElementById('siraAdminContent');
+    if (cardsEl) cardsEl.style.display = 'none';
+
+    if (tipo === 'inventario') {
+      _siraAdminMostrarInventario(container, responsable);
+      return;
+    }
+    if (tipo === 'gastos') {
+      _siraAdminMostrarGastos(container, responsable);
+      return;
+    }
+    // entrada / salida — reutilizar el mismo renderizador de staff
+    _siraAdminMostrarForm(tipo, container, responsable);
+  };
+
+  // -- Formulario entrada/salida para admin (mismo que staff) --
+  function _siraAdminMostrarForm(tipo, container, responsable) {
+    var colores = SIRA_COLORS[tipo] || SIRA_COLORS.salida;
+    var titulo = tipo === 'entrada' ? 'Registrar Entrada' : 'Registrar Salida';
+    var areas = ['Cejas','Pestañas','Facial','Coffee','Local','Depilaciones','Limpieza'];
+
+    var html = '<div id="siraAdminPanel_' + tipo + '" style="background:' + colores.bg + ';border-radius:18px;padding:20px;margin-bottom:12px;">'
+      + '<div style="font-size:17px;font-weight:800;color:' + colores.color + ';margin-bottom:16px;">' + titulo + '</div>';
+
+    // Buscador de productos
+    html += '<div style="margin-bottom:14px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>';
+    html += '<input type="text" id="siraAdminSearch_' + tipo + '" placeholder="Buscar producto..." oninput="_siraAdminFiltrar(\'' + tipo + '\')" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    html += '<div id="siraAdminSugg_' + tipo + '" style="background:var(--bg-card,#fff);border-radius:12px;margin-top:4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);"></div>';
+    html += '</div>';
+
+    // Cantidad + Área en fila única
+    html += '<div style="margin-bottom:14px;">';
+    html += '<div style="display:flex;gap:10px;align-items:flex-end;">';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Cantidad</div>';
+    html += '<input type="number" id="siraAdminCantidad_' + tipo + '" value="1" min="1" oninput="this.value=Math.max(1,parseInt(this.value)||1)" style="width:80px;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);text-align:center;box-sizing:border-box;-moz-appearance:textfield;">';
+    html += '</div>';
+    html += '<div style="flex:1;display:flex;flex-direction:column;gap:6px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;">Área</div>';
+    html += '<select id="siraAdminArea_' + tipo + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+    html += '<option value="">Seleccionar área…</option>';
+    areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
+    html += '</select></div></div></div>';
+
+    // Responsable
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
+    html += '<input type="text" id="siraAdminResp_' + tipo + '" value="' + responsable + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    html += '</div>';
+
+    html += '<button id="siraAdminBtn_' + tipo + '" onclick="_siraAdminEnviar(\'' + tipo + '\')" style="width:100%;padding:15px;background:' + colores.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,100px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + tipo + '</button>';
+    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '</div>';
+
+    container.innerHTML = html;
+    container.style.display = '';
+    _siraCargarProductos();
+  }
+
+  function _siraAdminFiltrar(tipo) {
+    var val = (document.getElementById('siraAdminSearch_' + tipo) || {}).value || '';
+    var sugg = document.getElementById('siraAdminSugg_' + tipo);
+    if (!sugg) return;
+    if (!val.trim()) { sugg.innerHTML = ''; return; }
+    var prods = window._siraProductos || [];
+    var norm = val.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var matches = prods.filter(function(p){
+      return (p.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(norm) >= 0;
+    }).slice(0,6);
+    sugg.innerHTML = matches.map(function(p){
+      return '<div onclick="_siraAdminSelProd(\'' + tipo + '\',\'' + (p.nombre||'').replace(/'/g,"\\'") + '\')" style="padding:11px 14px;border-bottom:1px solid var(--line,#eee);cursor:pointer;font-size:14px;font-weight:600;">'
+        + p.nombre + ' <span style="font-size:12px;font-weight:400;color:var(--ink-soft);">' + (p.area||'') + '</span></div>';
+    }).join('');
+  }
+
+  function _siraAdminSelProd(tipo, nombre) {
+    var inp = document.getElementById('siraAdminSearch_' + tipo);
+    if (inp) inp.value = nombre;
+    var sugg = document.getElementById('siraAdminSugg_' + tipo);
+    if (sugg) sugg.innerHTML = '';
+  }
+
+  async function _siraAdminEnviar(tipo) {
+    var producto  = (document.getElementById('siraAdminSearch_'   + tipo) || {}).value || '';
+    var cantidad  = Math.max(1, parseInt((document.getElementById('siraAdminCantidad_' + tipo) || {}).value || '1', 10));
+    var area      = ((document.getElementById('siraAdminArea_'    + tipo) || {}).value || '').trim();
+    var responsable = ((document.getElementById('siraAdminResp_'  + tipo) || {}).value || 'Mikaela').trim();
+    var btn = document.getElementById('siraAdminBtn_' + tipo);
+
+    if (!producto.trim()) { if (typeof showToast==='function') showToast('⚠ Selecciona un producto'); return; }
+    if (!area) { if (typeof showToast==='function') showToast('⚠ Selecciona un área'); return; }
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = 'Registrando…'; }
+
+    var r = await _siraPost('movimientoNexserv', { tipo: tipo, producto: producto, cantidad: cantidad, responsable: responsable, area: area, nota: 'Desde NexServ Admin' });
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Confirmar ' + tipo; }
+
+    if (r && (r.ok || r.success)) {
+      if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado (' + tipo + ')');
+      window._siraProductos = null;
+      _siraAdminVolver();
+    } else {
+      var errMsg = (r && r.error) ? r.error : 'Sin respuesta del servidor';
+      if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
+      console.error('[SIRA admin]', r);
+    }
+  }
+
+  function _siraAdminVolver() {
+    var container = document.getElementById('siraAdminFormContainer');
+    if (container) { container.innerHTML = ''; container.style.display = 'none'; }
+    var cardsEl = document.getElementById('siraAdminContent');
+    if (cardsEl) cardsEl.style.display = '';
+  }
+
+  // -- Ver Inventario: lista de productos SIRA --
+  async function _siraAdminMostrarInventario(container, responsable) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ink-soft);">Cargando inventario…</div>';
+    container.style.display = '';
+    await _siraCargarProductos();
+    var prods = window._siraProductos || [];
+    var areas = [...new Set(prods.map(function(p){ return p.area||'Sin área'; }))].sort();
+
+    var html = '<div style="margin-bottom:12px;">';
+    html += '<input type="text" id="siraInvSearch" placeholder="Buscar producto..." oninput="_siraAdminFiltrarInv()" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">';
+    html += '<button onclick="_siraAdminFiltrarInv(\'\')" style="padding:6px 14px;border-radius:100px;border:1.5px solid var(--line);background:var(--ink);color:#fff;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;" id="siraInvTabTodos">Todos</button>';
+    areas.forEach(function(a){
+      html += '<button onclick="_siraAdminFiltrarInv(\'' + a + '\')" style="padding:6px 14px;border-radius:100px;border:1.5px solid var(--line);background:var(--bg-card);color:var(--ink-soft);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;" class="siraInvTab">' + a + '</button>';
+    });
+    html += '</div>';
+    html += '<div id="siraInvLista">';
+    html += _siraAdminBuildListaProds(prods);
+    html += '</div>';
+    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;padding-bottom:80px;">← Volver</button>';
+
+    container.innerHTML = html;
+    window._siraInvAreaActiva = '';
+  }
+
+  function _siraAdminBuildListaProds(prods) {
+    if (!prods.length) return '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin productos</div>';
+    return prods.map(function(p){
+      var stockColor = p.stockActual <= (p.stockMin||0) ? '#c0392b' : p.stockActual <= (p.stockMin||0)*2 ? '#e67e22' : '#2d6a4f';
+      var dot = p.stockActual <= (p.stockMin||0) ? '#c0392b' : p.stockActual <= (p.stockMin||0)*2 ? '#e67e22' : '#27ae60';
+      return '<div style="display:flex;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line,#eee);">'
+        + (p.foto ? '<img src="' + p.foto + '" style="width:36px;height:36px;border-radius:10px;object-fit:cover;margin-right:10px;flex-shrink:0;">' : '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg);margin-right:10px;flex-shrink:0;"></div>')
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);">' + (p.area||'') + ' · ' + (p.unidad||'Unidad') + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;">'
+        + '<div style="font-size:18px;font-weight:800;color:' + stockColor + ';">' + (p.stockActual||0) + '</div>'
+        + '<div style="font-size:10px;color:var(--ink-faint);">unid.</div>'
+        + '<div style="width:8px;height:8px;border-radius:50%;background:' + dot + ';margin:2px auto 0;"></div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  window._siraAdminFiltrarInv = function(area) {
+    if (area !== undefined) window._siraInvAreaActiva = area;
+    var prods = window._siraProductos || [];
+    var searchVal = ((document.getElementById('siraInvSearch')||{}).value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    var filtrados = prods.filter(function(p){
+      var matchArea = !window._siraInvAreaActiva || (p.area||'') === window._siraInvAreaActiva;
+      var matchSearch = !searchVal || (p.nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').indexOf(searchVal) >= 0;
+      return matchArea && matchSearch;
+    });
+    var lista = document.getElementById('siraInvLista');
+    if (lista) lista.innerHTML = _siraAdminBuildListaProds(filtrados);
+    // Actualizar estilo tabs
+    document.querySelectorAll('.siraInvTab').forEach(function(b){
+      b.style.background = (b.textContent.trim() === window._siraInvAreaActiva) ? 'var(--ink)' : 'var(--bg-card)';
+      b.style.color = (b.textContent.trim() === window._siraInvAreaActiva) ? '#fff' : 'var(--ink-soft)';
+    });
+    var todosBtn = document.getElementById('siraInvTabTodos');
+    if (todosBtn) { todosBtn.style.background = window._siraInvAreaActiva ? 'var(--bg-card)' : 'var(--ink)'; todosBtn.style.color = window._siraInvAreaActiva ? 'var(--ink-soft)' : '#fff'; }
+  };
+
+  // -- Gastos Varios para Mikaela --
+  function _siraAdminMostrarGastos(container, responsable) {
+    // Categorías exactas de SIRA con emojis
+    var CATEGORIAS_GASTO = [
+      { key: 'Envío',        emoji: '🚚' },
+      { key: 'Reparación',   emoji: '🔧' },
+      { key: 'Servicio',     emoji: '⚡' },
+      { key: 'Transporte',   emoji: '🚕' },
+      { key: 'Insumo extra', emoji: '🛒' },
+      { key: 'Otro',         emoji: '📎' }
+    ];
+
+    var html = '<div style="background:#fdf3f3;border-radius:18px;padding:20px;margin-bottom:12px;">';
+    html += '<div style="font-size:17px;font-weight:800;color:#c0392b;margin-bottom:16px;">Registrar Gasto Varios</div>';
+
+    // Categoría con emojis
+    html += '<div style="margin-bottom:14px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Categoría</div>';
+    html += '<select id="siraGastoCat" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+    CATEGORIAS_GASTO.forEach(function(c){ html += '<option value="' + c.key + '">' + c.emoji + ' ' + c.key + '</option>'; });
+    html += '</select></div>';
+
+    // Descripción
+    html += '<div style="margin-bottom:14px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Descripción</div>';
+    html += '<input type="text" id="siraGastoDesc" placeholder="Ej: Envío de cera desde Quito" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    html += '</div>';
+
+    // Monto + Responsable en fila
+    html += '<div style="display:flex;gap:10px;margin-bottom:14px;">';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Monto ($)</div>';
+    html += '<input type="number" id="siraGastoMonto" value="0.00" min="0" step="0.01" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;color:var(--ink);background:var(--bg,#f8f8f6);box-sizing:border-box;-moz-appearance:textfield;">';
+    html += '</div>';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
+    html += '<select id="siraGastoResp" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+    html += '<option value="Mikaela"' + (responsable === 'Mikaela' ? ' selected' : '') + '>Mikaela</option>';
+    html += '<option value="Humberto"' + (responsable === 'Humberto' ? ' selected' : '') + '>Humberto</option>';
+    html += '</select>';
+    html += '</div></div>';
+
+    // Notas
+    html += '<div style="margin-bottom:16px;">';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Notas (opcional)</div>';
+    html += '<input type="text" id="siraGastoNota" placeholder="Detalle adicional" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);box-sizing:border-box;">';
+    html += '</div>';
+
+    html += '<button id="siraGastoBtn" onclick="_siraAdminEnviarGasto()" style="width:100%;padding:15px;background:#c0392b;color:#fff;border:none;border-radius:var(--radius-pill,100px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar gasto</button>';
+    html += '<button onclick="_siraAdminVolver()" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:14px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '</div>';
+
+    container.innerHTML = html;
+    container.style.display = '';
+  }
+
+  window._siraAdminEnviarGasto = async function() {
+    var cat         = ((document.getElementById('siraGastoCat')  ||{}).value||'Otro').trim();
+    var desc        = ((document.getElementById('siraGastoDesc') ||{}).value||'').trim();
+    var monto       = parseFloat((document.getElementById('siraGastoMonto')||{}).value||'0')||0;
+    var responsable = ((document.getElementById('siraGastoResp') ||{}).value||'Mikaela').trim();
+    var nota        = ((document.getElementById('siraGastoNota') ||{}).value||'').trim();
+    var btn = document.getElementById('siraGastoBtn');
+
+    if (!desc) { if (typeof showToast==='function') showToast('⚠ Agrega una descripción'); return; }
+    if (monto <= 0) { if (typeof showToast==='function') showToast('⚠ El monto debe ser mayor a 0'); return; }
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = 'Registrando…'; }
+
+    // Fecha y hora en formato requerido por SIRA
+    var now = new Date();
+    var fecha = now.getFullYear() + '-'
+      + String(now.getMonth()+1).padStart(2,'0') + '-'
+      + String(now.getDate()).padStart(2,'0');
+    var hora = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+
+    // Usar sessionToken del usuario (no el bridge token) — acción "gastoVarios"
+    var user = window.currentUser;
+    var sessionToken = (user && user.sessionToken) ? user.sessionToken : '';
+
+    var payload = {
+      action: 'gastoVarios',
+      sessionToken: sessionToken,
+      fecha: fecha,
+      hora: hora,
+      categoria: cat,
+      descripcion: desc,
+      monto: monto,
+      responsable: responsable,
+      notas: nota
+    };
+
+    // gastoVarios usa sessionToken → POST directo a SIRA_URL (no _siraPost que inyecta bridge token)
+    var r = null;
+    try {
+      var res = await fetch(SIRA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+      r = await res.json();
+    } catch(e) {
+      r = { ok: false, error: e.message };
+    }
+
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = 'Confirmar gasto'; }
+
+    if (r && (r.ok || r.success)) {
+      if (typeof showToast==='function') showToast('✅ Gasto registrado: $' + monto.toFixed(2));
+      _siraAdminVolver();
+    } else {
+      var errMsg = (r && r.error) ? r.error : 'Sin respuesta del servidor';
+      if (typeof showToast==='function') showToast('⚠ SIRA: ' + errMsg);
+      console.error('[SIRA gastos]', r);
+    }
+  };
