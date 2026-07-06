@@ -1057,7 +1057,7 @@
               prioridad: 'Normal',
               observaciones: 'Servicio adicional solicitado por ' + staffName + ' durante atención'
             }).then(function(r) {
-              if (r && r.success) {
+              if (r && (r.ok || r.success)) {
                 showToast('✅ ' + auth.servicioNombre + ' enviado a lista de espera');
               }
             }).catch(function(){});
@@ -4158,7 +4158,14 @@
     if (!producto) { if (typeof showToast === 'function') showToast('Escribe el nombre del producto'); return; }
     var btn2 = document.getElementById('siraEnviarBtn');
     if (btn2) { btn2.textContent = 'Registrando…'; btn2.disabled = true; }
-    var r = await _siraPost('registrarMovimientoStaff', { tipo, producto, cantidad, nota, quien, staff: user ? user.name : '', area: user ? user.area : '' });
+    var r = await _siraPost('movimientoNexserv', {
+      tipo:        tipo,
+      producto:    producto,
+      cantidad:    cantidad,
+      responsable: user ? user.name : 'Staff',
+      area:        user ? user.area : '',
+      nota:        nota + (quien ? ' · Para: ' + quien : '')
+    });
     var fb = document.getElementById('siraFeedback');
     var c3 = document.getElementById('siraFormContainer');
     if (r && r.success) {
