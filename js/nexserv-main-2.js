@@ -1675,6 +1675,9 @@
   async function loadStaffHome() {
     // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
     if (window._siraActivo || window._resumenBackup) return;
+    // Guard adicional: verificar que los elementos clave existen antes de continuar
+    const _sectionCheck = document.getElementById('as1Section') || document.getElementById('as2Section');
+    if (!_sectionCheck && !document.getElementById('staffName')) return;
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
     
@@ -1983,7 +1986,7 @@
         + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Esta clienta no tiene ficha registrada</div>'
         + '<button onclick="openNewPestFicha(\'' + clientKey + '\', ' + slot + ')" style="padding:14px 24px;background:var(--top-purple);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha de pestañas</button>'
         + '</div>'
-        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\' staff\')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
+        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\' staff)" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
         + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
         + 'Evidencia del trabajo realizado</button>';
       return;
@@ -2017,10 +2020,10 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.')" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
@@ -2830,7 +2833,7 @@
     if (!res.length){ cont.innerHTML='<div style="padding:10px;color:var(--ink-faint);font-size:12px;">Sin resultados</div>'; return; }
     cont.innerHTML = res.map(function(c){
       const cod=_acEsc(c.codigo), nom=_acEsc(c.nombre);
-      return '<div onclick="acSelectCliente(\''+cod+'\')" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
+      return '<div onclick="acSelectCliente(\''+cod+')" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
     }).join('');
   }
   function acSelectCliente(cod){
@@ -3065,8 +3068,8 @@
           '<div style="font-size:11px;color:var(--ink-faint);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;">Área que la atiende</div>' +
           '<div style="display:flex;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
           '<div style="display:flex;gap:8px;">' +
-            '<button onclick="confirmarLlegadaCita(\'' + c.id + '\')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
-            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + '\')" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
+            '<button onclick="confirmarLlegadaCita(\'' + c.id + ')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
+            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + ')" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
           '</div>' +
         '</div>';
       }).join('');
@@ -3240,7 +3243,7 @@
           '<div style="font-size:15px;line-height:1.5;color:#666;margin-bottom:18px;">' +
             'La agenda SYNA se abre en su propia pantalla en el teléfono.' +
           '</div>' +
-          '<button onclick="window.open(\'' + synaDest.replace(/'/g, "\\'") + '\',\'_blank\')" ' +
+          '<button onclick="window.open(\'' + synaDest.replace(/'/g, "\\'") + '\',\'_blank)" ' +
             'style="background:#6C4CE0;color:#fff;border:0;border-radius:14px;' +
             'padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;">' +
             'Abrir SYNA' +
@@ -3387,9 +3390,9 @@
                 <select id="reSel_${_uid}" onchange="document.getElementById('reBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
+                <button id="reBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','${_areaIdxAttr}','reSel_${_uid}','${_nombreSafe}','${w.codigo||''}\")" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>
               </div>
-              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe}')" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
+              <button onclick="retirarYCobrar('${w.idEspera}','${_nombreSafe}\")" style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>`;
             // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
             // así que se asigna staff directo con el mismo dropdown que usa multi-área
             // (no hace falta re-elegir el servicio). Si igual quiere cambiarlo, abajo
@@ -3400,7 +3403,7 @@
                 <select id="syncSel_${_uid}" onchange="document.getElementById('syncBtn_${_uid}').style.display=this.value?'block':'none'" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">
                   ${_staffOpcionesReasignar(_pendKey, busyStaff)}
                 </select>
-                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''}')" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
+                <button id="syncBtn_${_uid}" onclick="reasignarStaff('${w.idEspera}','','syncSel_${_uid}','${_nombreSafe}','${w.codigo||''}\")" style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>
               </div>`;
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
@@ -3421,8 +3424,8 @@
                 ${hechasHTML}
                 ${reassignHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
-                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
-                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
+                  <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}\")" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
+                  <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}\")" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
                 </div>
               </div>`;
             }
@@ -3440,8 +3443,8 @@
               ${estadoHTML}
               ${_desgloseMultiHTML}
               ${_esMultiPromo ? reassignHTML : `${esSyna ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
-                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
-                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}')" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+                <button onclick="openAssignServiceModal('${w.codigo}', '${w.nombre}\")" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                <button onclick="openAssignPromoModal('${w.codigo}', '${w.nombre}\")" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
               </div>`}
             </div>`;
           }).join('');
@@ -3639,11 +3642,11 @@
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                     data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}')"
+                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}\")"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
-                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}')"
+                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}\")"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
-                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}')"
+                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}\")"
                     style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
                 </div>
               </div>
@@ -4045,8 +4048,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button onclick="approveAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button onclick="rejectAuthorization('${req.id}')" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button onclick="approveAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button onclick="rejectAuthorization('${req.id}\")" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -4130,23 +4133,152 @@
     return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>';
   }
 
+  // Mapa de colores por tipo para los acordeones
+  var SIRA_COLORS = {
+    entrada: { bg:'#edf7f1', color:'#2d6a4f', btnBg:'#2d6a4f' },
+    salida:  { bg:'#f5f0e8', color:'#8b7355', btnBg:'#8b7355' },
+    bebida:  { bg:'#fdf8ed', color:'#a07830', btnBg:'#a07830' },
+    kit:     { bg:'#eef2ff', color:'#5b4fd4', btnBg:'#5b4fd4' }
+  };
+
   window._siraAccion = function(tipo) {
-    var c2 = document.getElementById('siraFormContainer');
-    if (!c2) return;
-    if (c2.dataset.tipo === tipo && c2.innerHTML) { c2.innerHTML = ''; c2.dataset.tipo = ''; return; }
-    c2.dataset.tipo = tipo;
-    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Registrar Kit de Pestañas' };
-    var ph = tipo === 'kit' ? 'Ej: Kit 9-11 Volumen' : tipo === 'bebida' ? 'Ej: Agua, Café' : tipo === 'entrada' ? 'Ej: Adhesivo negro' : 'Ej: Parches gel';
-    var quienRow = tipo === 'bebida' ? '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Quién la tomó</div><input id="siraQuien" placeholder="Clienta o staff" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>' : '';
-    c2.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.07);">'
-      + '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:14px;">' + labels[tipo] + '</div>'
-      + '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Producto / Insumo</div><input id="siraProducto" placeholder="' + ph + '" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
-      + '<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Cantidad</div><input id="siraCantidad" type="number" min="1" value="1" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
-      + quienRow
-      + '<div style="margin-bottom:14px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em;">Nota (opcional)</div><input id="siraNota" placeholder="Observación..." style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;"></div>'
-      + '<button onclick="_siraEnviar(\"' + tipo + '\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">Confirmar registro</button>'
-      + '</div>';
-    c2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    var panelId = 'siraPanel_' + tipo;
+    var existing = document.getElementById(panelId);
+
+    // Toggle: si ya está abierto, cerrarlo
+    if (existing) {
+      existing.style.maxHeight = '0';
+      existing.style.opacity = '0';
+      setTimeout(function() { if (existing.parentNode) existing.parentNode.removeChild(existing); }, 250);
+      return;
+    }
+
+    // Cerrar cualquier otro panel abierto
+    ['entrada','salida','bebida','kit'].forEach(function(t) {
+      var p = document.getElementById('siraPanel_' + t);
+      if (p && t !== tipo) {
+        p.style.maxHeight = '0'; p.style.opacity = '0';
+        setTimeout(function() { if (p.parentNode) p.parentNode.removeChild(p); }, 200);
+      }
+    });
+
+    var col = SIRA_COLORS[tipo] || SIRA_COLORS.entrada;
+    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Kit Lashista' };
+    var panel = document.createElement('div');
+    panel.id = panelId;
+    panel.style.cssText = 'overflow:hidden;max-height:0;opacity:0;transition:max-height .3s ease,opacity .25s ease;margin-bottom:10px;';
+
+    var contenido = '';
+
+    if (tipo === 'kit') {
+      // Kit: solo selector de cantidad 1-5
+      contenido =
+        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
+        + '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Frasco para shampo · Funda kit pestaña · Tarjeta pestaña</div>'
+        + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">¿Cuántos kits?</div>'
+        + '<div style="display:flex;gap:8px;margin-bottom:16px;">'
+        + [1,2,3,4,5].map(function(n){
+            return '<button onclick="_siraSelectKit(' + n + ')" id="siraKitBtn' + n + '" style="flex:1;padding:14px 0;border-radius:12px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--ink);">' + n + '</button>';
+          }).join('')
+        + '</div>'
+        + '<button onclick="_siraEnviar(\"kit\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.5;" disabled>Confirmar kit</button>'
+        + '<button onclick="_siraAccion(\"kit\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
+        + '<input type="hidden" id="siraKitCantidad" value="">'
+        + '</div>';
+
+    } else if (tipo === 'bebida') {
+      // Bebida: selector de tipo de bebida
+      var bebidas = ['Agua','Café','Té','Aromática','Jugo'];
+      contenido =
+        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
+        + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Bebida servida</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">'
+        + bebidas.map(function(b){
+            return '<button onclick="_siraSelectBebida(this,\"' + b + '\")" style="padding:10px 18px;border-radius:24px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);">' + b + '</button>';
+          }).join('')
+        + '</div>'
+        + '<input id="siraProducto" type="hidden" value="">'
+        + '<input id="siraCantidad" type="hidden" value="1">'
+        + '<button onclick="_siraEnviar(\"bebida\")" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.5;" disabled>Confirmar bebida</button>'
+        + '<button onclick="_siraAccion(\"bebida\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
+        + '</div>';
+
+    } else {
+      // Entrada / Salida: input de producto + cantidad
+      var ph = tipo === 'entrada' ? 'Ej: Adhesivo negro' : 'Ej: Parches gel';
+      contenido =
+        '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
+        + '<div style="margin-bottom:12px;">'
+          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>'
+          + '<input id="siraProducto" placeholder="' + ph + '" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">'
+        + '</div>'
+        + '<div style="margin-bottom:14px;">'
+          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>'
+          + '<div style="display:flex;gap:10px;align-items:center;">'
+            + '<button onclick="_siraCambiarCantidad(-1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">−</button>'
+            + '<div id="siraCantidadVal" style="flex:1;text-align:center;font-size:24px;font-weight:800;color:var(--ink);">1</div>'
+            + '<input type="hidden" id="siraCantidad" value="1">'
+            + '<button onclick="_siraCambiarCantidad(1)" style="width:44px;height:44px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg);font-size:22px;cursor:pointer;font-family:inherit;color:var(--ink);">+</button>'
+          + '</div>'
+        + '</div>'
+        + '<div style="margin-bottom:14px;">'
+          + '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Nota (opcional)</div>'
+          + '<input id="siraNota" placeholder="Observación..." style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">'
+        + '</div>'
+        + '<button onclick="_siraEnviar(\"' + tipo + '\")" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + col.btnBg + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo === 'entrada' ? 'entrada' : 'salida') + '</button>'
+        + '<button onclick="_siraAccion(\"' + tipo + '\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>'
+        + '</div>';
+    }
+
+    panel.innerHTML = contenido;
+
+    // Insertar DEBAJO de la card tocada
+    var cardBtn = document.querySelector('[onclick*="_siraAccion(\"' + tipo + '\")"]');
+    if (cardBtn && cardBtn.parentNode) {
+      cardBtn.parentNode.insertBefore(panel, cardBtn.nextSibling);
+    } else {
+      var fb = document.getElementById('siraFormContainer');
+      if (fb) fb.appendChild(panel);
+    }
+
+    // Animar apertura
+    requestAnimationFrame(function() {
+      panel.style.maxHeight = '600px';
+      panel.style.opacity = '1';
+      setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 150);
+    });
+  };
+
+  // Helpers para Kit y Bebida
+  window._siraSelectKit = function(n) {
+    [1,2,3,4,5].forEach(function(i) {
+      var b = document.getElementById('siraKitBtn' + i);
+      if (b) { b.style.background = i === n ? '#5b4fd4' : 'var(--bg,#f8f8f6)'; b.style.color = i === n ? '#fff' : 'var(--ink)'; b.style.borderColor = i === n ? '#5b4fd4' : 'var(--line,#eee)'; }
+    });
+    var hid = document.getElementById('siraKitCantidad');
+    if (hid) hid.value = n;
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  };
+
+  window._siraSelectBebida = function(el) {
+    var nombre = el.dataset.beb || '';
+    el.parentNode.querySelectorAll('button').forEach(function(b) {
+      b.style.background = 'var(--bg,#f8f8f6)'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line,#eee)';
+    });
+    el.style.background = '#a07830'; el.style.color = '#fff'; el.style.borderColor = '#a07830';
+    var inp = document.getElementById('siraProducto');
+    if (inp) inp.value = nombre;
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  };
+
+  window._siraCambiarCantidad = function(delta) {
+    var hid = document.getElementById('siraCantidad');
+    var val = document.getElementById('siraCantidadVal');
+    if (!hid || !val) return;
+    var n = Math.max(1, parseInt(hid.value || '1', 10) + delta);
+    hid.value = n; val.textContent = n;
   };
 
   window._siraEnviar = async function(tipo) {
