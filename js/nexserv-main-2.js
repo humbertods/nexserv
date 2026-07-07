@@ -3714,11 +3714,24 @@
                     data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
                     data-desglose="${desgloseEnc}"
                     style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
-                  <button onclick="mkEsperarAsignacion('${p.idEspera}','${(p.nombre||'').replace(/'/g,"'")}','${(p.servicio||'').replace(/'/g,"'")}','${p.total||'0'}','${(p.tomadaPor||'').replace(/'/g,"'")}','${p.precioRegular||p.total||'0'}','${(p.promoNombre||'')}','${desgloseEnc}\")"
+                  <button data-action="mk-esperar"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-total="${p.total||'0'}"
+                    data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-regular="${p.precioRegular||p.total||'0'}"
+                    data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-desglose="${desgloseEnc}"
                     style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
-                  <button onclick="openAgregarProducto('${p.idEspera}', '${(p.nombre||'').replace(/'/g,"\\'")}', '${p.total||'0'}\")"
+                  <button data-action="mk-agregar-producto"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-total="${p.total||'0'}"
                     style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
-                  <button onclick="eliminarTicketEspera('${p.idEspera}','${(p.nombre||'').replace(/'/g,"\\'")}\")"
+                  <button data-action="mk-borrar-ticket"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
                     style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
                 </div>
               </div>
@@ -5120,6 +5133,30 @@
       case 'sira-accion':
         e.stopPropagation();
         if (typeof _siraAccion === 'function') _siraAccion(tipo);
+        break;
+
+      case 'mk-esperar':
+        e.stopPropagation();
+        if (typeof mkEsperarAsignacion === 'function') {
+          var _d = target.dataset;
+          mkEsperarAsignacion(_d.id, _d.nombre, _d.servicio, _d.total, _d.chica, _d.regular, _d.promo, _d.desglose);
+        }
+        break;
+
+      case 'mk-agregar-producto':
+        e.stopPropagation();
+        if (typeof openAgregarProducto === 'function') {
+          var _d2 = target.dataset;
+          openAgregarProducto(_d2.id, _d2.nombre, _d2.total);
+        }
+        break;
+
+      case 'mk-borrar-ticket':
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function') {
+          var _d3 = target.dataset;
+          eliminarTicketEspera(_d3.id, _d3.nombre);
+        }
         break;
 
       // ── Inventario Admin (Mikaela) ──────────────────────────────────
