@@ -1729,11 +1729,11 @@
         
         window._as1Client     = a1.codigo;
         window._as1ClientName = a1.nombre || '';
-        document.getElementById('as1Avatar').textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+        var _av1=document.getElementById('as1Avatar'); if(_av1) _av1.textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
-        document.getElementById('as1Code').textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
-        document.getElementById('obs1Display').textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+        var _ac1=document.getElementById('as1Code'); if(_ac1) _ac1.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
+        var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
         _setNotaRecepcion(1, a1.observaciones);
         renderSecuenciaBanner(1, a1.secuencia || []);
 
@@ -1805,8 +1805,8 @@
           if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
           return sum + Number(s.price || 0);
         }, 0);
-        document.getElementById('as1Total').textContent = '$' + total1;
-        document.getElementById('as1SvcCount').textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
+        var _at1=document.getElementById('as1Total'); if(_at1) _at1.textContent = '$' + total1;
+        var _asc1=document.getElementById('as1SvcCount'); if(_asc1) _asc1.textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
         
         if (user.area === 'pestanas') {
           const _pk4 = a1.codigo.toLowerCase().replace(/-/g, '');
@@ -1835,8 +1835,8 @@
           if (est === 'en servicio' || est === 'completada') return false;
           const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
         }).length;
-        document.getElementById('navBadge').textContent = myCount;
-        document.getElementById('navBadge2').textContent = myCount;
+        var _nb=document.getElementById('navBadge'); if(_nb) _nb.textContent = myCount;
+        var _nb2=document.getElementById('navBadge2'); if(_nb2) _nb2.textContent = myCount;
         var _ps = document.getElementById('pendingStat'); if (_ps) { var _psv = _ps.querySelector('.value'); if (_psv) _psv.textContent = myCount; }
       }
 
@@ -1851,7 +1851,7 @@
         const totalDia = servicios.reduce((sum, s) => sum + Number(s.comision || 0), 0);
         
         // Actualizar contador de servicios
-        document.querySelector('#staffHome .stat .value').textContent = servicios.length; // stat "Hoy"
+        var _stHoy=document.querySelector('#staffHome .stat .value'); if(_stHoy) _stHoy.textContent = servicios.length;
         
         // Actualizar COMM_DATA con datos del día
         COMM_DATA = {
@@ -1884,7 +1884,7 @@
             </div>`;
         }).join('') + '</div>';
       } else {
-        document.querySelector('#staffHome .stat .value').textContent = '0';
+        var _stZero=document.querySelector('#staffHome .stat .value'); if(_stZero) _stZero.textContent = '0';
         servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
         
         // Reset COMM_DATA
