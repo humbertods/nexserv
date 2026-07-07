@@ -4500,22 +4500,54 @@
     if (r && (r.ok || r.success)) {
       var p2 = document.getElementById('siraPanel_' + tipo);
       if (p2) {
-        // Mostrar confirmación visual 1.8 segundos antes de cerrar
-        p2.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:24px 16px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.08);">'
-          + '<div style="font-size:36px;margin-bottom:8px;">✅</div>'
-          + '<div style="font-size:16px;font-weight:800;color:#2d6a4f;">Registrado en SIRA</div>'
-          + '<div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">' + producto + '</div>'
-          + '</div>';
-        p2.style.maxHeight = '200px';
-        setTimeout(function(){
-          if (p2 && p2.style) { p2.style.maxHeight='0'; p2.style.opacity='0'; }
-          setTimeout(function(){if(p2&&p2.parentNode)p2.parentNode.removeChild(p2);},300);
-        }, 1800);
+        p2.style.maxHeight = '0'; p2.style.opacity = '0';
+        setTimeout(function(){ if(p2&&p2.parentNode) p2.parentNode.removeChild(p2); }, 300);
       }
       if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
       window._siraProductos = null;
       // Agregar al historial local inmediatamente
       if (typeof _siraAgregarMovLocal === 'function') _siraAgregarMovLocal(tipo, producto, cantidad, responsable, area);
+
+      // ── Confirmación central + WhatsApp (solo para ENTRADAS) ───────────
+      if (tipo === 'entrada') {
+        var nuevoStock = (r.nuevoStock != null) ? r.nuevoStock : (r.stockActual != null ? r.stockActual : null);
+        var _waParts = [
+          String.fromCodePoint(0x1F4E6) + ' *SIRA - Nuevo ingreso*',
+          '',
+          String.fromCodePoint(0x2705) + ' +' + cantidad + ' ' + producto,
+          String.fromCodePoint(0x1F4CD) + ' Area: ' + area,
+          String.fromCodePoint(0x1F464) + ' ' + responsable,
+          (nuevoStock != null ? (String.fromCodePoint(0x1F4CA) + ' Stock actual: ' + nuevoStock + ' unid.') : ''),
+          '',
+          '_Inventario actualizado_'
+        ];
+        var waMsg = _waParts.join('\n');
+
+        // Modal centrado en pantalla
+        var overlay = document.createElement('div');
+        overlay.id = 'siraWaOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+        overlay.innerHTML =
+          '<div style="background:#fff;border-radius:24px;padding:32px 24px;width:100%;max-width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.18);">'
+          + '<div style="font-size:44px;margin-bottom:4px;">✅</div>'
+          + '<div style="font-size:18px;font-weight:900;color:#1a1a1a;margin-bottom:4px;">Registrado en SIRA</div>'
+          + '<div style="font-size:14px;color:#888;margin-bottom:6px;">+' + cantidad + ' ' + producto + '</div>'
+          + (nuevoStock != null
+              ? '<div style="font-size:13px;color:#555;background:#f5f5f5;border-radius:10px;padding:8px 12px;margin-bottom:20px;">📊 Stock actual: <strong>' + nuevoStock + ' unid.</strong></div>'
+              : '<div style="margin-bottom:20px;"></div>')
+          + '<a href="' + waUrl + '" target="_blank" rel="noopener" '
+          + 'style="display:block;width:100%;padding:15px;background:#25D366;color:#fff;border-radius:14px;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:10px;box-sizing:border-box;">'
+          + '📲 Notificar al grupo</a>'
+          + '<button onclick="document.getElementById(\'siraWaOverlay\').remove()" '
+          + 'style="width:100%;padding:12px;background:none;border:none;color:#888;font-size:14px;font-family:inherit;cursor:pointer;font-weight:600;">Cerrar</button>'
+          + '</div>';
+
+        // Cerrar al tocar fuera del modal
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) overlay.remove();
+        });
+        document.body.appendChild(overlay);
+      }
     } else {
       if (btn2) { btn2.textContent='Confirmar'; btn2.disabled=false; btn2.style.opacity='1'; }
       if (typeof showToast==='function') showToast('⚠ ' + ((r&&r.error)||'Error al registrar'));
