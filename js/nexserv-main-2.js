@@ -4338,7 +4338,22 @@
       html += '<div style="flex:1;">';
       html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Área</div>';
       html += '<select id="siraArea" style="width:100%;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
-      areas.forEach(function(a){ html += '<option value="' + a + '">' + a + '</option>'; });
+      // Auto-seleccionar área según la staff:
+      // bebida → Coffee siempre | kit → área staff | entrada/salida → área staff
+      var _defaultArea = tipo === 'bebida' ? 'Coffee'
+        : (function() {
+            var ua = String(user ? user.area || '' : '').toLowerCase();
+            if (ua.indexOf('pest') >= 0 || ua.indexOf('lifting') >= 0 || ua.indexOf('retiro') >= 0) return 'Pestañas';
+            if (ua.indexOf('facial') >= 0 || ua.indexOf('limpieza') >= 0) return 'Limpieza Facial';
+            if (ua.indexOf('coffee') >= 0) return 'Coffee';
+            if (ua.indexOf('local') >= 0) return 'Local';
+            if (ua.indexOf('depil') >= 0) return 'Depilaciones';
+            if (ua.indexOf('ceja') >= 0) return 'Cejas';
+            return 'Coffee'; // fallback
+          })();
+      areas.forEach(function(a){
+        html += '<option value="' + a + '"' + (a === _defaultArea ? ' selected' : '') + '>' + a + '</option>';
+      });
       html += '</select>';
       html += '</div>';
       html += '</div></div>';
