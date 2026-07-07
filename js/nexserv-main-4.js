@@ -1269,7 +1269,9 @@
 
   // === PROMO EN ATENCIÓN ===
   // Tracking de promos activas por clienta
-  let activePromos = {};
+  // activePromos vive en window para ser compartido entre módulos
+  if (!window.activePromos) window.activePromos = {};
+  var activePromos = window.activePromos;
   // ej: { 'Isabella Vera': { promo: {...}, startedBy: 'cejas', completedAreas: ['cejas'] } }
 
   function openPromoSelect(slot) {
