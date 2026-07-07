@@ -1846,6 +1846,7 @@
       const _svHoy = await LineaService.obtenerServiciosHoy(user.name);
       const servResult = { success: true, servicios: _svHoy };
       const servList = document.getElementById('staffServiciosHoy');
+      if (!servList) return; // DOM reemplazado por SIRA — abortar
       if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
         const servicios = servResult.servicios;
         
@@ -1863,6 +1864,7 @@
           items: servicios.map(s => '$' + Number(s.comision || 0).toFixed(2))
         };
         
+        if (!servList) return; // guard adicional — por si el DOM cambió entre await y el render
         servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servicios.map(s => {
           const initials = (window.currentUser && window.currentUser.role === 'staff') ? (String(s.codigo||'').replace(/[^0-9]/g,'').slice(-2) || '·') : s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           const comision = Number(s.comision || 0).toFixed(2);
@@ -1887,6 +1889,7 @@
         }).join('') + '</div>';
       } else {
         var _stZero=document.querySelector('#staffHome .stat .value'); if(_stZero) _stZero.textContent = '0';
+        if (!servList) return; // guard — DOM puede haber cambiado
         servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
         
         // Reset COMM_DATA
