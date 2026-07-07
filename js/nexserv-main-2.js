@@ -1,6 +1,10 @@
 // NEXSERV nexserv-main-2.js — Staff, autorizaciones, tickets
 // Depende de: nexserv-main-1.js
 
+  // activePromos vive en window para ser compartido entre módulos
+  if (!window.activePromos) window.activePromos = {};
+  var activePromos = window.activePromos;
+
   async function confirmServiceAndClose() {
     closeModal();
 
