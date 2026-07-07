@@ -1691,6 +1691,8 @@
       const result = await apiGet('getAtenciones', { chica: user.name });
       const section = document.getElementById('staffAtendiendoSection');
       const list = document.getElementById('staffAtendiendoList');
+      // Guard tardío: verificar que el DOM sigue siendo el de staffHome (no fue reemplazado por SIRA)
+      if (!section || !list) return;
       
       if (result.success && result.atenciones && result.atenciones.length > 0) {
         section.style.display = 'block';
@@ -4487,7 +4489,23 @@
       if (!producto) { if (typeof showToast==='function') showToast('Selecciona un combo'); return; }
       var btn2b = document.getElementById('siraEnviarBtn');
       if (btn2b) { btn2b.textContent='Registrando…'; btn2b.disabled=true; }
-      var COMBOS_MAP = {'Capuccino frío':['Capuccino frio','Servilleta logo','Galleta'],'Capuccino caliente':['Capuccino caliente','Servilleta logo','Galleta'],'Café negro':['Cafe negro','Servilleta logo','Galleta'],'Té de manzanilla c/m':['Te de manzanilla c/m','Servilleta logo','Galleta'],'Té de manzanilla':['Te de manzanilla','Servilleta logo','Galleta'],'Té de anís':['Te de anis','Servilleta logo','Galleta'],'Té de frutos rojos':['Te de frutos rojos','Servilleta logo','Galleta'],'Té de frutos rojos c/J':['Te de frutos rojos c/J','Servilleta logo','Galleta'],'Té relajante':['Te relajante','Servilleta logo','Galleta'],'Té de manzana con canela':['Te de manzana con canela','Servilleta logo','Galleta'],'Té de hierva luisa':['Te de hierva luisa','Servilleta logo','Galleta'],'Té de jamaica':['Te de jamaica','Servilleta logo','Galleta'],'Champagne':['Champagne','Servilleta logo','Galleta'],'Vino tinto':['Vino tinto','Servilleta logo','Galleta'],'Vino rosado':['Vino rosado','Servilleta logo','Galleta']};
+      var COMBOS_MAP = {
+        'Capuccino frío':         ['Capuccino frío','Servilleta logo','Galleta'],
+        'Capuccino caliente':     ['Capuccino caliente','Servilleta logo','Galleta'],
+        'Café negro':             ['Café negro','Servilleta logo','Galleta'],
+        'Té de manzanilla c/m':  ['Té de manzanilla c/m','Servilleta logo','Galleta'],
+        'Té de manzanilla':      ['Té de manzanilla','Servilleta logo','Galleta'],
+        'Té de anís':            ['Té de anís','Servilleta logo','Galleta'],
+        'Té de frutos rojos':    ['Té de frutos rojos','Servilleta logo','Galleta'],
+        'Té de frutos rojos c/J':['Té de frutos rojos c/J','Servilleta logo','Galleta'],
+        'Té relajante':          ['Té relajante','Servilleta logo','Galleta'],
+        'Té de manzana con canela':['Té de manzana con canela','Servilleta logo','Galleta'],
+        'Té de hierva luisa':    ['Té de hierva luisa','Servilleta logo','Galleta'],
+        'Té de jamaica':         ['Té de jamaica','Servilleta logo','Galleta'],
+        'Champagne':             ['Champagne','Servilleta logo','Galleta'],
+        'Vino tinto':            ['Vino tinto','Servilleta logo','Galleta'],
+        'Vino rosado':           ['Vino rosado','Servilleta logo','Galleta']
+      };
       var staffNomB = user ? user.name : 'Staff';
       var grupoB = staffNomB.replace(/ /g,'_') + '_combo_' + Date.now();
       var nowB = new Date();
@@ -4544,6 +4562,7 @@
           '_Inventario actualizado_'
         ];
         var waMsg = _waParts.join('\n');
+        var waUrl = 'https://wa.me/?text=' + encodeURIComponent(waMsg);
 
         // Modal centrado en pantalla
         var overlay = document.createElement('div');
