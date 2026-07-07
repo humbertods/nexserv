@@ -2201,8 +2201,28 @@
     // ── USAR FORMULARIO TM UNIFICADO ─────────────────────────────────────
     const areasMulti = buildTMAreasFromForm();
     if (areasMulti.length === 0) {
-      alert('Agregá al menos un servicio con área y servicio seleccionado.');
-      return;
+      // Fallback: si hay promo activa, usarla
+      if (tipo === 'promo' && promo && promo.name) {
+        areasMulti.push({
+          tentativo:    promo.name,
+          area:         areaKey,
+          precio:       promo.price || 0,
+          precioNormal: promo.regular || promo.price || 0,
+          tipo:         'promo'
+        });
+      } else if (servicioGTL && precioGTL > 0) {
+        areasMulti.push({
+          tentativo:    servicioGTL,
+          area:         areaKey,
+          precio:       precioGTL,
+          precioNormal: precioGTL,
+          tipo:         tipo === 'promo' ? 'promo' : 'normal'
+        });
+      } else {
+        alert('Seleccioná un servicio antes de continuar.');
+        window._goToListRunning = false;
+        return;
+      }
     }
     if (areasMulti.length === 1) {
       // Un solo servicio → flujo simple (normal o promo), nunca TM
@@ -2420,8 +2440,29 @@
     // ── USAR FORMULARIO TM UNIFICADO (asignación directa) ────────────────
     const areasMultiGA = buildTMAreasFromForm();
     if (areasMultiGA.length === 0) {
-      alert('Agregá al menos un servicio con área y servicio seleccionado.');
-      return;
+      // Fallback: si _arrTipo='promo' y hay una promo en _arrPromo, usarla directamente
+      if (tipo === 'promo' && promo && promo.name) {
+        areasMultiGA.push({
+          tentativo:    promo.name,
+          area:         areaKey,
+          precio:       promo.price || 0,
+          precioNormal: promo.regular || promo.price || 0,
+          tipo:         'promo'
+        });
+      } else if (servicioGA && precioGA > 0) {
+        // Fallback: usar servicio del campo arrService si tiene valor
+        areasMultiGA.push({
+          tentativo:    servicioGA,
+          area:         areaKey,
+          precio:       precioGA,
+          precioNormal: precioGA,
+          tipo:         tipo === 'promo' ? 'promo' : 'normal'
+        });
+      } else {
+        alert('Seleccioná un servicio antes de asignar.');
+        window._goAssignRunning = false;
+        return;
+      }
     }
 
     if (areasMultiGA.length === 1) {
