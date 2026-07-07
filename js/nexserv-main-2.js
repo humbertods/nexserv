@@ -1813,6 +1813,9 @@
         var _at1=document.getElementById('as1Total'); if(_at1) _at1.textContent = '$' + total1;
         var _asc1=document.getElementById('as1SvcCount'); if(_asc1) _asc1.textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
         
+        // Siempre actualizar botones de finalización según tipo de ticket (SP-/TM-/SN-)
+        setTimeout(() => updateFinishButtons(1), 150);
+        
         if (user.area === 'pestanas') {
           const _pk4 = a1.codigo.toLowerCase().replace(/-/g, '');
           apiGet('getFichaPestanas', { codigo: a1.codigo }).then(pr4 => {
