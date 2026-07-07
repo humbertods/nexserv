@@ -3329,9 +3329,12 @@
         });
 
         // Stats
-        document.getElementById('mkStatEspera').textContent = (esperando.length + completadas.length);
-        document.getElementById('mkStatServicio').textContent = enServicio.length;
-        document.getElementById('mkStatCobrar').textContent = porCobrar.length;
+        var _mkE = document.getElementById('mkStatEspera');
+        var _mkS = document.getElementById('mkStatServicio');
+        var _mkC = document.getElementById('mkStatCobrar');
+        if (_mkE) _mkE.textContent = (esperando.length + completadas.length);
+        if (_mkS) _mkS.textContent = enServicio.length;
+        if (_mkC) _mkC.textContent = porCobrar.length;
 
         // Lista de espera (clientas completadas para verificar van primero)
         document.getElementById('mkEsperaCount').textContent = (esperando.length + completadas.length);
@@ -4732,8 +4735,8 @@
     return card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',   'sira-admin-entrada', '#edf7f1', '#2d6a4f')
       + card(SVG_S, 'Registrar Salida',   'Se usó un producto en el salón',      'sira-admin-salida',  '#f5f0e8', '#8b7355')
       + card(SVG_G, 'Gastos Varios',      'Registrar un gasto de caja chica',    'sira-admin-gastos',  '#fff0f0', '#c0392b')
-      + card(SVG_I, 'Ver Inventario',     'Stock actual de productos SIRA',       'sira-admin-inv',     '#f0f4ff', '#2c5282')
       + formGastos
+      + card(SVG_I, 'Ver Inventario',     'Stock actual de productos SIRA',       'sira-admin-inv',     '#f0f4ff', '#2c5282')
       + '<div id="siraAdminFormContainer"></div>'
       + '<div id="siraAdminFeedback"></div>';
   }
