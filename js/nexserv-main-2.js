@@ -4172,6 +4172,8 @@
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
       + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
       + navHtml;
+    // Cargar historial diario desde SIRA después de renderizar
+    setTimeout(function() { if (typeof _siraCargarMovsHoy === 'function') _siraCargarMovsHoy(); }, 200);
   };
 
   function _siraRenderSecciones(esPestanas) {
@@ -4201,7 +4203,13 @@
       html += card(SVG_K, 'Kit Lashista', 'Frasco + Funda + Tarjeta pestaña', 'kit', '#eef2ff', '#5b4fd4');
     }
 
-    return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>';
+    // Historial diario de movimientos de esta staff
+    var histHtml = '<div style="margin-top:24px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial diario</div>'
+      + '<div id="siraMovHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
+      + '</div>';
+
+    return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>' + histHtml;
   }
 
   // Mapa de colores por tipo para los acordeones
@@ -4434,6 +4442,12 @@
         var p = document.getElementById('siraPanel_kit');
         if (p) { p.style.maxHeight='0'; setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},300); }
         if (typeof showToast==='function') showToast('✅ Kit Lashista ×' + cantidad + ' registrado en SIRA');
+        // Agregar kits al historial local
+        if (typeof _siraAgregarMovLocal === 'function') {
+          _siraAgregarMovLocal('salida', 'Frasco para shampo', cantidad, staffNomK, area);
+          _siraAgregarMovLocal('salida', 'Funda kit pestaña', cantidad, staffNomK, area);
+          _siraAgregarMovLocal('salida', 'Tarjeta pestaña', cantidad, staffNomK, area);
+        }
         window._siraProductos = null; // invalidar cache
       } else {
         if (btn2) { btn2.textContent='Confirmar kit'; btn2.disabled=false; btn2.style.opacity='1'; }
@@ -4500,12 +4514,118 @@
       }
       if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
       window._siraProductos = null;
+      // Agregar al historial local inmediatamente
+      if (typeof _siraAgregarMovLocal === 'function') _siraAgregarMovLocal(tipo, producto, cantidad, responsable, area);
     } else {
       if (btn2) { btn2.textContent='Confirmar'; btn2.disabled=false; btn2.style.opacity='1'; }
       if (typeof showToast==='function') showToast('⚠ ' + ((r&&r.error)||'Error al registrar'));
     }
   };
 
+
+  // ── Cache local de movimientos SIRA del día ────────────────────────────
+  window._siraMovsHoy = [];
+
+  // Render del historial diario en el panel staff
+  function _siraRenderMovHoy() {
+    var cont = document.getElementById('siraMovHoy');
+    if (!cont) return;
+    var user = window.currentUser;
+    var userName = user ? (user.name || '') : '';
+
+    // Fecha de hoy en formato YYYY-MM-DD (que usa SIRA)
+    var hoy = (function() {
+      var d = new Date();
+      var tz = 'America/Guayaquil';
+      try {
+        // Usar formato local Ecuador
+        var p = new Date(d.toLocaleString('en-US', { timeZone: tz }));
+        var mm = String(p.getMonth()+1).padStart(2,'0');
+        var dd = String(p.getDate()).padStart(2,'0');
+        return p.getFullYear() + '-' + mm + '-' + dd;
+      } catch(e) {
+        return d.toISOString().slice(0,10);
+      }
+    })();
+
+    // Filtrar movimientos de esta staff y de hoy
+    var mios = (window._siraMovsHoy || []).filter(function(m) {
+      var resp = String(m.responsable || m.resp || '').trim();
+      var fecha = String(m.fecha || '').trim().slice(0, 10); // YYYY-MM-DD
+      return resp === userName && fecha === hoy;
+    });
+
+    if (mios.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Todavía no registraste nada hoy</div>';
+      return;
+    }
+
+    // Mostrar en orden inverso (más reciente primero)
+    var html = '';
+    [...mios].reverse().forEach(function(m) {
+      var tipo = String(m.tipo || '').toLowerCase(); // 'entrada' o 'salida'
+      var esEntrada = tipo === 'entrada';
+      var cant = Number(m.cantidad || m.cant || 1);
+      var prod = String(m.producto || '');
+      var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
+      var bgIcon   = esEntrada ? '#edf7f1' : '#fff0f0';
+      var iconSvg  = esEntrada
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+
+      html += '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.</div>'
+        + '</div>'
+        + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
+        + '</div>';
+    });
+
+    cont.innerHTML = html;
+  }
+
+  // Cargar movimientos desde SIRA backend y renderizar
+  async function _siraCargarMovsHoy() {
+    try {
+      var r = await fetch(window.SIRA_URL + '?action=getMovimientos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      if (data && (data.ok || data.success)) {
+        window._siraMovsHoy = data.movimientos || [];
+      }
+    } catch(e) {
+      // silencioso — el historial mostrará los registros locales
+    }
+    _siraRenderMovHoy();
+  }
+
+  // Agregar movimiento local inmediatamente después de registrar
+  function _siraAgregarMovLocal(tipo, producto, cantidad, responsable, area) {
+    var hoy = (function() {
+      try {
+        var p = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+        return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
+      } catch(e) { return new Date().toISOString().slice(0,10); }
+    })();
+    window._siraMovsHoy = window._siraMovsHoy || [];
+    window._siraMovsHoy.push({
+      tipo:        tipo,
+      producto:    producto,
+      cantidad:    cantidad,
+      cant:        cantidad,
+      responsable: responsable,
+      resp:        responsable,
+      area:        area,
+      fecha:       hoy,
+      tipoUnidad:  'Unidad',
+    });
+    _siraRenderMovHoy();
+  }
+
+  window._siraRenderMovHoy   = _siraRenderMovHoy;
+  window._siraCargarMovsHoy  = _siraCargarMovsHoy;
+  window._siraAgregarMovLocal = _siraAgregarMovLocal;
 
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
