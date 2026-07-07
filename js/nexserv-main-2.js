@@ -1,10 +1,6 @@
 // NEXSERV nexserv-main-2.js — Staff, autorizaciones, tickets
 // Depende de: nexserv-main-1.js
 
-  // activePromos vive en window para ser compartido entre módulos
-  if (!window.activePromos) window.activePromos = {};
-  var activePromos = window.activePromos;
-
   async function confirmServiceAndClose() {
     closeModal();
 
@@ -1751,41 +1747,40 @@
 
           if (a1.promoNombre && String(a1.promoNombre).trim() !== '') {
             // Con promo: calcular el precio correspondiente al area del staff
-            // Comparación insensible a mayúsculas/espacios para tolerar variaciones en Sheets
-            const _pnNorm = String(a1.promoNombre).trim().toLowerCase();
-            const promoFull = PROMOS.find(p => String(p.name || '').trim().toLowerCase() === _pnNorm)
-                           || { name: String(a1.promoNombre).trim(), price: Number(a1.total || 0), regular: Number(a1.precioRegular || a1.total || 0), division: [], active: true, _fromTicket: true };
-            const myArea = user.area || 'cejas';
-            const myPrice = (typeof getMyPromoPrice === 'function' && !promoFull._fromTicket) ? getMyPromoPrice(promoFull, myArea) : Number(a1.total || 0);
+            const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
+            if (promoFull) {
+              const myArea = user.area || 'cejas';
+              const myPrice = getMyPromoPrice(promoFull, myArea);
 
-            // Solo agregar si no existe ya
-            if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
-              slotServices[1].unshift({
-                name: a1.promoNombre,
-                price: myPrice,
-                area: myArea
-              });
+              // Solo agregar si no existe ya
+              if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
+                slotServices[1].unshift({
+                  name: a1.promoNombre,
+                  price: myPrice,
+                  area: myArea
+                });
+              }
+              activePromos[clientKey1] = {
+                promo: promoFull,
+                startedBy: myArea,
+                completedAreas: (() => {
+                  try {
+                    const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
+                    const match = obsText.match(/_completedAreas:(\[.*?\])/);
+                    return match ? JSON.parse(match[1]) : [];
+                  } catch(e) { return []; }
+                })(),
+                _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
+              };
+              saveActivePromos(); // persistir en sessionStorage
+              // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
+              if (a1.promasExtra && a1.promasExtra.length > 0) {
+                window._takingPromasExtra = a1.promasExtra;
+                try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
+              }
+              // Actualizar botones de finalización con opciones de promo
+              setTimeout(() => updateFinishButtons(1), 300);
             }
-            activePromos[clientKey1] = {
-              promo: promoFull,
-              startedBy: myArea,
-              completedAreas: (() => {
-                try {
-                  const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
-                  const match = obsText.match(/_completedAreas:(\[.*?\])/);
-                  return match ? JSON.parse(match[1]) : [];
-                } catch(e) { return []; }
-              })(),
-              _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
-            };
-            saveActivePromos(); // persistir en sessionStorage
-            // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
-            if (a1.promasExtra && a1.promasExtra.length > 0) {
-              window._takingPromasExtra = a1.promasExtra;
-              try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
-            }
-            // Actualizar botones de finalización con opciones de promo
-            setTimeout(() => updateFinishButtons(1), 300);
           } else {
             // Sin promo: precio normal del servicio
             const price = a1.total || 0;
@@ -1812,9 +1807,6 @@
         }, 0);
         var _at1=document.getElementById('as1Total'); if(_at1) _at1.textContent = '$' + total1;
         var _asc1=document.getElementById('as1SvcCount'); if(_asc1) _asc1.textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
-        
-        // Siempre actualizar botones de finalización según tipo de ticket (SP-/TM-/SN-)
-        setTimeout(() => updateFinishButtons(1), 150);
         
         if (user.area === 'pestanas') {
           const _pk4 = a1.codigo.toLowerCase().replace(/-/g, '');
@@ -4381,7 +4373,7 @@
     }
 
     // Cancelar
-    html += '<button onclick="_siraAccion(\\"' + tipo + '\\")" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+      html += '<button data-sira-cancel="' + tipo + '" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
     html += '</div>';
     panel.innerHTML = html;
 
@@ -4409,6 +4401,9 @@
     if (inp) inp.value = nombre;
     if (buscar) buscar.value = nombre;
     if (lista) lista.style.display = 'none';
+    // Habilitar botón Confirmar visualmente (feedback claro para la staff)
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.style.opacity = '1'; btn.style.transform = 'scale(1.01)'; setTimeout(function(){ if(btn) btn.style.transform=''; }, 200); }
   };
 
   window._siraSelectKit = function(n) {
@@ -5030,6 +5025,14 @@
 
 (function _installDelegationHub() {
   document.addEventListener('click', function _delegationHandler(e) {
+    // Handler secundario: botón Cancelar de SIRA (usa data-sira-cancel en lugar de data-action)
+    var cancelTarget = e.target.closest('[data-sira-cancel]');
+    if (cancelTarget) {
+      e.stopPropagation();
+      var _tipoCancel = cancelTarget.dataset.siraCancel || '';
+      if (_tipoCancel && typeof _siraAccion === 'function') _siraAccion(_tipoCancel);
+      return;
+    }
     var target = e.target.closest('[data-action]');
     if (!target) return;
     var action   = target.dataset.action;
