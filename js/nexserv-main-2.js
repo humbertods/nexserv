@@ -4687,23 +4687,32 @@
     }
 
     // Formulario de Gastos Varios embebido (aparece al tocar la card)
+    // Formulario Gastos Varios — estructura SIRA (escribe en 💸 Gastos Varios via gastoVarios)
+    var _GV_CATS = [
+      { v:'Envio', l:'🚚 Envío' }, { v:'Reparacion', l:'🔧 Reparación' },
+      { v:'Servicio', l:'⚡ Servicio' }, { v:'Transporte', l:'🚕 Transporte' },
+      { v:'Insumo extra', l:'🛒 Insumo extra' }, { v:'Otro', l:'📎 Otro' }
+    ];
+    var _gvCatOpts = _GV_CATS.map(function(c){ return '<option value="' + c.v + '">' + c.l + '</option>'; }).join('');
+    var _fldStyle = 'width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;';
+    var _lblStyle = 'font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;display:block;';
     var formGastos = '<div id="siraAdminGastosForm" style="display:none;background:var(--bg-card);border-radius:16px;padding:18px;margin-bottom:12px;">'
-      + '<div style="font-size:15px;font-weight:800;margin-bottom:14px;">Registrar gasto</div>'
-      + '<input id="siraGvDesc" placeholder="Descripción del gasto" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;">'
-      + '<input id="siraGvMonto" type="number" placeholder="Monto $" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;">'
-      + '<select id="siraGvMetodo" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">'
-      + '<option value="efectivo">Efectivo</option>'
-      + '<option value="transferencia">Transferencia</option>'
-      + '</select>'
-      + '<select id="siraGvResponsable" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">'
-      + '<option value="Mikaela">Mikaela</option>'
-      + '<option value="Humberto">Humberto</option>'
-      + '</select>'
-      + '<div style="display:flex;gap:10px;">'
+      + '<div style="font-size:15px;font-weight:800;margin-bottom:16px;">Registrar gasto</div>'
+      + '<label style="' + _lblStyle + '">Categoría</label>'
+      + '<select id="siraGvCategoria" style="' + _fldStyle + '">' + _gvCatOpts + '</select>'
+      + '<label style="' + _lblStyle + '">Descripción</label>'
+      + '<input id="siraGvDesc" placeholder="Ej: Envío desde Quito" style="' + _fldStyle + '">'
+      + '<label style="' + _lblStyle + '">Monto $</label>'
+      + '<input id="siraGvMonto" type="number" min="0" step="0.01" placeholder="0.00" style="' + _fldStyle + '">'
+      + '<label style="' + _lblStyle + '">Responsable</label>'
+      + '<select id="siraGvResponsable" style="' + _fldStyle + '">'
+      + '<option value="Mikaela">Mikaela</option><option value="Humberto">Humberto</option></select>'
+      + '<label style="' + _lblStyle + '">Notas <span style="font-weight:400;text-transform:none;">opcional</span></label>'
+      + '<input id="siraGvNotas" placeholder="Ej: Transferencia realizada" style="' + _fldStyle + '">'
+      + '<div style="display:flex;gap:10px;margin-top:4px;">'
       + '<button onclick="cerrarSiraAdminGastosForm()" style="flex:1;padding:13px;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-soft);">Cancelar</button>'
-      + '<button onclick="confirmarSiraAdminGasto()" id="siraGvBtn" style="flex:2;padding:13px;background:#c0392b;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;color:white;">Confirmar gasto</button>'
-      + '</div>'
-      + '</div>';
+      + '<button onclick="confirmarSiraAdminGasto()" id="siraGvBtn" style="flex:2;padding:13px;background:#c0392b;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;color:white;">Confirmar gasto</button>'
+      + '</div></div>';
 
     return card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',   'sira-admin-entrada', '#edf7f1', '#2d6a4f')
       + card(SVG_S, 'Registrar Salida',   'Se usó un producto en el salón',      'sira-admin-salida',  '#f5f0e8', '#8b7355')
@@ -4735,28 +4744,44 @@
   };
 
   window.confirmarSiraAdminGasto = async function() {
+    var cat    = (document.getElementById('siraGvCategoria')  && document.getElementById('siraGvCategoria').value)  || 'Otro';
     var desc   = (document.getElementById('siraGvDesc').value   || '').trim();
     var monto  = parseFloat(document.getElementById('siraGvMonto').value || 0) || 0;
-    var metodo = document.getElementById('siraGvMetodo').value  || 'efectivo';
-    var resp   = document.getElementById('siraGvResponsable').value || 'Mikaela';
+    var resp   = (document.getElementById('siraGvResponsable') && document.getElementById('siraGvResponsable').value) || 'Mikaela';
+    var notas  = (document.getElementById('siraGvNotas')       && document.getElementById('siraGvNotas').value       || '').trim();
     if (!desc)     { if (typeof showToast==='function') showToast('⚠ Escribe la descripción'); return; }
     if (monto <= 0){ if (typeof showToast==='function') showToast('⚠ Ingresa un monto válido'); return; }
+
+    // Fecha y hora Ecuador (formato SIRA: YYYY-MM-DD y HH:mm)
+    var _now = new Date();
+    var _tz  = function(d) { try { return new Date(d.toLocaleString('en-US', { timeZone: 'America/Guayaquil' })); } catch(e) { return d; } };
+    var _ec  = _tz(_now);
+    var _fecha = _ec.getFullYear() + '-' + String(_ec.getMonth()+1).padStart(2,'0') + '-' + String(_ec.getDate()).padStart(2,'0');
+    var _hora  = String(_ec.getHours()).padStart(2,'0') + ':' + String(_ec.getMinutes()).padStart(2,'0');
+
     var btn = document.getElementById('siraGvBtn');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
-    var res = await apiPost('addGastoCaja', {
-      descripcion: desc, monto: monto, responsable: resp,
-      metodoGasto: metodo,
-      registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela'
+
+    // Enviar a SIRA via bridge (escribe en 💸 Gastos Varios, no en Movimientos ni CajaChica)
+    var res = await _siraPost('gastoVarios', {
+      fecha:       _fecha,
+      hora:        _hora,
+      categoria:   cat,
+      descripcion: desc,
+      monto:       monto,
+      responsable: resp,
+      notas:       notas
     });
+
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmar gasto'; }
-    if (res && res.success) {
+    if (res && (res.ok || res.success)) {
       document.getElementById('siraGvDesc').value  = '';
       document.getElementById('siraGvMonto').value = '';
-      if (typeof showToast==='function') showToast('✅ Gasto registrado en Caja Chica');
+      if (document.getElementById('siraGvNotas'))  document.getElementById('siraGvNotas').value = '';
+      if (typeof showToast==='function') showToast('✅ Gasto registrado en SIRA');
       cerrarSiraAdminGastosForm();
-      if (typeof loadMikaelaHome==='function') loadMikaelaHome();
     } else {
-      if (typeof showToast==='function') showToast('⚠ ' + ((res&&res.error)||'No se pudo guardar'));
+      if (typeof showToast==='function') showToast('⚠ ' + ((res&&(res.error||res.message))||'No se pudo guardar'));
     }
   };
 
