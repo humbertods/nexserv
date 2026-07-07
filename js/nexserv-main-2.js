@@ -4672,6 +4672,7 @@
       tipoUnidad:  'Unidad',
     });
     _siraRenderMovHoy();
+    if (typeof _siraRenderMovAdmin === 'function') _siraRenderMovAdmin();
   }
 
   window._siraRenderMovHoy   = _siraRenderMovHoy;
@@ -4871,7 +4872,11 @@
       + formGastos
       + card(SVG_I, 'Ver Inventario',     'Stock actual de productos SIRA',       'sira-admin-inv',     '#f0f4ff', '#2c5282')
       + '<div id="siraAdminFormContainer"></div>'
-      + '<div id="siraAdminFeedback"></div>';
+      + '<div id="siraAdminFeedback"></div>'
+      + '<div style="margin-top:24px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial diario</div>'
+      + '<div id="siraMovHoyAdmin"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
+      + '</div>';
   }
 
   window.abrirInventarioAdmin = function() {
@@ -4887,6 +4892,8 @@
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
       + '<div id="siraAdminContent">' + _siraRenderSeccionesAdmin() + '</div>'
       + navHtml;
+    // Cargar historial diario (todos los movimientos, no filtrado por staff)
+    setTimeout(function() { _siraCargarMovsAdmin(); }, 200);
   };
 
   window.cerrarSiraAdminGastosForm = function() {
@@ -4950,6 +4957,69 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EVENT DELEGATION HUB — nexserv-main-2
 // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Historial admin: TODOS los movimientos del día (no filtrado por staff) ──
+  async function _siraCargarMovsAdmin() {
+    try {
+      var r = await fetch(window.SIRA_URL + '?action=getMovimientos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      if (data && (data.ok || data.success)) {
+        window._siraMovsHoy = data.movimientos || [];
+      }
+    } catch(e) {}
+    _siraRenderMovAdmin();
+  }
+
+  function _siraRenderMovAdmin() {
+    var cont = document.getElementById('siraMovHoyAdmin');
+    if (!cont) return;
+
+    var hoy = (function() {
+      try {
+        var p = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+        return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
+      } catch(e) { return new Date().toISOString().slice(0,10); }
+    })();
+
+    // Admin ve TODOS los movimientos de hoy, ordenados más reciente primero
+    var movs = (window._siraMovsHoy || []).filter(function(m) {
+      return String(m.fecha || '').slice(0,10) === hoy;
+    });
+
+    if (movs.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
+      return;
+    }
+
+    var html = '';
+    [...movs].reverse().forEach(function(m) {
+      var tipo     = String(m.tipo || '').toLowerCase();
+      var esEntrada = tipo === 'entrada';
+      var cant     = Number(m.cantidad || m.cant || 1);
+      var prod     = String(m.producto || '');
+      var resp     = String(m.responsable || m.resp || '');
+      var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
+      var bgIcon   = esEntrada ? '#edf7f1' : '#fff0f0';
+      var iconSvg  = esEntrada
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+
+      html += '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.' + (resp ? ' · ' + resp : '') + '</div>'
+        + '</div>'
+        + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
+        + '</div>';
+    });
+
+    cont.innerHTML = html;
+  }
+
+  window._siraCargarMovsAdmin = _siraCargarMovsAdmin;
+  window._siraRenderMovAdmin  = _siraRenderMovAdmin;
+
 (function _installDelegationHub() {
   document.addEventListener('click', function _delegationHandler(e) {
     var target = e.target.closest('[data-action]');
