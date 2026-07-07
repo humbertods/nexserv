@@ -18,7 +18,7 @@
         const extraIdx = Number(cb.dataset.areaIdx);
         if (extraIdx) {
           try {
-            await apiPost('tomarAreaTicketMulti', {
+            await LineaService.tomarAreaTicket( {
               idEspera: idEspera_tm,
               chicaNombre: user_tm?.name || '',
               chicaArea: user_tm?.area || '',
@@ -235,7 +235,7 @@
     for (const s of otras) {
       const areaDestino = areaNames[s.area] || String(s.area || 'cejas').toLowerCase();
       try {
-        await apiPost('addServicioNormal', {
+        await LineaService.crearServicio( {
           codigo: codigo, nombre: nombre,
           servicio: s.name, area: areaDestino,
           precio: Number(s.price || 0), prioridad: 'Normal',
@@ -268,7 +268,7 @@
     // Buscar en ServicioPromo si es SP- o vacío
     if (!idEsperaActual || idEsperaActual.startsWith('SP-')) {
       try {
-        const spData = await apiGet('getServicioPromo');
+        const spData = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
         if (spData.success) {
           const todosLosTickets = [...(spData.enServicio || []), ...(spData.porCobrar || [])];
           miTicketSheet = todosLosTickets.find(t =>
@@ -288,7 +288,7 @@
     // El SN- original no tiene serviciosDetalle de Lesly — está en el SP- creado por continuarPromoALista
     if (idEsperaActual.startsWith('SN-') && !miTicketSheet) {
       try {
-        const spData2 = await apiGet('getServicioPromo');
+        const spData2 = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
         if (spData2.success) {
           // IMPORTANTE: solo SP "en servicio". Un SP que ya está "por cobrar" está finalizado
           // y NO es el ticket de un enganche en curso. Incluir los "por cobrar" hacía que un
@@ -403,7 +403,7 @@
       if (esTicketSP || esEngancheSN) {
         const idParaFinalizar = esEngancheSN ? miTicketSheet.idEspera : idEsperaActual;
         const _spInfo = (typeof PROMOS !== 'undefined' ? PROMOS : []).find(function(p){ return p && p.name === data.promoNombre; });
-        _finResp = await apiPost('finalizarServicioPromo', {
+        _finResp = await LineaService.finalizarServicio( {
           idEspera: idParaFinalizar,
           chicaNombre: user?.name || '',
           clienteNombre: data.clientName,
@@ -1048,7 +1048,7 @@
             const clientNameEng = slotNum === 1
               ? document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || ''
               : document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
-            apiPost('addServicioNormal', {
+            LineaService.crearServicio( {
               codigo: clientCodeEng || auth.clienteCodigo,
               nombre: clientNameEng || auth.clienteNombre,
               servicio: auth.servicioNombre,
@@ -1613,7 +1613,7 @@
     const esTicketSP2 = idEspera2.startsWith('SP-');
     if (esTicketSP2 && desgloseDelSheet2.length === 0) {
       try {
-        const spData2 = await apiGet('getServicioPromo');
+        const spData2 = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
         if (spData2.success) {
           const allSP2 = [...(spData2.esperando||[]), ...(spData2.enServicio||[]), ...(spData2.porCobrar||[])];
           const miTicket2 = allSP2.find(t => t.idEspera === idEspera2);
@@ -1632,7 +1632,7 @@
 
     try {
       if (esTicketSP2) {
-        await apiPost('finalizarServicioPromo', {
+        await LineaService.finalizarServicio( {
           idEspera: idEspera2,
           chicaNombre: user?.name || '',
           clienteNombre: clientName,
@@ -1825,7 +1825,7 @@
       }
       
       // Actualizar contadores
-      const waitResult = await apiGet('getListaEspera');
+      const waitResult = await LineaService.obtenerListaEspera().then(function(l){ return {success:true, lista:l}; }).catch(function(){ return apiGet('getListaEspera'); });
       if (waitResult.success) {
         const allowed = AREA_FILTER[user.area] || [];
         const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
@@ -1841,7 +1841,7 @@
       }
 
       // Cargar servicios completados hoy
-      const servResult = await apiGet('getServiciosHoy', { chica: user.name });
+      const servResult = await { success: true, servicios: await LineaService.obtenerServiciosHoy(user.name) };
       const servList = document.getElementById('staffServiciosHoy');
       if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
         const servicios = servResult.servicios;
@@ -2634,7 +2634,7 @@
     }
 
     try {
-      const result = await apiPost('asignarServicioNormal', {
+      const result = await LineaService.asignarServicio( {
         codigo: client.code,
         servicio: svc.name,
         area: svc.area,
@@ -3314,7 +3314,7 @@
         // Set de staff ocupadas ahora mismo (para marcar Disponible/Ocupada al reasignar)
         const busyStaff = new Set();
         enServicio.forEach(function(a){
-          if (a.fuente === 'TicketMulti' && Array.isArray(a.areas)) {
+          if (LineaService.clasificarTicket(a).esMulti) {
             a.areas.forEach(function(ar){
               if (String(ar.estado||'').toLowerCase() === 'en servicio' && ar.staff)
                 busyStaff.add(String(ar.staff).trim().toLowerCase());
@@ -3378,7 +3378,7 @@
 
             // ── Control de reasignación (multi-servicio / promo-dúo) ──
             const _fuente = w.fuente || '';
-            const _esMultiPromo = _fuente === 'TicketMulti' || _fuente === 'ServicioPromo';
+            const _esMultiPromo = LineaService.clasificarTicket(w).esMulti || LineaService.clasificarTicket(w).tienePromo;
             const _pendKey = _normAreaKey(esContinuacion
               ? [sigueTxt, w.area, w.servicio, obs].join(' ')
               : [w.area, w.servicio, obs].join(' '));
@@ -3524,7 +3524,7 @@
             const areaLabels = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: 'Depilación', depilación: 'Depilación', pestanas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg> Pestañas', pestañas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
 
             let timelineHTML = '';
-            const esTM = a.fuente === 'TicketMulti' && a.areas && a.areas.length > 0;
+            const esTM = LineaService.clasificarTicket(a).esMulti;
 
             if (esTM) {
               // ── TICKET MULTI: desglose real por área ──
@@ -3664,19 +3664,15 @@
         } else {
           window._mkPorCobrarData = porCobrar;
           cobrarList.innerHTML = porCobrar.map(p => {
-            const esTM = p.fuente === 'TicketMulti';
+            const esTM = LineaService.clasificarTicket(p).esMulti;
             let desgloseData = p.serviciosDetalle;
             if (desgloseData && desgloseData.length > 0 && !esTM) {
               const staffsEnDesglose = [...new Set(desgloseData.map(d => d.staff))];
               const ultimaStaff = staffsEnDesglose[staffsEnDesglose.length - 1];
-              // Si es promo, las líneas del desglose son subdivisiones del precio total
-              // NO deben sumarse — el total real es p.total (precio de la promo)
-              const esPromo = !!(p.promoNombre);
               desgloseData = desgloseData.map(d => ({
                 ...d,
                 congelado: d.staff !== ultimaStaff,
-                montoNormal: d.montoNormal || d.monto,
-                esSubdivisionPromo: esPromo  // flag para que cobrarDesdeBtn use data-total
+                montoNormal: d.montoNormal || d.monto
               }));
             }
             if (!desgloseData && esTM && p.areas) {
