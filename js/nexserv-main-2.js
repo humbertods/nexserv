@@ -4708,52 +4708,106 @@
 
   // Ver inventario: carga productos de SIRA y los muestra inline
   async function _siraVerInventarioAdmin() {
-    var cont = document.getElementById('siraAdminContent');
-    if (!cont) return;
-    // Mostrar loading
-    var invDiv = document.getElementById('siraAdminInvView');
-    if (!invDiv) {
-      invDiv = document.createElement('div');
-      invDiv.id = 'siraAdminInvView';
-      invDiv.style.cssText = 'margin-top:16px;';
-      cont.appendChild(invDiv);
-    }
-    invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando inventario...</div>';
-    invDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    if (!window._siraInvAdminBackup) window._siraInvAdminBackup = screen.innerHTML;
 
+    var html = '<div style="padding:0 0 90px;">';
+    html += '<button onclick="_cerrarInvAdmin()" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;font-family:inherit;font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;padding:16px 16px 8px;">&#8592; Mi panel</button>';
+    html += '<div style="padding:0 16px 16px;">';
+    html += '<div style="font-size:22px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">SIRA ENGINE</div>';
+    // Buscador
+    html += '<div style="position:relative;margin-bottom:12px;">';
+    html += '<span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--ink-faint);">&#128269;</span>';
+    html += '<input id="invAdminSearch" type="text" placeholder="Buscar producto..." oninput="_invAdminFiltrar()" style="width:100%;padding:13px 14px 13px 42px;border:none;border-radius:20px;font-family:inherit;font-size:15px;background:#f0f0ee;color:var(--ink);box-sizing:border-box;">';
+    html += '</div>';
+    // Filtro área
+    html += '<div style="position:relative;margin-bottom:16px;">';
+    html += '<select id="invAdminArea" onchange="_invAdminFiltrar()" style="width:100%;padding:14px 16px;border:none;border-radius:20px;font-family:inherit;font-size:15px;font-weight:700;background:#1a1a1a;color:#fff;box-sizing:border-box;appearance:none;-webkit-appearance:none;cursor:pointer;">';
+    html += '<option value="">Todas las &#225;reas</option>';
+    html += '<option value="Cejas">Cejas</option>';
+    html += '<option value="Pest&#241;as">Pesta&#241;as</option>';
+    html += '<option value="Coffee">Coffee</option>';
+    html += '<option value="Local">Local</option>';
+    html += '<option value="General">General</option>';
+    html += '</select>';
+    html += '<span style="position:absolute;right:16px;top:50%;transform:translateY(-50%);color:#fff;pointer-events:none;">&#9660;</span>';
+    html += '</div>';
+    // Lista
+    html += '<div id="invAdminLista"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div></div>';
+    html += '</div></div>';
+
+    screen.innerHTML = html;
+
+    window._invAdminProds = [];
     try {
-      var SIRA_URL_inv   = window.SIRA_URL   || '';
-      var SIRA_TOKEN_inv = window.SIRA_TOKEN || '';
-      var r = await fetch(SIRA_URL_inv + '?action=getProductos&token=' + SIRA_TOKEN_inv + '&_t=' + Date.now());
+      var r = await fetch(window.SIRA_URL + '?action=getProductos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
       var data = await r.json();
-      var prods = (data && data.productos) ? data.productos : [];
-      if (prods.length === 0) {
-        invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin productos</div>';
-        return;
-      }
-      // Agrupar por área
-      var porArea = {};
-      prods.forEach(function(p) {
-        var a = p.area || 'General';
-        if (!porArea[a]) porArea[a] = [];
-        porArea[a].push(p);
-      });
-      var html = '<div style="font-size:15px;font-weight:800;margin-bottom:12px;">Stock actual</div>';
-      Object.keys(porArea).sort().forEach(function(area) {
-        html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin:14px 0 6px;">' + area + '</div>';
-        porArea[area].forEach(function(p) {
-          var stockColor = (p.stock <= 5) ? '#c0392b' : (p.stock <= 15) ? '#e67e22' : '#2d6a4f';
-          html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);">'
-            + '<span style="font-size:13px;color:var(--ink);">' + p.nombre + '</span>'
-            + '<span style="font-size:13px;font-weight:800;color:' + stockColor + ';">' + (p.stock != null ? p.stock : '—') + '</span>'
-            + '</div>';
-        });
-      });
-      invDiv.innerHTML = html;
-    } catch(e) {
-      invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Error al cargar inventario</div>';
+      window._invAdminProds = (data && (data.ok || data.success)) ? (data.productos || []) : [];
+    } catch(e) { window._invAdminProds = []; }
+    _invAdminFiltrar();
+  }
+
+  function _invAdminFiltrar() {
+    var q    = (document.getElementById('invAdminSearch')  && document.getElementById('invAdminSearch').value  || '').toLowerCase().trim();
+    var area = (document.getElementById('invAdminArea')    && document.getElementById('invAdminArea').value    || '');
+    var lista = document.getElementById('invAdminLista');
+    if (!lista) return;
+
+    var prods = (window._invAdminProds || []).filter(function(p) {
+      var matchQ    = !q    || String(p.nombre||'').toLowerCase().indexOf(q) >= 0;
+      var matchArea = !area || String(p.area||'').toLowerCase() === area.toLowerCase();
+      return matchQ && matchArea;
+    });
+
+    if (prods.length === 0) {
+      lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-faint);font-size:14px;">Sin productos</div>';
+      return;
+    }
+
+    lista.innerHTML = prods.map(function(p) {
+      var stock    = Number(p.stock != null ? p.stock : (p.cantidad != null ? p.cantidad : -1));
+      var stockMin = Number(p.stockMin || p.min || 5);
+      var agotado  = stock === 0;
+      var bajo     = stock > 0 && stock <= stockMin;
+      var stockColor = agotado ? '#c0392b' : bajo ? '#e67e22' : '#2d6a4f';
+      var stockLabel = stock < 0 ? '—' : String(stock);
+      var alerta     = agotado || bajo;
+
+      // Imagen del producto — SIRA devuelve URL o vacío
+      var imgUrl = p.imagen || p.foto || p.url || '';
+      var imgUrl = p.imagen || p.foto || p.url || '';
+      var imgHtml = imgUrl
+        ? ('<div style="width:48px;height:48px;border-radius:12px;background:#f5f0e8;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;"><img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'📦\'"></div>')
+        : '<div style="width:48px;height:48px;border-radius:12px;background:#f5f0e8;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">&#128230;</div>';
+
+      var unidad = p.unidad || p.tipoUnidad || 'Unidad';
+
+      return '<div style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="flex-shrink:0;">' + imgHtml + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:15px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
+          + '<div style="font-size:12px;color:#888;margin-top:2px;">' + (p.area||'') + ' · ' + unidad + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;">'
+          + '<div style="font-size:22px;font-weight:900;color:' + stockColor + ';line-height:1;">' + stockLabel + '</div>'
+          + '<div style="font-size:10px;color:' + stockColor + ';font-weight:600;">unid.</div>'
+          + (alerta ? '<div style="width:8px;height:8px;border-radius:50%;background:' + stockColor + ';margin:3px auto 0;"></div>' : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function _cerrarInvAdmin() {
+    var screen = document.getElementById('mikaelaHome');
+    if (screen && window._siraInvAdminBackup) {
+      screen.innerHTML = window._siraInvAdminBackup;
+      window._siraInvAdminBackup = null;
     }
   }
+  window._cerrarInvAdmin = _cerrarInvAdmin;
+  window._invAdminFiltrar = _invAdminFiltrar;
   window._siraVerInventarioAdmin = _siraVerInventarioAdmin;
 
   window.cerrarInventarioStaff = function() {
