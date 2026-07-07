@@ -4515,6 +4515,52 @@
     }
   };
   // ── Inventario Mikaela/Admin ──────────────────────────────────────────────
+  // ── Render de secciones ADMIN (Mikaela) — diferente a las de staff ──────
+  function _siraRenderSeccionesAdmin() {
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_G = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Zm10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
+    var SVG_I = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-7 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm1 10h-2v-6h2v6Z"/></svg>';
+
+    function card(svg, titulo, desc, accion, bgCard, colorIcon) {
+      return '<button data-action="' + accion + '" style="'
+        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
+        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
+        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
+        + '</button>';
+    }
+
+    // Formulario de Gastos Varios embebido (aparece al tocar la card)
+    var formGastos = '<div id="siraAdminGastosForm" style="display:none;background:var(--bg-card);border-radius:16px;padding:18px;margin-bottom:12px;">'
+      + '<div style="font-size:15px;font-weight:800;margin-bottom:14px;">Registrar gasto</div>'
+      + '<input id="siraGvDesc" placeholder="Descripción del gasto" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;">'
+      + '<input id="siraGvMonto" type="number" placeholder="Monto $" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;">'
+      + '<select id="siraGvMetodo" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">'
+      + '<option value="efectivo">Efectivo</option>'
+      + '<option value="transferencia">Transferencia</option>'
+      + '</select>'
+      + '<select id="siraGvResponsable" style="width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">'
+      + '<option value="Mikaela">Mikaela</option>'
+      + '<option value="Humberto">Humberto</option>'
+      + '</select>'
+      + '<div style="display:flex;gap:10px;">'
+      + '<button onclick="cerrarSiraAdminGastosForm()" style="flex:1;padding:13px;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-soft);">Cancelar</button>'
+      + '<button onclick="confirmarSiraAdminGasto()" id="siraGvBtn" style="flex:2;padding:13px;background:#c0392b;border:none;border-radius:12px;font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;color:white;">Confirmar gasto</button>'
+      + '</div>'
+      + '</div>';
+
+    return card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',   'sira-admin-entrada', '#edf7f1', '#2d6a4f')
+      + card(SVG_S, 'Registrar Salida',   'Se usó un producto en el salón',      'sira-admin-salida',  '#f5f0e8', '#8b7355')
+      + card(SVG_G, 'Gastos Varios',      'Registrar un gasto de caja chica',    'sira-admin-gastos',  '#fff0f0', '#c0392b')
+      + card(SVG_I, 'Ver Inventario',     'Stock actual de productos SIRA',       'sira-admin-inv',     '#f0f4ff', '#2c5282')
+      + formGastos
+      + '<div id="siraAdminFormContainer"></div>'
+      + '<div id="siraAdminFeedback"></div>';
+  }
+
   window.abrirInventarioAdmin = function() {
     var screen = document.getElementById('mikaelaHome');
     if (!screen) return;
@@ -4526,8 +4572,39 @@
       '<button class="back-btn" onclick="cerrarInventarioAdmin()">← Mi panel</button>'
       + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
       + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
-      + '<div id="siraAdminContent">' + _siraRenderSecciones(true) + '</div>'
+      + '<div id="siraAdminContent">' + _siraRenderSeccionesAdmin() + '</div>'
       + navHtml;
+  };
+
+  window.cerrarSiraAdminGastosForm = function() {
+    var f = document.getElementById('siraAdminGastosForm');
+    if (f) f.style.display = 'none';
+  };
+
+  window.confirmarSiraAdminGasto = async function() {
+    var desc   = (document.getElementById('siraGvDesc').value   || '').trim();
+    var monto  = parseFloat(document.getElementById('siraGvMonto').value || 0) || 0;
+    var metodo = document.getElementById('siraGvMetodo').value  || 'efectivo';
+    var resp   = document.getElementById('siraGvResponsable').value || 'Mikaela';
+    if (!desc)     { if (typeof showToast==='function') showToast('⚠ Escribe la descripción'); return; }
+    if (monto <= 0){ if (typeof showToast==='function') showToast('⚠ Ingresa un monto válido'); return; }
+    var btn = document.getElementById('siraGvBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+    var res = await apiPost('addGastoCaja', {
+      descripcion: desc, monto: monto, responsable: resp,
+      metodoGasto: metodo,
+      registradoPor: (window.currentUser && window.currentUser.name) || 'Mikaela'
+    });
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar gasto'; }
+    if (res && res.success) {
+      document.getElementById('siraGvDesc').value  = '';
+      document.getElementById('siraGvMonto').value = '';
+      if (typeof showToast==='function') showToast('✅ Gasto registrado en Caja Chica');
+      cerrarSiraAdminGastosForm();
+      if (typeof loadMikaelaHome==='function') loadMikaelaHome();
+    } else {
+      if (typeof showToast==='function') showToast('⚠ ' + ((res&&res.error)||'No se pudo guardar'));
+    }
   };
 
   window.cerrarInventarioAdmin = function() {
@@ -4539,3 +4616,99 @@
     window._siraAdminBackup = null;
     setTimeout(function() { if (typeof loadMikaelaHome === 'function') loadMikaelaHome(); }, 100);
   };
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT DELEGATION HUB — nexserv-main-2
+// ═══════════════════════════════════════════════════════════════════════════
+(function _installDelegationHub() {
+  document.addEventListener('click', function _delegationHandler(e) {
+    var target = e.target.closest('[data-action]');
+    if (!target) return;
+    var action   = target.dataset.action;
+    var id       = target.dataset.id       || '';
+    var nombre   = target.dataset.nombre   || '';
+    var total    = target.dataset.total    || '0';
+    var servicio = target.dataset.servicio || '';
+    var tomada   = target.dataset.tomada   || '';
+    var regular  = target.dataset.regular  || total;
+    var promo    = target.dataset.promo    || '';
+    var desglose = target.dataset.desglose || '';
+    var key      = target.dataset.key      || id;
+    var staff    = target.dataset.staff;
+    var cod      = target.dataset.cod      || id;
+    var tipo     = target.dataset.tipo     || '';
+
+    switch (action) {
+      case 'esperar-cobro':
+        e.stopPropagation();
+        if (typeof mkEsperarAsignacion === 'function')
+          mkEsperarAsignacion(id, nombre, servicio, total, tomada, regular, promo, desglose);
+        break;
+      case 'agregar-producto':
+        e.stopPropagation();
+        if (typeof openAgregarProducto === 'function') openAgregarProducto(id, nombre, total);
+        break;
+      case 'eliminar-ticket':
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function') eliminarTicketEspera(id, nombre);
+        break;
+      case 'abrir-evidencias':
+        e.stopPropagation();
+        if (typeof abrirEvidenciasPestanas === 'function') {
+          var sName = (staff !== undefined && staff !== '')
+            ? staff : ((window.currentUser && window.currentUser.name) || 'staff');
+          abrirEvidenciasPestanas(key, nombre, sName);
+        }
+        break;
+      case 'mantener-ficha':
+        e.stopPropagation();
+        if (typeof showToast === 'function') showToast('✅ Se mantiene la ficha actual para este servicio.');
+        break;
+      case 'approve-auth':
+        e.stopPropagation();
+        if (typeof approveAuthorization === 'function') approveAuthorization(id);
+        break;
+      case 'reject-auth':
+        e.stopPropagation();
+        if (typeof rejectAuthorization === 'function') rejectAuthorization(id);
+        break;
+      case 'ac-select':
+        e.stopPropagation();
+        if (typeof acSelectCliente === 'function') acSelectCliente(cod);
+        break;
+      case 'confirmar-cita':
+        e.stopPropagation();
+        if (typeof confirmarLlegadaCita === 'function') confirmarLlegadaCita(id);
+        break;
+      case 'cancelar-cita':
+        e.stopPropagation();
+        if (typeof cancelarCitaSyna === 'function') cancelarCitaSyna(id, nombre);
+        break;
+      case 'sira-accion':
+        e.stopPropagation();
+        if (typeof _siraAccion === 'function') _siraAccion(tipo);
+        break;
+
+      // ── Inventario Admin (Mikaela) ──────────────────────────────────
+      case 'sira-admin-entrada':
+        e.stopPropagation();
+        if (typeof _siraAccion === 'function') _siraAccion('entrada');
+        break;
+      case 'sira-admin-salida':
+        e.stopPropagation();
+        if (typeof _siraAccion === 'function') _siraAccion('salida');
+        break;
+      case 'sira-admin-gastos': {
+        e.stopPropagation();
+        var gf = document.getElementById('siraAdminGastosForm');
+        if (gf) gf.style.display = (gf.style.display === 'none' || gf.style.display === '') ? 'block' : 'none';
+        break;
+      }
+      case 'sira-admin-inv':
+        e.stopPropagation();
+        window.open('https://humbertods.github.io/sira/', '_blank');
+        break;
+    }
+  });
+})();
