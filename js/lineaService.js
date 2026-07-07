@@ -158,7 +158,15 @@
       return apiGet('getTicketMulti', { idEspera: idEspera || '' })
         .then(function(r) {
           if (!r || !r.success) return null;
-          return r.ticket || r.data || null;
+          // El backend devuelve { activos:[], porCobrar:[], porVerificar:[] }
+          // r.ticket y r.data no existen — buscar en activos por idEspera
+          var id = String(idEspera || '').trim();
+          var todos = [].concat(r.activos || [], r.porCobrar || [], r.porVerificar || []);
+          if (id) {
+            var match = todos.find(function(t){ return String(t.idEspera||'').trim() === id; });
+            if (match) return match;
+          }
+          return todos[0] || null;
         })
         .catch(function() { return null; });
     },
