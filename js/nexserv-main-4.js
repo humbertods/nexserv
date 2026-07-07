@@ -426,7 +426,7 @@
         `}
         
         ${canEdit && numSesiones > 0 ? `
-          <button data-action="abrir-pigmento" data-cod="${codigo}" data-nombre="${clientName.replace(/\"/g,'&quot;')}" class="btn-primary" style="width: 100%; margin-top: 16px;">+ Registrar nueva sesión</button>
+          <button onclick="openCejasPigmentoModal('${codigo}', '${clientName}')" class="btn-primary" style="width: 100%; margin-top: 16px;">+ Registrar nueva sesión</button>
         ` : ''}
       `;
     } catch (err) {
@@ -651,9 +651,9 @@
         <div style="background:var(--bg);border-radius:12px;padding:8px 12px;">${buildDesgloseHTML(c)}</div>
         ${totalStr}
         <div style="display:flex;gap:6px;margin-top:10px;">
-          <button data-action="agregar-extra" data-id="${c.idEspera}" data-cod="${c.codigo||''}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
-          <button data-action="mandar-cobro" data-id="${c.idEspera}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
-          <button data-action="eliminar-ticket" data-id="${c.idEspera}" data-nombre="${nombreSafe.replace(/"/g,'&quot;')}" title="Borrar ticket" style="padding:11px 13px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">🗑</button>
+          <button onclick="agregarServicioExtra('${c.idEspera}','${c.codigo||''}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
+          <button onclick="mandarACobro('${c.idEspera}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
+          <button onclick="eliminarTicketEspera('${c.idEspera}','${nombreSafe}')" title="Borrar ticket" style="padding:11px 13px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">🗑</button>
         </div>
       </div>`;
   }
@@ -844,7 +844,7 @@
     return staffList.map((s, si) => {
       const id = pfx + '-s' + si;
       return '<div style="margin-top:4px;">' +
-        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
+        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
           '<div><div style="font-size:13px;font-weight:700;">' + s.nombre + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);">' + s.servicios.length + ' servicio' + (s.servicios.length !== 1 ? 's' : '') + '</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div style="text-align:right;">' +
@@ -879,7 +879,7 @@
       const total = dd.recs.reduce((s, r) => s + r.valor, 0);
       const comm = dd.recs.reduce((s, r) => s + r.comision, 0);
       return '<div style="margin-top:6px;">' +
-        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:15px;font-weight:700;">' + _owFmtDia(dd.d) + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + staffList.length + ' staff · ' + dd.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -918,7 +918,7 @@
       const fechas = sm.recs.map(r => r.d).sort((a, b) => a - b);
       const rango = fechas.length ? (String(fechas[0].getDate()).padStart(2, '0') + '–' + String(fechas[fechas.length - 1].getDate()).padStart(2, '0')) : '';
       return '<div style="margin-top:6px;">' +
-        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:16px;font-weight:800;">Semana ' + sm.w + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (rango ? rango + ' · ' : '') + nStaff + ' staff · ' + sm.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -948,7 +948,7 @@
       const comm = mm.recs.reduce((s, r) => s + r.comision, 0);
       const nStaff = new Set(mm.recs.map(r => r.staff)).size;
       return '<div style="margin-top:6px;">' +
-        '<div data-action="ow-toggle" data-id="'+id+'" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+        '<div onclick="owToggle(\'' + id + '\')" style="background:var(--bg-card);border-radius:14px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
           '<div><div style="font-size:16px;font-weight:800;">' + _OW_MESES[mm.mo] + ' ' + mm.y + '</div>' +
           '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + nStaff + ' staff · ' + mm.recs.length + ' servicios</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;"><div><div style="font-size:16px;font-weight:800;color:var(--ink);text-align:right;">$' + total.toFixed(0) + '</div>' +
@@ -2212,7 +2212,7 @@
         let result;
         if (esPromo) {
           // Promo de 1 área → addServicioPromo (flujo SP-)
-          result = await apiPost('addServicioPromo', {
+          result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: a.tentativo,
             area: a.area, prioridad: prioridad, observaciones: obs,
             esTop: isTop ? 'Sí' : 'No', total: a.precio,
@@ -2221,7 +2221,7 @@
           });
         } else {
           // Normal de 1 área → addServicioNormal (flujo SN-)
-          result = await apiPost('addServicioNormal', {
+          result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: a.tentativo,
             area: a.area, prioridad: prioridad, observaciones: obs,
             esTop: isTop ? 'Sí' : 'No', total: a.precio
@@ -2241,7 +2241,7 @@
 
     // 2+ áreas → TM
     try {
-      const result = await apiPost('crearTicketMulti', {
+      const result = await LineaService.crearServicio( {
         codigo: codigo, nombre: nombre, prioridad: prioridad,
         observaciones: obs, areas: areasMulti,
         secuencia: window._secuencia.map(s => s.area)
@@ -2344,7 +2344,7 @@
             : `${staff.area} · Disponible`);
       const initials = staff.name[0];
       const html = `
-        <div class="client-row" data-action="go-assign" data-nombre="${staff.name.replace(/\"/g,'&quot;')}">
+        <div class="client-row" onclick="goAssign('${staff.name}')">
           <div class="client-avatar">${initials}</div>
           <div class="client-info">
             <div class="client-name">${staff.name}</div>
@@ -2431,7 +2431,7 @@
       try {
         let result;
         if (esPromoGA) {
-          result = await apiPost('addServicioPromo', {
+          result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
             area: aGA.area, prioridad: 'Normal', observaciones: obs,
             esTop: isTop ? 'Sí' : 'No', total: aGA.precio,
@@ -2440,7 +2440,7 @@
             asignadaA: chica
           });
         } else {
-          result = await apiPost('addServicioNormal', {
+          result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
             area: aGA.area, prioridad: 'Normal', observaciones: obs,
             esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
@@ -2461,7 +2461,7 @@
 
     // 2+ áreas → TM con asignación directa
     try {
-      const tmResult = await apiPost('crearTicketMulti', {
+      const tmResult = await LineaService.crearServicio( {
         codigo: codigo, nombre: nombre, prioridad: 'Normal',
         observaciones: obs, areas: areasMultiGA,
         secuencia: window._secuencia.map(s => s.area),
@@ -2482,7 +2482,7 @@
     // Legacy path (no longer reached)
     try {
       const tienePromoGA = false;
-      const accionGA = 'addServicioNormal';
+      const accionGA = '__lineaService_crearServicio__' // FASE1→LineaService.crearServicio;
       const result = await apiPost(accionGA, postData);
       console.log('📥 Respuesta de ' + accionGA + ':', result);
       
@@ -2635,7 +2635,7 @@
     const found = lista.filter(c => (c.name||'').toLowerCase().includes(q.toLowerCase())).slice(0, 8);
     if (found.length === 0) { sug.style.display = 'none'; return; }
     sug.innerHTML = found.map(c =>
-      `<div data-action="vd-sel-cliente" data-nombre="${(c.name||'').replace(/"/g,'&quot;')}"
+      `<div onclick="vdSeleccionarCliente('${(c.name||'').replace(/'/g,"\\'")}',this)"
         style="padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px solid var(--line);"
         onmouseover="this.style.background='var(--accent-bg)'" onmouseout="this.style.background=''">
         ${c.name}
@@ -2776,7 +2776,7 @@
           <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${c.servicio} · $${c.total.toFixed(2)}</div>
           <div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">Esperando asignación de cobro</div>
         </div>
-        <button data-action="mk-quitar" data-idx="${idx}" style="background:none;border:none;color:var(--danger,#e53);font-size:20px;cursor:pointer;padding:4px;">✕</button>
+        <button onclick="mkQuitarEsperaCobro(${idx})" style="background:none;border:none;color:var(--danger,#e53);font-size:20px;cursor:pointer;padding:4px;">✕</button>
       </div>
     `).join('');
   }
@@ -2800,7 +2800,7 @@
       }
       row.style.display = 'block';
       opcionesEl.innerHTML = lista.map((c, idx) => `
-        <button data-action="mk-asignar" data-id="${idEspera}" data-target="${c.idEspera}"
+        <button onclick="mkAsignarAlCobroById('${idEspera}', '${c.idEspera}')"
           style="padding:7px 12px;background:var(--accent-bg);color:var(--accent);border:1.5px solid var(--accent);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">
           + ${c.nombre.split(' ')[0]}
         </button>
@@ -2916,7 +2916,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="font-size:14px;font-weight:800;${c._editado ? 'color:var(--accent-deep);' : ''}">$${(Number(c.total)||0).toFixed(2)}</div>
-          <button data-action="cobrar-editar-monto" data-idx="${idx}" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
+          <button onclick="cobrarEditarMontoGrupal(${idx})" title="Editar valor" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px;">✏️</button>
         </div>
       </div>
     `).join('');
@@ -2977,7 +2977,7 @@
       // Guardar copia de servicios ANTES de limpiar el slot
       window['_slotServicesBefore' + slot] = [...(slotServices[slot] || [])];
 
-      const r = await apiPost('completarAreaTicketMulti', {
+      const r = await LineaService.completarAreaTicket( {
         idEspera,
         chicaNombre: user?.name || ''
       });
@@ -3028,7 +3028,7 @@
     // Construir desglose completo: áreas previas (del TM) + área actual
     let desgloseCompleto = [];
     try {
-      const tmData = await apiGet('getTicketMulti');
+      const tmData = await LineaService.obtenerGrupoTicket(window._cobrarId || window._as1Client || '').then(function(_r){ return _r ? { success:true, activos:[_r] } : { success:false, activos:[] }; });
       if (tmData.success) {
         const tm = (tmData.activos || []).find(t => t.idEspera === idEspera);
         if (tm && tm.areas) {
@@ -3059,7 +3059,7 @@
     }
 
     try {
-      const r = await apiPost('completarAreaTicketMulti', {
+      const r = await LineaService.completarAreaTicket( {
         idEspera,
         chicaNombre: user?.name || '',
         esUltima: true,
@@ -3501,7 +3501,7 @@
         // Siempre refrescar _tmAreasActuales desde el backend tras cualquier acción TM
         // Esto garantiza que si la staff navega y vuelve, el estado es correcto
         try {
-          const tmFresh = await apiGet('getTicketMulti');
+          const tmFresh = await LineaService.obtenerGrupoTicket(window._cobrarId || window._as1Client || '').then(function(_r){ return _r ? { success:true, activos:[_r] } : { success:false, activos:[] }; });
           const idEsperaFresh = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
           const tmObj = (tmFresh.activos || []).find(t => t.idEspera === idEsperaFresh);
           if (tmObj) {
@@ -4696,73 +4696,5 @@ function renderInformeServicios(d, pestanasData, tendData) {
 
   body.innerHTML = html;
 }
-
-// ═══════════════════════════════════════════════════════════════
-// EVENT DELEGATION HUB — nexserv-main-4
-// ═══════════════════════════════════════════════════════════════
-(function _installDelegationHub4() {
-  document.addEventListener('click', function(e) {
-    var target = e.target.closest('[data-action]');
-    if (!target) return;
-    var action = target.dataset.action;
-    var id     = target.dataset.id     || '';
-    var nombre = target.dataset.nombre || '';
-    var cod    = target.dataset.cod    || '';
-    var idx    = parseInt(target.dataset.idx  || '0', 10);
-    var target2= target.dataset.target || '';
-    var val    = target.dataset.val;
-
-    switch (action) {
-      // ── En Atención / WaitList (Owner/Mikaela) ──
-      case 'agregar-extra':
-        e.stopPropagation();
-        if (typeof agregarServicioExtra === 'function') agregarServicioExtra(id, cod, nombre);
-        break;
-      case 'mandar-cobro':
-        e.stopPropagation();
-        if (typeof mandarACobro === 'function') mandarACobro(id, nombre);
-        break;
-      case 'eliminar-ticket':
-        // shared with main-2 delegation
-        e.stopPropagation();
-        if (typeof eliminarTicketEspera === 'function') eliminarTicketEspera(id, nombre);
-        break;
-      // ── Owner historial ──
-      case 'ow-toggle':
-        e.stopPropagation();
-        if (typeof owToggle === 'function') owToggle(id);
-        break;
-      // ── Pigmento ──
-      case 'abrir-pigmento':
-        e.stopPropagation();
-        if (typeof openCejasPigmentoModal === 'function') openCejasPigmentoModal(cod, nombre);
-        break;
-      // ── Cobro grupal (Mikaela) ──
-      case 'mk-quitar':
-        e.stopPropagation();
-        if (typeof mkQuitarEsperaCobro === 'function') mkQuitarEsperaCobro(idx);
-        break;
-      case 'mk-asignar':
-        e.stopPropagation();
-        if (typeof mkAsignarAlCobroById === 'function') mkAsignarAlCobroById(id, target2);
-        break;
-      case 'cobrar-editar-monto':
-        e.stopPropagation();
-        if (typeof cobrarEditarMontoGrupal === 'function') cobrarEditarMontoGrupal(idx);
-        break;
-      // ── Venta directa ──
-      case 'vd-sel-cliente':
-        e.stopPropagation();
-        if (typeof vdSeleccionarCliente === 'function') vdSeleccionarCliente(nombre, target);
-        break;
-      // ── Asignación staff ──
-      case 'go-assign':
-        e.stopPropagation();
-        if (typeof goAssign === 'function') goAssign(nombre);
-        break;
-    }
-  });
-})();
-
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
