@@ -1384,9 +1384,23 @@
           if (_obs1) _obs1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
           _setNotaRecepcion(1, a1.observaciones);
 
-          // Restaurar servicios de la 1ª clienta desde el ticket (no solo slot 2)
-          if (!String(a1.idEspera||'').startsWith('TM-') && !a1.promoNombre) {
-            if (a1.serviciosDetalle && a1.serviciosDetalle.length > 0) {
+          // Restaurar servicios de la 1ª clienta desde el ticket
+          if (!String(a1.idEspera||'').startsWith('TM-')) {
+            if (a1.promoNombre && a1.promoNombre.trim() !== '') {
+              // Es una promo → cargar el nombre de la promo en slotServices para que el modal lo muestre
+              // Buscar precio: total del ticket → precioRegular → PROMOS cargados
+              var _precioPromo1 = Number(a1.total || 0) || Number(a1.precioRegular || 0);
+              // Si aún es 0, buscar en PROMOS cargados por nombre
+              if (!_precioPromo1 && typeof PROMOS !== 'undefined' && PROMOS) {
+                var _promoMatch = PROMOS.find(function(p){ return p.name === a1.promoNombre || p.promo === a1.promoNombre; });
+                if (_promoMatch) _precioPromo1 = Number(_promoMatch.precio || _promoMatch.price || _promoMatch.precioPromo || 0);
+              }
+              slotServices[1] = [{ name: a1.promoNombre, price: _precioPromo1, area: a1.area || '', status: 'aprobado', isPromo: true }];
+              // También registrar en _availablePromo para el flujo de cobro
+              if (!window._availablePromo) {
+                window._availablePromo = { name: a1.promoNombre, price: _precioPromo1, regular: Number(a1.precioRegular || a1.total || 0) };
+              }
+            } else if (a1.serviciosDetalle && a1.serviciosDetalle.length > 0) {
               slotServices[1] = a1.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.nombre || sd.name, price: Number(sd.monto || sd.precio || sd.price || 0), area: sd.area || a1.area || '' }; });
             } else if (a1.servicio && a1.servicio !== '—') {
               let _n1 = a1.servicio;
@@ -1412,7 +1426,9 @@
               pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
               const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + (a2.horaLlegada ? ' · Llegó ' + a2.horaLlegada : '');
               // Cargar servicios de la 2ª clienta si vienen del ticket
-              if (a2.serviciosDetalle && a2.serviciosDetalle.length > 0) {
+              if (a2.promoNombre && a2.promoNombre.trim() !== '') {
+                slotServices[2] = [{ name: a2.promoNombre, price: Number(a2.total || 0), area: a2.area || '', status: 'aprobado', isPromo: true }];
+              } else if (a2.serviciosDetalle && a2.serviciosDetalle.length > 0) {
                 slotServices[2] = a2.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.name, price: Number(sd.monto || sd.price || 0), area: sd.area || '' }; });
               } else if (a2.servicio && a2.servicio !== '—') {
                 slotServices[2] = [{ name: a2.servicio, price: Number(a2.total || 0), area: a2.area || '' }];
