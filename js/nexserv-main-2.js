@@ -1751,40 +1751,41 @@
 
           if (a1.promoNombre && String(a1.promoNombre).trim() !== '') {
             // Con promo: calcular el precio correspondiente al area del staff
-            const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
-            if (promoFull) {
-              const myArea = user.area || 'cejas';
-              const myPrice = getMyPromoPrice(promoFull, myArea);
+            // Comparación insensible a mayúsculas/espacios para tolerar variaciones en Sheets
+            const _pnNorm = String(a1.promoNombre).trim().toLowerCase();
+            const promoFull = PROMOS.find(p => String(p.name || '').trim().toLowerCase() === _pnNorm)
+                           || { name: String(a1.promoNombre).trim(), price: Number(a1.total || 0), regular: Number(a1.precioRegular || a1.total || 0), division: [], active: true, _fromTicket: true };
+            const myArea = user.area || 'cejas';
+            const myPrice = (typeof getMyPromoPrice === 'function' && !promoFull._fromTicket) ? getMyPromoPrice(promoFull, myArea) : Number(a1.total || 0);
 
-              // Solo agregar si no existe ya
-              if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
-                slotServices[1].unshift({
-                  name: a1.promoNombre,
-                  price: myPrice,
-                  area: myArea
-                });
-              }
-              activePromos[clientKey1] = {
-                promo: promoFull,
-                startedBy: myArea,
-                completedAreas: (() => {
-                  try {
-                    const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
-                    const match = obsText.match(/_completedAreas:(\[.*?\])/);
-                    return match ? JSON.parse(match[1]) : [];
-                  } catch(e) { return []; }
-                })(),
-                _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
-              };
-              saveActivePromos(); // persistir en sessionStorage
-              // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
-              if (a1.promasExtra && a1.promasExtra.length > 0) {
-                window._takingPromasExtra = a1.promasExtra;
-                try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
-              }
-              // Actualizar botones de finalización con opciones de promo
-              setTimeout(() => updateFinishButtons(1), 300);
+            // Solo agregar si no existe ya
+            if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
+              slotServices[1].unshift({
+                name: a1.promoNombre,
+                price: myPrice,
+                area: myArea
+              });
             }
+            activePromos[clientKey1] = {
+              promo: promoFull,
+              startedBy: myArea,
+              completedAreas: (() => {
+                try {
+                  const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
+                  const match = obsText.match(/_completedAreas:(\[.*?\])/);
+                  return match ? JSON.parse(match[1]) : [];
+                } catch(e) { return []; }
+              })(),
+              _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
+            };
+            saveActivePromos(); // persistir en sessionStorage
+            // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
+            if (a1.promasExtra && a1.promasExtra.length > 0) {
+              window._takingPromasExtra = a1.promasExtra;
+              try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
+            }
+            // Actualizar botones de finalización con opciones de promo
+            setTimeout(() => updateFinishButtons(1), 300);
           } else {
             // Sin promo: precio normal del servicio
             const price = a1.total || 0;
