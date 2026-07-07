@@ -699,9 +699,9 @@
     }
 
     if (_idEsperaSlot.startsWith('TM-')) {
-      apiGet('getTicketMulti').then(function(tmData) {
-        if (!tmData.success) return;
-        var tm = (tmData.activos || []).find(function(t) { return t.idEspera === _idEsperaSlot; });
+      LineaService.obtenerGrupoTicket(_idEsperaSlot).then(function(tm) {
+        if (!tm) return;
+        var tmData = { success: true }; // compatibilidad
         if (!tm) return;
         var miNombre = user && user.name ? user.name : '';
         var slotN = slot1 ? 1 : 2;
@@ -999,7 +999,7 @@
       const precioRest = serviciosRestantes.reduce((s, v) => s + Number(v.price || 0), 0);
       const areaRest = serviciosRestantes[0].area || user?.area || 'cejas';
 
-      await apiPost('addServicioNormal', {
+      await LineaService.crearServicio( {
         codigo: clientCodigo,
         nombre: data.clientName,
         servicio: nombresRest,
@@ -1617,9 +1617,7 @@
   function _solEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function _solTipo(f){
     f = String(f||'');
-    if (f === 'TicketMulti') return 'Combo / Ticket Multi (TM)';
-    if (f === 'ServicioPromo') return 'Promo (SP)';
-    if (f === 'ServicioNormal') return 'Servicio normal (SN)';
+    return LineaService.etiquetaFuente({ fuente: f, idEspera: '' });
     if (f === 'ListaEspera') return 'Lista de espera (LE)';
     return f || '—';
   }
@@ -1987,7 +1985,7 @@
       sec.keys.forEach(function(pair) {
         var url = fotos[pair[0]];
         html += '<div style="text-align:center;"><div style="font-size:10px;font-weight:700;color:#888;margin-bottom:4px;">' + pair[1] + '</div>'
-          + (url ? '<img src="' + _driveImgUrl(url) + '" onclick="_evVerFoto(\'' + url + '\')" style="width:100%;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;">'
+          + (url ? '<img src="' + url + '" onclick="_evVerFoto(\'' + url + '\')" style="width:100%;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;">'
                  : '<div style="height:100px;border:1.5px dashed #ddd;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:11px;">Sin foto</div>')
           + '</div>';
       });
@@ -2540,7 +2538,7 @@
     // ── TICKET MULTI: usar endpoint específico ────────────────
     if (takingId.startsWith('TM-')) {
       try {
-        const result = await apiPost('tomarAreaTicketMulti', {
+        const result = await LineaService.tomarAreaTicket({
           idEspera:    takingId,
           chicaNombre: name,
           chicaArea:   user?.area || '',
@@ -2946,7 +2944,7 @@
 
           // Si es TM: cargar areas completas y mostrar botones correctos desde el inicio
           if (window._as1IdEspera && window._as1IdEspera.startsWith('TM-')) {
-            apiGet('getTicketMulti').then(function(tmData) {
+            LineaService.obtenerGrupoTicket('').then(function(tmData) {
               if (tmData.success) {
                 var tm = (tmData.activos || []).find(function(t) { return t.idEspera === window._as1IdEspera; });
                 if (tm) {
@@ -3234,7 +3232,7 @@
 
           // Si es TM: cargar areas completas para slot 2 (todas las áreas de esta staff + completadas)
           if (window._as2IdEspera && window._as2IdEspera.startsWith('TM-')) {
-            apiGet('getTicketMulti').then(function(tmData2) {
+            LineaService.obtenerGrupoTicket('').then(function(tmData2) {
               if (tmData2.success) {
                 var tm2 = (tmData2.activos || []).find(function(t) { return t.idEspera === window._as2IdEspera; });
                 if (tm2) {
@@ -3682,7 +3680,8 @@
     let miAreaTM = null;
     let totalPromoCombo = 0;
     try {
-      const tmData = await apiGet('getTicketMulti');
+      const _tmRaw = await LineaService.obtenerGrupoTicket(window._cobrarId || '');
+      const tmData = { success: true, activos: _tmRaw ? [_tmRaw] : [] };
       if (tmData.success) {
         const tm = (tmData.activos || []).find(t => t.idEspera === idEspera);
         if (tm) {
@@ -4239,25 +4238,12 @@ async function renderEvidenciasPanel() {
   document.getElementById('evLoading').outerHTML = html;
 }
 
-
-// ── Helper: convierte URL de Drive a formato que funciona en <img> sin CORS ──
-function _driveImgUrl(url) {
-  if (!url) return url;
-  // Extraer file ID de /uc?export=view&id=ID o /file/d/ID/
-  var m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || url.match(/\/d\/([a-zA-Z0-9_-]+)\//);
-  if (m && m[1]) {
-    // thumbnail URL: funciona en <img> sin problemas de CORS
-    return 'https://lh3.googleusercontent.com/d/' + m[1];
-  }
-  return url; // devolver original si no se puede convertir
-}
-
 function _evFotoSlot(key, label, url, codigo, staff) {
   var inputId = 'evInput_' + key;
   var imgId   = 'evImg_'   + key;
   var imgHtml = url
     ? '<div style="position:relative;cursor:pointer;" onclick="_evMenuFoto(\'' + key + '\',\'' + url + '\',\'' + inputId + '\')">'
-        + '<img id="' + imgId + '" src="' + _driveImgUrl(url) + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
+        + '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
         + '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#fff;">⋯</div>'
       + '</div>'
     : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
@@ -4319,7 +4305,7 @@ function _evVerFoto(url) {
     lb.appendChild(closeBtn);
     document.body.appendChild(lb);
   }
-  document.getElementById('evLightboxImg').src = _driveImgUrl(url);
+  document.getElementById('evLightboxImg').src = url;
   lb.style.display = 'flex';
 }
 function evCambiarFoto(key, inputId) {
@@ -4355,7 +4341,7 @@ async function evSubirFoto(input, key, codigo, staff) {
   if (r && r.success) {
     if (statusEl) { statusEl.textContent = '✓ Guardado'; statusEl.style.color = 'var(--success,#2d6a4f)'; }
     var imgEl = document.getElementById(imgId);
-    if (imgEl) { imgEl.src = _driveImgUrl(r.url); imgEl.style.opacity = '1'; }
+    if (imgEl) { imgEl.src = r.url + '&t=' + Date.now(); imgEl.style.opacity = '1'; }
   } else {
     var _errMsg = (r && r.message) ? r.message : (r && r.error) ? r.error : 'sin respuesta';
     console.error('[Evidencias] ERROR:', _errMsg, '| respuesta completa:', JSON.stringify(r));
