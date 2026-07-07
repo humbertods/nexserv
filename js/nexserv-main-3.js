@@ -33,6 +33,11 @@
       alert('Error al rechazar la autorización');
     }
   }
+
+  // Exponer globalmente para que el delegation hub las encuentre
+  window.approveAuthorization = approveAuthorization;
+  window.rejectAuthorization  = rejectAuthorization;
+
   async function loadPorCobrar() {
     const list = document.getElementById('porCobrarList');
     const countEl = document.getElementById('porCobrarCount');
