@@ -3337,7 +3337,7 @@
         if (_mkC) _mkC.textContent = porCobrar.length;
 
         // Lista de espera (clientas completadas para verificar van primero)
-        document.getElementById('mkEsperaCount').textContent = (esperando.length + completadas.length);
+        var _mkEC = document.getElementById('mkEsperaCount'); if (_mkEC) _mkEC.textContent = (esperando.length + completadas.length);
         const esperaList = document.getElementById('mkEsperaList');
         const completadasHTML = completadas.map(c => buildCompletadaCard(c)).join('');
         if (esperando.length === 0 && completadas.length === 0) {
@@ -4677,6 +4677,76 @@
   window._siraCargarMovsHoy  = _siraCargarMovsHoy;
   window._siraAgregarMovLocal = _siraAgregarMovLocal;
 
+
+  // ── Wrappers admin para Entrada/Salida desde panel Mikaela ──────────────
+  // Llama a _siraAccion pero redirige el panel al contenedor correcto (admin)
+  function _siraAccionAdmin(tipo, triggerBtn) {
+    // Preparar el contenedor admin como fallback
+    var adminCont = document.getElementById('siraAdminFormContainer');
+    if (adminCont) {
+      // Temporalmente hacer que siraFormContainer apunte al contenedor admin
+      adminCont.id = 'siraFormContainer';
+      if (typeof _siraAccion === 'function') _siraAccion(tipo);
+      // Restaurar el ID
+      var restored = document.getElementById('siraFormContainer');
+      if (restored) restored.id = 'siraAdminFormContainer';
+    } else {
+      // Fallback: llamar directo
+      if (typeof _siraAccion === 'function') _siraAccion(tipo);
+    }
+  }
+  window._siraAccionAdmin = _siraAccionAdmin;
+
+  // Ver inventario: carga productos de SIRA y los muestra inline
+  async function _siraVerInventarioAdmin() {
+    var cont = document.getElementById('siraAdminContent');
+    if (!cont) return;
+    // Mostrar loading
+    var invDiv = document.getElementById('siraAdminInvView');
+    if (!invDiv) {
+      invDiv = document.createElement('div');
+      invDiv.id = 'siraAdminInvView';
+      invDiv.style.cssText = 'margin-top:16px;';
+      cont.appendChild(invDiv);
+    }
+    invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando inventario...</div>';
+    invDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      var SIRA_URL_inv   = window.SIRA_URL   || '';
+      var SIRA_TOKEN_inv = window.SIRA_TOKEN || '';
+      var r = await fetch(SIRA_URL_inv + '?action=getProductos&token=' + SIRA_TOKEN_inv + '&_t=' + Date.now());
+      var data = await r.json();
+      var prods = (data && data.productos) ? data.productos : [];
+      if (prods.length === 0) {
+        invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin productos</div>';
+        return;
+      }
+      // Agrupar por área
+      var porArea = {};
+      prods.forEach(function(p) {
+        var a = p.area || 'General';
+        if (!porArea[a]) porArea[a] = [];
+        porArea[a].push(p);
+      });
+      var html = '<div style="font-size:15px;font-weight:800;margin-bottom:12px;">Stock actual</div>';
+      Object.keys(porArea).sort().forEach(function(area) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin:14px 0 6px;">' + area + '</div>';
+        porArea[area].forEach(function(p) {
+          var stockColor = (p.stock <= 5) ? '#c0392b' : (p.stock <= 15) ? '#e67e22' : '#2d6a4f';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);">'
+            + '<span style="font-size:13px;color:var(--ink);">' + p.nombre + '</span>'
+            + '<span style="font-size:13px;font-weight:800;color:' + stockColor + ';">' + (p.stock != null ? p.stock : '—') + '</span>'
+            + '</div>';
+        });
+      });
+      invDiv.innerHTML = html;
+    } catch(e) {
+      invDiv.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Error al cargar inventario</div>';
+    }
+  }
+  window._siraVerInventarioAdmin = _siraVerInventarioAdmin;
+
   window.cerrarInventarioStaff = function() {
     var screen = document.getElementById(window._siraScreenId || 'staffHome');
     if (screen && window._siraBackup) {
@@ -4889,11 +4959,11 @@
       // ── Inventario Admin (Mikaela) ──────────────────────────────────
       case 'sira-admin-entrada':
         e.stopPropagation();
-        if (typeof _siraAccion === 'function') _siraAccion('entrada');
+        if (typeof _siraAccionAdmin === 'function') _siraAccionAdmin('entrada', target);
         break;
       case 'sira-admin-salida':
         e.stopPropagation();
-        if (typeof _siraAccion === 'function') _siraAccion('salida');
+        if (typeof _siraAccionAdmin === 'function') _siraAccionAdmin('salida', target);
         break;
       case 'sira-admin-gastos': {
         e.stopPropagation();
@@ -4903,7 +4973,7 @@
       }
       case 'sira-admin-inv':
         e.stopPropagation();
-        window.open('https://humbertods.github.io/sira/', '_blank');
+        if (typeof _siraVerInventarioAdmin === 'function') _siraVerInventarioAdmin();
         break;
     }
   });
