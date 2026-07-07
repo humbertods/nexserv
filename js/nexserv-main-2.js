@@ -3339,6 +3339,7 @@
         // Lista de espera (clientas completadas para verificar van primero)
         var _mkEC = document.getElementById('mkEsperaCount'); if (_mkEC) _mkEC.textContent = (esperando.length + completadas.length);
         const esperaList = document.getElementById('mkEsperaList');
+        if (!esperaList) return; // Guard: inventario SIRA activo, DOM de mikaelaHome reemplazado
         const completadasHTML = completadas.map(c => buildCompletadaCard(c)).join('');
         if (esperando.length === 0 && completadas.length === 0) {
           esperaList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">✨ No hay clientas esperando</div>';
@@ -4681,18 +4682,26 @@
   // ── Wrappers admin para Entrada/Salida desde panel Mikaela ──────────────
   // Llama a _siraAccion pero redirige el panel al contenedor correcto (admin)
   function _siraAccionAdmin(tipo, triggerBtn) {
-    // Preparar el contenedor admin como fallback
+    // Marcar temporalmente el card con data-sira para que _siraAccion lo encuentre
+    // e inserte el panel justo debajo del card tocado (no al final)
+    var cardEl = triggerBtn || document.querySelector('[data-action="sira-admin-' + tipo + '"]');
+    var addedSira = false;
+    if (cardEl && !cardEl.dataset.sira) {
+      cardEl.dataset.sira = tipo;
+      addedSira = true;
+    }
+    // Asegurar que siraFormContainer existe como fallback
     var adminCont = document.getElementById('siraAdminFormContainer');
-    if (adminCont) {
-      // Temporalmente hacer que siraFormContainer apunte al contenedor admin
-      adminCont.id = 'siraFormContainer';
-      if (typeof _siraAccion === 'function') _siraAccion(tipo);
-      // Restaurar el ID
+    var tempId = false;
+    if (adminCont) { adminCont.id = 'siraFormContainer'; tempId = true; }
+
+    if (typeof _siraAccion === 'function') _siraAccion(tipo);
+
+    // Restaurar IDs y atributos
+    if (addedSira && cardEl) delete cardEl.dataset.sira;
+    if (tempId) {
       var restored = document.getElementById('siraFormContainer');
       if (restored) restored.id = 'siraAdminFormContainer';
-    } else {
-      // Fallback: llamar directo
-      if (typeof _siraAccion === 'function') _siraAccion(tipo);
     }
   }
   window._siraAccionAdmin = _siraAccionAdmin;
