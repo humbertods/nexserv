@@ -4514,3 +4514,28 @@
       window._siraActivo = false;
     }
   };
+  // ── Inventario Mikaela/Admin ──────────────────────────────────────────────
+  window.abrirInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    var navEl = screen.querySelector('nav.nav');
+    var navHtml = navEl ? navEl.outerHTML : '';
+    window._siraAdminBackup = screen.innerHTML;
+    window._siraAdminActivo = true;
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioAdmin()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraAdminContent">' + _siraRenderSecciones(true) + '</div>'
+      + navHtml;
+  };
+
+  window.cerrarInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    window._siraAdminActivo = false;
+    if (screen && window._siraAdminBackup) {
+      screen.innerHTML = window._siraAdminBackup;
+    }
+    window._siraAdminBackup = null;
+    setTimeout(function() { if (typeof loadMikaelaHome === 'function') loadMikaelaHome(); }, 100);
+  };
