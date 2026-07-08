@@ -288,11 +288,11 @@
   }
 
   // Abrir la pantalla de inventario interno de la marca (menú → "Inventario de productos").
+  // Es una .screen: navegamos con show() para que quede dentro del marco del teléfono.
   function openMkInventario() {
     const search = document.getElementById('mkStockSearch');
     if (search) search.value = '';
-    const modal = document.getElementById('mkStockModal');
-    if (modal) modal.classList.add('active');
+    show('mkStockScreen');
     renderMkStock();
   }
 
@@ -4067,3 +4067,4 @@
 
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
+
