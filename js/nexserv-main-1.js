@@ -474,7 +474,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; ${si < s.servicios.length - 1 ? 'border-bottom: 1px solid var(--line);' : ''}">
                   <div style="flex:1;">
                     <div style="font-size: 13px; font-weight: 600;">${sv.cliente}</div>
-                    <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${svcDisplay} · ${sv.hora}</div>
+                    <div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">${svcDisplay} · ${(function(){var str=String(sv.hora||'').trim();var m=str.match(/(\d{1,2}):(\d{2})/);var hh=m?(('0'+m[1]).slice(-2)+':'+m[2]):str;var f=String(sv.fecha||'').trim();return f?(f+(hh?' · '+hh:'')):hh;})()}</div>
                   </div>
                   <div style="display:flex;align-items:center;gap:8px;">
                     <div style="font-size: 15px; font-weight: 700; color: var(--accent-deep);">$${Math.round(Number(sv.precio || 0))}</div>
@@ -4425,3 +4425,4 @@ window.evSubirFotoDesdeInput = evSubirFotoDesdeInput;
 window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
+
