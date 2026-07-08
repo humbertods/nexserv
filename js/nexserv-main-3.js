@@ -231,41 +231,69 @@
     if (confirmBtn) { confirmBtn.style.display = ''; }
   }
 
-  async function renderMkStock() {
+  // Inventario interno de la marca (Rosa Aguilera). Consulta + edición con – / +.
+  // Fuente: getProductosMarca() (localStorage 'nexserv_stock'). NO es SIRA.
+  // Síncrona: el stock es local, así que no hay spinner ni parpadeo al ajustar.
+  function renderMkStock() {
     const el = document.getElementById('mkStockList');
     if (!el) return;
-    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">⏳ Cargando productos...</div>';
 
-    // Forzar recarga fresca del backend
-    await cargarProductosMarca();
-    const q = (document.getElementById('mkStockSearch')?.value || '').toLowerCase();
-    const productos = window._productosMarca || [];
+    const q = (document.getElementById('mkStockSearch') && document.getElementById('mkStockSearch').value || '').toLowerCase();
+    const productos = getProductosMarca();
     const filtrados = q ? productos.filter(p => p.nombre.toLowerCase().includes(q)) : productos;
 
     if (filtrados.length === 0) {
-      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">No hay productos de marca en SIRA</div>';
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);">No hay productos que coincidan.</div>';
       return;
     }
 
     el.innerHTML = filtrados.map(p => {
-      const minimo = p.minimo || 0;
-      const bajo = p.stock <= minimo && p.stock > 0;
+      const minimo  = p.min || 0;
+      const bajo    = p.stock <= minimo && p.stock > 0;
       const agotado = p.stock === 0;
-      const color = agotado ? 'var(--danger)' : bajo ? '#e0a800' : 'var(--success)';
-      const badge = agotado ? '🔴 AGOTADO' : bajo ? '🟡 BAJO' : '🟢 OK';
+      const color   = agotado ? 'var(--danger)' : bajo ? '#e0a800' : 'var(--success)';
+      const badge   = agotado ? '🔴 AGOTADO' : bajo ? '🟡 BAJO' : '🟢 OK';
+      const esPack  = p.tipo === 'paquete';
+      const nEsc    = String(p.nombre).replace(/'/g, "\\'");
+
+      // Los packs derivan su stock del MÍNIMO de sus componentes → no se editan
+      // directo (solo lectura). Los productos base sí tienen – / +.
+      const controles = esPack
+        ? `<div style="text-align:right;flex-shrink:0;min-width:88px;">
+             <div style="font-size:26px;font-weight:800;color:${color};line-height:1;">${p.stock}</div>
+             <div style="font-size:10px;font-weight:700;color:${color};">${badge}</div>
+             <div style="font-size:9px;color:var(--ink-faint);margin-top:2px;">auto (pack)</div>
+           </div>`
+        : `<div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+             <button onclick="window.ajustarStock('${nEsc}', -1)" aria-label="restar"
+               style="width:32px;height:32px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg-card);color:var(--ink);font-size:20px;font-weight:800;line-height:1;cursor:pointer;">–</button>
+             <div style="text-align:center;min-width:44px;">
+               <div style="font-size:24px;font-weight:800;color:${color};line-height:1;">${p.stock}</div>
+               <div style="font-size:9px;font-weight:700;color:${color};">${badge}</div>
+             </div>
+             <button onclick="window.ajustarStock('${nEsc}', 1)" aria-label="sumar"
+               style="width:32px;height:32px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg-card);color:var(--ink);font-size:20px;font-weight:800;line-height:1;cursor:pointer;">+</button>
+           </div>`;
+
       return `
-        <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg-card);border-radius:16px;margin-bottom:8px;border-left:4px solid ${color};">
-          <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg-card);border-radius:16px;margin-bottom:8px;border-left:4px solid ${color};">
+          <div style="flex:1;min-width:0;">
             <div style="font-size:14px;font-weight:700;">${p.nombre}</div>
             <div style="font-size:11px;color:var(--ink-faint);margin-top:2px;">Precio venta: $${p.precio} · Mín: ${minimo}</div>
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:26px;font-weight:800;color:${color};line-height:1;">${p.stock}</div>
-            <div style="font-size:10px;font-weight:700;color:${color};">${badge}</div>
-          </div>
+          ${controles}
         </div>
       `;
     }).join('');
+  }
+
+  // Abrir la pantalla de inventario interno de la marca (menú → "Inventario de productos").
+  function openMkInventario() {
+    const search = document.getElementById('mkStockSearch');
+    if (search) search.value = '';
+    const modal = document.getElementById('mkStockModal');
+    if (modal) modal.classList.add('active');
+    renderMkStock();
   }
 
   function ajustarStock(nombre, delta) {
@@ -275,6 +303,14 @@
     saveStockData(stock);
     renderMkStock();
   }
+
+  // Exponer al scope global (estos archivos van dentro de un IIFE): el onclick
+  // del menú y los botones – / + necesitan alcanzarlas.
+  window.openMkInventario = openMkInventario;
+  window.renderMkStock    = renderMkStock;
+  window.ajustarStock     = ajustarStock;
+  window.openMkStock      = openMkStock;
+  window.closeMkStock     = closeMkStock;
 
   // Override cargarProductosMarca para usar la lista local
   window._productosMarca = null; // forzar uso de función local
