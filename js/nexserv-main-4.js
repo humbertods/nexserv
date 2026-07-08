@@ -2927,8 +2927,23 @@
 
   function mkAsignarAlCobro(idEsperaPrincipal, idxEsperando) {
     const principal = window._mkPorCobrarData?.find(p => p.idEspera === idEsperaPrincipal);
-    const asignada  = window._mkEsperandoCobro[idxEsperando];
-    if (!principal || !asignada) { showToast('Error: no se encontraron datos'); return; }
+    const _asignStub = window._mkEsperandoCobro[idxEsperando];
+    if (!principal || !_asignStub) { showToast('Error: no se encontraron datos'); return; }
+
+    // ── Re-hidratar el DESGLOSE POR STAFF de la clienta en espera ──────────────
+    // FIX: el stub de _mkEsperandoCobro guarda el desglose solo como string
+    // (desgloseEnc) y nunca se decodificaba → la clienta absorbida viajaba SIN
+    // serviciosDetalle y el backend le acreditaba TODO a una sola staff (se perdían
+    // servicios/comisiones de las demás). Priorizamos la fuente fresca
+    // (_mkPorCobrarData, igual que la principal); si no está, decodificamos el stub.
+    let asignada = window._mkPorCobrarData?.find(p => p.idEspera === _asignStub.idEspera);
+    if (!asignada) {
+      asignada = Object.assign({}, _asignStub);
+      if (_asignStub.desgloseEnc) {
+        try { asignada.serviciosDetalle = JSON.parse(decodeURIComponent(_asignStub.desgloseEnc)); }
+        catch (e) { asignada.serviciosDetalle = null; }
+      }
+    }
 
     // Construir el cobro combinado
     const clientas = [principal, asignada];
@@ -4741,3 +4756,4 @@ function renderInformeServicios(d, pestanasData, tendData) {
 }
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
+
