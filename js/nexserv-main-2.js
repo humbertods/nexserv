@@ -1900,7 +1900,7 @@
               <div class="client-avatar">${initials}</div>
               <div class="client-info">
                 <div class="client-name">${clienteDisplay(s.nombre, s.codigo)}</div>
-                <div class="client-meta">${svcDisplay} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
+                <div class="client-meta">${svcDisplay} · $${s.total} · ${(function(){var str=String(s.horaToma||'').trim();var m=str.match(/(\d{1,2}):(\d{2})/);return m?(('0'+m[1]).slice(-2)+':'+m[2]):str;})()} · ${s.metodoPago}</div>
               </div>
               <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--success);">$${comision}</div>
             </div>`;
@@ -3907,7 +3907,16 @@
           : String(h.nombre || h.clienteNombre || '');
         const cliente = clienteDisplay(clienteRaw, String(h.codigo || h.code || '')) || '—';
         const servicio = String(h.servicio || '—');
-        const hora = String(h.hora || '');
+        // La hora podía venir como Date serializado de Sheets ("Sat Dec 30 1899
+        // 10:44:00 GMT...") → mostraba 1899. Ahora usamos la FECHA REAL del sheet
+        // (h.fecha, ej. 08/07/2026) + solo la hora limpia (HH:mm).
+        const hora = (function(){
+          var s = String(h.hora || '').trim();
+          var m = s.match(/(\d{1,2}):(\d{2})/);
+          var hhmm = m ? (('0' + m[1]).slice(-2) + ':' + m[2]) : s;
+          var f = String(h.fecha || '').trim();
+          return f ? (f + (hhmm ? ' · ' + hhmm : '')) : hhmm;
+        })();
         const metodo = String(h.metodoPago || 'Efectivo');
         const itemIdx = window._historialItems.length;
         window._historialItems.push({ ...h, _idx: itemIdx });
