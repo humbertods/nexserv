@@ -1,9696 +1,5201 @@
-// ============================================
-// NexServ · Google Apps Script — Backend API
-// Versión: 5.2 - FIX cobro TM tarjeta: precio normal por área se re-deriva del regular real del combo (Paquetes), evitando el descuento doble-contado (ej. Combo 24 marcaba $80 en vez de $67) (11/06/2026)
-// Versión: 5.1 - Separación dev/prod: SHEET_ID y SIRA_API_URL se eligen por ScriptProperty 'ENV'. Default 'prod' (producción intacta salvo ENV=dev explícito) (11/06/2026)
-// Versión: 5.0 - FIX: doGet usaba 'data' (solo existe en doPost) en estadoDispositivo y 7 casos hermanos → ahora e.parameter. Arregla auto-desbloqueo de dispositivos por GET (11/06/2026)
-// Versión: 4.9 - FIX: serviciosDetalle se acumula (multi-staff) en vez de sobreescribir (05/05/2026)
-// Conecta la app HTML con Google Sheets
-// ============================================
+// NEXSERV nexserv-main-2.js — Staff, autorizaciones, tickets
+// Depende de: nexserv-main-1.js
 
-// ── Selección de entorno (dev / prod) ───────────────────────
+  async function confirmServiceAndClose() {
+    closeModal();
 
-// ── Helper: leer propiedades del script ─────────────────────
-// Centralizado aquí para que todos los módulos del proyecto lo usen.
-function prop_(name) {
-  try { return PropertiesService.getScriptProperties().getProperty(name) || ''; }
-  catch(e) { return ''; }
-}
-// El entorno se decide por la ScriptProperty 'ENV'. Por seguridad,
-// si NO está definida se asume 'prod': producción nunca cambia de
-// comportamiento a menos que se ponga ENV='dev' explícitamente.
-//
-// CÓMO ACTIVAR DEV: en el PROYECTO de Apps Script de pruebas (la copia,
-// no el de producción) → Configuración del proyecto → Propiedades del
-// script → agregar  ENV = dev . En el de producción: dejarla sin
-// definir (o ENV = prod). Así el mismo código sirve para los dos.
-const ENV = (function () {
-  try {
-    return PropertiesService.getScriptProperties().getProperty('ENV') === 'dev' ? 'dev' : 'prod';
-  } catch (e) { return 'prod'; }
-})();
-
-const ENV_CONFIG = {
-  prod: {
-    SHEET_ID: '1vIhdBWz5_-9JggtjjrddoJRJc9__aIjh2IIs5EuzqS4',
-    // API de SIRA (inventario/gastos). NexServ la consulta solo-lectura
-    // para traer "Gastos Varios" del mes al cierre.
-    SIRA_API_URL: 'https://script.google.com/macros/s/AKfycbzyEBabD-2BXhSd1tmIXpWXwzHPWE5CoF4VcGD1c5ILkACl8FmWbQRTL0juM70sxZnw/exec'
-  },
-  dev: {
-    SHEET_ID: '__PEGA_DEV_SHEET_ID__',  // ← ID de la COPIA de prueba del Sheet
-    SIRA_API_URL: ''                     // dev sin SIRA → el cierre cae al ingreso manual
-  }
-};
-
-const SHEET_ID     = ENV_CONFIG[ENV].SHEET_ID;
-const SIRA_API_URL = ENV_CONFIG[ENV].SIRA_API_URL;
-
-
-// ── Sanitizador de inputs (R-010 NEXCERT) ───────────────────────────────────
-// Previene formula injection en Google Sheets: cualquier valor que empiece con
-// = + - @ | y sea string se prefija con un apostrofe ' que Sheets interpreta
-// como texto literal, bloqueando la ejecución de =IMPORTRANGE(), =CMD(), etc.
-// Usar _san() en TODOS los campos de texto que se escriben a Sheets desde
-// datos del usuario (nombres, servicios, observaciones, métodos de pago, etc.).
-// Campos numéricos o fechas NO pasan por _san() — solo strings del usuario.
-function _san(value) {
-  if (value === null || value === undefined) return '';
-  var s = String(value);
-  // Fórmulas en Sheets empiezan con =, +, -, @, | — prefijamos con ' para texto literal
-  if (s.length > 0 && '=+-@|'.indexOf(s.charAt(0)) >= 0) return "'" + s;
-  return s;
-}
-
-// ── Versión de la app (fuente de verdad única) ──────────────
-// Subila en CADA cambio que se despliegue. El frontend la consulta al
-// abrir (acción 'getVersion') y, si la suya es distinta, avisa a la chica
-// para que recargue. Así se detectan solas las tablets con caché vieja.
-// Convención: mismo número que el header de versión de arriba.
-const APP_VERSION = '5.2';
-
-function getSheet(name) {
-  return SpreadsheetApp.openById(SHEET_ID).getSheetByName(name);
-}
-
-// ============================================
-// CORS + ROUTING
-// ============================================
-function doGet(e) {
-  const action = e.parameter.action;
-
-  // Chequeo de versión: liviano, sin credenciales (la app lo llama al abrir,
-  // incluso antes del login, para saber si está desactualizada).
-  if (action === 'getVersion') {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: true, version: APP_VERSION }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  // ── Módulo 0: guardia de autenticación ──
-  const auth = authorize(e.parameter, action);
-  if (!auth.ok) return ContentService
-    .createTextOutput(JSON.stringify({ error: auth.reason, code: auth.code }))
-    .setMimeType(ContentService.MimeType.JSON);
-
-  let result;
-
-  // ── Riesgo #4: serializar escrituras para evitar choques simultáneos ──
-  const _lock = (_esEscritura_(action) && action !== 'login') ? LockService.getScriptLock() : null;
-  if (_lock && !_lock.tryLock(15000)) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: 'El sistema está procesando otra operación. Probá de nuevo en un momento.' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  try {
-    switch (action) {
-      case 'getClientas': result = handleGetClientas(); break;
-      case 'getDatosFacturacion': result = handleGetDatosFacturacion(e.parameter); break;
-      case 'getFacturaciones': result = handleGetFacturaciones(e.parameter); break;
-      case 'getCliente': result = handleGetCliente(e.parameter); break;
-      case 'getCatalogo': result = handleGetCatalogo(); break;
-      case 'getPromos': result = handleGetPromos(); break;
-      case 'getListaEspera': result = _cached_('c_listaEspera', handleGetListaEspera); break;
-      case 'getPrelista': result = handleGetPrelista(); break;
-      case 'getAbonoActivo': result = handleGetAbonoActivo(e.parameter); break;
-      case 'getEstadoCita': result = handleGetEstadoCita(e.parameter); break;
-      case 'crearTicketSyna': result = handleCrearTicketSyna(e.parameter); break;
-      case 'confirmarLlegada': result = handleConfirmarLlegada(e.parameter); break;
-      case 'cancelarCita': result = handleCancelarCita(e.parameter); break;
-      case 'eliminarTicketEspera': result = handleEliminarTicketEspera(e.parameter); break;
-      case 'getComisiones': result = handleGetComisiones(e.parameter); break;
-      case 'getHistorial': result = handleGetHistorial(e.parameter); break;
-      case 'getClientasFrecuentes': result = handleGetClientasFrecuentes(e.parameter); break;
-      case 'getDescanso': result = handleGetDescanso(); break;
-      case 'getFichaPestanas':          result = handleGetFichaPestanas(e.parameter);                break;
-      case 'getEvidenciasPestanas':     result = handleGetEvidenciasPestanas(e.parameter);           break;
-      case 'getFichaFacial': result = handleGetFichaFacial(e.parameter); break;
-      case 'getFichaCejasPigmento': result = handleGetFichaCejasPigmento(e.parameter); break;
-      case 'getHistorialClienta': result = handleGetHistorialClienta(e.parameter); break;
-      case 'getUltimoServicioArea': result = handleGetUltimoServicioArea(e.parameter); break;
-      case 'getPerfilFichas':     result = handleGetPerfilFichas(e.parameter);     break;
-      case 'getListaCompleta': result = _cached_('c_listaCompleta', handleGetListaCompleta_LEGACY); break; // ROLLBACK INC-02 — 2026-07-07
-      case 'getPorCobrar': result = _cached_('c_porCobrar', handleGetPorCobrar); break;
-      case 'getServiciosHoy': result = _cached_('c_serviciosHoy_' + (e.parameter.chica || ''), function(){ return handleGetServiciosHoy(e.parameter); }); break;
-      case 'getServiciosSemana': result = handleGetServiciosSemana(e.parameter); break;
-      case 'getAtenciones': result = handleGetAtenciones(e.parameter); break;
-      case 'getCierresPagos': result = handleGetCierresPagos(); break;
-      case 'getCierresSemana': result = handleGetCierresSemana(); break;
-      case 'getAutorizaciones': result = handleGetAutorizaciones(); break;
-      case 'getServiciosCobrados': result = handleGetServiciosCobrados(e.parameter); break;
-      case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
-      case 'getServicioPromo':  result = handleGetServicioPromo(e.parameter);  break;
-      case 'getTicketMulti':    result = handleGetTicketMulti(e.parameter);    break;
-      case 'getTableroLineas':  result = getTableroLineas();                    break;
-      case 'getReporteServicios': result = handleGetReporteServicios(e.parameter); break;
-      case 'getPorCobrarDesdeLineas': {
-        // Paso 3 — leer "por cobrar" desde Lineas con enriquecimiento de esTop (igual que handleGetPorCobrar)
-        const _rL = getPorCobrarDesdeLineas(e.parameter);
-        if (_rL.success && _rL.porCobrar.length > 0) {
+    // ── Si es TM: tomar también las áreas adicionales que marcó la staff ──
+    const _tmPanel = document.getElementById('confirmSvcTMPanel');
+    if (_tmPanel && _tmPanel.style.display !== 'none') {
+      const slot_tm = window._confirmSvcSlot || 1;
+      const idEspera_tm = slot_tm === 1 ? (window._as1IdEspera||'') : (window._as2IdEspera||'');
+      const user_tm = window.currentUser;
+      // Checkboxes desmarcados = áreas esperando que la staff NO va a tomar (no hacer nada)
+      // Checkboxes marcados (no disabled) = áreas que la staff TAMBIÉN quiere tomar
+      const extraChecks = document.querySelectorAll('#confirmSvcTMAreas input[type="checkbox"]:not([disabled]):checked');
+      let _tomadasExtra = 0;
+      for (const cb of extraChecks) {
+        const extraIdx = Number(cb.dataset.areaIdx);
+        if (extraIdx) {
           try {
-            const _wsC = getSheet('Clientas'); const _dC = _wsC.getDataRange().getValues();
-            const _topMap = {};
-            for (let _ci = 3; _ci < _dC.length; _ci++) {
-              if (String(_dC[_ci][7] || '').toLowerCase().includes('sí')) _topMap[String(_dC[_ci][0]).trim()] = true;
-            }
-            _rL.porCobrar.forEach(function(p){ if (_topMap[p.codigo]) p.esTop = true; });
-          } catch(eTop) {}
-        }
-        result = _rL; break;
-      }
-      case 'auditarPorCobrarLineas':  result = auditarPorCobrarLineas();             break;
-      case 'getLaboratorioCliente': result = getLaboratorioCliente(e.parameter); break;
-      // ── ASISTENCIA Y PERMISOS ──
-      case 'getAsistenciaHoy':     result = handleGetAsistenciaHoy();                    break;
-      case 'getInformeMensual':    result = handleGetInformeMensual(e.parameter);         break;
-      case 'inicializarPestanas': result = handleInicializarPestanas(); break;
-      case 'limpiarAtenciones': result = handleLimpiarAtenciones(); break;
-      case 'getMarcaProductos': result = handleGetMarcaProductos(); break;
-      case 'getCajaChica':     result = handleGetCajaChica(e.parameter);     break;
-      case 'getCajaHistorico': result = handleGetCajaHistorico(e.parameter); break;
-      case 'getCierreMes':     result = handleGetCierreMes(e.parameter);     break;
-      case 'getCierresMesHistorico': result = handleGetCierresMesHistorico(); break;
-      case 'getSolucionesLog':       result = handleGetSolucionesLog();       break;
-      // En doGet los parámetros llegan en e.parameter (NO existe 'data', eso es de doPost).
-      case 'guardarPushSub':  result = handleGuardarPushSub(e.parameter);  break;
-      case 'listarPushSubs':  result = handleListarPushSubs();             break;
-      case 'enviarPushStaff': result = handleEnviarPushStaff(e.parameter); break;
-      case 'getSesiones':     result = handleGetSesiones();                break;
-      case 'pingSesion':      result = handlePingSesion(e.parameter);      break;
-      case 'estadoDispositivo': result = handleEstadoDispositivo(e.parameter); break;
-      case 'setAprobacion':   result = handleSetAprobacion(e.parameter);   break;
-      case 'setModoSeguridad':result = handleSetModoSeguridad(e.parameter);break;
-      case 'setDescanso':     result = handleSetDescanso(e.parameter);     break;
-      case 'setDescansoGlobal': result = handleSetDescansoGlobal(e.parameter); break;
-      default: result = { error: 'Acción no reconocida' };
-    }
-  } catch (err) {
-    result = { error: err.toString() };
-  } finally {
-    if (_lock) { _lock.releaseLock(); _cacheBustAll_(); }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
-  const action = data.action;
-
-  // ── Módulo 0: guardia de autenticación ──
-  const auth = authorize(data, action);
-  if (!auth.ok) return ContentService
-    .createTextOutput(JSON.stringify({ error: auth.reason, code: auth.code }))
-    .setMimeType(ContentService.MimeType.JSON);
-
-  // ── Ruta rápida sin lock: subida de fotos a Drive (no compite con tickets) ──
-  if (action === 'subirEvidenciaPestanas') {
-    try {
-      const _r = handleSubirEvidenciaPestanas(data);
-      return ContentService.createTextOutput(JSON.stringify(_r))
-        .setMimeType(ContentService.MimeType.JSON);
-    } catch(_e) {
-      return ContentService.createTextOutput(JSON.stringify({ success: false, message: String(_e) }))
-        .setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  let result;
-
-  // ── Riesgo #4: serializar escrituras para evitar choques simultáneos ──
-  const _lock = (_esEscritura_(action) && action !== 'login') ? LockService.getScriptLock() : null;
-  if (_lock && !_lock.tryLock(15000)) {
-    return ContentService
-      .createTextOutput(JSON.stringify({ success: false, error: 'El sistema está procesando otra operación. Probá de nuevo en un momento.' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
-  try {
-    switch (action) {
-      case 'login': result = handleLogin(data); break;
-      case 'addClienta': result = handleAddClienta(data); break;
-      case 'updateClienta': result = handleUpdateClienta(data); break;
-      case 'updateClientaFull': result = handleUpdateClientaFull(data); break;
-      case 'addListaEspera': result = handleAddListaEspera(data); break;
-      case 'crearTicketSyna': result = handleCrearTicketSyna(data); break;
-      case 'getPrelista': result = handleGetPrelista(); break;
-      case 'registrarAbono': result = handleRegistrarAbono(data); break;
-      case 'addObservacionClienta': result = handleAddObservacionClienta(data); break;
-      case 'consumirAbono': result = handleConsumirAbono(data); break;
-      case 'setCodigoTicket': result = handleSetCodigoTicket(data); break;
-      case 'getAbonoActivo': result = handleGetAbonoActivo(data); break;
-      case 'getEstadoCita': result = handleGetEstadoCita(data); break;
-      case 'getLaboratorioCliente': result = getLaboratorioCliente(data); break;
-      // ── ASISTENCIA Y PERMISOS ──
-      case 'asistenciaEntrada':       result = handleAsistenciaEntrada(data);       break;
-      case 'asistenciaSalida':        result = handleAsistenciaSalida(data);        break;
-      case 'asistenciaPermiso':       result = handleAsistenciaPermiso(data);       break;
-      case 'asistenciaRegreso':       result = handleAsistenciaRegreso(data);       break;
-      case 'asistenciaEvento':        result = handleAsistenciaEvento(data);        break;
-      case 'asistenciaCorreccion':    result = handleAsistenciaCorreccion(data);    break;
-      case 'asistenciaWhatsApp':      result = handleAsistenciaWhatsApp(data);      break;
-      case 'asistenciaCierreAuto':    result = handleAsistenciaCierreAutomatico();  break;
-      case 'confirmarLlegada': result = handleConfirmarLlegada(data); break;
-      case 'cancelarCita': result = handleCancelarCita(data); break;
-      case 'eliminarTicketEspera': result = handleEliminarTicketEspera(data); break;
-      case 'tomarClienta':
-        // Normalizar: el frontend puede mandar idListaEspera o idEspera
-        if (!data.idEspera && data.idListaEspera) data.idEspera = data.idListaEspera;
-        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
-          result = handleTomarServicioNormal(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
-          result = handleTomarServicioPromo(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('TM-')) {
-          result = handleTomarAreaTicketMulti({ idEspera: data.idEspera, chicaNombre: data.chicaNombre });
-        } else {
-          result = handleTomarClienta(data);
-        }
-        break;
-      case 'finalizarAtencion':
-        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
-          result = handleFinalizarServicioNormal(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
-          result = handleFinalizarServicioPromo(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('TM-')) {
-          // Un TM- (combo/multi-área) NUNCA debe caer en handleFinalizarAtencion (que solo
-          // busca en ListaEspera LE-) → ahí se perdía la clienta sin avisar a Mikaela.
-          // handleCompletarAreaTicketMulti marca el área de la staff como completada y,
-          // si quedan áreas, las deja en "Esperando" + avisa a Mikaela ("En espera parcial").
-          result = handleCompletarAreaTicketMulti(data);
-        } else {
-          result = handleFinalizarAtencion(data);
-        }
-        break;
-      case 'confirmarCobro':
-        if (data.idEspera && String(data.idEspera).startsWith('SN-')) {
-          result = handleConfirmarCobroNormal(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('SP-')) {
-          result = handleConfirmarCobroPromo(data);
-        } else if (data.idEspera && String(data.idEspera).startsWith('TM-')) {
-          result = handleConfirmarCobroMulti(data);
-        } else {
-          result = handleConfirmarCobro(data);
-        }
-        break;
-      case 'updateServiciosAtencion': result = handleUpdateServiciosAtencion(data); break;
-      case 'devolverALista': result = handleDevolverALista(data); break;
-      case 'continuarPromoALista': result = handleContinuarPromoALista(data); break;
-      case 'addPromo': result = handleAddPromo(data); break;
-      case 'updatePromo': result = handleUpdatePromo(data); break;
-      case 'addFichaPestanas':          result = handleAddFichaPestanas(data);                     break;
-      case 'subirEvidenciaPestanas':    result = handleSubirEvidenciaPestanas(data);               break;
-      case 'addVisitaFacial':    result = handleAddVisitaFacial(data);    break;
-      case 'getHistorialFacial': result = handleGetHistorialFacial(e.parameter); break;
-      case 'getPerfilFichas':    result = handleGetPerfilFichas(e.parameter); break;
-      case 'getHistorialClienta': result = handleGetHistorialClienta(e.parameter); break;
-      case 'completarYTomarSiguienteAreaTM': result = handleCompletarYTomarSiguienteAreaTM(data); break;
-      case 'updateFichaFacial':  result = handleUpdateFichaFacial(data);  break;
-      case 'addFichaCejasPigmento': result = handleAddFichaCejasPigmento(data); break;
-      case 'cierreSemanal': result = handleCierreSemanal(data); break;
-      case 'verificarCierreAutomatico': result = handleVerificarCierreAutomatico(); break;
-      case 'inicializarPestanas': result = handleInicializarPestanas(); break;
-      case 'addServicioNormal': result = handleAddServicioNormal(data); break;
-      case 'addServicioPromo':  result = handleAddServicioPromo(data);  break;
-      case 'getServicioNormal': result = handleGetServicioNormal(e.parameter); break;
-      case 'tomarServicioNormal': result = handleTomarServicioNormal(data); break;
-      case 'finalizarServicioNormal': result = handleFinalizarServicioNormal(data); break;
-      case 'finalizarServicioPromo':  result = handleFinalizarServicioPromo(data);  break;
-      case 'confirmarCobroNormal': result = handleConfirmarCobroNormal(data); break;
-      case 'pagoIndividual': result = handlePagoIndividual(data); break;
-      case 'bloquearUsuario': result = handleBloquearUsuario(data); break;
-      case 'asignarServicioNormal': result = handleAsignarServicioNormal(data); break;
-      case 'confirmarServicioStaff': result = handleConfirmarServicioStaff(data); break;
-      case 'actualizarServicioSP': result = handleActualizarServicioSP(data); break;
-      case 'asignarPromo': result = handleAsignarPromo(data); break;
-      case 'asignarStaff': result = handleAsignarStaff(data); break;
-      case 'mandarACobro': result = handleMandarACobro(data); break;
-      case 'retirarYCobrar': result = handleRetirarYCobrar(data); break;
-      case 'agregarServicioExtra': result = handleAgregarServicioExtra(data); break;
-      case 'agregarPromoExtra': result = handleAgregarPromoExtra(data); break;
-      case 'guardarFacturacion': result = handleGuardarFacturacion(data); break;
-      case 'solicitarAutorizacion': result = handleSolicitarAutorizacion(data); break;
-      case 'aprobarAutorizacion': result = handleAprobarAutorizacion(data); break;
-      case 'rechazarAutorizacion': result = handleRechazarAutorizacion(data); break;
-      case 'registrarVentaProductos': result = handleRegistrarVentaProductos(data); break;
-      case 'eliminarServicio': result = handleEliminarServicio(data); break;
-      // ── TICKET MULTI ──
-      case 'crearTicketMulti':       result = handleCrearTicketMulti(data);       break;
-      case 'tomarAreaTicketMulti':   result = handleTomarAreaTicketMulti(data);   break;
-      case 'completarAreaTicketMulti': result = handleCompletarAreaTicketMulti(data); break;
-      case 'confirmarCobroMulti':    result = handleConfirmarCobroMulti(data);    break;
-      case 'addGastoCaja':    result = handleAddGastoCaja(data);    break;
-      case 'addAperturaCaja': result = handleAddAperturaCaja(data); break;
-      case 'guardarCierreMes': result = handleGuardarCierreMes(data); break;
-      case 'anularGastoCaja': result = handleAnularGastoCaja(data); break;
-      case 'registrarSolucion':   result = handleRegistrarSolucion(data); break;
-      case 'borrarSolucionesLog': result = handleBorrarSolucionesLog();    break;
-      case 'cerrarCaja':      result = handleCerrarCaja(data);      break;
-      case 'guardarPushSub':  result = handleGuardarPushSub(data);  break;
-      case 'listarPushSubs':  result = handleListarPushSubs();      break;
-      case 'enviarPushStaff': result = handleEnviarPushStaff(data); break;
-      case 'getSesiones':     result = handleGetSesiones();         break;
-      case 'pingSesion':      result = handlePingSesion(data);      break;
-      case 'estadoDispositivo': result = handleEstadoDispositivo(data); break;
-      case 'setAprobacion':   result = handleSetAprobacion(data);   break;
-      case 'setModoSeguridad':result = handleSetModoSeguridad(data);break;
-      case 'setDescanso':     result = handleSetDescanso(data);     break;
-      case 'setDescansoGlobal': result = handleSetDescansoGlobal(data); break;
-      default: result = { error: 'Acción no reconocida' };
-    }
-  } catch (err) {
-    result = { error: err.toString() };
-  } finally {
-    if (_lock) { _lock.releaseLock(); _cacheBustAll_(); }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// ============================================
-// LOGIN → movido a NexServ_Auth.gs (Módulo 0)
-// handleLogin() ahora vive en el archivo de seguridad:
-// compara contra el hash y emite el token de sesión firmado.
-// ============================================
-
-// ── Modo de descanso (bloqueo temporal de acceso por staff) ──────────────
-function _leerDescanso() {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty('DESCANSO_STAFF');
-    return raw ? JSON.parse(raw) : {};
-  } catch(e) { return {}; }
-}
-function _staffEnDescanso(nombre) {
-  if (_descansoGlobalActivo()) return true; // descanso global bloquea a todo el equipo
-  const cfg = _leerDescanso();
-  return cfg[String(nombre || '').trim()] === true;
-}
-// ── Descanso GLOBAL: bloquea a TODO el equipo de una sola vez (el Owner queda exento) ──
-function _descansoGlobalActivo() {
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty('DESCANSO_GLOBAL');
-    if (!raw) return false;
-    const o = JSON.parse(raw);
-    return !!(o && o.on === true);
-  } catch (e) { return false; }
-}
-function handleGetDescanso() {
-  let g = false, desde = '', por = '';
-  try {
-    const raw = PropertiesService.getScriptProperties().getProperty('DESCANSO_GLOBAL');
-    if (raw) { const o = JSON.parse(raw); g = !!(o && o.on); desde = (o && o.desde) || ''; por = (o && o.por) || ''; }
-  } catch (e) {}
-  return { success: true, config: _leerDescanso(), global: g, desde: desde, por: por };
-}
-function handleSetDescansoGlobal(data) {
-  try {
-    const activar = (data && (data.activar === true || data.activar === 'true'));
-    const props = PropertiesService.getScriptProperties();
-    if (activar) {
-      props.setProperty('DESCANSO_GLOBAL', JSON.stringify({
-        on: true,
-        desde: new Date().toISOString(),
-        por: String((data && data.por) || '')
-      }));
-    } else {
-      props.deleteProperty('DESCANSO_GLOBAL');
-      // "Desbloquear equipo" debe liberar a TODAS: limpiar también los descansos
-      // INDIVIDUALES. Si no, las staff con flag individual seguían bloqueadas al
-      // quitar el global (causa de "persiste con algunas staff").
-      props.deleteProperty('DESCANSO_STAFF');
-    }
-    return { success: true, global: _descansoGlobalActivo() };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-function handleSetDescanso(data) {
-  const cfg = _leerDescanso();
-  const nombre = String((data && data.staff) || '').trim();
-  if (!nombre) return { success: false, message: 'Falta el nombre de la staff' };
-  if (data.bloqueado === true || data.bloqueado === 'true') cfg[nombre] = true;
-  else delete cfg[nombre];
-  PropertiesService.getScriptProperties().setProperty('DESCANSO_STAFF', JSON.stringify(cfg));
-  return { success: true, config: cfg };
-}
-
-// ============================================
-// CLIENTAS
-// ============================================
-// Perfil/historial completo de una clienta para Mikaela
-// Devuelve el ÚLTIMO servicio de un área para una clienta (p. ej. cejas), leyendo
-// HistorialOwner de abajo hacia arriba: como se agrega en orden cronológico, el primer
-// match es el más reciente. params: { codigo, area }.
-//   HistorialOwner: A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor
-function handleGetUltimoServicioArea(params) {
-  try {
-    var codigo = String((params && params.codigo) || '').trim();
-    var area   = String((params && params.area) || '').trim().toLowerCase();
-    if (!codigo) return { success: false, message: 'codigo requerido' };
-    if (!area)   return { success: false, message: 'area requerida' };
-    var clave = area.indexOf('cej') >= 0 ? 'cej'
-              : area.indexOf('depil') >= 0 ? 'depil'
-              : area.indexOf('pest') >= 0 ? 'pest'
-              : area.indexOf('facial') >= 0 ? 'facial'
-              : area;
-    var ws = getSheet('HistorialOwner');
-    var d = ws.getDataRange().getValues();
-    for (var i = d.length - 1; i >= 3; i--) {
-      if (String(d[i][2] || '').trim() !== codigo) continue;
-      var aFila = String(d[i][6] || '').toLowerCase();
-      if (aFila.indexOf(clave) < 0) continue;
-      return {
-        success: true, found: true,
-        fecha: String(d[i][0] || ''), hora: String(d[i][1] || ''),
-        servicio: String(d[i][5] || ''), area: String(d[i][6] || ''),
-        staff: String(d[i][7] || ''), valor: Number(d[i][8] || 0)
-      };
-    }
-    return { success: true, found: false };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-function handleGetHistorialClienta(params) {
-  var codigo = String((params && params.codigo) || '').trim();
-  if (!codigo) return { success: false, error: 'Falta el código de la clienta' };
-
-  // Datos de la clienta + última visita
-  var cliente = null;
-  try {
-    var wsC = getSheet('Clientas');
-    var dataC = wsC.getDataRange().getValues();
-    for (var i = 3; i < dataC.length; i++) {
-      if (String(dataC[i][0] || '').trim() === codigo) {
-        cliente = {
-          codigo: dataC[i][0], nombre: dataC[i][1], telefono: dataC[i][2],
-          ultimaVisita: dataC[i][4], totalVisitas: dataC[i][5], observaciones: dataC[i][9] || '',
-          // Datos de facturación: cédula K(10), correo L(11), ciudad Q(16)
-          cedula: dataC[i][10] || '', correo: dataC[i][11] || '', ciudad: dataC[i][16] || '',
-          // Observaciones por área que dejan las staff (Clientas L–P / índices 12–15)
-          obsCejas:      dataC[i][12] || '',
-          obsDepilacion: dataC[i][13] || '',
-          obsPestanas:   dataC[i][14] || '',
-          obsFacial:     dataC[i][15] || ''
-        };
-        break;
-      }
-    }
-  } catch (e) {}
-
-  // Fichas (reusar getters existentes)
-  var fichaFacial = null, fichaPestanas = null, fichaPigmento = null;
-  try { fichaFacial   = handleGetFichaFacial({ codigo: codigo }); } catch (e) {}
-  try { fichaPestanas = handleGetFichaPestanas({ codigo: codigo }); } catch (e) {}
-  try { fichaPigmento = handleGetFichaCejasPigmento({ codigo: codigo }); } catch (e) {}
-
-  // Historial de servicios (HistorialOwner): A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor
-  var historial = [];
-  try {
-    var wsH = getSheet('HistorialOwner');
-    var dataH = wsH.getDataRange().getValues();
-    for (var j = 3; j < dataH.length; j++) {
-      if (String(dataH[j][2] || '').trim() === codigo) {
-        historial.push({
-          fecha: dataH[j][0], hora: dataH[j][1], servicio: dataH[j][5],
-          area: dataH[j][6], staff: dataH[j][7], valor: dataH[j][8]
-        });
-      }
-    }
-    historial.reverse(); // más reciente primero
-  } catch (e) {}
-
-  // Bitácora permanente de observaciones que dejaron las staff (todas las áreas)
-  var observacionesStaff = [];
-  try {
-    var wsO = SpreadsheetApp.openById(SHEET_ID).getSheetByName('ObservacionesClienta');
-    if (wsO) {
-      var dataO = wsO.getDataRange().getValues();
-      for (var k = 1; k < dataO.length; k++) {
-        if (String(dataO[k][2] || '').trim() === codigo) {
-          observacionesStaff.push({
-            fecha: dataO[k][0], hora: dataO[k][1],
-            area: dataO[k][4], staff: dataO[k][5], observacion: dataO[k][6]
-          });
-        }
-      }
-      observacionesStaff.reverse(); // más reciente primero
-    }
-  } catch (e) {}
-
-  return {
-    success: true,
-    cliente: cliente,
-    fichaFacial: fichaFacial,
-    fichaPestanas: fichaPestanas,
-    fichaPigmento: fichaPigmento,
-    observacionesStaff: observacionesStaff,
-    historial: historial
-  };
-}
-
-function handleGetClientas() {
-  const ws = getSheet('Clientas');
-  const data = ws.getDataRange().getValues();
-  const clientas = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    clientas.push({
-      codigo: row[0],
-      nombre: row[1],
-      telefono: row[2],
-      fechaRegistro: row[3],
-      ultimaVisita: row[4],
-      totalVisitas: row[5],
-      visitasMes: row[6],
-      esTop: row[7],
-      overrideManual: row[8],
-      observaciones: row[9],
-      cedula: row[10] || '',
-      correo: row[11] || '',
-      obsCejas: row[12] || '',
-      obsDepilacion: row[13] || '',
-      obsPestanas: row[14] || '',
-      obsFacial: row[15] || ''
-    });
-  }
-  return { success: true, clientas: clientas };
-}
-
-function handleGetCliente(params) {
-  const clientas = handleGetClientas();
-  const cliente = clientas.clientas.find(c => c.codigo === params.codigo);
-  if (!cliente) return { success: false, message: 'Clienta no encontrada' };
-
-  // Traer fichas de pestañas
-  const fichasPest = handleGetFichaPestanas({ codigo: params.codigo });
-  // Traer ficha facial
-  const fichaFac = handleGetFichaFacial({ codigo: params.codigo });
-  // Traer historial de servicios
-  const historial = getHistorialCliente(params.codigo);
-
-  return {
-    success: true,
-    cliente: cliente,
-    fichasPestanas: fichasPest.fichas || [],
-    fichaFacial: fichaFac.ficha || null,
-    historial: historial
-  };
-}
-
-function handleAddClienta(data) {
-  // Saneamiento de nombre: un nombre real de clienta nunca trae " + " (eso viene de
-  // un cobro grupal/combo cuyo nombre se mostró concatenado, ej. "Susana + Micaela").
-  // Si llega así, nos quedamos con el primer nombre para no crear clientas basura.
-  try {
-    var _nm = String((data && data.nombre) || '').trim();
-    if (/\s\+\s/.test(_nm)) {
-      var _primero = _nm.split(/\s*\+\s*/)[0].trim();
-      data.nombre = _primero || _nm;
-    } else {
-      data.nombre = _nm;
-    }
-  } catch (eNm) {}
-
-  const ws = getSheet('Clientas');
-  const lastRow = ws.getLastRow();
-
-  // Generar código automático
-  const lastCode = ws.getRange(lastRow, 1).getValue();
-  const nextNum = lastCode ? parseInt(String(lastCode).replace('C-', '')) + 1 : 1;
-  const codigo = 'C-' + String(nextNum).padStart(4, '0');
-
-  const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-
-  const estadoInicial = (data.directoListaEspera === true || String(data.directoListaEspera || '').toLowerCase() === 'true')
-    ? 'Esperando'
-    : 'Prelista';
-
-  ws.appendRow([
-    codigo,
-    data.nombre,
-    data.telefono || '',
-    today,
-    '—',
-    0,
-    0,
-    'No',
-    'Auto',
-    data.observaciones || '',
-    data.cedula || '',
-    data.correo || '',
-    data.obsCejas || '',
-    data.obsDepilacion || '',
-    data.obsPestanas || '',
-    data.obsFacial || ''
-  ]);
-
-  // Si tiene ficha de pestañas
-  if (data.pestModelo) {
-    handleAddFichaPestanas({
-      codigo: codigo,
-      nombre: data.nombre,
-      modelo: data.pestModelo,
-      diseno: data.pestDiseno || '—',
-      tallas: data.pestTallas || '—',
-      obs: data.pestObs || ''
-    });
-  }
-
-  // Si tiene ficha facial
-  if (data.facBiotipo) {
-    handleUpdateFichaFacial({
-      codigo: codigo,
-      nombre: data.nombre,
-      edad: data.facEdad,
-      sexo: data.facSexo,
-      biotipo: data.facBiotipo,
-      fototipo: data.facFototipo,
-      tipoPiel: data.facTipoPiel,
-      signosLesiones: data.facSignos,
-      signosHiper: data.facHiper,
-      estadoPiel: data.facEstado,
-      alergias: data.facAlergias,
-      antecedentes: data.facAntecedentes,
-      obsExtra: data.facObsExtra
-    });
-  }
-
-  return { success: true, codigo: codigo, message: 'Clienta registrada' };
-}
-
-function handleUpdateClienta(data) {
-  const ws = getSheet('Clientas');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    if (allData[i][0] === data.codigo) {
-      const row = i + 1;
-      if (data.observaciones !== undefined) ws.getRange(row, 10).setValue(data.observaciones);
-      if (data.obsCejas !== undefined) ws.getRange(row, 13).setValue(data.obsCejas);
-      if (data.obsDepilacion !== undefined) ws.getRange(row, 14).setValue(data.obsDepilacion);
-      if (data.obsPestanas !== undefined) ws.getRange(row, 15).setValue(data.obsPestanas);
-      if (data.obsFacial !== undefined) ws.getRange(row, 16).setValue(data.obsFacial);
-      if (data.overrideManual !== undefined) ws.getRange(row, 9).setValue(data.overrideManual);
-      return { success: true };
-    }
-  }
-  return { success: false, message: 'Clienta no encontrada' };
-}
-
-function handleUpdateClientaFull(data) {
-  const ws = getSheet('Clientas');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    if (allData[i][0] === data.codigo) {
-      const row = i + 1;
-      // Actualizar todos los campos editables
-      if (data.nombre !== undefined) ws.getRange(row, 2).setValue(data.nombre);
-      if (data.telefono !== undefined) ws.getRange(row, 3).setValue(data.telefono);
-      if (data.cedula !== undefined) ws.getRange(row, 11).setValue(data.cedula);
-      if (data.correo !== undefined) ws.getRange(row, 12).setValue(data.correo);
-      if (data.obsCejas !== undefined) ws.getRange(row, 13).setValue(data.obsCejas);
-      if (data.obsDepilacion !== undefined) ws.getRange(row, 14).setValue(data.obsDepilacion);
-      if (data.obsPestanas !== undefined) ws.getRange(row, 15).setValue(data.obsPestanas);
-      if (data.obsFacial !== undefined) ws.getRange(row, 16).setValue(data.obsFacial);
-      if (data.ciudad !== undefined) ws.getRange(row, 17).setValue(data.ciudad);   // col Q = ciudad (facturación)
-      return { success: true };
-    }
-  }
-  return { success: false, message: 'Clienta no encontrada' };
-}
-
-
-// ============================================
-// CATÁLOGO
-// ============================================
-function handleGetCatalogo() {
-  const ws = getSheet('Catalogo');
-  const data = ws.getDataRange().getValues();
-  const servicios = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    servicios.push({
-      codigo: row[0],
-      area: row[1],
-      servicio: row[2],
-      precio: row[3],
-      activo: row[4]
-    });
-  }
-  return { success: true, servicios: servicios };
-}
-
-// ============================================
-// PROMOS / PAQUETES
-// ============================================
-function handleGetPromos() {
-  const ws = getSheet('Paquetes');
-  const data = ws.getDataRange().getValues();
-  const promos = [];
-
-  // Fila 1=título, 2=nota, 3=encabezados, promos desde fila 4 (índice 3)
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    // Solo leer filas que tengan un ID válido de promo (P001, P002, etc.)
-    if (!id.startsWith('P')) continue;
-    // Ignorar IDs inválidos como PNaN
-    const num = parseInt(id.replace('P', ''));
-    if (isNaN(num)) continue;
-    promos.push({
-      id: id,
-      name: String(row[1] || ''),           // campo 'name' para compatibilidad con PROMOS frontend
-      nombre: row[1],
-      servicios: row[2],
-      price: Number(row[3] || 0),           // precioCombo = precio promo
-      precioCombo: row[3],
-      // FIX: si sumaIndividual (col E) está vacío, usar el precioCombo como fallback
-      // para que el frontend no reciba regular=0 y Tarjeta no cobre precio promo.
-      // El precio regular correcto debe llenarse en la hoja Paquetes col E.
-      regular: Number(row[4] || row[3] || 0), // sumaIndividual = precio regular sin descuento
-      sumaIndividual: row[4],
-      ahorro: row[5],
-      desde: row[6],
-      hasta: row[7],
-      activa: row[8] !== undefined ? String(row[8]).toLowerCase() !== 'no' : true,
-      division: row[9] ? String(row[9]) : ''
-    });
-  }
-  return { success: true, promos: promos };
-}
-
-function handleAddPromo(data) {
-  const ws = getSheet('Paquetes');
-  const allData = ws.getDataRange().getValues();
-
-  // Buscar el último ID de promo válido para generar el siguiente
-  let maxNum = 0;
-  let lastPromoRow = 4; // fila del encabezado (índice 3 = fila 4)
-  for (let i = 4; i < allData.length; i++) {
-    const id = String(allData[i][0] || '').trim();
-    if (id.startsWith('P')) {
-      const num = parseInt(id.replace('P', ''));
-      if (!isNaN(num) && num > maxNum) {
-        maxNum = num;
-        lastPromoRow = i + 1; // fila real (1-based)
-      }
-    }
-  }
-  const id = 'P' + String(maxNum + 1).padStart(3, '0');
-
-  // Insertar justo después de la última promo existente
-  ws.insertRowAfter(lastPromoRow);
-  const newRow = lastPromoRow + 1;
-  ws.getRange(newRow, 1).setValue(id);
-  ws.getRange(newRow, 2).setValue(data.nombre || '');
-  ws.getRange(newRow, 3).setValue(data.servicios || '');
-  ws.getRange(newRow, 4).setValue(Number(data.precio) || 0);
-  ws.getRange(newRow, 5).setValue(Number(data.regular) || 0);
-  ws.getRange(newRow, 6).setValue((Number(data.regular) || 0) - (Number(data.precio) || 0));
-  ws.getRange(newRow, 7).setValue(data.desde || '');
-  ws.getRange(newRow, 8).setValue(data.hasta || '');
-  ws.getRange(newRow, 9).setValue(data.activa !== false ? 'Sí' : 'No');
-  ws.getRange(newRow, 10).setValue(data.division || '');
-
-  return { success: true, id: id };
-}
-
-function handleUpdatePromo(data) {
-  const ws = getSheet('Paquetes');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 4; i < allData.length; i++) {
-    const id = String(allData[i][0] || '').trim();
-    if (id === data.id) {
-      const row = i + 1;
-      ws.getRange(row, 2).setValue(data.nombre);
-      ws.getRange(row, 3).setValue(data.servicios);
-      ws.getRange(row, 4).setValue(Number(data.precio) || 0);
-      ws.getRange(row, 5).setValue(Number(data.regular) || 0);
-      ws.getRange(row, 6).setValue((Number(data.regular) || 0) - (Number(data.precio) || 0));
-      ws.getRange(row, 7).setValue(data.desde);
-      ws.getRange(row, 8).setValue(data.hasta);
-      if (data.activa !== undefined) ws.getRange(row, 9).setValue(data.activa ? 'Sí' : 'No');
-      if (data.division !== undefined) ws.getRange(row, 10).setValue(data.division);
-      return { success: true };
-    }
-  }
-  return { success: false };
-}
-
-// ============================================
-// LISTA DE ESPERA
-// Columnas reales: A=ID | B=Fecha | C=Hora llegada | D=Código cliente | E=Cliente | F=Servicio | G=Área | H=Prioridad | I=Estado | J=Tomada por | K=Hora toma | L=Observaciones
-// ============================================
-// Borra (cancela) un ticket de la lista de espera. Soft-delete: marca estado 'Cancelado'
-// para que desaparezca de la lista pero quede el registro (reversible/auditable).
-function handleEliminarTicketEspera(data) {
-  var id = String((data && data.id) || '').trim();
-  if (!id) return { success: false, error: 'Falta el id del ticket' };
-
-  // Determinar hoja y fila inicial según el tipo de ticket
-  var hoja = null, desde = 1;
-  if (id.indexOf('LE-') === 0)      { hoja = 'ListaEspera';    desde = 3; }
-  else if (id.indexOf('SN-') === 0) { hoja = 'ServicioNormal'; desde = 1; }
-  else if (id.indexOf('SP-') === 0) { hoja = 'ServicioPromo';  desde = 1; }
-  else if (id.indexOf('TM-') === 0) { hoja = 'TicketMulti';    desde = 1; }
-  else return { success: false, error: 'Tipo de ticket no reconocido: ' + id };
-
-  var ws = getSheet(hoja);
-  if (!ws) return { success: false, error: 'Hoja ' + hoja + ' no encontrada' };
-
-  var rows = ws.getDataRange().getValues();
-  for (var i = desde; i < rows.length; i++) {
-    if (String(rows[i][0] || '').trim() === id) {
-      ws.deleteRow(i + 1); // borra la fila completa del sheet (permanente)
-      return { success: true, id: id, borrado: true };
-    }
-  }
-  return { success: false, error: 'Ticket no encontrado' };
-}
-
-function handleGetListaEspera() {
-  const ws = getSheet('ListaEspera');
-  const data = ws.getDataRange().getValues();
-  const lista = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id || !id.startsWith('LE-')) continue;
-    const estado = String(row[8] || '').toLowerCase();
-    if (estado === 'tomada' || estado === 'completada' || estado === 'finalizada' || estado === 'en servicio' || estado === 'por cobrar' || estado === 'cancelado' || estado === 'prelista') continue;
-    // Excluir tickets atascados con fecha 1899
-    if (row[1] instanceof Date && row[1].getFullYear() < 2000) continue;
-    lista.push({
-      id: id,
-      fecha: row[1],
-      horaLlegada: row[2],
-      codigo: row[3],
-      nombre: row[4],
-      servicio: row[5],
-      area: row[6],
-      prioridad: row[7],
-      estado: row[8],
-      tomadaPor: row[9],
-      horaToma: row[10],
-      observaciones: row[11] || '',
-      total: Number(row[12] || 0),
-      promoNombre: row[13] || '',
-      precioPromo: row[14] || '',
-      precioRegular: row[15] || '',
-      secuencia: (function(){ try { return JSON.parse(row[16] || '[]'); } catch(e) { return []; } })(),
-      promasExtra: (function(){ try { return JSON.parse(row[17] || '[]'); } catch(e) { return []; } })(),
-      esTop: 'No',
-      asignadaA: estado === 'asignada' ? String(row[9] || '') : ''
-    });
-  }
-  
-  // Buscar si son TOP desde la hoja Clientas
-  try {
-    const wsC = getSheet('Clientas');
-    const cData = wsC.getDataRange().getValues();
-    const topMap = {};
-    for (let i = 3; i < cData.length; i++) {
-      if (String(cData[i][7] || '').toLowerCase().includes('sí')) topMap[cData[i][0]] = true;
-    }
-    lista.forEach(l => { if (topMap[l.codigo]) l.esTop = 'Sí'; });
-  } catch(e) {}
-
-  // Merge con ServicioNormal (tickets SN- esperando)
-  try {
-    const snR = handleGetServicioNormal({});
-    if (snR.success && snR.esperando) {
-      snR.esperando.forEach(sn => {
-        lista.push({
-          id          : sn.idEspera,
-          fecha       : sn.fecha,
-          horaLlegada : sn.horaLlegada,
-          codigo      : sn.codigo,
-          nombre      : sn.nombre,
-          servicio    : sn.servicio,
-          area        : sn.area,
-          prioridad   : sn.prioridad || 'Normal',
-          estado      : sn.estado || 'Esperando',
-          tomadaPor   : sn.tomadaPor || '',
-          horaToma    : sn.horaTomada || '',
-          observaciones: sn.observaciones || '',
-          total       : Number(sn.total || 0),
-          promoNombre : sn.promoNombre || '',
-          precioPromo : sn.precioPromo || '',
-          precioRegular: sn.precioNormal || '',
-          tipo        : sn.tipo || 'SN',
-          secuencia   : [],
-          promasExtra : [],
-          esTop       : sn.esTop || 'No',
-          asignadaA   : sn.asignadaA || '',
-          fuente      : 'ServicioNormal'
-        });
-      });
-    }
-  } catch(e) {}
-
-  // Merge con ServicioPromo (tickets SP- esperando)
-  try {
-    const spR = handleGetServicioPromo({});
-    if (spR.success && spR.esperando) {
-      spR.esperando.forEach(sp => {
-        lista.push({
-          id          : sp.idEspera,
-          fecha       : sp.fecha,
-          horaLlegada : sp.horaLlegada,
-          codigo      : sp.codigo,
-          nombre      : sp.nombre,
-          servicio    : sp.servicio,
-          area        : sp.area,
-          prioridad   : sp.prioridad || 'Normal',
-          estado      : sp.estado || 'Esperando',
-          tomadaPor   : sp.tomadaPor || '',
-          horaToma    : sp.horaTomada || '',
-          observaciones: sp.observaciones || '',
-          total       : Number(sp.total || 0),
-          promoNombre : sp.promoNombre || '',
-          precioPromo : sp.precioPromo || '',
-          precioRegular: sp.precioNormal || '',
-          tipo        : sp.tipo || 'SP',
-          secuencia   : [],
-          promasExtra : [],
-          esTop       : 'No',
-          asignadaA   : sp.asignadaA || '',
-          fuente      : 'ServicioPromo'
-        });
-      });
-    }
-  } catch(e) {}
-
-  // Merge con TicketMulti — solo la PRÓXIMA área según secuencia (una tarjeta por TM)
-  try {
-    const tmR = handleGetTicketMulti({});
-    if (tmR.success && tmR.activos) {
-      tmR.activos.forEach(function(tm) {
-        // Flujo secuencial: si alguna área del TM está EN SERVICIO, no liberar la
-        // siguiente todavía. La próxima área recién aparece cuando la staff actual
-        // termina su parte (toca "terminé mi parte") y su área deja de estar en servicio.
-        var tieneEnServicio = (tm.areas || []).some(function(a) {
-          return String(a.estado || '').toLowerCase() === 'en servicio';
-        });
-        if (tieneEnServicio) return;
-        var areasEsperando = (tm.areas || []).filter(function(a) {
-          return String(a.estado || '').toLowerCase() === 'esperando';
-        });
-        if (areasEsperando.length === 0) return;
-        var proximaArea = null;
-        if (tm.secuencia && tm.secuencia.length > 0) {
-          for (var si = 0; si < tm.secuencia.length; si++) {
-            var seqArea = String(tm.secuencia[si]).toLowerCase();
-            var match = areasEsperando.filter(function(a) {
-              return String(a.area || '').toLowerCase() === seqArea;
-            })[0];
-            if (match) { proximaArea = match; break; }
-          }
-        }
-        if (!proximaArea) proximaArea = areasEsperando[0];
-        // Modelo centralizado: priorizar área en espera que ya tenga staff asignada
-        var areaAsignadaLE = areasEsperando.filter(function(a){ return a.staff && String(a.staff).trim() !== ''; })[0];
-        if (areaAsignadaLE) proximaArea = areaAsignadaLE;
-        var staffTM = String(proximaArea.staff || '').trim();
-        lista.push({
-          id          : tm.idEspera,
-          fecha       : '',
-          horaLlegada : '',
-          codigo      : tm.codigo,
-          nombre      : tm.nombre,
-          servicio    : proximaArea.tentativo || '',
-          area        : proximaArea.area || 'multi',
-          prioridad   : tm.prioridad || 'Normal',
-          estado      : staffTM ? 'Asignada' : 'Esperando',
-          tomadaPor   : staffTM,
-          horaToma    : '',
-          observaciones: tm.observaciones || '',
-          total       : proximaArea.precio || 0,
-          promoNombre : '',
-          precioPromo : '',
-          precioRegular: '',
-          tipo        : 'TM',
-          secuencia   : tm.secuencia || [],
-          promasExtra : [],
-          esTop       : 'No',
-          asignadaA   : staffTM,
-          fuente      : 'TicketMulti',
-          areaIdx     : proximaArea.idx
-        });
-      });
-    }
-  } catch(e) {}
-
-  return { success: true, lista: lista };
-}
-
-function handleAddListaEspera(data) {
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-  
-  // Buscar último ID válido
-  let maxNum = 0;
-  for (let i = 3; i < allData.length; i++) {
-    const id = String(allData[i][0] || '');
-    if (id.startsWith('LE-')) {
-      const num = parseInt(id.replace('LE-', ''));
-      if (num > maxNum) maxNum = num;
-    }
-  }
-  const id = 'LE-' + String(maxNum + 1).padStart(4, '0');
-
-  const now = new Date();
-  const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const hora = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-
-  // Si viene con asignadaA, el estado es "Asignada" y se guarda la chica en col J
-  const estado = data.asignadaA ? 'Asignada' : 'Esperando';
-  const tomadaPor = data.asignadaA || '';
-
-  // Columnas: A=ID | B=Fecha | C=Hora | D=Código | E=Nombre | F=Servicio | G=Área | H=Prioridad | I=Estado | J=TomadaPor | K=HoraToma | L=Obs | M=Total | N=PromoNombre | O=PrecioPromo | P=PrecioRegular | Q=SecuenciaAreas
-  // Secuencia: array de areas en orden definido por Mikaela, guardado como JSON string
-  const secuenciaStr = data.secuencia && data.secuencia.length > 0
-    ? JSON.stringify(data.secuencia.map(s => s.area || s))
-    : '';
-
-  // Promos extra (2a y 3a promo) guardadas como JSON en col R
-  const promasExtraStr = data.promasExtra && data.promasExtra.length > 0
-    ? JSON.stringify(data.promasExtra)
-    : '';
-
-  ws.appendRow([
-    id, fecha, hora, data.codigo, data.nombre, data.servicio,
-    data.area, data.prioridad || 'Normal', estado, tomadaPor, '', data.observaciones || '',
-    data.total || 0,                // M(12): Total
-    data.promoNombre || '',          // N(13): Promo 1 nombre
-    data.precioPromo || '',          // O(14): Promo 1 precio
-    data.precioRegular || '',        // P(15): Promo 1 precio regular
-    secuenciaStr,                    // Q(16): Secuencia de areas (JSON)
-    promasExtraStr                   // R(17): Promos extra 2 y 3 (JSON)
-  ]);
-
-  // espejo Lineas: registrar la clienta desde el momento en que llega a la cola.
-  // Sin esto, un LE- no existia en Lineas hasta finalizarAtencion (demasiado tarde).
-  // promoRef no aplica para LE- (no es un ticket referenciado por id),
-  // la linea se ata al ticket via ticketRef en lineaDesdeAsignacion cuando se asigna staff.
-  try {
-    lineaDesdeListaEspera({
-      codigo:       data.codigo,
-      nombre:       data.nombre,
-      servicio:     data.servicio,
-      area:         data.area,
-      total:        data.total || 0,
-      promoNombre:  data.promoNombre || '',
-      precioPromo:  data.precioPromo || 0,
-      precioRegular: data.precioRegular || 0,
-      asignadaA:    data.asignadaA || '',
-      observaciones: data.observaciones || ''
-    }, 'LE');
-  } catch (eLn) { Logger.log('espejo addListaEspera Lineas: ' + eLn); }
-
-  return { success: true, id: id };
-}
-
-function handleTomarClienta(data) {
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-  const now = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-
-  for (let i = 3; i < allData.length; i++) {
-    if (String(allData[i][0]).trim() === data.idListaEspera) {
-      const row = i + 1;
-      const estado = String(ws.getRange(row, 9).getValue()).toLowerCase();
-      
-      // Si ya está en servicio o completada, no se puede tomar
-      if (estado === 'en servicio' || estado === 'completada') {
-        return { success: false, message: 'Esta clienta ya fue tomada por ' + ws.getRange(row, 10).getValue() };
-      }
-      
-      // Si está asignada, solo la chica asignada puede tomarla
-      if (estado === 'asignada') {
-        const asignadaA = String(ws.getRange(row, 10).getValue()).trim();
-        if (asignadaA && asignadaA !== data.chicaNombre) {
-          return { success: false, message: 'Esta clienta está asignada a ' + asignadaA };
-        }
-      }
-      
-      ws.getRange(row, 9).setValue('En servicio');   // col I = Estado
-      ws.getRange(row, 10).setValue(data.chicaNombre); // col J = Tomada por
-      ws.getRange(row, 11).setValue(now);               // col K = Hora toma
-
-      // Crear registro en Atenciones
-      handleAddAtencion({
-        codigo: allData[i][3],        // col D = Código cliente
-        nombre: allData[i][4],        // col E = Nombre
-        chica: data.chicaNombre,
-        servicio: allData[i][5],      // col F = Servicio
-        area: allData[i][6],          // col G = Área
-        idEspera: allData[i][0]       // col A = ID ticket LE-XXXX
-      });
-
-      // #1 Avisar a Mikaela que una staff tomó a la clienta
-      _pushMikaela('👤 Clienta tomada', String(data.chicaNombre || 'Una chica') + ' tomó a ' + String(allData[i][4] || 'una clienta') + (allData[i][5] ? ' · ' + allData[i][5] : ''));
-
-      return { success: true, horaToma: now };
-    }
-  }
-
-  // Si no encontró en ListaEspera, buscar en ServicioPromo (tickets SP-)
-  if (String(data.idListaEspera || '').startsWith('SP-')) {
-    return handleTomarServicioPromo({
-      idEspera: data.idListaEspera,
-      chicaNombre: data.chicaNombre
-    });
-  }
-
-  return { success: false, message: 'Registro no encontrado' };
-}
-
-// ============================================
-// FINALIZAR ATENCIÓN Y COBRO
-// ============================================
-// La chica toca "Finalizar servicio" → estado pasa a "Por cobrar"
-// Devuelve SOLO el texto de sistema de unas observaciones (rastro de progreso:
-// "✅ ... completada por ...", "Sigue:", "Pasado por", etc.), quitando la nota
-// humana que escribió Mikaela. Espejo inverso de _extraerNotaRecepcion del frontend:
-// lo que el recuadro "Nota Especial" mostraría como nota, acá se descarta, para que
-// la nota NO se arrastre a la siguiente staff cuando la clienta pasa de área.
-function _soloTextoSistemaObs(obs) {
-  var s = String(obs == null ? '' : obs).trim();
-  if (!s) return '';
-  var partes = s.split(/\s*\|\s*|\n+/);
-  var sys = [/^✅/, /^Continuaci/i, /^Pasad[oa] por/i, /^Servicio adicional/i, /^Devuelt[oa]/i, /durante atenci/i, /termin[oó] su parte/i];
-  var keep = [];
-  for (var i = 0; i < partes.length; i++) {
-    var p = partes[i].trim();
-    if (!p) continue;
-    for (var j = 0; j < sys.length; j++) { if (sys[j].test(p)) { keep.push(p); break; } }
-  }
-  return keep.join(' | ');
-}
-
-// ── Helper de escritura en batch ────────────────────────────────────────
-// Reemplaza múltiples ws.getRange(row, col).setValue(val) en secuencia
-// (cada uno = 1 round-trip HTTP ~150-300ms) por escrituras agrupadas por fila
-// que se consolidan al final en rangos contiguos usando setValues().
-//
-// Uso:
-//   const bw = _batchWriter_(ws);
-//   bw.set(row, col, value);   // acumular
-//   bw.flush();                 // escribir todo de una vez
-//
-// Impacto: una función con 10 setValue individuales dispersos en 1 fila
-// pasa de ~1500ms a ~150ms (1 sola llamada de sheets en vez de 10).
-function _batchWriter_(sheet) {
-  var _pending = {}; // key = 'row' → { col → value }
-  return {
-    set: function(row, col, value) {
-      if (!_pending[row]) _pending[row] = {};
-      _pending[row][col] = value;
-    },
-    flush: function() {
-      var rows = Object.keys(_pending).map(Number).sort(function(a,b){ return a-b; });
-      rows.forEach(function(row) {
-        var cols = Object.keys(_pending[row]).map(Number).sort(function(a,b){ return a-b; });
-        if (cols.length === 0) return;
-        // Agrupar columnas contiguas en un solo setValues
-        var groups = [];
-        var start = cols[0], prev = cols[0], group = [cols[0]];
-        for (var c = 1; c < cols.length; c++) {
-          if (cols[c] === prev + 1) {
-            group.push(cols[c]);
-            prev = cols[c];
-          } else {
-            groups.push({ start: start, cols: group });
-            start = cols[c]; prev = cols[c]; group = [cols[c]];
-          }
-        }
-        groups.push({ start: start, cols: group });
-        groups.forEach(function(g) {
-          var vals = g.cols.map(function(c){ return _pending[row][c]; });
-          if (g.cols.length === 1) {
-            sheet.getRange(row, g.start).setValue(vals[0]);
-          } else {
-            sheet.getRange(row, g.start, 1, g.cols.length).setValues([vals]);
-          }
-        });
-      });
-      _pending = {};
-    }
-  };
-}
-
-function handleFinalizarAtencion(data) {
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    const id = String(allData[i][0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(allData[i][8] || '').toLowerCase();
-    const tomadaPor = String(allData[i][9] || '').trim();
-    const nombre = String(allData[i][4] || '').trim();
-    const codigoRow = String(allData[i][3] || '').trim();
-
-    // Excluir tickets con fecha 1899
-    const fechaBruta = allData[i][1];
-    const esFechaValida = fechaBruta instanceof Date && fechaBruta.getFullYear() > 2000;
-    if (!esFechaValida) continue;
-    // Acepta 'en servicio'/'pendiente-staff' y también 'asignada': si la staff terminó pero
-    // el ticket no se volteó a 'en servicio' (promo asignada por Mikaela), igual lo finaliza.
-    // Sigue protegido por el match de id o nombre+código+staff de abajo (no agarra otro ticket).
-    if (estado !== 'en servicio' && estado !== 'pendiente-staff' && estado !== 'asignada') continue;
-
-    // PRIORIDAD 1: buscar por ID exacto (evita confundir tickets de la misma clienta)
-    const matchId = data.idEspera && id === String(data.idEspera).trim();
-    // PRIORIDAD 2: fallback por nombre/código + staff (para tickets sin idEspera)
-    const matchNombre = nombre === data.clienteNombre;
-    const matchCodigo = data.clienteCodigo && codigoRow === String(data.clienteCodigo).trim();
-    const matchStaff = tomadaPor.toLowerCase() === String(data.chicaNombre || '').toLowerCase();
-    const matchFallback = matchStaff && (matchNombre || matchCodigo);
-
-    if (!matchId && !matchFallback) continue;
-      const row = i + 1;
-      const bw = _batchWriter_(ws); // batch all writes — flush once at the end
-
-      // espejo Lineas: el servicio actual queda 'completado'.
-      // FIX: pasar idEspera para match exacto por ticketRef (evita tocar línea incorrecta
-      // si la misma clienta tiene dos servicios del mismo área en el día)
-      try {
-        marcarLineaCompletadaPorCodigo(
-          codigoRow,
-          String(data.idEspera || ''),
-          String(data.areaCompletada || data.area || '').toLowerCase(),
-          data.servicio || data.promoNombre || ''
-        );
-      } catch (eLn) { Logger.log('espejo finalizarAtencion Lineas: ' + eLn); }
-
-      bw.set(row, 13, data.total || '0'); // M: total inicial
-
-      if (data.nuevaArea && !data.esRetiro && !data.siguientePromo) {
-        const nuevaAreaLower = String(data.nuevaArea).toLowerCase();
-        const obsActual2 = _soloTextoSistemaObs(String(allData[i][11] || ''));
-        const nuevaObs2 = (obsActual2 ? obsActual2 + ' | ' : '') + '\u2705 ' + (data.areaCompletada || '') + ' completado por ' + data.chicaNombre + ' \u00b7 Sigue: ' + data.areasFaltantes;
-        bw.set(row, 6,  data.servicio || data.servicioSiguiente || '');
-        bw.set(row, 7,  nuevaAreaLower);
-        bw.set(row, 9,  'Esperando');
-        bw.set(row, 10, '');
-        bw.set(row, 12, nuevaObs2);
-        bw.set(row, 13, data.total || '0');
-
-      } else if (data.esRetiro) {
-        bw.set(row, 6,  data.servicio || '');
-        bw.set(row, 14, '');
-        bw.set(row, 15, '');
-        bw.set(row, 16, data.total || '0');
-        bw.set(row, 17, '');
-
-      } else if (data.siguientePromo) {
-        const sigArea = String(data.siguientePromoArea || '').toLowerCase() || 'cejas';
-        bw.set(row, 6,  data.siguientePromo);
-        bw.set(row, 7,  sigArea);
-        bw.set(row, 9,  'Esperando');
-        bw.set(row, 10, '');
-        bw.set(row, 14, data.siguientePromo);
-        bw.set(row, 15, data.siguientePromoPrecio || '0');
-
-        let regularVal = data.siguientePromoRegular || data.siguientePromoPrecio || '0';
-        try {
-          const regularSiguiente = Number(data.siguientePromoRegular || data.siguientePromoPrecio || 0);
-          const regularExistente = Number(allData[i][15] || 0);
-          const regularAhora     = Number(data.precioRegular || data.total || 0);
-          const totalRegular = regularExistente + regularSiguiente;
-          regularVal = totalRegular > 0 ? totalRegular : (regularAhora + regularSiguiente);
-        } catch(eR) {}
-        bw.set(row, 16, regularVal);
-        bw.set(row, 22, data.promasExtraRestantes ? JSON.stringify(data.promasExtraRestantes) : '');
-
-        if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
-          try {
-            let desgloseExistente = [];
-            const colS = allData[i][18];
-            if (colS) { try { desgloseExistente = JSON.parse(colS); } catch(eJ) {} }
-            const nuevoDesglose = [...desgloseExistente];
-            data.serviciosDetalle.forEach(function(nuevo) {
-              if (!nuevoDesglose.some(function(ex){ return ex.staff === nuevo.staff && ex.servicio === nuevo.servicio; })) nuevoDesglose.push(nuevo);
+            await LineaService.tomarAreaTicket( {
+              idEspera: idEspera_tm,
+              chicaNombre: user_tm?.name || '',
+              chicaArea: user_tm?.area || '',
+              areaIdx: extraIdx
             });
-            bw.set(row, 19, JSON.stringify(nuevoDesglose));
-            bw.set(row, 13, nuevoDesglose.reduce(function(s, d){ return s + Number(d.monto || 0); }, 0));
-          } catch(eD) {}
-        }
-
-      } else {
-        // Finalizar: pasa a "Por verificar"
-        bw.set(row, 9, 'Por verificar');
-        try { _avisarMikaelaClientaLista((data && (data.clienteNombre || data.clientName)) || '', (data && (data.servicio || data.promoNombre)) || ''); } catch(e){}
-        if (data.promoNombre) bw.set(row, 14, data.promoNombre);
-        if (data.servicio)    bw.set(row, 6,  data.servicio);
-
-        let totalFinal = Number(data.total || 0);
-        if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
-          let desgloseExistente = [];
-          const colS = allData[i][18];
-          if (colS) { try { desgloseExistente = JSON.parse(colS); } catch(e) {} }
-          const totalExistente = desgloseExistente.reduce((s, d) => s + Number(d.monto || 0), 0);
-          const totalNuevo = data.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
-          if (totalExistente > 0) totalFinal = totalExistente + totalNuevo;
-          bw.set(row, 13, totalFinal);
-        }
-        bw.set(row, 15, data.precioRegular || data.total || '0');
-        cerrarAtencion(data.idEspera, data.chicaNombre, data.clienteNombre, data.servicio, totalFinal, '', 'Por cobrar');
-      }
-
-      // Desglose multi-staff col S (19)
-      if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
-        try {
-          let desgloseExistente = [];
-          const colS = allData[i][18];
-          if (colS) { try { desgloseExistente = JSON.parse(colS); } catch(e) {} }
-          const nuevoDesglose = [...desgloseExistente];
-          data.serviciosDetalle.forEach(nuevo => {
-            if (!nuevoDesglose.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio)) nuevoDesglose.push(nuevo);
-          });
-          bw.set(row, 19, JSON.stringify(nuevoDesglose));
-        } catch(e) {}
-      }
-
-      bw.flush(); // UNA tanda de escrituras — antes eran 30 llamadas individuales
-
-      // Cerrar autorizaciones pendientes
-      try {
-        const wsAuth = getSheet('Autorizaciones');
-        if (wsAuth) {
-          const authData = wsAuth.getDataRange().getValues();
-          const authBw = _batchWriter_(wsAuth);
-          for (let j = 1; j < authData.length; j++) {
-            if (String(authData[j][3]||'').trim() === data.clienteNombre &&
-                String(authData[j][5]||'').trim() === data.chicaNombre &&
-                ['aprobado','pendiente'].indexOf(String(authData[j][10]||'').toLowerCase()) >= 0) {
-              authBw.set(j + 1, 11, 'completada');
-            }
-          }
-          authBw.flush();
-        }
-      } catch(eAuth) {}
-
-      return { success: true };
-  }
-  return { success: false, message: 'Atención no encontrada' };
-}
-
-// Dashboard completo de Mikaela: esperando + en servicio + por cobrar
-
-// ============================================================
-// handleGetListaCompleta — INCIDENCIA 02 — Lee desde LINEAS
-// Fuente única: getTableroLineas()
-// Reconstruye areas[] para TM agrupando por grupo_id (promoRef sin :N)
-// Reconstruye secuencia[] ordenando por sufijo :1,:2,:3
-// Fallback automático a handleGetListaCompleta_LEGACY si Lineas falla
-// Rollback manual: en case 'getListaCompleta' cambiar a handleGetListaCompleta_LEGACY
-// Autor: migración LINEAS — INCIDENCIA 02 — 2026-07-07
-// ============================================================
-function handleGetListaCompleta() {
-  try {
-    var tablero = getTableroLineas();
-    if (!tablero || typeof tablero !== 'object') {
-      throw new Error('getTableroLineas no devolvió objeto válido');
-    }
-
-    var tz = 'America/Guayaquil';
-
-    // ── helpers internos ────────────────────────────────────────────────────
-
-    // Normalizar estado Lineas (snake_case) al formato que espera el frontend (con espacio)
-    function _normEstado(e) {
-      var s = String(e || '').toLowerCase().trim();
-      if (s === 'en_servicio') return 'en servicio';
-      if (s === 'por_cobrar')  return 'por cobrar';
-      return s; // 'esperando', 'completado', 'cobrado', 'anulado' — ya correctos
-    }
-
-    // Parsear grupo_id y areaIdx desde promoRef
-    // 'TM-372:1' → { grupoId:'TM-372', areaIdx:1, prefijo:'TM' }
-    // 'SP-240'   → { grupoId:'SP-240', areaIdx:0, prefijo:'SP' }
-    function _parseRef(promoRef) {
-      var ref = String(promoRef || '').trim();
-      var grupoId = ref, areaIdx = 0;
-      if (ref.indexOf(':') >= 0) {
-        var p = ref.split(':');
-        grupoId = p[0];
-        areaIdx = parseInt(p[1]) || 1;
-      }
-      var prefijo = grupoId.split('-')[0] || '';
-      return { grupoId: grupoId, areaIdx: areaIdx, prefijo: prefijo };
-    }
-
-    // Formatear fecha/hora desde valor de Lineas
-    function _fmt(val, tipo) {
-      if (!val) return '';
-      if (val instanceof Date) {
-        return Utilities.formatDate(val, tz, tipo === 'fecha' ? 'dd/MM/yyyy' : 'HH:mm');
-      }
-      var s = String(val);
-      if (tipo === 'hora' && s.length > 5 && s.indexOf('T') >= 0) {
-        try { return Utilities.formatDate(new Date(s), tz, 'HH:mm'); } catch(e) {}
-      }
-      return s;
-    }
-
-    // Construir objeto base desde una línea de Lineas (para SN/SP/LE)
-    function _lineaAItem(l, clientesMap) {
-      var parsed = _parseRef(l.promoRef);
-      var prefijo = parsed.prefijo;
-      var idEspera = parsed.grupoId;
-      var fuente = prefijo === 'TM' ? 'TicketMulti'
-                 : prefijo === 'SP' ? 'ServicioPromo'
-                 : prefijo === 'SN' ? 'ServicioNormal'
-                 : 'ListaEspera';
-      var esPromo = (prefijo === 'SP' || prefijo === 'TM');
-      var cliData = clientesMap[String(l.codigo || '').trim()] || {};
-      // Enriquecer observaciones por área
-      var obsLinea = String(l.obs || l.observaciones || '');
-      if (!obsLinea) {
-        var areaLow = String(l.area || '').toLowerCase();
-        obsLinea = areaLow.indexOf('ceja')    >= 0 ? (cliData.obsCejas      || '')
-                 : areaLow.indexOf('depilac') >= 0 ? (cliData.obsDepilacion || '')
-                 : areaLow.indexOf('pesta')   >= 0 ? (cliData.obsPestanas   || '')
-                 : areaLow.indexOf('facial')  >= 0 ? (cliData.obsFacial     || '')
-                 : (cliData.obsGeneral || '');
-      }
-      return {
-        idEspera      : idEspera,
-        fecha         : _fmt(l.fecha, 'fecha'),
-        horaLlegada   : '',          // no en Lineas — solo visual
-        codigo        : String(l.codigo   || ''),
-        nombre        : String(l.cliente  || ''),
-        servicio      : String(l.servicio || ''),
-        area          : String(l.area     || ''),
-        prioridad     : 'Normal',    // no en Lineas — default
-        tomadaPor     : String(l.staff    || ''),
-        horaToma      : _fmt(l.horaToma || l.hora, 'hora'),
-        observaciones : obsLinea,
-        total         : Number(l.monto || 0),
-        promoNombre   : esPromo ? (l.promoNombre || l.comboNombre || String(l.servicio || '')) : '',
-        precioRegular : Number(l.montoRegular || l.monto || 0),
-        secuencia     : [],
-        serviciosDetalle: null,
-        promasExtra   : [],
-        esTop         : !!(cliData.esTop),
-        fuente        : fuente,
-        estado        : _normEstado(l.estado),
-        areaIdx       : parsed.areaIdx,
-        pendienteConfirmacion: false,
-        areas         : []
-      };
-    }
-
-    // ── Cargar mapa de Clientas (esTop + obs por área) ───────────────────────
-    var clientesMap = {};
-    try {
-      var wsC = getSheet('Clientas');
-      var cData = wsC.getDataRange().getValues();
-      for (var ci = 3; ci < cData.length; ci++) {
-        var cod = String(cData[ci][0] || '').trim();
-        if (!cod) continue;
-        clientesMap[cod] = {
-          esTop         : String(cData[ci][7]  || '').toLowerCase().indexOf('sí') >= 0,
-          obsGeneral    : String(cData[ci][9]  || ''),
-          obsCejas      : String(cData[ci][12] || ''),
-          obsDepilacion : String(cData[ci][13] || ''),
-          obsPestanas   : String(cData[ci][14] || ''),
-          obsFacial     : String(cData[ci][15] || '')
-        };
-      }
-    } catch(eC) {
-      Logger.log('[getListaCompleta] error Clientas: ' + eC);
-    }
-
-    var esperando   = [];
-    var enServicio  = [];
-    var porCobrar   = [];
-    var completadas = [];
-
-    // ── Función principal de procesamiento por grupo de líneas ────────────────
-    // Para TM: agrupa todas las líneas del mismo grupo_id y reconstruye areas[]
-    // Para SP/SN/LE: procesa cada línea individualmente
-    function _procesarLineas(lineas, destArray) {
-      // Separar TM del resto
-      var tmGrupos = {};  // grupoId → [lineas]
-      var resto    = [];
-
-      lineas.forEach(function(l) {
-        var parsed = _parseRef(l.promoRef);
-        if (parsed.prefijo === 'TM') {
-          if (!tmGrupos[parsed.grupoId]) tmGrupos[parsed.grupoId] = [];
-          tmGrupos[parsed.grupoId].push({ linea: l, areaIdx: parsed.areaIdx });
-        } else {
-          resto.push(l);
-        }
-      });
-
-      // Procesar SN/SP/LE — mapeo 1:1
-      var idsAgregados = new Set();
-      resto.forEach(function(l) {
-        var parsed = _parseRef(l.promoRef);
-        var key = parsed.grupoId || (String(l.codigo||'') + '|' + String(l.staff||''));
-        if (idsAgregados.has(key)) return;
-        idsAgregados.add(key);
-        destArray.push(_lineaAItem(l, clientesMap));
-      });
-
-      // Procesar TM — reconstruir areas[] por grupo
-      Object.keys(tmGrupos).forEach(function(grupoId) {
-        var entradas = tmGrupos[grupoId];
-
-        // Ordenar por areaIdx (:1, :2, :3) → secuencia natural
-        entradas.sort(function(a, b) { return a.areaIdx - b.areaIdx; });
-
-        // Usar la primera línea como base del item
-        var lineaBase = entradas[0].linea;
-        var cliData   = clientesMap[String(lineaBase.codigo || '').trim()] || {};
-
-        // Reconstruir areas[]
-        var areas = entradas.map(function(e) {
-          var l = e.linea;
-          return {
-            idx          : e.areaIdx,
-            area         : String(l.area     || ''),
-            tentativo    : String(l.servicio || ''),   // en Lineas servicio = confirmado
-            confirmado   : String(l.servicio || ''),
-            staff        : String(l.staff    || ''),
-            estado       : _normEstado(l.estado),
-            hora         : _fmt(l.horaToma || l.hora, 'hora'),
-            precio       : Number(l.monto        || 0),
-            precioNormal : Number(l.montoRegular || l.monto || 0)
-          };
-        });
-
-        // Reconstruir secuencia[] desde el orden de áreas (sufijo :1,:2,:3)
-        var secuencia = areas.map(function(a) { return String(a.area || ''); })
-                            .filter(Boolean);
-
-        // tomadaPor = staff de áreas en servicio, o todas si completado
-        var staffEnServicio = areas
-          .filter(function(a) { return a.estado === 'en servicio'; })
-          .map(function(a) { return a.staff; })
-          .filter(Boolean);
-        var tomadaPor = staffEnServicio.length > 0
-          ? staffEnServicio.join(', ')
-          : areas.map(function(a){ return a.staff; }).filter(Boolean).join(', ') || '—';
-
-        // total = suma de precios de áreas activas
-        var totalTM = areas.reduce(function(s, a) {
-          return s + (a.estado !== 'cancelado' ? Number(a.precio || 0) : 0);
-        }, 0);
-        var regularTM = areas.reduce(function(s, a) {
-          return s + (a.estado !== 'cancelado' ? Number(a.precioNormal || 0) : 0);
-        }, 0);
-
-        // servicio = resumen de áreas (ej: 'pestanas 🔄 Diana | depilacion ⏳')
-        var resumenAreas = areas.map(function(a) {
-          var est = a.estado;
-          if (est === 'completado')  return (a.tentativo || a.area) + ' ✅ ' + (a.staff || '');
-          if (est === 'en servicio') return (a.tentativo || a.area) + ' 🔄 ' + (a.staff || '');
-          return (a.tentativo || a.area) + ' ⏳';
-        }).join(' | ');
-
-        // observaciones: usar obs de la primera línea o Clientas
-        var obsBase = String(lineaBase.obs || lineaBase.observaciones || '');
-        if (!obsBase) obsBase = cliData.obsGeneral || '';
-
-        destArray.push({
-          idEspera      : grupoId,
-          fecha         : _fmt(lineaBase.fecha, 'fecha'),
-          horaLlegada   : '',
-          codigo        : String(lineaBase.codigo  || ''),
-          nombre        : String(lineaBase.cliente || ''),
-          servicio      : resumenAreas,
-          area          : 'multi',
-          prioridad     : 'Normal',
-          tomadaPor     : tomadaPor,
-          horaToma      : _fmt(lineaBase.horaToma || lineaBase.hora, 'hora'),
-          observaciones : obsBase,
-          total         : totalTM,
-          promoNombre   : lineaBase.promoNombre || lineaBase.comboNombre || String(lineaBase.servicio || ''),
-          precioRegular : regularTM,
-          secuencia     : secuencia,
-          serviciosDetalle: null,
-          promasExtra   : [],
-          esTop         : !!(cliData.esTop),
-          fuente        : 'TicketMulti',
-          estado        : 'multi',
-          areaIdx       : entradas[0].areaIdx,
-          pendienteConfirmacion: false,
-          areas         : areas
-        });
-      });
-    }
-
-    // ── Procesar cada sección del tablero ────────────────────────────────────
-    _procesarLineas(tablero.esperando    || [], esperando);
-    _procesarLineas(tablero.en_servicio  || [], enServicio);
-    _procesarLineas(tablero.porVerificar || [], completadas);  // completadas = por verificar
-    _procesarLineas(tablero.porCobrar    || [], porCobrar);
-
-    Logger.log('[getListaCompleta] fuente=LINEAS esp=' + esperando.length
-      + ' srv=' + enServicio.length
-      + ' cob=' + porCobrar.length
-      + ' comp=' + completadas.length);
-
-    // ── PASO 2 (M-02): guardia de datos incompletos → fallback a LEGACY ──────
-    // Si algún ticket ACTIVO (esperando / en servicio / por cobrar) reconstruido
-    // desde LINEAS viene sin nombre o sin código, NO servimos el tablero de
-    // LINEAS: caemos a LEGACY (ListaEspera/SN/SP/TM) donde esos campos existen.
-    // Empty (0 tickets) no dispara: filter sobre arrays vacíos no marca nada.
-    var _activosLC = [].concat(esperando, enServicio, porCobrar);
-    var _incompletosLC = _activosLC.filter(function (t) {
-      return !String((t && t.nombre) || '').trim()
-          || !String((t && t.codigo) || '').trim();
-    });
-    if (_incompletosLC.length > 0) {
-      Logger.log('[getListaCompleta] datos incompletos: ' + _incompletosLC.length
-        + '/' + _activosLC.length + ' tickets activos sin nombre/código — FALLBACK a LEGACY. '
-        + 'ids: ' + _incompletosLC.map(function (t) { return t.idEspera; }).join(', '));
-      return handleGetListaCompleta_LEGACY();
-    }
-
-    return {
-      success: true,
-      esperando:   esperando,
-      enServicio:  enServicio,
-      porCobrar:   porCobrar,
-      completadas: completadas
-    };
-
-  } catch(eLn) {
-    Logger.log('[getListaCompleta] FALLBACK legacy — error Lineas: ' + eLn);
-    return handleGetListaCompleta_LEGACY();
-  }
-}
-
-function handleGetListaCompleta_LEGACY() {
-  const ws = getSheet('ListaEspera');
-  const data = ws.getDataRange().getValues();
-  const esperando = [];
-  const enServicio = [];
-  const porCobrar = [];
-  const completadas = [];
-
-  // Cargar TOP map
-  let topMap = {};
-  try {
-    const wsC = getSheet('Clientas');
-    const cData = wsC.getDataRange().getValues();
-    for (let i = 3; i < cData.length; i++) {
-      if (String(cData[i][7] || '').toLowerCase().includes('sí')) topMap[cData[i][0]] = true;
-    }
-  } catch(e) {}
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(row[8] || '').toLowerCase().trim();
-    const codigo = row[3];
-    const esTop = topMap[codigo] || false;
-
-    // Formatear horas para el panel en vivo de Mikaela
-    let horaLlegadaStr = '';
-    if (row[2] instanceof Date) {
-      horaLlegadaStr = Utilities.formatDate(row[2], 'America/Guayaquil', 'HH:mm');
-    } else {
-      horaLlegadaStr = String(row[2] || '');
-    }
-    let horaTomadaStr = '';
-    if (row[10] instanceof Date) {
-      horaTomadaStr = Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm');
-    } else {
-      horaTomadaStr = String(row[10] || '');
-    }
-
-    const item = {
-      idEspera: id,
-      fecha: row[1],
-      horaLlegada: horaLlegadaStr,
-      codigo: codigo,
-      nombre: row[4],
-      servicio: row[5],
-      area: row[6],
-      prioridad: row[7],
-      tomadaPor: row[9] || '',
-      horaToma: horaTomadaStr,
-      observaciones: row[11] || '',
-      total: row[12] || '0',
-      promoNombre: row[13] || '',
-      precioRegular: row[15] || row[14] || row[12] || '0',  // P=precioRegular acum., O=precioPromo, M=total
-      secuencia: (function(){ try { return JSON.parse(row[16] || '[]'); } catch(e) { return []; } })(),
-      serviciosDetalle: (function(){ try { return row[18] ? JSON.parse(row[18]) : null; } catch(e) { return null; } })(),
-      promasExtra: (function(){ try { return JSON.parse(row[17] || '[]'); } catch(e) { return []; } })(), // col R = promasExtra (2a y 3a promo)
-      esTop: esTop
-    };
-
-    // Excluir tickets ESPERANDO con fecha inválida (1899 = bug de fecha)
-    // Tickets en servicio NO se excluyen — el servicio es real aunque la fecha esté mal
-    const fechaTicket = row[1];
-    const esTicketValido = fechaTicket instanceof Date && fechaTicket.getFullYear() > 2000;
-    if (!esTicketValido && (estado === 'esperando' || estado === 'asignada')) continue;
-
-    if (estado === 'esperando' || estado === 'asignada') esperando.push(item);
-    else if (estado === 'en servicio') enServicio.push(item);
-    else if (estado === 'pendiente-staff') {
-      enServicio.push({ ...item, pendienteConfirmacion: true });
-    }
-    else if (estado === 'por cobrar') porCobrar.push(item);
-    else if (estado === 'por verificar') completadas.push(item);
-  }
-
-  // Merge con ServicioNormal y ServicioPromo
-  try {
-    const snResult = handleGetServicioNormal({});
-    if (snResult.success) {
-      esperando.push(...snResult.esperando);
-      enServicio.push(...snResult.enServicio);
-      porCobrar.push(...snResult.porCobrar);
-      completadas.push(...(snResult.porVerificar || []));
-    }
-  } catch(e) {}
-  try {
-    const spResult = handleGetServicioPromo({});
-    if (spResult.success) {
-      esperando.push(...spResult.esperando);
-      enServicio.push(...spResult.enServicio);
-      porCobrar.push(...spResult.porCobrar);
-      completadas.push(...(spResult.porVerificar || []));
-    }
-  } catch(e) {}
-
-  // Merge con TicketMulti
-  try {
-    const tmR = handleGetTicketMulti({});
-    if (tmR.success) {
-      // Áreas en espera → esperando
-      (tmR.activos || []).forEach(function(tm) {
-        var tieneEnServicio = false;
-        (tm.areas || []).forEach(function(a) {
-          if (String(a.estado || '').toLowerCase() === 'en servicio') tieneEnServicio = true;
-        });
-        // Si algún área está en servicio, mostrar en enServicio
-        if (tieneEnServicio) {
-          var resumenAreas = (tm.areas || []).map(function(a) {
-            var est = String(a.estado||'').toLowerCase();
-            if (est === 'completado') return (a.tentativo||a.area) + ' ✅ ' + (a.staff||'');
-            if (est === 'en servicio') return (a.tentativo||a.area) + ' 🔄 ' + (a.staff||'');
-            return (a.tentativo||a.area) + ' ⏳';
-          }).join(' | ');
-          // FIX: calcular total como suma de precios actuales de cada área (no precioPromo estático)
-          var totalActualTM = (tm.areas || []).reduce(function(s, a) { return s + Number(a.precio || 0); }, 0);
-          if (totalActualTM === 0) totalActualTM = tm.precioPromo; // fallback
-          enServicio.push({
-            idEspera:  tm.idEspera, codigo: tm.codigo, nombre: tm.nombre,
-            servicio:  resumenAreas, area: 'multi',
-            tomadaPor: (tm.areas||[]).filter(function(a){ return a.staff && String(a.estado||'').toLowerCase()==='en servicio'; }).map(function(a){return a.staff;}).join(', ') || '—',
-            total: totalActualTM, estado: tm.estado,
-            horaToma: (tm.areas[0] && tm.areas[0].hora) ? tm.areas[0].hora : '',
-            areas: tm.areas, secuencia: tm.secuencia || [],
-            fuente: 'TicketMulti'
-          });
-        } else {
-          // Todo en espera — solo la próxima según secuencia
-          var areasEsp = (tm.areas || []).filter(function(a) { return String(a.estado||'').toLowerCase() === 'esperando'; });
-          if (areasEsp.length > 0) {
-            var proxA = null;
-            if (tm.secuencia && tm.secuencia.length > 0) {
-              for (var si2 = 0; si2 < tm.secuencia.length; si2++) {
-                var sa = String(tm.secuencia[si2]).toLowerCase();
-                var ma = areasEsp.filter(function(a){ return String(a.area||'').toLowerCase() === sa; })[0];
-                if (ma) { proxA = ma; break; }
-              }
-            }
-            if (!proxA) proxA = areasEsp[0];
-            // Modelo centralizado: si un área en espera ya tiene staff asignada, priorizarla
-            var areaAsignadaTM = areasEsp.filter(function(a){ return a.staff && String(a.staff).trim() !== ''; })[0];
-            if (areaAsignadaTM) proxA = areaAsignadaTM;
-            esperando.push({
-              idEspera:  tm.idEspera, codigo: tm.codigo, nombre: tm.nombre,
-              servicio:  proxA.tentativo || 'Multi-servicio', area: proxA.area || 'multi',
-              tomadaPor: (proxA.staff || ''), total: proxA.precio || 0, estado: 'Esperando',
-              fuente: 'TicketMulti', areaIdx: proxA.idx,
-              areas: tm.areas, secuencia: tm.secuencia || []
-            });
-          }
-        }
-      });
-      // Por cobrar
-      (tmR.porCobrar || []).forEach(function(tm) {
-        porCobrar.push({
-          idEspera:     tm.idEspera,
-          codigo:       tm.codigo,
-          nombre:       tm.nombre,
-          servicio:     'Multi (' + tm.areas.length + ' servicios)',
-          area:         'multi',
-          tomadaPor:    (tm.areas || []).map(function(a){return a.staff;}).filter(Boolean).join(', '),
-          total:        tm.precioPromo,
-          precioRegular: tm.precioNormal,
-          areas:        tm.areas,
-          fuente:       'TicketMulti',
-          esTop:        false
-        });
-      });
-      // Áreas completadas pendientes de verificación → completadas
-      (tmR.porVerificar || []).forEach(function(tm) {
-        completadas.push({
-          idEspera:      tm.idEspera,
-          codigo:        tm.codigo,
-          nombre:        tm.nombre,
-          servicio:      'Multi (' + tm.areas.length + ' servicios)',
-          area:          'multi',
-          tomadaPor:     (tm.areas || []).map(function(a){return a.staff;}).filter(Boolean).join(', '),
-          total:         tm.precioPromo,
-          precioRegular: tm.precioNormal,
-          areas:         tm.areas,
-          fuente:        'TicketMulti',
-          esTop:         false
-        });
-      });
-    }
-  } catch(e) {}
-
-  return { success: true, esperando: esperando, enServicio: enServicio, porCobrar: porCobrar, completadas: completadas };
-}
-
-// Mikaela ve las clientas listas para cobrar
-function handleGetPorCobrar() {
-  const ws = getSheet('ListaEspera');
-  const data = ws.getDataRange().getValues();
-  const porCobrar = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(row[8] || '').toLowerCase();
-    // Incluir tanto 'por cobrar' como tickets completados con metodoPago 'pendiente cobro final'
-    const esPorCobrar = estado === 'por cobrar';
-    const esPendienteCobro = estado === 'completada' && String(row[15] || '').toLowerCase().includes('pendiente');
-    if (!esPorCobrar && !esPendienteCobro) continue;
-
-    porCobrar.push({
-      idEspera: id,
-      codigo: row[3],
-      nombre: row[4],
-      servicio: row[5],
-      area: row[6],
-      tomadaPor: row[9],
-      total: row[12] || '0',
-      promoNombre: row[13] || '',
-      precioRegular: row[15] || row[14] || row[12] || '0',  // col P=precioRegular, O=precioPromo, M=total
-      secuencia: (function(){ try { return JSON.parse(row[16] || '[]'); } catch(e) { return []; } })(),
-      serviciosDetalle: (function(){ try { return row[18] ? JSON.parse(row[18]) : null; } catch(e) { return null; } })(),
-      esTop: false
-    });
-  }
-
-  // Buscar TOP
-  try {
-    const wsC = getSheet('Clientas');
-    const cData = wsC.getDataRange().getValues();
-    const topMap = {};
-    for (let i = 3; i < cData.length; i++) {
-      if (String(cData[i][7] || '').toLowerCase().includes('sí')) topMap[cData[i][0]] = true;
-    }
-    porCobrar.forEach(p => { if (topMap[p.codigo]) p.esTop = true; });
-  } catch(e) {}
-
-  // Merge con ServicioNormal
-  try {
-    const snR = handleGetServicioNormal({});
-    if (snR.success) {
-      snR.porCobrar.forEach(sn => {
-        porCobrar.push({
-          idEspera      : sn.idEspera,
-          codigo        : sn.codigo,
-          nombre        : sn.nombre,
-          servicio      : sn.servicio,
-          area          : sn.area,
-          tomadaPor     : sn.tomadaPor,
-          total         : sn.tipo === 'SP' ? sn.precioPromo : sn.precioNormal,
-          promoNombre   : sn.promoNombre,
-          precioRegular : sn.precioNormal,
-          tipo          : sn.tipo,
-          serviciosDetalle: null,
-          esTop         : false
-        });
-      });
-    }
-  } catch(e) {}
-
-  // Merge con ServicioPromo
-  try {
-    const spR = handleGetServicioPromo({});
-    if (spR.success) {
-      spR.porCobrar.forEach(sp => {
-        // Construir desglose: si ya viene del ticket (multi-staff), usarlo directamente.
-        // Si no (promo de una sola área), construir uno sintético con los datos del ticket.
-        let desgloseUsar = sp.serviciosDetalle;
-        if (!desgloseUsar || desgloseUsar.length === 0) {
-          const montoArea = Number(sp.precioMiArea || sp.total || sp.precioPromo || 0);
-          if (montoArea > 0 && sp.tomadaPor) {
-            desgloseUsar = [{ staff: sp.tomadaPor, servicio: sp.servicio, area: sp.area, monto: montoArea }];
-          }
-        }
-        porCobrar.push({
-          idEspera      : sp.idEspera,
-          codigo        : sp.codigo,
-          nombre        : sp.nombre,
-          servicio      : sp.servicio,
-          area          : sp.area,
-          tomadaPor     : sp.tomadaPor,
-          total         : sp.total || sp.precioPromo || sp.precioNormal, // col M = precio de esta área
-          promoNombre   : sp.promoNombre,
-          precioRegular : sp.precioNormal,  // col T = precio normal total
-          tipo          : sp.tipo || 'SP',
-          serviciosDetalle: desgloseUsar || null,
-          esTop         : false
-        });
-      });
-    }
-  } catch(e) {}
-
-  return { success: true, porCobrar: porCobrar };
-}
-
-// ============================================
-// CONTINUAR PROMO: La chica terminó su parte, devolver a lista para la siguiente área
-// ============================================
-function handleContinuarPromoALista(data) {
-  const now = new Date();
-  const horaStr  = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-  const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const idEspera = String(data.idEspera || '').trim();
-
-  // Detectar fuente: SP- → ServicioPromo, SN- → ServicioNormal, LE- → ListaEspera
-  if (idEspera.startsWith('SP-') || idEspera.startsWith('SN-')) {
-    const sheetName  = idEspera.startsWith('SP-') ? 'ServicioPromo' : 'ServicioNormal';
-    const COLS       = idEspera.startsWith('SP-') ? COLS_PROMO : COLS_NORMAL;
-    const ws         = getOrCreateSheet(sheetName, COLS);
-    const allData    = ws.getDataRange().getValues();
-
-    for (let i = 1; i < allData.length; i++) {
-      const id     = String(allData[i][0] || '').trim();
-      const estado = String(allData[i][8] || '').toLowerCase();
-      if (id !== idEspera) continue;
-      if (estado !== 'en servicio') continue;
-
-      const row = i + 1;
-      // Marcar como completada parcial (continuará en otra área)
-      ws.getRange(row, 9).setValue('Completada-parcial');
-      ws.getRange(row, 10).setValue(data.chicaNombre || '');
-      // Usar montoChica del frontend (precio de SU área), no el total acumulado de col M
-      const montoChica = Number(data.montoChica || 0) || Number(allData[i][12] || 0);
-      ws.getRange(row, 13).setValue(montoChica);
-
-      // Registrar comisión de esta chica
-      if (montoChica > 0) { try { updateComision(data.chicaNombre, montoChica); } catch(e) {} }
-
-      // FIX: espejo a Lineas para que la staff vea esta clienta en su historial de hoy.
-      // handleGetServiciosHoy lee de getTableroLineas() que solo ve estados completado/cobrado/en_servicio.
-      // Antes solo se escribía en HistorialOwner (que el owner ve) pero no en Lineas,
-      // entonces la staff que pasó la clienta a otra área no veía nada en su panel.
-      try {
-        marcarLineaCompletadaPorCodigo(
-          String(allData[i][3] || ''),  // codigo cliente
-          idEspera,                      // promoRef del ticket original
-          String(allData[i][6] || '').toLowerCase(), // area
-          data.areaCompletada || '',
-          data.chicaNombre || ''
-        );
-      } catch(eLnCP) { Logger.log('espejo Lineas continuarPromo: ' + eLnCP); }
-
-      // Escribir en HistorialOwner
-      try {
-        const areaStr = String(allData[i][6] || '').toLowerCase();
-        const pct = areaStr.includes('facial') ? 0.4 : 0.3;
-        const wsH = getSheet('HistorialOwner');
-        wsH.appendRow([fechaStr, horaStr, allData[i][3], allData[i][4], '',
-          data.areaCompletada + ' (parte de promo)', allData[i][6], data.chicaNombre,
-          montoChica, Math.round(montoChica * pct * 100) / 100, 'Pendiente cobro final']);
-      } catch(e) {}
-
-      // Crear nuevo registro SP- para la siguiente área
-      const newId = getNextIdPromo();
-      const precioNormal = Number(allData[i][idEspera.startsWith('SP-') ? 19 : 19] || allData[i][15] || 0);
-      const precioPromo  = Number(allData[i][idEspera.startsWith('SP-') ? 20 : 20] || allData[i][14] || 0);
-      const obsActual    = String(allData[i][11] || '');
-      const areasYaCompletadas = [data.areaCompletada].filter(Boolean);
-      const nuevaObs     = (obsActual ? obsActual + ' | ' : '') +
-        '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre +
-        ' · Falta: ' + data.areasFaltantes +
-        ' · _completedAreas:' + JSON.stringify(areasYaCompletadas);
-      const montoSiguiente = Number(data.montoSiguienteArea || 0);
-
-      const wsNew = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-
-      // FIX: incluir extras de esta área en el desglose del nuevo SP.
-      // Antes solo se guardaba { area, servicio, monto, staff } del área principal,
-      // perdiendo los extras aprobados. Al cobrar la siguiente área, el total no
-      // incluía los extras y tampoco pasaban a HistorialOwner.
-      var desgloseEstaArea = [{ area: data.areaCompletada, servicio: data.servicioNombre || data.areaCompletada, monto: montoChica, staff: data.chicaNombre }];
-      try {
-        var desgloseChicaRaw = data.desgloseChica;
-        if (desgloseChicaRaw) {
-          var desgloseChicaParsed = typeof desgloseChicaRaw === 'string' ? JSON.parse(desgloseChicaRaw) : desgloseChicaRaw;
-          if (Array.isArray(desgloseChicaParsed) && desgloseChicaParsed.length > 0) {
-            desgloseEstaArea = desgloseChicaParsed; // ya incluye promo + extras
-          }
-        }
-      } catch(eDG) {}
-
-      wsNew.appendRow([
-        newId, fechaStr, horaStr,
-        allData[i][3], allData[i][4],       // Código, Nombre
-        data.areasFaltantes || '',           // Servicio = área faltante
-        data.nuevaArea || '',                // Área
-        allData[i][7] || 'Normal',           // Prioridad
-        'Esperando',                         // Estado
-        '', '', nuevaObs,                    // Tomada por, Hora tomada, Obs
-        montoSiguiente,                      // Total (precio de la siguiente área)
-        data.promoNombre || allData[i][13] || '', // Promo nombre
-        precioPromo, precioNormal, '',       // Precio promo, Precio regular, Área completada
-        JSON.stringify(desgloseEstaArea),    // Desglose — incluye promo + extras de esta staff
-        'SP', precioNormal, precioPromo      // Tipo, Precio Normal, Precio Promo
-      ]);
-
-      return { success: true, newId: newId };
-    }
-    return { success: false, message: 'Ticket ' + idEspera + ' no encontrado en ' + sheetName };
-  }
-
-  // Flujo original para LE-
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    const id = String(allData[i][0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(allData[i][8] || '').toLowerCase();
-    const tomadaPor = String(allData[i][9] || '').trim();
-    const nombre = String(allData[i][4] || '').trim();
-
-    // Buscar por ID exacto primero, fallback nombre+staff
-    const matchId790 = data.idEspera && id === String(data.idEspera).trim();
-    const esActivo = (estado === 'en servicio' || estado === 'pendiente-staff');
-    if (!matchId790 && !(esActivo && tomadaPor === data.chicaNombre && nombre === data.clienteNombre)) continue;
-    if (!esActivo) continue;
-    {
-      const row = i + 1;
-      
-      // 1. Marcar este registro como "Completada" para que la chica lo vea en su historial
-      ws.getRange(row, 9).setValue('Completada');
-      ws.getRange(row, 16).setValue('Pendiente cobro final'); // metodoPago temporal
-      ws.getRange(row, 17).setValue(horaStr);
-      // Priorizar montoChica del frontend (precio de SU área), luego col M del sheet
-      const montoRealSheet = Number(allData[i][12] || 0);
-      const montoFinalChica = Number(data.montoChica || 0) || montoRealSheet;
-      ws.getRange(row, 18).setValue(String(montoFinalChica));
-      
-      // Actualizar servicio con lo que hizo esta chica
-      ws.getRange(row, 6).setValue(data.servicioActualizado || allData[i][5]);
-      
-      // Registrar comisión de esta chica (usar total real del Sheet)
-      const montoParaComision = montoFinalChica > 0 ? montoFinalChica : Number(data.montoChica || 0);
-      if (montoParaComision > 0) {
-        updateComision(data.chicaNombre, montoParaComision);
-      }
-
-      // FIX: espejo a Lineas — mismo fix que el flujo SP-/SN-
-      try {
-        marcarLineaCompletadaPorCodigo(
-          String(allData[i][3] || ''),
-          id,
-          String(allData[i][6] || '').toLowerCase(),
-          data.areaCompletada || '',
-          data.chicaNombre || ''
-        );
-      } catch(eLnCPLE) { Logger.log('espejo Lineas continuarPromo LE: ' + eLnCPLE); }
-
-      // Escribir en HistorialOwner para la parte de esta chica
-      try {
-        const areaStr = String(allData[i][6] || '').toLowerCase();
-        const pct = areaStr.includes('facial') ? 0.4 : 0.3;
-        const comision = Math.round(Number(data.montoChica) * pct * 100) / 100;
-        
-        const wsH = getSheet('HistorialOwner');
-        wsH.appendRow([
-          fechaStr, horaStr, allData[i][3], nombre, '',
-          data.areaCompletada + ' (parte de promo)', allData[i][6], data.chicaNombre,
-          montoParaComision || 0, Math.round(montoParaComision * pct * 100) / 100, 'Pendiente cobro final'
-        ]);
-      } catch(e) {}
-      
-      // 2. Crear NUEVO registro en lista de espera para la siguiente área
-      let maxNum = 0;
-      const freshData = ws.getDataRange().getValues();
-      for (let j = 3; j < freshData.length; j++) {
-        const jId = String(freshData[j][0] || '');
-        if (jId.startsWith('LE-')) {
-          const num = parseInt(jId.replace('LE-', ''));
-          if (num > maxNum) maxNum = num;
-        }
-      }
-      const newId = 'LE-' + String(maxNum + 1).padStart(4, '0');
-      
-      // Observaciones con historial de la promo (solo el rastro de sistema; la nota
-      // humana NO se arrastra a la siguiente staff — se considera ya entregada)
-      const obsActual = _soloTextoSistemaObs(String(allData[i][11] || ''));
-      const nuevaObs = (obsActual ? obsActual + ' | ' : '') + '✅ ' + data.areaCompletada + ' completada por ' + data.chicaNombre + ' · Falta: ' + data.areasFaltantes;
-      
-      // Col M del nuevo ticket = total ACUMULADO real (lo ya hecho + la siguiente área)
-      // Esto es lo que Mikaela ve como "TOTAL ACUMULADO" en el panel
-      const totalEstaAreaSheet = Number(allData[i][12] || 0); // col M actual
-      const montoSiguiente = Number(data.montoSiguienteArea || 0);
-      const montoYaHechoReal = Number(data.montoChica || 0) || Number(data.totalAcumulado || 0) || totalEstaAreaSheet;
-      // totalAcumulado = lo que hizo esta staff (incluyendo extras) + lo que hará la siguiente
-      const totalNuevoTicket = String((montoYaHechoReal > 0 ? montoYaHechoReal : 0) + montoSiguiente);
-      
-      // Guardar también el monto real de esta área (para comisiones correctas)
-      const montoChicaReal = Number(data.montoChica || 0) || (totalEstaAreaSheet > 0 ? totalEstaAreaSheet : 0);
-      
-      // Limpiar el nombre del servicio — quitar prefijos de historial como [✅Diana:...]
-      let servicioLimpio = String(data.areasFaltantes || '');
-      // Si viene con texto de historial (contiene [✅ o emoji de staff), extraer solo el nombre del servicio
-      if (servicioLimpio.includes('[') || servicioLimpio.includes('✅')) {
-        // Intentar extraer la parte después del | si existe
-        const partes = servicioLimpio.split('|');
-        servicioLimpio = partes[partes.length - 1].trim();
-        // Si sigue teniendo brackets, limpiar
-        servicioLimpio = servicioLimpio.replace(/\[.*?\]/g, '').trim();
-      }
-
-      // Usar hora actual como hora de llegada (allData[i][2] puede ser Date vacía → 1899)
-      const horaLlegadaNueva = horaStr;
-      ws.appendRow([
-        newId, fechaStr, horaLlegadaNueva, allData[i][3], nombre,
-        servicioLimpio + ' (continuación promo)',
-        data.nuevaArea || allData[i][6],
-        allData[i][7] || 'Normal',
-        'Esperando', '', '', nuevaObs,
-        totalNuevoTicket,
-        data.promoNombre || allData[i][13] || '', // N: promoNombre (usa el que cambió la staff; si no vino, hereda del original)
-        allData[i][14] || '', // O: precioRegular (hereda del original)
-        '',                   // P: precioPromo (vacío, será llenado al cobrar)
-        '',                   // Q: secuencia (no aplica para continuación)
-        allData[i][17] || '' // R: promasExtra (hereda del original para que no se pierdan)
-      ]);
-      
-      // Copiar el desglose al nuevo ticket (col S)
-      // Combinar: desglose existente del ticket original + desglose de esta staff
-      try {
-        let desgloseOriginal = [];
-        const colSOriginal = allData[i][18];
-        if (colSOriginal) { try { desgloseOriginal = JSON.parse(String(colSOriginal)); } catch(e) {} }
-        
-        let desgloseEstaChica = [];
-        if (data.desgloseChica) {
-          try {
-            desgloseEstaChica = typeof data.desgloseChica === 'string'
-              ? JSON.parse(data.desgloseChica) : data.desgloseChica;
+            _tomadasExtra++;
           } catch(e) {}
         }
-        
-        // Si no vino desglose del frontend, crear uno básico con los datos disponibles
-        if (desgloseEstaChica.length === 0 && montoFinalChica > 0) {
-          desgloseEstaChica = [{ 
-            staff: data.chicaNombre, 
-            servicio: data.servicioActualizado || data.servicio || 'Servicio', 
-            area: data.areaCompletada || '', 
-            monto: montoFinalChica 
-          }];
+      }
+
+      // Reconstruir el slot con TODOS los servicios marcados (el actual + los extra)
+      // para que se le carguen todos a la vez y no solo el primero.
+      const _areasRef = window._tmAreasActuales || [];
+      const _seleccionadas = [];
+      document.querySelectorAll('#confirmSvcTMAreas input[type="checkbox"]:checked').forEach(function(cb) {
+        const idx = Number(cb.dataset.areaIdx);
+        const ar = _areasRef.find(function(a){ return Number(a.idx) === idx; });
+        if (ar) _seleccionadas.push({
+          name: ar.tentativo || ar.confirmado || ar.area || 'Servicio',
+          price: Number(ar.precio) || 0,
+          area: ar.area,
+          idx: ar.idx
+        });
+      });
+      if (_seleccionadas.length > 0) {
+        slotServices[slot_tm] = _seleccionadas;
+        renderServicesForSlot(slot_tm);
+        const _totalSel = _seleccionadas.reduce(function(s,v){ return s + Number(v.price||0); }, 0);
+        const _totEl = document.getElementById('as' + slot_tm + 'Total');
+        if (_totEl) _totEl.textContent = '$' + _totalSel;
+        const _cntEl = document.getElementById('as' + slot_tm + 'SvcCount');
+        if (_cntEl) _cntEl.textContent = String(_seleccionadas.length);
+        setTimeout(function(){ try { updateFinishButtons(slot_tm); } catch(e){} }, 300);
+      }
+
+      // Avisar a Mikaela que la staff tomó todos los servicios marcados
+      if (_tomadasExtra > 0) {
+        // En el banner que ve la staff: solo el código (privacidad). El nombre solo va al push de Mikaela.
+        const _codCli = (slot_tm === 1 ? (window._as1Client || '') : (window._as2Client || '')) || 'clienta';
+        const _nomCli = document.getElementById('as' + slot_tm + 'Name')?.textContent?.replace(' ⭐','') || 'la clienta';
+        try {
+          simulateNotif('mikaela',
+            (user_tm?.name || 'Staff') + ' tomó todos los servicios',
+            _codCli + ' · ' + _seleccionadas.length + ' servicios', false);
+        } catch(e) {}
+        // (El aviso a Mikaela ahora lo manda el backend al pasar a "Por verificar" — evita duplicado)
+      }
+
+      // Resetear panel para la próxima vez
+      document.getElementById('confirmSvcTMPanel').style.display = 'none';
+      document.getElementById('confirmSvcNormalPanel').style.display = 'block';
+      const cambiarBtn = document.getElementById('confirmSvcCambiarBtn');
+      if (cambiarBtn) cambiarBtn.style.display = '';
+    }
+
+    // Confirmar al backend — NO bloqueamos la UI, se lanza en background
+    const slot = window._confirmSvcSlot || 1;
+    const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    showToast('✅ Servicio confirmado');  // ← inmediato, no espera al backend
+
+    // Backend en paralelo — no await, no bloquea
+    (async function() {
+      try {
+        if (!idEspera) return;
+        // Lanzar confirmar + actualizar SP en paralelo si aplica
+        const svcsConf = (slotServices[slot] || []).filter(s =>
+          s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado'
+        );
+        const svcNuevo = svcsConf.map(s => s.name).join(' + ');
+        const precioNuevo = svcsConf.reduce((s,v) => s + Number(v.price||0), 0);
+
+        const promises = [ apiPost('confirmarServicioStaff', { idEspera }) ];
+        if (idEspera.startsWith('SP-') && svcNuevo) {
+          promises.push(apiPost('actualizarServicioSP', {
+            idEspera, nuevoServicio: svcNuevo, nuevoPrecio: precioNuevo
+          }));
         }
-        
-        const desgloseAcum = [...desgloseOriginal, ...desgloseEstaChica];
-        if (desgloseAcum.length > 0) {
-          const lastRowNew = ws.getLastRow();
-          ws.getRange(lastRowNew, 19).setValue(JSON.stringify(desgloseAcum));
+        await Promise.all(promises);  // ambas llamadas en paralelo
+      } catch(e) { console.warn('[confirmService] backend error:', e); }
+    })();
+
+    const user = window.currentUser;
+
+    // ── Si es cejas pigmento: mostrar ficha rápida de efecto polvo ──
+    const slot_cs = window._confirmSvcSlot || 1;
+    const svcs_cs = slotServices[slot_cs] || [];
+    const tienePigmento = svcs_cs.some(function(s) { return esSrvPigmento(s.name); });
+    if (tienePigmento && user && String(user.area||'').toLowerCase().includes('ceja')) {
+      const clientCodigo_cs = slot_cs === 1 ? (window._as1Client || '') : (window._as2Client || '');
+      const clientNombre_cs = document.getElementById('as' + slot_cs + 'Name')?.textContent?.replace(' ⭐','') || '';
+      const clientKey_cs = clientCodigo_cs.toLowerCase().replace(/-/g,'');
+      const el_cs = document.getElementById('cejasQuick' + slot_cs);
+      if (el_cs) el_cs.innerHTML = ''; // forzar recarga
+      if (el_cs) el_cs.style.display = 'none';
+      setTimeout(function() {
+        if (clientCodigo_cs) loadCejasQuick(clientKey_cs, slot_cs, clientCodigo_cs, clientNombre_cs);
+      }, 400);
+    }
+
+    // ── Si es facial: abrir modal de ficha facial para registrar la visita ──
+    if (user?.area === 'facial' || user?.role === 'owner') {
+      const slot2 = window._confirmSvcSlot || 1;
+      const clientNombre = document.getElementById('as' + slot2 + 'Name')?.textContent?.replace(' ⭐','') || '';
+      const clientCodigo = document.getElementById('as' + slot2 + 'Code')?.textContent?.split(' ')[0] || '';
+      const clientKey = clientCodigo.toLowerCase().replace(/-/g,'');
+      // Pre-llenar datos de la clienta en el modal de visita facial
+      setTimeout(() => {
+        // Asegurar que CLIENT_PROFILES tenga la entrada
+        if (clientCodigo && !CLIENT_PROFILES[clientKey]) {
+          CLIENT_PROFILES[clientKey] = {
+            name: clientNombre, code: clientCodigo,
+            facial: { history: [] }, pestanas: { fichas: [], history: [] },
+            cejas: { history: [] }, depilacion: { history: [] }
+          };
+        }
+        // Guardar datos de la clienta para la ficha/visita
+        window._currentFacialClientKey = clientKey;
+        window._currentFacialClientNombre = clientNombre;
+        window._currentFacialClientCodigo = clientCodigo;
+        // Pre-calcular servicio y precio para la visita
+        const svcs = slotServices[slot2] || [];
+        window._currentFacialSvcName = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+        window._currentFacialSvcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
+        // FIX: cargar ficha facial del sheet antes de mostrar el panel
+        // Si ya existe ficha en el sheet, mostrarla; si no, mostrar "Sin ficha"
+        if (clientCodigo) {
+          apiGet('getFichaFacial', { codigo: clientCodigo }).then(facRes => {
+            if (facRes.success && facRes.ficha) {
+              if (!CLIENT_PROFILES[clientKey]) CLIENT_PROFILES[clientKey] = { name: clientNombre, code: clientCodigo, facial: {} };
+              if (!CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial = {};
+              CLIENT_PROFILES[clientKey].facial.ficha = facRes.ficha;
+            }
+            loadFacialFichaQuick(clientKey, slot2);
+          }).catch(() => loadFacialFichaQuick(clientKey, slot2));
+        } else {
+          loadFacialFichaQuick(clientKey, slot2);
+        }
+      }, 400);
+    }
+  }
+
+  // Alias movido a nexserv-main-1.js donde está definida showConfirmServiceModal
+  // window.confirmarServicioObligatorio = showConfirmServiceModal; // ← en main-1
+
+  function changeServiceFromModal() {
+    closeModal();
+    const slot = window._confirmSvcSlot || 1;
+    // Abrir el selector de servicio/promo en modo enganche (sin necesitar autorización)
+    window._addServiceSlot = slot;
+    window._editEngancheIdx = 0; // reemplazar el servicio en posición 0
+    openAddService(slot, true); // true = modo enganche explícito
+    // Cambiar título y ocultar nota
+    setTimeout(() => {
+      const modalTitle = document.querySelector('#addServiceModal .modal-title');
+      if (modalTitle) modalTitle.textContent = '🔄 Cambiar servicio';
+      const noteWrapper = document.getElementById('addSvcNoteWrapper');
+      if (noteWrapper) noteWrapper.style.display = 'none';
+      const confirmBtn = document.getElementById('addSvcConfirmBtn');
+      if (confirmBtn) confirmBtn.textContent = 'Confirmar cambio';
+    }, 100);
+  }
+
+  async function finalizarServicioSP(slot) {
+    slot = slot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
+    const user = window.currentUser;
+    if (!user) return;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clienteCodigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+
+    // Obtener datos del servicio desde slotServices o desde activePromos
+    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const promoData = activePromos[clientKey];
+    const totalFinal = svcs.reduce((s,v) => s + Number(v.price||0), 0) || (promoData ? Number(promoData.promo?.price||0) : 0);
+    const svcNames = svcs.map(s => s.name).join(' + ') || promoData?.promo?.name || 'Servicio';
+    const precioRegular = promoData ? String(Number(promoData.promo?.regular || promoData.promo?.price || totalFinal)) : String(totalFinal);
+    const promoNombre = promoData?.promo?.name || '';
+
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey, clientName, svcNames,
+      total: String(totalFinal),
+      promoNombre, precioRegular,
+      idEspera, clienteCodigo,
+      areasExtras: [], promasExtraPendientes: []
+    };
+
+    showToast('⏳ Enviando a cobro...');
+    try {
+      await finishAndSend();
+    } catch(e) {
+      alert('Error al enviar a cobro: ' + e.message);
+    }
+  }
+
+  // La staff terminó su parte: envía los servicios de OTRA área a su lista de espera
+  // (para que otra staff los tome) y luego cobra solo su parte.
+  async function finalizarYPasarOtraArea(slot) {
+    slot = slot || 1;
+    const user = window.currentUser;
+    if (!user) return;
+    const myArea = user.area || 'cejas';
+    const codigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+    const nombre = (document.getElementById('as' + slot + 'Name')?.textContent || '').replace(' ⭐','').trim();
+    const svcs = (slotServices[slot] || []).filter(s =>
+      s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const otras = svcs.filter(s => !window.esMismaAreaM3(myArea, s.area || s.name));
+    if (otras.length === 0) { await finalizarServicioSP(slot); return; }
+
+    showToast('⏳ Enviando a otra staff...');
+    const areaNames = { 'Cejas':'cejas', 'Depilación':'depilacion', 'Pestañas':'pestanas', 'Facial':'facial', 'Lifting / Retiro':'retiro_lifting' };
+    for (const s of otras) {
+      const areaDestino = areaNames[s.area] || String(s.area || 'cejas').toLowerCase();
+      try {
+        await LineaService.crearServicio( {
+          codigo: codigo, nombre: nombre,
+          servicio: s.name, area: areaDestino,
+          precio: Number(s.price || 0), prioridad: 'Normal',
+          observaciones: 'Pasado por ' + (user.name || 'staff') + ' durante atención'
+        });
+      } catch(e) {}
+      // Marcar como enviado para que NO se cobre con esta staff
+      const ref = (slotServices[slot] || []).find(x => x === s);
+      if (ref) ref.status = 'enganche-enviado';
+    }
+    try { renderServicesForSlot(slot); } catch(e) {}
+    showToast('✅ ' + otras.map(s => s.name).join(', ') + ' enviado a otra staff');
+    // Cobrar solo la parte de esta staff
+    await finalizarServicioSP(slot);
+  }
+  window.finalizarYPasarOtraArea = finalizarYPasarOtraArea;
+
+  async function finishAndSend() {
+    // Mandar directo a cobrar (finaliza completamente)
+    closeModal();
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: resolver id fresco si el local está vacío
+
+    // ── PASO 1: Determinar el idEspera real del ticket activo ──────────────────
+    let idEsperaActual = data.idEspera || window._as1IdEspera || '';
+    let miTicketSheet = null;
+
+    // Buscar en ServicioPromo si es SP- o vacío
+    if (!idEsperaActual || idEsperaActual.startsWith('SP-')) {
+      try {
+        const spData = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
+        if (spData.success) {
+          const todosLosTickets = [...(spData.enServicio || []), ...(spData.porCobrar || [])];
+          miTicketSheet = todosLosTickets.find(t =>
+            t.tomadaPor === user?.name &&
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client))
+          );
+          if (miTicketSheet) {
+            idEsperaActual = miTicketSheet.idEspera;
+            window._as1IdEspera = idEsperaActual;
+          }
         }
       } catch(e) {}
-      
-      return { success: true };
     }
-  }
-  return { success: false, message: 'Atención no encontrada' };
-}
 
-// Mikaela confirma cobro → estado pasa a "Completada"
-// ============================================
-// ABONOS (depósitos para reservar) — se cuentan al cobrar
-// Hoja Abonos: A=ID B=Fecha C=Código D=Cliente E=Monto F=Origen G=Estado H=idEspera
-// Decisión del negocio: el abono NO entra a caja al registrarse; se cuenta TODO al cobrar
-// (caja y comisión sobre el total completo). El abono solo se muestra y se descuenta de lo
-// que la clienta entrega físicamente.
-// ============================================
-// Atar un código nuevo a un ticket activo (busca en las 4 hojas por ID).
-// Lo usa el cobro cuando se le crea código a una clienta walk-in para
-// registrarle un abono y que se descuente al cobrar.
-function handleSetCodigoTicket(data) {
-  try {
-    const id     = String((data && data.idEspera) || '').trim();
-    const codigo = String((data && data.codigo)   || '').trim();
-    if (!id || !codigo) return { success:false, message:'Falta id o código.' };
-    const hojas = ['ListaEspera', 'ServicioNormal', 'ServicioPromo', 'TicketMulti'];
-    for (let s = 0; s < hojas.length; s++) {
-      const ws = getSheet(hojas[s]);
-      if (!ws) continue;
-      const rows = ws.getDataRange().getValues();
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() === id) {
-          ws.getRange(i + 1, 4).setValue(codigo); // col D = código de la clienta
-          return { success:true, hoja: hojas[s] };
-        }
-      }
-    }
-    return { success:false, message:'Ticket no encontrado.' };
-  } catch(e){ return { success:false, message:String(e) }; }
-}
-
-function _getAbonosSheet() {
-  return getOrCreateSheet('Abonos', ['ID','Fecha','Código','Cliente','Monto','Origen','Estado','idEspera']);
-}
-function handleRegistrarAbono(data) {
-  try {
-    const codigo = String((data && data.codigo) || '').trim();
-    const monto  = Number((data && data.monto) || 0);
-    if (!codigo)      return { success:false, message:'Falta el código de la clienta.' };
-    if (!(monto > 0)) return { success:false, message:'El abono debe ser mayor a 0.' };
-    const ws = _getAbonosSheet();
-    const id = 'AB-' + String(ws.getLastRow()).padStart(4,'0');
-    const fecha = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-    ws.appendRow([id, fecha, codigo, data.cliente || '', monto, data.origen || 'admin', 'activo', data.idEspera || '']);
-    return { success:true, id:id };
-  } catch(e){ return { success:false, message:String(e) }; }
-}
-function handleGetAbonoActivo(params) {
-  try {
-    const codigo = String((params && params.codigo) || '').trim().toUpperCase();
-    if (!codigo) return { success:true, monto:0, registros:[] };
-    const ws = _getAbonosSheet();
-    const rows = ws.getDataRange().getValues();
-    let monto = 0; const registros = [];
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][2] || '').trim().toUpperCase() !== codigo) continue;
-      if (String(rows[i][6] || '').toLowerCase().trim() !== 'activo') continue;
-      monto += Number(rows[i][4] || 0);
-      registros.push({ id: rows[i][0], fecha: rows[i][1], monto: Number(rows[i][4] || 0), origen: rows[i][5] });
-    }
-    return { success:true, monto:monto, registros:registros };
-  } catch(e){ return { success:false, message:String(e), monto:0 }; }
-}
-function handleConsumirAbono(data) {
-  try {
-    const codigo = String((data && data.codigo) || '').trim().toUpperCase();
-    if (!codigo) return { success:true, consumidos:0 };
-    const ws = _getAbonosSheet();
-    const rows = ws.getDataRange().getValues();
-    let n = 0;
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][2] || '').trim().toUpperCase() !== codigo) continue;
-      if (String(rows[i][6] || '').toLowerCase().trim() !== 'activo') continue;
-      ws.getRange(i+1, 7).setValue('usado');
-      n++;
-    }
-    return { success:true, consumidos:n };
-  } catch(e){ return { success:false, message:String(e) }; }
-}
-
-// ============================================
-// ESTADO DE CITA (para SYNA) — consulta si la clienta ya pagó su servicio
-// Solo lectura. SYNA consulta por idEspera (el LE- que recibió) o por codigo[+fecha].
-// "Pagado" = existe una Atención con Estado 'Completado' (se marca al cobrar).
-// Atenciones: 0=ID 1=Fecha 2=HoraEntrada 3=HoraSalida 4=Código 5=Cliente
-//             6=Staff 7=Servicio 8=Estado 9=Total 10=Método 11=idEspera 12=Área
-// ============================================
-function handleGetEstadoCita(params) {
-  try {
-    const idEspera = String((params && params.idEspera) || '').trim();
-    const codigo   = String((params && params.codigo) || '').trim().toUpperCase();
-    const fecha    = String((params && params.fecha) || '').trim(); // opcional dd/MM/yyyy
-    if (!idEspera && !codigo) {
-      return { success: false, message: 'Falta idEspera o codigo.', pagado: false };
-    }
-    const ws = getSheet('Atenciones');
-    const data = ws.getDataRange().getValues();
-    let mejor = null;
-    for (let i = 3; i < data.length; i++) {
-      const estado = String(data[i][8] || '').trim();
-      if (estado !== 'Completado') continue; // 'Completado' = ya cobrada
-      const rowId    = String(data[i][11] || '').trim();
-      const rowCod   = String(data[i][4]  || '').trim().toUpperCase();
-      const rowFecha = String(data[i][1]  || '').trim();
-      let match = false;
-      if (idEspera && rowId === idEspera) {
-        match = true;
-      } else if (codigo && rowCod === codigo) {
-        match = (!fecha || rowFecha === fecha);
-      }
-      if (!match) continue;
-      // Nos quedamos con el último que matchee (el más reciente en la hoja)
-      mejor = {
-        idEspera: rowId,
-        codigo:   rowCod,
-        cliente:  String(data[i][5]  || ''),
-        servicio: String(data[i][7]  || ''),
-        total:    Number(data[i][9]  || 0),
-        metodo:   String(data[i][10] || ''),
-        fecha:    rowFecha,
-        hora:     String(data[i][3]  || '')
-      };
-    }
-    if (mejor) return { success: true, pagado: true, cita: mejor };
-    return { success: true, pagado: false };
-  } catch (e) {
-    return { success: false, message: String(e), pagado: false };
-  }
-}
-
-function handleConfirmarCobro(data) {
-  // Router: el frontend siempre llama 'confirmarCobro'. TM-/SP-/SN- van a su handler;
-  // aca solo se cierran los LE-.
-  const _idEsp = String(data.idEspera || '').trim();
-  if (_idEsp.indexOf('TM-') === 0) return handleConfirmarCobroMulti(data);
-  if (_idEsp.indexOf('SP-') === 0) return handleConfirmarCobroPromo(data);
-  if (_idEsp.indexOf('SN-') === 0) return handleConfirmarCobroNormal(data);
-
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-  const now = new Date();
-  const horaStr  = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-  const fechaStr = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-
-  for (let i = 3; i < allData.length; i++) {
-    if (String(allData[i][0]).trim() === data.idEspera) {
-      const row = i + 1;
-      // ── IDEMPOTENCIA: si el ticket ya fue cobrado, NO re-procesar (evita doble comisión/ingreso) ──
-      const _estLE = String(allData[i][8] || '').trim().toLowerCase();
-      if (_estLE === 'completada' || _estLE === 'completado') {
-        return { success: true, yaCobrado: true, message: 'Este ticket ya estaba cobrado.' };
-      }
-      const metodoPago = data.metodoPago || 'Efectivo';
-
-      const codigoCliente    = allData[i][3] || '';
-      const nombreCliente     = allData[i][4] || '';
-      const servicioOriginal  = allData[i][5] || '';
-      const promoNombreStr    = String(allData[i][13] || data.promoNombre || '').trim();
-      const servicio          = promoNombreStr ? promoNombreStr + ' (PROMO)' : servicioOriginal;
-      const area              = allData[i][6] || '';
-      const chicaNombre       = String(allData[i][9] || '').trim();
-      const notaAjuste        = String(data.notaAjuste || '');
-
-      const precioPromoRow = Number(allData[i][14] || 0); // O: precio promo
-      const precioRegRow   = Number(allData[i][15] || 0); // P: precio regular
-      const totalFrontend  = Number(data.totalCobrado) || 0;
-
-      // Armar lineas (hechos): desglose del frontend, o de col S, o linea unica
-      let _fd = null;
-      if (data.serviciosDetalle && data.serviciosDetalle.length > 0) {
-        _fd = (typeof data.serviciosDetalle === 'string')
-          ? (function(){ try { return JSON.parse(data.serviciosDetalle); } catch(e){ return null; } })()
-          : data.serviciosDetalle;
-      }
-      if (!_fd) {
-        const colS = allData[i] ? allData[i][18] : null;
-        if (colS) { try { _fd = JSON.parse(colS); } catch (eJ) {} }
-      }
-      let lineas = [];
-      if (_fd && _fd.length > 0) {
-        lineas = _fd.map(function (p) {
-          return {
-            staff: String(p.staff || chicaNombre),
-            area: String(p.area || area),
-            servicio: String(p.servicio || servicio),
-            precioRegular: Number(p.montoNormal || 0),
-            precioPromo: Number(p.monto || 0)
-          };
-        });
-      } else {
-        const reg  = promoNombreStr ? (precioRegRow > 0 ? precioRegRow : totalFrontend) : (totalFrontend > 0 ? totalFrontend : precioRegRow);
-        const prom = promoNombreStr ? (precioPromoRow > 0 ? precioPromoRow : totalFrontend) : 0;
-        lineas = [{ staff: chicaNombre, area: area, servicio: servicio, precioRegular: reg, precioPromo: prom }];
-      }
-
-      // Motor unico: tarjeta=regular / efectivo=promo, reparte comision, suma extras
-      const liq = liquidarCobro_(lineas, metodoPago, (precioRegRow > 0 ? precioRegRow : totalFrontend));
-      const totalCobrado = liq.total;
-
-      ws.getRange(row, 9).setValue('Completada');
-      ws.getRange(row, 16).setValue(metodoPago); // P: metodoPago
-      ws.getRange(row, 17).setValue(horaStr);    // Q: horaCobro
-      ws.getRange(row, 18).setValue(totalCobrado); // R: totalCobrado
-
-      // espejo Lineas: marcar la línea de esta clienta (ticket legacy LE-) como 'cobrado'.
-      // Cubre cobro individual Y grupal (el grupal llama a confirmarCobro por cada clienta).
-      // Los TM-/SP-/SN- ya se marcan en su propio handler (router de arriba).
-      try { marcarLineaCobradaPorCodigo(codigoCliente, (promoNombreStr || servicioOriginal), metodoPago); } catch (eLn) { Logger.log('espejo cobro LE-: ' + eLn); }
-
-      // ServiciosExtras: col K con el ID del ticket cobrado
+    // ── ENGANCHE: si es SN- pero hay desglose acumulado en memoria, buscar también en SP ──
+    // Cuando Laura toma enganche de Lesly (SN-), el ticket del enganche es SP-
+    // El SN- original no tiene serviciosDetalle de Lesly — está en el SP- creado por continuarPromoALista
+    if (idEsperaActual.startsWith('SN-') && !miTicketSheet) {
       try {
-        const wsExt = getSheet('ServiciosExtras');
-        if (wsExt) {
-          const extData = wsExt.getDataRange().getValues();
-          const codCliente = String(allData[i][3] || '').trim();
-          for (let e = 1; e < extData.length; e++) {
-            if (String(extData[e][5]||'').trim() === codCliente &&
-                String(extData[e][0]||'').trim() === fechaStr &&
-                String(extData[e][10]||'').trim() === '') {
-              wsExt.getRange(e + 1, 11).setValue(data.idEspera || '');
-            }
+        const spData2 = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
+        if (spData2.success) {
+          // IMPORTANTE: solo SP "en servicio". Un SP que ya está "por cobrar" está finalizado
+          // y NO es el ticket de un enganche en curso. Incluir los "por cobrar" hacía que un
+          // servicio extra (SN-) se enlazara con un SP ajeno YA cobrable de la misma clienta
+          // (ej: la depilación de Keyla en "Por cobrar") y se intentara finalizar ESE SP
+          // congelado → "Ticket SP no encontrado". El SN- debe finalizarse por su propio camino.
+          const allSP = [...(spData2.enServicio || [])];
+          // Buscar SP ticket para esta clienta (puede tener desglose de la staff previa)
+          // FIX: solo vincular SP que tiene a ESTA staff en serviciosDetalle.
+          // Sin este filtro, el SN de María (piernas $30) encontraba el SP de Laura (facial $32)
+          // para la misma clienta, sumaba los montos y mostraba precio incorrecto en cobro grupal.
+          const linkedSP = allSP.find(t =>
+            (t.nombre === data.clientName || t.codigo === (data.clienteCodigo || window._as1Client)) &&
+            t.serviciosDetalle && t.serviciosDetalle.length > 0 &&
+            t.serviciosDetalle.some(d => d.staff === (user && user.name))
+          );
+          if (linkedSP && linkedSP.serviciosDetalle && linkedSP.serviciosDetalle.length > 0) {
+            miTicketSheet = linkedSP;
+            // No cambiar idEsperaActual — solo usamos miTicketSheet para el desglose
           }
         }
-      } catch (eExt) {}
-
-      try { updateVisitaClienta(codigoCliente); } catch (e) {}
-
-      // Comision + historial: UNA sola vez, al cobro final, por cada staff que participo
-      try {
-        const wsH = getSheet('HistorialOwner');
-        const idEsperaHist = String(data.idEspera || '');
-        liq.lineas.forEach(function (l) {
-          if (l.staff && l.monto > 0) { try { updateComision(l.staff, l.monto); } catch (eC) {} }
-          wsH.appendRow([fechaStr, horaStr, codigoCliente, nombreCliente, idEsperaHist,
-            l.servicio, l.area, l.staff, l.monto, l.comision, metodoPago, notaAjuste]);
-        });
-      } catch (e) {}
-
-      // CierresPagos (historial de Mikaela)
-      try {
-        const wsPagos = getSheet('CierresPagos');
-        const desgloseStr = data.serviciosDetalle && data.serviciosDetalle.length > 0 ? JSON.stringify(data.serviciosDetalle) : '';
-        wsPagos.appendRow([now, horaStr, nombreCliente, chicaNombre, servicio, totalCobrado, metodoPago, desgloseStr, notaAjuste]);
-      } catch (e) {}
-
-      cerrarAtencion(data.idEspera, chicaNombre, nombreCliente, servicio, totalCobrado, metodoPago, 'Completado');
-
-      return { success: true };
-    }
-  }
-  return { success: false };
-}
-
-// Servicios completados hoy por una chica
-function handleGetServiciosSemana(params) {
-  const ws = getSheet('HistorialOwner');
-  const data = ws.getDataRange().getValues();
-  const now = new Date();
-  const tz = 'America/Guayaquil';
-
-  // Calcular inicio de semana (lunes)
-  const dayOfWeek = (now.getDay() + 6) % 7; // 0=lun
-  const lunes = new Date(now);
-  lunes.setDate(now.getDate() - dayOfWeek);
-  lunes.setHours(0, 0, 0, 0);
-
-  const DIAS = ['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
-  const serviciosPorDia = {};
-
-  // Datos desde fila 3 (indice 2) — filas 1-2 son titulo/descripcion
-  for (let i = 2; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-
-    // Col A=Fecha B=Hora C=Codigo D=Nombre E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-    const chica = String(row[7] || '').trim();
-    if (params && params.chica && chica !== params.chica) continue;
-
-    // Parsear fecha
-    let fechaDate;
-    if (row[0] instanceof Date) {
-      fechaDate = row[0];
-    } else {
-      const parts = String(row[0] || '').split('/');
-      if (parts.length !== 3) continue;
-      fechaDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      } catch(e) {}
     }
 
-    if (fechaDate < lunes || fechaDate > now) continue;
+    const esTicketSP = idEsperaActual.startsWith('SP-');
 
-    const diaIdx = fechaDate.getDay(); // 0=dom
-    const diaNombre = DIAS[diaIdx];
-    const fechaStr = Utilities.formatDate(fechaDate, tz, 'dd/MM/yyyy');
+    // ── PASO 2: Obtener servicios aprobados ────────────────────────────────────
+    let svcsAprobados = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
 
-    if (!serviciosPorDia[diaNombre]) {
-      serviciosPorDia[diaNombre] = { dia: diaNombre, fecha: fechaStr, orden: diaIdx === 0 ? 7 : diaIdx, total: 0, servicios: [] };
-    }
-
-    const valor = Number(row[8] || 0);
-    const comision = Number(row[9] || 0);
-    const hora = row[1] instanceof Date
-      ? Utilities.formatDate(row[1], tz, 'HH:mm')
-      : String(row[1] || '');
-
-    serviciosPorDia[diaNombre].total += comision;
-    serviciosPorDia[diaNombre].servicios.push({
-      cliente: row[3],
-      codigo: row[2],
-      servicio: row[5],
-      valor: valor,
-      comision: comision,
-      hora: hora,
-      metodoPago: row[10],
-      fecha: fechaStr
-    });
-  }
-
-  const dias = Object.values(serviciosPorDia).sort((a, b) => a.orden - b.orden);
-  return { success: true, dias: dias };
-}
-
-function handleGetServiciosHoy(params) {
-  // ── PASO 5: Lee desde Lineas (fuente de verdad) con fallback al legacy ──
-  try {
-    var tablero = getTableroLineas();
-    var todasLineas = [].concat(
-      tablero.completado || [],
-      tablero.cobrado    || [],
-      tablero.en_servicio || []
-    );
-    var servicios = [];
-    var claves = new Set();
-    todasLineas.forEach(function(l) {
-      if (params.chica && String(l.staff||'').trim() !== params.chica) return;
-      var clave = String(l.codigo||'') + '|' + String(l.servicio||'').toLowerCase() + '|' + String(l.staff||'').toLowerCase();
-      if (claves.has(clave)) return;
-      claves.add(clave);
-      var comisionFinal = Number(l.comision || 0);
-      if (comisionFinal === 0 && (l.estado === 'en_servicio' || l.estado === 'completado')) {
-        var _area = String(l.area || '').toLowerCase();
-        var _pct  = _area.indexOf('facial') >= 0 ? 0.4 : 0.3;
-        comisionFinal = Math.round(Number(l.monto || 0) * _pct * 100) / 100;
+    // Si memoria está vacía, reconstruir desde el ticket del sheet
+    if (svcsAprobados.length === 0 && miTicketSheet) {
+      const montoSheet = Number(miTicketSheet.total || miTicketSheet.precioPromo || 0);
+      if (montoSheet > 0) {
+        svcsAprobados = [{
+          name: miTicketSheet.promoNombre || miTicketSheet.servicio || data.svcNames || 'Servicio',
+          price: montoSheet,
+          area: miTicketSheet.area || user?.area || ''
+        }];
       }
-      // Formatear fecha correctamente — puede ser Date o string
-      var _fecha = l.fecha;
-      var _fechaStr = '';
-      if (_fecha instanceof Date && _fecha.getFullYear() > 2000) {
-        _fechaStr = Utilities.formatDate(_fecha, 'America/Guayaquil', 'dd/MM/yyyy');
-      } else if (typeof _fecha === 'string' && _fecha.length > 0) {
-        // Si viene como string "Sat Dec 30 1899..." → intentar reparsear desde horaToma
-        // o dejar vacío para que el frontend no muestre fecha inválida
-        var _fechaParsed = new Date(_fecha);
-        _fechaStr = (!isNaN(_fechaParsed) && _fechaParsed.getFullYear() > 2000)
-          ? Utilities.formatDate(_fechaParsed, 'America/Guayaquil', 'dd/MM/yyyy')
-          : '';
-      }
-      servicios.push({
-        nombre        : String(l.cliente  || ''),
-        codigo        : String(l.codigo   || ''),
-        servicio      : String(l.servicio || ''),
-        area          : String(l.area     || ''),
-        horaToma      : String(l.hora     || ''),
-        total         : Number(l.monto    || 0),
-        metodoPago    : String(l.metodoPago || (l.estado === 'cobrado' ? 'Efectivo' : 'Pendiente cobro')),
-        tomadaPor     : String(l.staff    || ''),
-        fecha         : _fechaStr,
-        promoNombre   : String(l.promoRef || ''),
-        precioRegular : Number(l.montoRegular || 0),
-        observaciones : String(l.obs      || ''),
-        horaCobro     : String(l.horaDevuelta || ''),
-        comision      : comisionFinal,
-        pendienteCobro: (l.estado === 'en_servicio' || l.estado === 'completado')
-      });
-    });
-    Logger.log('[ServiciosHoy] fuente=Lineas, items=' + servicios.length);
-    return { success: true, servicios: servicios };
-  } catch(eLn) {
-    Logger.log('[ServiciosHoy] fallback legacy: ' + eLn);
-  }
-
-  // ── FALLBACK LEGACY (si Lineas falla) ──────────────────────────────────
-  var ws = getSheet('ListaEspera');
-  var data = ws.getDataRange().getValues();
-  var hoy = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-  var servicios = [];
-  // FIX: deduplicar por IDENTIDAD del servicio (codigo cliente + servicio + chica),
-  // NO por total ni hora. El total varía entre fuentes para el mismo servicio
-  // (ServicioPromo guarda precioMiArea, ListaEspera/ServicioNormal el total cobrado,
-  // y con el bug de tarjeta/promo el mismo servicio queda con dos montos distintos),
-  // lo que hacía que la clave difiriera y el servicio se mostrara duplicado (ej. Lesly
-  // como 2da area en promos). La hora tampoco es estable (horaToma vs horaCobro).
-  // Mismo cliente + mismo servicio + misma chica = mismo servicio, sin importar monto/hora.
-  var clavesDuplicadas = new Set();
-  function claveSvc(codigo, servicio, staff) {
-    var svc = String(servicio||'').trim().toLowerCase()
-      .replace(/\(.*?\)/g, ' ')        // quita "(continuación promo)", "(✅ completado)", "(PROMO)", etc
-      .replace(/\bpromo\b/g, ' ')      // normaliza variante promo/regular del mismo servicio
-      .replace(/\s+/g, ' ').trim();
-    return String(codigo||'').trim().toLowerCase() + '|' + svc + '|' + String(staff||'').trim().toLowerCase();
-  }
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(row[8] || '').toLowerCase();
-    if (estado !== 'completada') continue;
-    
-    // Comparar fecha — puede ser string o Date object
-    let fechaStr = '';
-    if (row[1] instanceof Date) {
-      fechaStr = Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy');
-    } else {
-      fechaStr = String(row[1] || '');
-    }
-    if (fechaStr !== hoy) continue;
-    
-    const tomadaPor = String(row[9] || '').trim();
-    if (params.chica && tomadaPor !== params.chica) continue;
-
-    // Formatear hora de toma
-    let horaToma = '';
-    if (row[10] instanceof Date) {
-      horaToma = Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm');
-    } else {
-      horaToma = String(row[10] || '');
-    }
-    
-    // Formatear hora de cobro
-    let horaCobro = '';
-    if (row[16] instanceof Date) {
-      horaCobro = Utilities.formatDate(row[16], 'America/Guayaquil', 'HH:mm');
-    } else {
-      horaCobro = String(row[16] || '');
     }
 
-    // Calcular comisión individual
-    const area = String(row[6] || '').toLowerCase();
-    const totalCobrado = Number(row[17] || row[12] || 0);
-    const porcentaje = area.includes('facial') ? 0.4 : 0.3;
-    const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
+    // Fallback final: usar datos de _finishingData
+    if (svcsAprobados.length === 0 && Number(data.total) > 0) {
+      svcsAprobados = [{
+        name: data.svcNames || 'Servicio',
+        price: Number(data.total),
+        area: user?.area || ''
+      }];
+    }
 
-    const _cLE = claveSvc(row[3], row[5], tomadaPor);
-    if (clavesDuplicadas.has(_cLE)) continue; // evitar duplicado del mismo servicio
-    clavesDuplicadas.add(_cLE); // registrar para evitar duplicados desde otras fuentes
-    servicios.push({
-      nombre: row[4],
-      codigo: row[3],
-      servicio: row[5],
-      area: row[6],
-      horaToma: horaToma,
-      total: row[17] || row[12] || '0',
-      metodoPago: row[15] || 'Efectivo',
-      tomadaPor: tomadaPor,
-      fecha: fechaStr,
-      promoNombre: row[13] || '',
-      precioRegular: row[14] || '',
-      observaciones: row[11] || '',
-      horaCobro: horaCobro,
-      comision: comision  // Nueva: comisión individual
-    });
-  }
-  
-  // Merge con ServicioNormal (tickets SN- completados hoy)
-  try {
-    const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const dataN = wsN.getDataRange().getValues();
-    for (let i = 1; i < dataN.length; i++) {
-      const row = dataN[i];
-      const id = String(row[0]||'').trim();
-      if (!id.startsWith('SN-')) continue;
-      const estado = String(row[8]||'').toLowerCase();
-      if (estado !== 'completada') continue;
+    // ── PASO 3: Calcular totales ───────────────────────────────────────────────
+    const promoDataFresh = data.clientKey ? (activePromos[data.clientKey] || null) : null;
+    const totalSoloEstaStaff = svcsAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    // Para enganche: sumar partes previas del sheet (Lesly) + esta staff (Laura)
+    let totalPrevioSheet = 0;
+    // Incluir desglose del sheet tanto si es SP como si es SN con SP vinculado
+    if (miTicketSheet?.serviciosDetalle?.length > 0) {
+      totalPrevioSheet = miTicketSheet.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
+    }
+    const totalCombinadoEnganche = totalPrevioSheet + totalSoloEstaStaff;
+    const totalFresh = String(totalCombinadoEnganche > 0 ? totalCombinadoEnganche : (Number(data.total) || 0));
+    const svcNamesFresh = svcsAprobados.map(s => s.name).join(' + ') || data.svcNames || 'Servicio';
+    // precioRegular: para tarjeta = precio normal total (promo compartida usa precios del sheet)
+    let precioRegularFresh = totalFresh;
+    if (promoDataFresh) {
+      precioRegularFresh = String(Number(promoDataFresh.promo.regular || promoDataFresh.promo.price));
+    } else if (miTicketSheet && totalPrevioSheet > 0) {
+      // Promo compartida sin activePromos: usar precioRegular del sheet + precio regular de esta staff
+      const precioRegSheetTotal = Number(miTicketSheet.precioRegular || miTicketSheet.precioNormal || 0);
+      precioRegularFresh = String(precioRegSheetTotal > 0 ? precioRegSheetTotal : totalCombinadoEnganche);
+    }
 
-      let fechaStr = '';
-      if (row[1] instanceof Date) {
-        fechaStr = Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy');
-      } else { fechaStr = String(row[1]||''); }
-      if (fechaStr !== hoy) continue;
+    // ── PASO 4: Construir desglose ─────────────────────────────────────────────
+    const desgloseActual = svcsAprobados.map(s => ({
+      staff: user?.name || '',
+      servicio: s.name,
+      area: s.area || user?.area || '',
+      monto: Number(s.price || 0)
+    }));
 
-      const tomadaPor = String(row[9]||'').trim();
-      if (params.chica && tomadaPor !== params.chica) continue;
+    // Base: desglose del sheet (partes de staffs anteriores) + lo que hay en memoria
+    // SIEMPRE combinar: el sheet guarda partes previas (ej: Lesly), la memoria tiene la actual (Laura)
+    const desgloseAcumulado = [];
 
-      const horaToma  = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10]||'');
-      const horaCobro = row[15] instanceof Date ? Utilities.formatDate(row[15], 'America/Guayaquil', 'HH:mm') : String(row[15]||'');
-      const area = String(row[6]||'').toLowerCase();
-      const totalCobrado = Number(row[16]||row[12]||0);
-      const porcentaje = area.includes('facial') ? 0.4 : 0.3;
-      const comision = Math.round(totalCobrado * porcentaje * 100) / 100;
-
-      const _cN = claveSvc(row[3], row[5], tomadaPor);
-      if (clavesDuplicadas.has(_cN)) continue; // ya agregado desde otra fuente → no duplicar
-      clavesDuplicadas.add(_cN); // registrar para que HistorialOwner no duplique
-      servicios.push({
-        nombre     : String(row[4]||''),
-        codigo     : String(row[3]||''),
-        servicio   : String(row[5]||''),
-        area       : String(row[6]||''),
-        horaToma   : horaToma,
-        total      : row[16]||row[12]||'0',
-        metodoPago : String(row[14]||'Efectivo'),
-        tomadaPor  : tomadaPor,
-        fecha      : fechaStr,
-        promoNombre: '',
-        precioRegular: '',
-        observaciones: String(row[11]||''),
-        horaCobro  : horaCobro,
-        comision   : comision
+    // 1) Agregar partes del sheet primero (staffs anteriores — funciona para SP y SN-enganche)
+    if (miTicketSheet?.serviciosDetalle?.length > 0) {
+      miTicketSheet.serviciosDetalle.forEach(d => {
+        // Fix: servicio puede ser undefined si fue guardado antes del fix
+        if (!d.servicio) d.servicio = d.area || miTicketSheet.promoNombre || 'Servicio';
+        const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
+        if (!yaExiste) desgloseAcumulado.push(d);
       });
     }
-  } catch(e) {}
 
-  // Merge con ServicioPromo (tickets SP- completados hoy)
-  try {
-    const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const dataP = wsP.getDataRange().getValues();
-    for (let i = 1; i < dataP.length; i++) {
-      const row = dataP[i];
-      const id = String(row[0]||'').trim();
-      if (!id.startsWith('SP-')) continue;
-      const estado = String(row[8]||'').toLowerCase();
-      // Mostrar tanto completada (cobrada) como completada-parcial (parte hecha, sigue en otra área)
-      // y 'por cobrar' (última área, esperando pago)
-      if (estado !== 'completada' && estado !== 'completada-parcial' && estado !== 'por cobrar') continue;
-
-      let fechaStr = '';
-      if (row[1] instanceof Date) {
-        fechaStr = Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy');
-      } else { fechaStr = String(row[1]||''); }
-      if (fechaStr !== hoy) continue;
-
-      const tomadaPor = String(row[9]||'').trim();
-      if (params.chica && tomadaPor !== params.chica) continue;
-
-      const horaToma  = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10]||'');
-      const horaCobro = row[15] instanceof Date ? Utilities.formatDate(row[15], 'America/Guayaquil', 'HH:mm') : String(row[15]||'');
-      // Usar col M (precioMiArea) para la comisión de esta staff
-      const precioMiArea = Number(row[12] || 0);
-      const area = String(row[6]||'').toLowerCase();
-      const porcentaje = area.includes('facial') ? 0.4 : 0.3;
-      const comision = Math.round(precioMiArea * porcentaje * 100) / 100;
-
-      const _cSP = claveSvc(row[3], row[5], tomadaPor);
-      if (clavesDuplicadas.has(_cSP)) continue;
-      clavesDuplicadas.add(_cSP); // registrar para que HistorialOwner no duplique
-      servicios.push({
-        nombre     : String(row[4]||''),
-        codigo     : String(row[3]||''),
-        servicio   : String(row[5]||''),
-        area       : String(row[6]||''),
-        horaToma   : horaToma,
-        total      : String(precioMiArea),
-        metodoPago : (estado === 'completada-parcial' || estado === 'por cobrar') ? 'Pendiente cobro' : String(row[14]||'Efectivo'),
-        tomadaPor  : tomadaPor,
-        fecha      : fechaStr,
-        promoNombre: String(row[13]||''),
-        precioRegular: String(Number(row[19]||0)),
-        observaciones: String(row[11]||''),
-        horaCobro  : horaCobro,
-        comision   : comision,
-        tipo       : 'SP'
-      });
-    }
-  } catch(e) {}
-
-  // ── Merge HistorialOwner — tickets TM y SP cobrados hoy ──────────────────
-  try {
-    var wsH  = getSheet('HistorialOwner');
-    var dataH = wsH.getDataRange().getValues();
-    for (var i = 2; i < dataH.length; i++) {
-      var rowH = dataH[i];
-      if (!rowH[0]) continue;
-      var fechaHStr = rowH[0] instanceof Date
-        ? Utilities.formatDate(rowH[0], 'America/Guayaquil', 'dd/MM/yyyy')
-        : String(rowH[0] || '');
-      if (fechaHStr !== hoy) continue;
-      var staffH = String(rowH[7] || '').trim();
-      if (params.chica && staffH !== params.chica) continue;
-      var colE = String(rowH[4] || '').trim();
-      // FIX: deduplicar por fuente.
-      // LE- y SN- → ya vienen del merge de ListaEspera/ServicioNormal → excluir siempre.
-      // SP- → ya vienen del merge de ServicioPromo → excluir siempre.
-      // Solo incluir desde HistorialOwner los tickets TM- (que no tienen merge propio).
-      var esSP   = colE.startsWith('SP-');
-      var esLE_SN = colE.startsWith('LE-') || colE.startsWith('SN-');
-      if (esLE_SN || esSP) continue; // ya aparece por su merge correspondiente
-      var metodoPagoH = String(rowH[10] || '').trim();
-      if (metodoPagoH === 'Pendiente cobro final' || metodoPagoH === 'Pendiente cobro') continue;
-      var horaH = rowH[1] instanceof Date
-        ? Utilities.formatDate(rowH[1], 'America/Guayaquil', 'HH:mm')
-        : String(rowH[1] || '');
-      // FIX: deduplicar — no agregar si ya existe desde ServicioNormal/SP/LE
-      const _cH = claveSvc(rowH[2], rowH[5], staffH);
-      if (clavesDuplicadas.has(_cH)) continue;
-      clavesDuplicadas.add(_cH);
-      servicios.push({
-        nombre      : String(rowH[3] || ''),
-        codigo      : String(rowH[2] || ''),
-        servicio    : String(rowH[5] || ''),
-        area        : String(rowH[6] || ''),
-        horaToma    : horaH,
-        total       : Number(rowH[8] || 0),
-        metodoPago  : metodoPagoH,
-        tomadaPor   : staffH,
-        fecha       : fechaHStr,
-        promoNombre : '',
-        precioRegular: '',
-        observaciones: '',
-        horaCobro   : horaH,
-        comision    : Number(rowH[9] || 0)
-      });
-    }
-  } catch(eTM) {}
-  // ── Fin merge HistorialOwner ────────────────────────────────────────────
-
-  // ── Merge TicketMulti — áreas YA completadas pero el ticket AÚN no cobrado ──
-  // Para que la staff vea su parte apenas la termina, aunque la clienta pase a otra
-  // área y el combo todavía no se haya cobrado. Comisión PROVISIONAL (sobre el monto
-  // del área); se fija definitivamente al cobrar. Los TM ya cobrados quedan en estado
-  // 'Completado' → no entran acá (esos vienen de HistorialOwner, arriba).
-  try {
-    var wsTMh = getTMSheet();
-    var lastTMh = wsTMh.getLastRow();
-    if (lastTMh >= 3) {
-      var dataTMh = wsTMh.getRange(3, 1, lastTMh - 2, 37).getValues();
-      for (var ti = 0; ti < dataTMh.length; ti++) {
-        var rowT = dataTMh[ti];
-        var idT = String(rowT[0] || '').trim();
-        if (!idT.startsWith('TM-')) continue;
-        if (String(rowT[5] || '').toLowerCase() === 'completado') continue; // ya cobrado → HistorialOwner
-        var fechaTStr = rowT[1] instanceof Date
-          ? Utilities.formatDate(rowT[1], 'America/Guayaquil', 'dd/MM/yyyy')
-          : String(rowT[1] || '');
-        if (fechaTStr !== hoy) continue;
-        for (var aTM = 0; aTM < 4; aTM++) {
-          var baseTM = TM_AREA_COL[aTM];
-          var tentTM = String(rowT[baseTM] || '').trim();
-          if (!tentTM) continue;
-          if (String(rowT[baseTM + 3] || '').trim().toLowerCase() !== 'completado') continue; // solo áreas hechas
-          var staffTM = String(rowT[baseTM + 2] || '').trim();
-          if (!staffTM) continue;
-          if (params.chica && staffTM !== params.chica) continue;
-          var areaKeyTM = tentTM.indexOf('||') !== -1 ? tentTM.split('||')[0] : '';
-          var svcTM     = tentTM.indexOf('||') !== -1 ? tentTM.split('||')[1] : tentTM;
-          var precioTM  = Number(rowT[TM_PRECIO_COL[aTM]] || 0);
-          var pctTM     = areaKeyTM.toLowerCase().indexOf('facial') >= 0 ? 0.4 : 0.3;
-          var _cTM = claveSvc(rowT[3], svcTM, staffTM);
-          if (clavesDuplicadas.has(_cTM)) continue;
-          clavesDuplicadas.add(_cTM);
-          servicios.push({
-            nombre        : String(rowT[4] || ''),
-            codigo        : String(rowT[3] || ''),
-            servicio      : svcTM,
-            area          : areaKeyTM,
-            horaToma      : String(rowT[baseTM + 4] || '').trim(),
-            total         : precioTM,
-            metodoPago    : 'Pendiente cobro',
-            tomadaPor     : staffTM,
-            fecha         : fechaTStr,
-            promoNombre   : '',
-            precioRegular : '',
-            observaciones : '',
-            horaCobro     : '',
-            comision      : Math.round(precioTM * pctTM * 100) / 100,
-            pendienteCobro: true
-          });
-        }
-      }
-    }
-  } catch(eTMh) {}
-  // ── Fin merge TicketMulti en progreso ───────────────────────────────────
-
-  return { success: true, servicios: servicios };
-} // fin handleGetServiciosHoy
-
-// ============================================
-// ATENCIONES Y SERVICIOS
-// ============================================
-
-// ============================================================
-// handleGetAtenciones — INCIDENCIA 01 — Lee desde LINEAS
-// Fuente única: getTableroLineas().en_servicio
-// Fallback automático a handleGetAtenciones_LEGACY si Lineas falla
-// Rollback manual: reemplazar handleGetAtenciones por handleGetAtenciones_LEGACY
-//   en el case 'getAtenciones' del doGet
-// Autor: migración LINEAS — 2026-07-07
-// ============================================================
-function handleGetAtenciones(params) {
-  try {
-    // ── LECTURA DESDE LINEAS ─────────────────────────────────────────────
-    var tablero = getTableroLineas();
-    var enServicio = tablero.en_servicio || [];
-
-    if (!Array.isArray(enServicio)) {
-      throw new Error('getTableroLineas no devolvió en_servicio como array');
-    }
-
-    var tz = 'America/Guayaquil';
-    var chicaFiltro = params && params.chica ? String(params.chica).trim() : '';
-    var atenciones = [];
-    var idsAgregados = new Set();
-
-    enServicio.forEach(function(l) {
-      // Filtrar por chica si viene el parámetro
-      if (chicaFiltro && String(l.staff || '').trim() !== chicaFiltro) return;
-
-      // ── Derivar idEspera y areaIdx desde promoRef ──────────────────────
-      // promoRef puede ser: 'TM-372:1', 'SP-240', 'SN-683', 'LE-001'
-      var promoRef = String(l.promoRef || '').trim();
-      var idEspera = promoRef;
-      var areaIdx  = 0;
-      if (promoRef.indexOf(':') >= 0) {
-        var partes = promoRef.split(':');
-        idEspera = partes[0];                          // 'TM-372'
-        areaIdx  = Math.max(0, Number(partes[1] || 1) - 1); // ':1' → idx 0
-      }
-
-      // Deduplicar: para TM, pueden llegar varias líneas del mismo grupo
-      // (una por área). Cada línea tiene promoRef único (TM-372:1, TM-372:2)
-      // pero las mostramos como atenciones separadas (una por área/staff)
-      var claveDedupe = promoRef || (String(l.codigo||'') + '|' + String(l.staff||''));
-      if (idsAgregados.has(claveDedupe)) return;
-      idsAgregados.add(claveDedupe);
-
-      // ── Determinar fuente y tipo desde prefijo ─────────────────────────
-      var prefijo = idEspera.split('-')[0] || '';  // 'TM', 'SP', 'SN', 'LE'
-      var fuente = prefijo === 'TM' ? 'TicketMulti'
-                 : prefijo === 'SP' ? 'ServicioPromo'
-                 : prefijo === 'SN' ? 'ServicioNormal'
-                 : 'ListaEspera';
-
-      // ── promoNombre: condición 8 ───────────────────────────────────────
-      // Para SP y TM: el nombre del combo/promo ES el campo servicio de Lineas
-      // Para SN y LE: no hay promo
-      var esPromoOMulti = (prefijo === 'SP' || prefijo === 'TM');
-      var promoNombre = esPromoOMulti
-        ? (l.promoNombre || l.comboNombre || l.servicio || '')
-        : '';
-
-      // ── Formatear hora de toma ─────────────────────────────────────────
-      var horaToma = '';
-      if (l.horaToma instanceof Date) {
-        horaToma = Utilities.formatDate(l.horaToma, tz, 'HH:mm');
-      } else if (l.horaToma) {
-        horaToma = String(l.horaToma);
-        // Si viene como ISO string, extraer HH:mm
-        if (horaToma.length > 5 && horaToma.indexOf('T') >= 0) {
-          try { horaToma = Utilities.formatDate(new Date(horaToma), tz, 'HH:mm'); } catch(e) {}
-        }
-      } else if (l.hora) {
-        horaToma = String(l.hora);
-      }
-
-      // ── Formatear fecha ────────────────────────────────────────────────
-      var fecha = '';
-      if (l.fecha instanceof Date) {
-        fecha = Utilities.formatDate(l.fecha, tz, 'dd/MM/yyyy');
-      } else {
-        fecha = String(l.fecha || '');
-      }
-
-      // ── observaciones: condición 9 ─────────────────────────────────────
-      // Se enriquece más abajo con datos de Clientas por área
-      var observaciones = String(l.obs || l.observaciones || '');
-
-      atenciones.push({
-        idEspera    : idEspera,
-        fecha       : fecha,
-        horaLlegada : '',          // no en Lineas — no crítico para el panel
-        codigo      : String(l.codigo   || ''),
-        nombre      : String(l.cliente  || ''),
-        servicio    : String(l.servicio || ''),
-        area        : String(l.area     || ''),
-        prioridad   : 'Normal',    // no en Lineas — default seguro
-        tomadaPor   : String(l.staff    || ''),
-        horaToma    : horaToma,
-        observaciones: observaciones,
-        total        : Number(l.monto   || 0),
-        precioPromo  : Number(l.monto   || 0),
-        promoNombre  : promoNombre,
-        precioRegular: Number(l.montoRegular || l.monto || 0),
-        tipo         : prefijo || 'SN',
-        fuente       : fuente,
-        estado       : String(l.estado  || 'en_servicio'),
-        // Campos específicos TM
-        areaIdx                : areaIdx,
-        servicioTentativo      : String(l.servicio || ''),  // confirmado = tentativo en Lineas
-        pendienteConfirmacion  : false  // en_servicio = ya fue tomado y confirmado
-      });
+    // 2) Agregar desglose acumulado en memoria (partes de enganche anteriores parseadas de obs)
+    (window._desgloseAcumulado || []).forEach(d => {
+      const yaExiste = desgloseAcumulado.some(ex => ex.staff === d.staff && ex.servicio === d.servicio);
+      if (!yaExiste) desgloseAcumulado.push(d);
     });
 
-    // ── Enrichment desde Clientas (igual que la versión legacy) ───────────
+    // 3) Agregar el servicio actual de esta staff
+    desgloseActual.forEach(nuevo => {
+      const yaExiste = desgloseAcumulado.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
+      if (!yaExiste) desgloseAcumulado.push(nuevo);
+    });
+
+    // ── PASO 5: Llamar al backend ──────────────────────────────────────────────
+    // Para enganche SN-→SP: usar el SP ticket del desglose si existe, no el SN original
+    const esEngancheSN = !esTicketSP && miTicketSheet && miTicketSheet.idEspera && miTicketSheet.idEspera.startsWith('SP-');
+    let _finResp = null;
     try {
-      var wsC = getSheet('Clientas');
-      var cData = wsC.getDataRange().getValues();
-      atenciones.forEach(function(a) {
-        for (var i = 3; i < cData.length; i++) {
-          if (String(cData[i][0]).trim() !== String(a.codigo).trim()) continue;
-          a.esTop        = String(cData[i][7]  || '').toLowerCase().includes('sí');
-          a.obsGeneral   = String(cData[i][9]  || '');
-          a.obsCejas     = String(cData[i][12] || '');
-          a.obsDepilacion= String(cData[i][13] || '');
-          a.obsPestanas  = String(cData[i][14] || '');
-          a.obsFacial    = String(cData[i][15] || '');
-          // Condición 9: enriquecer observaciones con dato de Clientas si vacío
-          if (!a.observaciones) {
-            var areaLow = String(a.area || '').toLowerCase();
-            a.observaciones = areaLow.includes('ceja')     ? a.obsCejas
-                            : areaLow.includes('depilac')  ? a.obsDepilacion
-                            : areaLow.includes('pesta')    ? a.obsPestanas
-                            : areaLow.includes('facial')   ? a.obsFacial
-                            : a.obsGeneral;
-          }
-          break;
-        }
-      });
-    } catch(eC) {
-      Logger.log('[getAtenciones] enrich Clientas error: ' + eC);
-    }
-
-    // ── AGRUPAR POR CLIENTA: un "ticket madre" por clienta, servicios = subtickets ──
-    // Antes se devolvía una atención por LÍNEA → una clienta con 2 servicios aparecía
-    // dos veces en el panel de la staff y ocupaba 2 slots. Ahora se colapsa por código:
-    // una sola atención con serviciosDetalle[] (los subtickets). El frontend ya sabe
-    // cargar serviciosDetalle en el slot, así que un slot = una clienta.
-    var _porCliente = {}, _orden = [];
-    atenciones.forEach(function (a) {
-      var key = String(a.codigo || a.nombre || a.idEspera || '');
-      if (!_porCliente[key]) { _porCliente[key] = []; _orden.push(key); }
-      _porCliente[key].push(a);
-    });
-    var agrupadas = _orden.map(function (key) {
-      var svs = _porCliente[key];
-      if (svs.length <= 1) return svs[0];   // una sola → igual que antes
-      var base = svs[0];
-      base.serviciosDetalle = svs.map(function (s) {
-        return {
-          servicio: s.servicio, area: s.area,
-          monto: Number(s.total || 0),
-          montoNormal: Number(s.precioRegular || s.total || 0),
-          esPromo: (s.tipo === 'TM' || s.tipo === 'SP')
-        };
-      });
-      // Nombre combinado para la tarjeta, total y regular sumados.
-      base.servicio      = svs.map(function (s) { return s.servicio; }).join(' + ');
-      base.total         = svs.reduce(function (t, s) { return t + Number(s.total || 0); }, 0);
-      base.precioPromo   = base.total;
-      base.precioRegular = svs.reduce(function (t, s) { return t + Number(s.precioRegular || 0); }, 0);
-      base.promoNombre   = '';   // clienta con varios servicios → el front usa serviciosDetalle
-      base._subtickets   = svs.length;
-      return base;
-    });
-
-    Logger.log('[getAtenciones] fuente=LINEAS lineas=' + atenciones.length
-      + ' clientas=' + agrupadas.length
-      + (chicaFiltro ? ' chica=' + chicaFiltro : ''));
-    return { success: true, atenciones: agrupadas };
-
-  } catch(eLn) {
-    // ── FALLBACK AUTOMÁTICO A LEGACY ──────────────────────────────────────
-    Logger.log('[getAtenciones] FALLBACK legacy — error Lineas: ' + eLn);
-    return handleGetAtenciones_LEGACY(params);
-  }
-}
-
-function handleGetAtenciones_LEGACY(params) {
-  // Buscar en ListaEspera las que están "En servicio"
-  const ws = getSheet('ListaEspera');
-  const data = ws.getDataRange().getValues();
-  const atenciones = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(row[8] || '').toLowerCase();
-    if (estado !== 'en servicio' && estado !== 'pendiente-staff') continue;
-    // Excluir tickets atascados con fecha 1899
-    if (row[1] instanceof Date && row[1].getFullYear() < 2000) continue;
-    
-    // Si pidieron filtrar por chica
-    if (params.chica && String(row[9]).trim() !== params.chica) continue;
-    
-    // Formatear horas
-    let horaLlegada = row[2] instanceof Date ? Utilities.formatDate(row[2], 'America/Guayaquil', 'HH:mm') : String(row[2] || '');
-    let horaToma = row[10] instanceof Date ? Utilities.formatDate(row[10], 'America/Guayaquil', 'HH:mm') : String(row[10] || '');
-    
-    atenciones.push({
-      idEspera: id,
-      fecha: row[1] instanceof Date ? Utilities.formatDate(row[1], 'America/Guayaquil', 'dd/MM/yyyy') : String(row[1] || ''),
-      horaLlegada: horaLlegada,
-      codigo: row[3],
-      nombre: row[4],
-      servicio: row[5],
-      area: row[6],
-      prioridad: row[7],
-      tomadaPor: row[9],
-      horaToma: horaToma,
-      observaciones: row[11] || '',
-      total: row[12] || '0',
-      precioPromo: row[12] || '0',  // Agregar este campo explícitamente
-      promoNombre: row[13] || '',
-      precioRegular: row[14] || ''
-    });
-  }
-  
-  // Buscar datos extra de clienta (obs por área, esTop)
-  try {
-    const wsC = getSheet('Clientas');
-    const cData = wsC.getDataRange().getValues();
-    atenciones.forEach(a => {
-      for (let i = 3; i < cData.length; i++) {
-        if (String(cData[i][0]).trim() === String(a.codigo).trim()) {
-          a.esTop = String(cData[i][7] || '').toLowerCase().includes('sí');
-          a.obsGeneral = cData[i][9] || '';
-          a.obsCejas = cData[i][12] || '';
-          a.obsDepilacion = cData[i][13] || '';
-          a.obsPestanas = cData[i][14] || '';
-          a.obsFacial = cData[i][15] || '';
-          break;
-        }
+      if (esTicketSP || esEngancheSN) {
+        const idParaFinalizar = esEngancheSN ? miTicketSheet.idEspera : idEsperaActual;
+        const _spInfo = (typeof PROMOS !== 'undefined' ? PROMOS : []).find(function(p){ return p && p.name === data.promoNombre; });
+        _finResp = await LineaService.finalizarServicio( {
+          idEspera: idParaFinalizar,
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          servicio: svcNamesFresh,
+          total: totalFresh,
+          promoNombre: data.promoNombre || '',
+          precioPromo: _spInfo ? String(_spInfo.price) : '',
+          precioRegular: _spInfo ? String(_spInfo.regular || _spInfo.price) : '',
+          serviciosDetalle: desgloseAcumulado
+        });
+      } else {
+        _finResp = await apiPost('finalizarAtencion', {
+          idEspera: idEsperaActual,
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          clienteCodigo: window._as1Client || '',
+          servicio: svcNamesFresh,
+          total: totalFresh,
+          promoNombre: data.promoNombre,
+          precioRegular: precioRegularFresh,
+          serviciosDetalle: desgloseAcumulado
+        });
       }
-    });
-  } catch(e) {}
+    } catch (err) { console.error('❌ Error en apiPost finalizarServicio:', err); _finResp = null; }
 
-  // Merge con ServicioNormal (tickets SN- en servicio)
-  // FIX: deduplicar por idEspera para evitar mostrar el mismo ticket dos veces
-  const idsYaAgregados = new Set(atenciones.map(a => a.idEspera));
-  try {
-    const snR = handleGetServicioNormal(params || {});
-    if (snR.success && snR.enServicio) {
-      snR.enServicio.forEach(sn => {
-        if (params && params.chica && sn.tomadaPor !== params.chica) return;
-        if (idsYaAgregados.has(sn.idEspera)) return; // ya está desde ListaEspera
-        idsYaAgregados.add(sn.idEspera);
-        atenciones.push({
-          idEspera    : sn.idEspera,
-          fecha       : sn.fecha,
-          horaLlegada : sn.horaLlegada,
-          codigo      : sn.codigo,
-          nombre      : sn.nombre,
-          servicio    : sn.servicio,
-          area        : sn.area,
-          prioridad   : sn.prioridad || 'Normal',
-          tomadaPor   : sn.tomadaPor,
-          horaToma    : sn.horaTomada || '',
-          observaciones: sn.observaciones || '',
-          total       : sn.total || '0',
-          precioPromo : sn.precioPromo || sn.total || '0',
-          promoNombre : sn.promoNombre || '',
-          precioRegular: sn.precioNormal || sn.total || '0',
-          tipo        : sn.tipo || 'SN',
-          fuente      : 'ServicioNormal'
-        });
-      });
-    }
-  } catch(e) {}
-
-  // Merge con ServicioPromo (tickets SP- en servicio)
-  try {
-    const spR = handleGetServicioPromo(params || {});
-    if (spR.success && spR.enServicio) {
-      spR.enServicio.forEach(function(sp) {
-        if (params && params.chica && sp.tomadaPor !== params.chica) return;
-        if (String(sp.estado || '').toLowerCase() === 'por cobrar') return;
-        if (idsYaAgregados.has(sp.idEspera)) return; // deduplicar
-        idsYaAgregados.add(sp.idEspera);
-        atenciones.push({
-          idEspera    : sp.idEspera,
-          fecha       : sp.fecha,
-          horaLlegada : sp.horaLlegada,
-          codigo      : sp.codigo,
-          nombre      : sp.nombre,
-          servicio    : sp.servicio,
-          area        : sp.area,
-          prioridad   : sp.prioridad || 'Normal',
-          tomadaPor   : sp.tomadaPor,
-          horaToma    : sp.horaTomada || '',
-          observaciones: sp.observaciones || '',
-          total       : sp.total || '0',
-          precioPromo : sp.precioPromo || sp.total || '0',
-          promoNombre : sp.promoNombre || '',
-          precioRegular: sp.precioNormal || sp.total || '0',
-          tipo        : sp.tipo || 'SP',
-          fuente      : 'ServicioPromo',
-          pendienteConfirmacion: false
-        });
-      });
-    }
-  } catch(e) {}
-
-  // Merge con TicketMulti — mostrar áreas asignadas a esta staff
-  try {
-    const chicaFiltroTM = (params && params.chica) ? String(params.chica) : '';
-    const tmR = handleGetTicketMulti({ chica: chicaFiltroTM });
-    if (tmR.success) {
-      tmR.activos.forEach(function(tm) {
-        (tm.areas || []).forEach(function(a) {
-          if (chicaFiltroTM && a.staff !== chicaFiltroTM) return;
-          // Solo áreas realmente EN SERVICIO (ya tomadas por la staff).
-          // Un área asignada por Mikaela pero aún en 'Esperando' se ve en la
-          // lista de espera de la staff para tomarla — NO como "en atención".
-          if (String(a.estado || '').toLowerCase() !== 'en servicio') return;
-          atenciones.push({
-            idEspera:  tm.idEspera,
-            codigo:    tm.codigo,
-            nombre:    tm.nombre,
-            servicio:  a.confirmado || a.tentativo,
-            servicioTentativo: a.tentativo,
-            area:      a.area || 'multi',
-            tomadaPor: a.staff,
-            total:     a.precio,
-            estado:    a.estado,
-            horaToma:  a.hora,
-            areaIdx:   a.idx,
-            fuente:    'TicketMulti',
-            pendienteConfirmacion: !a.confirmado
-          });
-        });
-      });
-    }
-  } catch(e) {}
-
-  return { success: true, atenciones: atenciones };
-}
-
-function handleAddAtencion(data) {
-  const ws = getSheet('Atenciones');
-  const lastRow = ws.getLastRow();
-  const lastId = lastRow > 3 ? ws.getRange(lastRow, 1).getValue() : 'AT-0000';
-  const nextNum = parseInt(String(lastId).replace('AT-', '')) + 1;
-  const id = 'AT-' + String(nextNum).padStart(4, '0');
-
-  const now = new Date();
-  const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const hora = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-
-  // Columnas: A=ID | B=Fecha | C=HoraEntrada | D=HoraSalida | E=Código | F=Cliente | G=Staff | H=Servicio | I=Estado | J=Total | K=MetodoPago | L=idEspera
-  ws.appendRow([
-    id,              // A: ID
-    fecha,           // B: Fecha
-    hora,            // C: Hora entrada
-    '',              // D: Hora salida (se llena al finalizar)
-    data.codigo,     // E: Código cliente
-    data.nombre,     // F: Cliente
-    data.chica,      // G: Staff
-    data.servicio || '', // H: Servicio
-    'En servicio',   // I: Estado
-    '',              // J: Total (se llena al finalizar)
-    '',              // K: Método pago (se llena al cobrar)
-    data.idEspera || '' // L: ID del ticket ListaEspera (para cruzar)
-  ]);
-
-  return { success: true, idAtencion: id };
-}
-
-// Actualiza el registro en Atenciones al finalizar/cobrar
-// Busca por idEspera (col L) o por cliente+staff+fecha si no hay idEspera
-function cerrarAtencion(idEspera, chicaNombre, clienteNombre, servicio, total, metodoPago, nuevoEstado) {
-  try {
-    const ws = getSheet('Atenciones');
-    const data = ws.getDataRange().getValues();
-    const hoy = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-    const horaSalida = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-
-    for (let i = 3; i < data.length; i++) {
-      const rowIdEspera = String(data[i][11] || '').trim(); // col L = idEspera
-      const rowStaff = String(data[i][6] || '').trim();     // col G = Staff
-      const rowCliente = String(data[i][5] || '').trim();   // col F = Cliente
-      const rowFecha = String(data[i][1] || '').trim();     // col B = Fecha
-      const rowEstado = String(data[i][8] || '').trim();    // col I = Estado
-
-      if (rowEstado === 'Finalizado' || rowEstado === 'Completado') continue;
-
-      // Match por idEspera primero, luego fallback por cliente+staff+fecha
-      const matchId = idEspera && rowIdEspera === String(idEspera).trim();
-      const matchFallback = rowStaff === chicaNombre && rowCliente === clienteNombre && rowFecha === hoy;
-
-      if (!matchId && !matchFallback) continue;
-
-      const row = i + 1;
-      if (horaSalida) ws.getRange(row, 4).setValue(horaSalida);  // D: Hora salida
-      if (servicio)   ws.getRange(row, 8).setValue(servicio);    // H: Servicio final
-      ws.getRange(row, 9).setValue(nuevoEstado || 'Finalizado'); // I: Estado
-      if (total)      ws.getRange(row, 10).setValue(total);      // J: Total
-      if (metodoPago) ws.getRange(row, 11).setValue(metodoPago); // K: Método pago
+    // ── VALIDACIÓN: si el backend NO confirmó el envío, NO limpiar ni mostrar éxito ──
+    // (antes el alert de éxito salía SIEMPRE y la clienta desaparecía de la pantalla sin haberse enviado)
+    if (!_finResp || !_finResp.success) {
+      const _msg = (_finResp && _finResp.message) ? _finResp.message : 'no se pudo conectar con el servidor';
+      alert('⚠️ NO se pudo enviar la clienta a cobro.\n\nMotivo: ' + _msg + '.\n\nLa clienta sigue en tu pantalla — volvé a tocar "Finalizar servicio". Si sigue fallando, avisá a Mikaela.');
       return;
     }
-  } catch(e) { /* no bloquear flujo principal */ }
-}
 
-function handleAddServicio(data) {
-  const ws = getSheet('Servicios');
-  const lastRow = ws.getLastRow();
-  const lastId = lastRow > 3 ? ws.getRange(lastRow, 1).getValue() : 'SV-0000';
-  const nextNum = parseInt(String(lastId).replace('SV-', '')) + 1;
-  const id = 'SV-' + String(nextNum).padStart(4, '0');
-
-  const now = new Date();
-  const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const hora = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-
-  ws.appendRow([
-    id, data.idAtencion, data.codigoServicio, data.servicio, data.precio,
-    data.chica, fecha, hora, data.esPromo || 'No', data.idPromo || '', data.esRetiroNuestro || ''
-  ]);
-
-  // Actualizar comisiones
-  updateComision(data.chica, data.precio);
-
-  return { success: true, idServicio: id };
-}
-
-function handleFinalizarServicio(data) {
-  const ws = getSheet('Atenciones');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    if (allData[i][0] === data.idAtencion) {
-      const row = i + 1;
-      const now = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-      ws.getRange(row, 7).setValue('Finalizado');
-      ws.getRange(row, 8).setValue(now);
-      ws.getRange(row, 9).setValue(data.metodoPago || 'Efectivo');
-      ws.getRange(row, 10).setValue(data.totalCobrado || 0);
-
-      // Actualizar visita de la clienta
-      updateVisitaClienta(allData[i][1]);
-
-      // Guardar en historial del Owner
-      addHistorialOwner(allData[i], data);
-
-      return { success: true };
+    // ── LIMPIEZA: el backend confirmó el envío, ahora sí limpiar el slot ──
+    if (activePromos[data.clientName]) delete activePromos[data.clientName];
+    if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
+    window._as1IdEspera = '';
+    window._as1Client = '';
+    window._finishingData = null;
+    window._desgloseAcumulado = [];
+    slotServices[slot] = [];
+    if (user && activeClients[user.name]) {
+      activeClients[user.name] = (activeClients[user.name] || []).filter((_, i) => i !== slot - 1);
+      updateCapacityUI(user.name);
     }
-  }
-  return { success: false };
-}
+    saveActivePromos();
 
-// ============================================
-// COMISIONES
-// ============================================
-function handleGetComisiones(params) {
-  const ws = getSheet('Comisiones');
-  const data = ws.getDataRange().getValues();
-  const comisiones = [];
-
-  // Columnas: A=Chica | B=Área | C=Servicios | D=Facturado | E=% Comisión | F=Comisión a pagar
-  // Datos desde fila 4 (indice 3) - fila 3 son encabezados
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    if (params && params.chica && String(row[0]).trim() !== params.chica) continue;
-    // FIX: forzar números para evitar que Sheets devuelva fechas cuando el formato está mal
-    const _facturado = row[3] instanceof Date ? 0 : Number(row[3]) || 0;
-    let _comision  = row[5] instanceof Date ? 0 : Number(row[5]) || 0;
-    // FIX: si la comisión llega en 0 (celda con formato de fecha o vacía) pero hay facturado,
-    // recalcularla desde el % / área para no mostrar el valor a pagar en blanco.
-    if (_comision === 0 && _facturado > 0) {
-      const _areaStr = String(row[1] || '').toLowerCase();
-      const _pctStr  = String(row[4] || '');
-      const _pct = (_areaStr.includes('facial') || _pctStr.includes('40')) ? 0.4 : 0.3;
-      _comision = Math.round(_facturado * _pct * 100) / 100;
-    }
-    comisiones.push({
-      chica: row[0],
-      area: row[1],
-      servicios: Number(row[2]) || 0,
-      facturado: _facturado,
-      porcentaje: row[4],
-      comision: _comision
-    });
-  }
-  return { success: true, comisiones: comisiones };
-}
-
-function updateComision(chicaNombre, precio) {
-  const ws = getSheet('Comisiones');
-  const data = ws.getDataRange().getValues();
-  const precioNum = Number(precio) || 0;
-  if (precioNum <= 0) return;
-
-  // FIX: i=3 — María está en fila 4 (índice 3), i=4 la saltaba
-  for (let i = 3; i < data.length; i++) {
-    if (String(data[i][0]).trim() === chicaNombre) {
-      const row = i + 1;
-      const servicios = (Number(data[i][2]) || 0) + 1;
-      const facturado = (Number(data[i][3]) || 0) + precioNum;
-      
-      // Determinar porcentaje: 40% si el área dice Facial, sino 30%
-      const areaStr = String(data[i][1] || '').toLowerCase();
-      const pctStr = String(data[i][4] || '');
-      let pct = 0.3;
-      if (areaStr.includes('facial') || pctStr.includes('40')) {
-        pct = 0.4;
-      }
-      const comision = facturado * pct;
-
-      ws.getRange(row, 3).setNumberFormat('0').setValue(servicios);
-      ws.getRange(row, 4).setNumberFormat('0.00').setValue(facturado);
-      ws.getRange(row, 6).setNumberFormat('0.00').setValue(Math.round(comision * 100) / 100);
+    // Si había depilación compartida, crear ticket con las partes restantes
+    if (window._depiRestPending && window._depiRestPending.length > 0) {
+      const restNames = window._depiRestPending.map(i => i.nombre).join(' + ');
+      const restTotal = window._depiRestPending.reduce((s, i) => s + Number(i.precio || 0), 0);
+      const obsDepi = `✅ ${data.svcNames} completado por ${user?.name || 'Staff'} · Pendiente: ${restNames}`;
+      try {
+        await apiPost('continuarPromoALista', {
+          idEspera: idEsperaActual || '',
+          chicaNombre: user?.name || '',
+          clienteNombre: data.clientName,
+          servicio: restNames,
+          total: String(restTotal),
+          promoNombre: data.promoNombre || '',
+          precioRegular: data.precioRegular || String(restTotal),
+          areaCompletada: 'depilacion',
+          areasFaltantes: restNames,
+          nuevaArea: 'depilacion',
+          montoSiguienteArea: String(restTotal),
+          servicioActualizado: obsDepi
+        });
+      } catch(e) { console.error(e); }
+      window._depiRestPending = [];
+      show('staffHome');
+      await new Promise(r => setTimeout(r, 300));
+      loadStaffHome();
+      alert(`✓ Tu parte lista. ${restNames} quedó en lista de espera para otra staff.`);
       return;
     }
-  }
-}
 
-// ============================================
-// SINCRONIZAR SERVICIOS EN ATENCIÓN
-// Cuando la chica agrega/modifica/quita servicios, se actualiza en ListaEspera
-// para que Mikaela vea en tiempo real qué servicios tiene la clienta
-// ============================================
-// Categoría de un área de slot TM para emparejar con la división del combo nuevo.
-function _catSlotTM(areaKey) {
-  var a = String(areaKey || '').toLowerCase();
-  if (a.indexOf('pest') >= 0) return 'pestanas';
-  if (a.indexOf('facial') >= 0) return 'facial';
-  return 'cejas'; // cejas, depilacion, bigote, retiro, lifting, pigmento → categoría cejas
-}
-
-function handleUpdateServiciosAtencion(data) {
-  // ── DEDUP defensivo del string de servicios: evita "A + B + B + A" si llega duplicado
-  // desde cualquier vía. No toca el total (ese ya viene correcto del frontend).
-  if (data && data.servicios) {
-    var _seenSv = {}, _outSv = [];
-    String(data.servicios).split(' + ').forEach(function(p) {
-      var t = String(p).trim(); if (!t) return;
-      var k = t.toLowerCase(); if (_seenSv[k]) return; _seenSv[k] = true; _outSv.push(t);
-    });
-    data.servicios = _outSv.join(' + ');
-  }
-  // espejo Lineas: reflejar el cambio de servicio / aplicar promo en la línea de esa staff.
-  // Matchea por idEspera/promoRef o código+staff → cubre SN, SP y TM (donde estaba el hueco).
-  try { lineaActualizarPorCambio(data); } catch (eLn) { Logger.log('espejo cambio Lineas: ' + eLn); }
-  // Intentar primero en ServicioNormal (tickets SN-)
-  try {
-    const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const rowsN = wsN.getDataRange().getValues();
-    for (let i = 1; i < rowsN.length; i++) {
-      const id     = String(rowsN[i][0]||'').trim();
-      const estado = String(rowsN[i][8]||'').toLowerCase();
-      const tomada = String(rowsN[i][9]||'').trim();
-      const nombre = String(rowsN[i][4]||'').trim();
-      const codigo = String(rowsN[i][3]||'').trim();
-      const matchId = data.idEspera && id === String(data.idEspera).trim();
-      const matchN = nombre === data.clienteNombre;
-      const matchC = data.clienteCodigo && codigo === String(data.clienteCodigo).trim();
-      if (id.startsWith('SN-') && estado === 'en servicio' && (matchId || (tomada === data.chicaNombre && (matchN || matchC)))) {
-        const row = i + 1;
-        const bwN = _batchWriter_(wsN);
-        bwN.set(row, 6,  data.servicios || '');
-        bwN.set(row, 13, data.total || '0');
-        if (data.promoNombre) {
-          bwN.set(row, 14, data.promoNombre);
-          bwN.set(row, 19, 'SP');
-          bwN.set(row, 20, Number(data.precioRegular || data.total || 0));
-          bwN.set(row, 21, Number(data.precioPromo   || data.total || 0));
-        } else {
-          bwN.set(row, 19, 'SN');
-          bwN.set(row, 20, Number(data.total || 0));
-          bwN.set(row, 21, '');
-        }
-        bwN.flush();
-        return { success: true };
-      }
-    }
-  } catch(eN) {}
-
-  // Intentar en ServicioPromo (tickets SP-)
-  try {
-    const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const rowsP = wsP.getDataRange().getValues();
-    for (let i = 1; i < rowsP.length; i++) {
-      const id     = String(rowsP[i][0]||'').trim();
-      const estado = String(rowsP[i][8]||'').toLowerCase();
-      const tomada = String(rowsP[i][9]||'').trim();
-      const nombre = String(rowsP[i][4]||'').trim();
-      const codigo = String(rowsP[i][3]||'').trim();
-      const matchId = data.idEspera && id === String(data.idEspera).trim();
-      const matchN  = nombre === data.clienteNombre;
-      const matchC  = data.clienteCodigo && codigo === String(data.clienteCodigo).trim();
-      if (id.startsWith('SP-') && estado === 'en servicio' && (matchId || (tomada === data.chicaNombre && (matchN || matchC)))) {
-        const row = i + 1;
-        const bwP = _batchWriter_(wsP);
-        bwP.set(row, 6,  data.servicios || '');
-        bwP.set(row, 13, data.total || '0');
-        if (data.promoNombre) {
-          bwP.set(row, 14, data.promoNombre);
-          bwP.set(row, 19, 'SP');
-          bwP.set(row, 20, Number(data.precioRegular || data.total || 0));
-          bwP.set(row, 21, Number(data.precioPromo   || data.total || 0));
-        } else {
-          bwP.set(row, 19, data.tipo || 'SP');
-          bwP.set(row, 20, Number(data.total || 0));
-        }
-        bwP.flush();
-        return { success: true };
-      }
-    }
-  } catch(eP) {}
-
-  // Intentar en TicketMulti (tickets TM-)
-  try {
-    const wsTM = getTMSheet();
-    const rowsTM = wsTM.getRange(3, 1, Math.max(1, wsTM.getLastRow() - 2), 37).getValues();
-    for (let i = 0; i < rowsTM.length; i++) {
-      const tmId = String(rowsTM[i][0] || '').trim();
-      if (!tmId.startsWith('TM-')) continue;
-      const matchId = data.idEspera && tmId === String(data.idEspera).trim();
-      const tmNombre = String(rowsTM[i][2] || '').trim();
-      const matchN = tmNombre === data.clienteNombre;
-      if (!matchId && !matchN) continue;
-
-      // Encontrar el área de esta staff en el TM y actualizar tentativo + precio
-      const rowNum = i + 3;
-      for (let a = 0; a < 4; a++) {
-        const base = TM_AREA_COL[a];
-        const tent = String(rowsTM[i][base] || '').trim();
-        const staffEnArea = String(rowsTM[i][base + 2] || '').trim();
-        const estadoArea = String(rowsTM[i][base + 3] || '').toLowerCase();
-        if (!tent) continue;
-        if (staffEnArea === data.chicaNombre && estadoArea === 'en servicio') {
-          // Actualizar tentativo: mantener el prefijo "area||" y actualizar el servicio
-          const tentParts = tent.split('||');
-          const areaPrefix = tentParts[0] || '';
-          const newTent = areaPrefix + '||' + (data.servicios || tentParts[1] || tent);
-          wsTM.getRange(rowNum, base + 1).setValue(newTent); // col base (0-indexed) = base+1 (1-indexed)
-          // Actualizar precio en TM_PRECIO_COL
-          const aIdx = TM_AREA_COL.indexOf(base);
-          if (aIdx >= 0) wsTM.getRange(rowNum, TM_PRECIO_COL[aIdx] + 1).setValue(Number(data.total || 0));
-          // reflejar en memoria para el recálculo de totales
-          rowsTM[i][base] = newTent;
-          if (aIdx >= 0) rowsTM[i][TM_PRECIO_COL[aIdx]] = Number(data.total || 0);
-
-          // ── PROPAGAR el cambio de combo a las OTRAS áreas del ticket ─────────
-          // Al cambiar a una promo nueva, las otras áreas del ticket deben reflejar el
-          // combo NUEVO:
-          //   • si el combo nuevo INCLUYE esa área → ACTUALIZAR nombre + precio nuevos
-          //     (así la otra staff —ej. María en cejas— ve el combo correcto, no el viejo).
-          //   • si NO la incluye → CANCELAR (huérfana).
-          // Nunca se toca un área ya tomada/en servicio/completada (se protege el trabajo).
-          // data.promoDivision: [{cat:'cejas'|'pestanas'|'facial', servicio, monto}]
-          let _divNueva = [];
-          try { _divNueva = JSON.parse(String(data.promoDivision || '[]')); } catch (eD) { _divNueva = []; }
-          const _comboNuevo = String(data.promoNombre || data.servicios || '').trim();
-          const _nuevasAreas = String(data.promoAreas || '')
-            .toLowerCase().split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-          // pool de entradas del combo nuevo (se consumen 1 a 1 por categoría para no duplicar)
-          const _pool = (Array.isArray(_divNueva) ? _divNueva : []).map(function (d) {
-            return { cat: String(d.cat || '').toLowerCase(), servicio: String(d.servicio || ''), monto: Number(d.monto || 0), usada: false };
-          });
-          for (let b2 = 0; b2 < 4; b2++) {
-            const base2 = TM_AREA_COL[b2];
-            if (base2 === base) continue;                       // no tocar la propia
-            const tent2 = String(rowsTM[i][base2] || '').trim();
-            if (!tent2) continue;                               // área vacía
-            const estado2 = String(rowsTM[i][base2 + 3] || '').toLowerCase();
-            const pendiente = (estado2 === '' || estado2 === 'esperando' || estado2 === 'espera' || estado2 === 'pendiente');
-            if (!pendiente) continue;                           // proteger trabajo ya tomado/en curso
-            const areaKey2 = (tent2.split('||')[0] || '');
-            const cat2 = _catSlotTM(areaKey2);
-            // buscar una entrada NO usada del combo nuevo con esa categoría
-            let _match = null;
-            for (let p = 0; p < _pool.length; p++) {
-              if (!_pool[p].usada && _pool[p].cat === cat2) { _match = _pool[p]; _pool[p].usada = true; break; }
-            }
-            if (_match) {
-              // el combo nuevo incluye esta área → ACTUALIZAR al combo nuevo
-              const _nuevoTent = areaKey2 + '||' + (_comboNuevo || _match.servicio || (tent2.split('||')[1] || ''));
-              wsTM.getRange(rowNum, base2 + 1).setValue(_nuevoTent);
-              wsTM.getRange(rowNum, TM_PRECIO_COL[b2] + 1).setValue(Number(_match.monto || 0));
-              rowsTM[i][base2] = _nuevoTent;
-              rowsTM[i][TM_PRECIO_COL[b2]] = Number(_match.monto || 0);
-            } else if (_pool.length === 0 && _nuevasAreas.length && _nuevasAreas.indexOf((tent2.split('||')[0] || '').toLowerCase()) >= 0) {
-              // fallback (frontend viejo sin división): el área está en la promo nueva → no tocar
-              continue;
-            } else {
-              // el combo nuevo NO incluye esta área → CANCELAR (huérfana)
-              wsTM.getRange(rowNum, base2 + 1).setValue('');
-              wsTM.getRange(rowNum, base2 + 3 + 1).setValue('Cancelado');
-              wsTM.getRange(rowNum, TM_PRECIO_COL[b2] + 1).setValue(0);
-              rowsTM[i][base2] = '';
-              rowsTM[i][base2 + 3] = 'Cancelado';
-              rowsTM[i][TM_PRECIO_COL[b2]] = 0;
-              try { anularLineaSlotTM(tmId, b2); } catch (eAnu) { Logger.log('anular slot TM Lineas: ' + eAnu); }
-            }
-          }
-
-          // ── Recalcular totales del ticket (solo áreas NO canceladas) ──
-          let _normalArr = [];
-          try { _normalArr = JSON.parse(String(rowsTM[i][36] || '[]')); } catch (eA) { _normalArr = []; }
-          let _sumPromo = 0, _sumNormal = 0;
-          for (let b3 = 0; b3 < 4; b3++) {
-            const base3 = TM_AREA_COL[b3];
-            const tent3 = String(rowsTM[i][base3] || '').trim();
-            const est3  = String(rowsTM[i][base3 + 3] || '').toLowerCase();
-            if (!tent3 || est3 === 'cancelado') continue;
-            const pPromo = Number(rowsTM[i][TM_PRECIO_COL[b3]] || 0);
-            let pNormal;
-            if (base3 === base) pNormal = Number(data.precioRegular || data.total || pPromo);
-            else if (Array.isArray(_normalArr) && _normalArr[b3] !== undefined && Number(_normalArr[b3]) > 0) pNormal = Number(_normalArr[b3]);
-            else pNormal = pPromo;
-            _sumPromo  += pPromo;
-            _sumNormal += pNormal;
-          }
-          wsTM.getRange(rowNum, 35).setValue(Math.round(Math.max(_sumNormal, _sumPromo) * 100) / 100); // row[34]=totalNormalTM (1-idx 35)
-          wsTM.getRange(rowNum, 36).setValue(Math.round(_sumPromo * 100) / 100);                       // row[35]=totalPromoTM  (1-idx 36)
-
-          return { success: true };
-        }
-      }
-    }
-  } catch(eTM) {}
-
-  // Fallback: buscar en ListaEspera (tickets LE-)
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 3; i < allData.length; i++) {
-    const id = String(allData[i][0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    const estado = String(allData[i][8] || '').toLowerCase();
-    const tomadaPor = String(allData[i][9] || '').trim();
-    const nombre = String(allData[i][4] || '').trim();
-
-    const codigoRow3 = String(allData[i][3] || '').trim();
-    const matchN3 = nombre === data.clienteNombre;
-    const matchC3 = data.clienteCodigo && codigoRow3 === String(data.clienteCodigo).trim();
-    if (estado === 'en servicio' && tomadaPor === data.chicaNombre && (matchN3 || matchC3)) {
-      const row = i + 1;
-      ws.getRange(row, 6).setValue(data.servicios || '');
-      ws.getRange(row, 13).setValue(data.total || '0');
-      return { success: true };
-    }
-  }
-  return { success: false, message: 'Atención no encontrada' };
-}
-
-// ============================================
-// DEVOLVER CLIENTA A LISTA DE ESPERA
-// ============================================
-function handleDevolverALista(data) {
-  const id      = String(data.idEspera || '').trim();
-  const chica   = String(data.chicaNombre || '').trim();
-  const cliente = String(data.clienteNombre || '').trim();
-  const motivo  = data.motivo || '';
-
-  // Revertir una fila de ServicioNormal/ServicioPromo a "Esperando"
-  function revertirServicio(sheetName, cols) {
-    const ws = getOrCreateSheet(sheetName, cols);
-    const rows = ws.getDataRange().getValues();
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() !== id) continue;
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (estado !== 'en servicio') return { success: false, message: 'La clienta ya no está en servicio.' };
-      const row = i + 1;
-      ws.getRange(row, 9).setValue('Esperando');  // I: Estado
-      ws.getRange(row, 10).setValue('');           // J: Tomada por
-      ws.getRange(row, 11).setValue('');           // K: Hora toma
-      if (motivo) {
-        const obs = String(rows[i][11] || '');
-        ws.getRange(row, 12).setValue((obs ? obs + ' | ' : '') + 'Devuelta por ' + chica + ': ' + motivo);
-      }
-      // espejo Lineas: la línea vuelve a 'esperando' y se libera el staff (id = SP-/SN- = promoRef exacto)
-      try { revertirLineaAEsperaPorCodigo(String(rows[i][3] || ''), id, '', ''); } catch (eLn) { Logger.log('espejo devolver Lineas: ' + eLn); }
-      cerrarAtencion(id, chica, cliente, '', '', '', 'Devuelto');
-      return { success: true };
-    }
-    return { success: false, message: 'Ticket no encontrado.' };
-  }
-
-  if (id.indexOf('SN-') === 0) return revertirServicio('ServicioNormal', COLS_NORMAL);
-  if (id.indexOf('SP-') === 0) return revertirServicio('ServicioPromo',  COLS_PROMO);
-
-  // Ticket multi: devolver el área que esta staff tiene en servicio
-  if (id.indexOf('TM-') === 0) {
-    const ws = getTMSheet();
-    const last = ws.getLastRow();
-    if (last < 3) return { success: false, message: 'Ticket no encontrado.' };
-    const rows = ws.getRange(3, 1, last - 2, 37).getValues();
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== id) continue;
-      const rowNum = i + 3;
-      for (let a = 0; a < 4; a++) {
-        const base = TM_AREA_COL[a];
-        const staffArea  = String(rows[i][base + 2] || '').trim();
-        const estadoArea = String(rows[i][base + 3] || '').toLowerCase().trim();
-        if (staffArea === chica && estadoArea === 'en servicio') {
-          ws.getRange(rowNum, base + 3 + 1).setValue('Esperando'); // estado
-          ws.getRange(rowNum, base + 2 + 1).setValue('');          // staff
-          ws.getRange(rowNum, base + 4 + 1).setValue('');          // hora toma
-          // espejo Lineas: revertir la línea del área devuelta (match por código + área)
-          try { revertirLineaAEsperaPorCodigo(String(rows[i][3] || ''), '', String(rows[i][base] || '').split('||')[0].toLowerCase(), ''); } catch (eLn) { Logger.log('espejo devolver Lineas: ' + eLn); }
-          cerrarAtencion(id, chica, cliente, '', '', '', 'Devuelto');
-          return { success: true };
-        }
-      }
-      return { success: false, message: 'No tenés un área en servicio en este ticket.' };
-    }
-    return { success: false, message: 'Ticket no encontrado.' };
-  }
-
-  // ListaEspera (LE-) — match por id si viene, si no por estado+chica+nombre
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-  for (let i = 3; i < allData.length; i++) {
-    const rid = String(allData[i][0] || '').trim();
-    if (!rid.startsWith('LE-')) continue;
-    const estado = String(allData[i][8] || '').toLowerCase();
-    const tomadaPor = String(allData[i][9] || '').trim();
-    const nombre = String(allData[i][4] || '').trim();
-    const matchId = id && rid === id;
-    const matchFallback = !id && estado === 'en servicio' && tomadaPor === chica && nombre === cliente;
-    if (!(matchId || matchFallback)) continue;
-    if (estado !== 'en servicio') return { success: false, message: 'La clienta ya no está en servicio.' };
-    const row = i + 1;
-    ws.getRange(row, 9).setValue('Esperando');
-    ws.getRange(row, 10).setValue('');
-    ws.getRange(row, 11).setValue('');
-    if (motivo) {
-      const obsActual = String(allData[i][11] || '');
-      ws.getRange(row, 12).setValue((obsActual ? obsActual + ' | ' : '') + 'Devuelta por ' + chica + ': ' + motivo);
-    }
-    // espejo Lineas: revertir la línea a 'esperando' (match por código + área de la fila LE-)
-    try { revertirLineaAEsperaPorCodigo(String(allData[i][3] || ''), '', String(allData[i][6] || '').toLowerCase(), ''); } catch (eLn) { Logger.log('espejo devolver Lineas: ' + eLn); }
-    cerrarAtencion(id, chica, cliente, '', '', '', 'Devuelto');
-    return { success: true };
-  }
-  return { success: false, message: 'Atención no encontrada' };
-}
-
-// ============================================
-// FICHAS DE PESTAÑAS
-// ============================================
-function handleGetPerfilFichas(params) {
-  var codigo = String(params.codigo || '').trim();
-  var fichasPestanas = [], fichaFacial = null, historialFacial = [], fichasPigmento = [];
-  try { var p = handleGetFichaPestanas({ codigo: codigo });      if (p && p.fichas)     fichasPestanas  = p.fichas; } catch (e) {}
-  try { var f = handleGetFichaFacial({ codigo: codigo });        if (f && f.ficha)      fichaFacial     = f.ficha; } catch (e) {}
-  try { var h = handleGetHistorialFacial({ codigo: codigo });    if (h && h.historial)  historialFacial = h.historial; } catch (e) {}
-  try { var g = handleGetFichaCejasPigmento({ codigo: codigo }); if (g && g.fichas)     fichasPigmento  = g.fichas; } catch (e) {}
-  return { success: true, fichasPestanas: fichasPestanas, fichaFacial: fichaFacial, historialFacial: historialFacial, fichasPigmento: fichasPigmento };
-}
-
-function handleGetFichaPestanas(params) {
-  const ws = getSheet('FichaPestanas');
-  const data = ws.getDataRange().getValues();
-  const fichas = [];
-
-  for (let i = 2; i < data.length; i++) {
-    const row = data[i];
-    if (String(row[0]).trim() === String(params.codigo).trim()) {
-      fichas.push({
-        nroFicha: row[2],
-        modelo: row[3],
-        diseno: row[4],
-        tallas: row[5],
-        obs: row[6],
-        fecha: row[7],
-        activa: String(row[8]).toLowerCase() === 'sí'
-      });
-    }
-  }
-  // Última visita de pestañas (servicio + staff + fecha) desde HistorialOwner — para mostrarla en atención
-  var ultimaVisita = null;
-  try {
-    var wsH = getSheet('HistorialOwner');
-    var dataH = wsH.getDataRange().getValues();
-    for (var k = dataH.length - 1; k >= 3; k--) {
-      var areaH = String(dataH[k][6] || '').toLowerCase();
-      if (String(dataH[k][2] || '').trim() === String(params.codigo).trim() && areaH.indexOf('pesta') >= 0) {
-        var fv = dataH[k][0], fStr;
-        try {
-          if (fv instanceof Date) { fStr = Utilities.formatDate(fv, 'America/Guayaquil', 'dd/MM/yy'); }
-          else { fStr = String(fv || ''); var mm = fStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if (mm) fStr = mm[1] + '/' + mm[2] + '/' + mm[3].slice(2); }
-        } catch (e2) { fStr = String(fv || ''); }
-        ultimaVisita = { servicio: dataH[k][5], staff: dataH[k][7], fecha: fStr };
-        break;
-      }
-    }
-  } catch (e) {}
-  return { success: true, fichas: fichas, ultimaVisita: ultimaVisita };
-}
-
-function handleAddFichaPestanas(data) {
-  const ws = getSheet('FichaPestanas');
-  const allData = ws.getDataRange().getValues();
-
-  // Desactivar fichas anteriores de esta clienta
-  for (let i = 2; i < allData.length; i++) {
-    if (String(allData[i][0]).trim() === String(data.codigo).trim() && String(allData[i][8]).toLowerCase().includes('s')) {
-      ws.getRange(i + 1, 9).setValue('No');
-    }
-  }
-
-  // Contar fichas existentes
-  const existentes = allData.filter(r => r[0] === data.codigo).length - (allData[0] ? 0 : 0);
-  const nroFicha = existentes + 1;
-
-  // Máximo 5: si ya tiene 5, eliminar la más antigua
-  if (nroFicha > 5) {
-    for (let i = 2; i < allData.length; i++) {
-      if (String(allData[i][0]).trim() === String(data.codigo).trim()) {
-        ws.deleteRow(i + 1);
-        break;
-      }
-    }
-  }
-
-  const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-
-  const nroFinal = nroFicha > 5 ? 5 : nroFicha;
-  const existentesCount = allData.filter(r => String(r[0]).trim() === String(data.codigo).trim()).length;
-  ws.appendRow([
-    data.codigo, data.nombre || '', nroFinal,
-    data.modelo, data.diseno || '—', data.tallas || '—',
-    data.obs || '', today, 'Sí'
-  ]);
-
-  return { success: true };
-}
-
-
-// ============================================
-// EVIDENCIAS DE PESTAÑAS
-// Guarda hasta 6 fotos (antes izq/der, después izq/der, línea agua izq/der)
-// en Google Drive y almacena las URLs en FichaPestanas cols J-Q.
-// ============================================
-
-// ID de la carpeta de Drive donde se guardan las evidencias.
-// Crear manualmente una carpeta "NexServ Evidencias" en Drive, compartirla
-// con la cuenta de servicio, y poner su ID aquí o en ScriptProperties.
-function _evidenciasFolderId_() {
-  var id = PropertiesService.getScriptProperties().getProperty('EVIDENCIAS_FOLDER_ID');
-  if (id) return id;
-  // Fallback: crear la carpeta automáticamente si no existe
-  var folders = DriveApp.getFoldersByName('NexServ Evidencias');
-  if (folders.hasNext()) return folders.next().getId();
-  var folder = DriveApp.createFolder('NexServ Evidencias');
-  PropertiesService.getScriptProperties().setProperty('EVIDENCIAS_FOLDER_ID', folder.getId());
-  return folder.getId();
-}
-
-// Mapa de tipos de foto a índice de columna en FichaPestanas (0-indexed desde col A)
-var EVIDENCIA_COLS = {
-  'antes_izq':    9,   // J
-  'antes_der':    10,  // K
-  'despues_izq':  11,  // L
-  'despues_der':  12,  // M
-  'linea_izq':    13,  // N
-  'linea_der':    14,  // O
-  // fecha y staff de evidencia
-  '_fecha_ev':    15,  // P
-  '_staff_ev':    16   // Q
-};
-
-function handleSubirEvidenciaPestanas(data) {
-  try {
-    var codigo  = String(data.codigo || '').trim();
-    var tipo    = String(data.tipo   || '').trim();   // 'antes_izq' | 'antes_der' | etc.
-    var base64  = String(data.imagen || '').trim();   // base64 sin prefijo data:
-    var staff   = String(data.staff  || 'admin').trim();
-    var fecha   = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-
-    if (!codigo || !tipo || !base64) return { success: false, message: 'Datos incompletos' };
-    if (!(tipo in EVIDENCIA_COLS))   return { success: false, message: 'Tipo inválido: ' + tipo };
-
-    // Guardar imagen en Drive
-    var colIdx  = EVIDENCIA_COLS[tipo];
-    var blob    = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg',
-                    codigo + '_' + tipo + '_' + fecha.replace(/\//g,'-') + '.jpg');
-    var folder  = DriveApp.getFolderById(_evidenciasFolderId_());
-    // Eliminar foto anterior del mismo tipo para esta clienta (evitar acumular)
-    var existing = folder.getFilesByName(blob.getName());
-    while (existing.hasNext()) existing.next().setTrashed(true);
-    var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    var url = 'https://drive.google.com/uc?export=view&id=' + file.getId();
-
-    // Actualizar FichaPestanas — buscar la ficha activa de esta clienta
-    var ws = getSheet('FichaPestanas');
-    var rows = ws.getDataRange().getValues();
-    var fichaRow = -1;
-    for (var i = rows.length - 1; i >= 2; i--) {
-      var _activa = String(rows[i][8]).trim().toLowerCase(); var _esActiva = _activa === 's' || _activa === 'si' || _activa === 'true' || _activa === 'activa' || _activa === '1';
-      if (String(rows[i][0]).trim() === codigo && _esActiva) {
-        fichaRow = i + 1; // 1-indexed
-        break;
-      }
-    }
-    // Si no hay ficha activa marcada, buscar cualquier ficha reciente de esta clienta
-    if (fichaRow < 0) {
-      for (var j = rows.length - 1; j >= 2; j--) {
-        if (String(rows[j][0]).trim() === codigo) {
-          fichaRow = j + 1; break;
-        }
-      }
-    }
-    if (fichaRow < 0) return { success: false, message: 'No se encontró ficha para esta clienta (código: ' + codigo + ')' };
-
-    ws.getRange(fichaRow, colIdx + 1).setValue(url);
-    ws.getRange(fichaRow, EVIDENCIA_COLS['_fecha_ev'] + 1).setValue(fecha);
-    ws.getRange(fichaRow, EVIDENCIA_COLS['_staff_ev'] + 1).setValue(staff);
-
-    return { success: true, url: url, tipo: tipo };
-  } catch(e) {
-    Logger.log('handleSubirEvidenciaPestanas ERROR: ' + e + ' | stack: ' + (e.stack||''));
-    return { success: false, message: 'Error al guardar: ' + String(e).substring(0,200) };
-  }
-}
-
-function handleGetEvidenciasPestanas(params) {
-  try {
-    var codigo = String(params.codigo || '').trim();
-    if (!codigo) return { success: false, message: 'Código requerido' };
-    var ws   = getSheet('FichaPestanas');
-    var rows = ws.getDataRange().getValues();
-    // Buscar ficha activa
-    for (var i = rows.length - 1; i >= 2; i--) {
-      var _activa = String(rows[i][8]).trim().toLowerCase(); var _esActiva = _activa === 's' || _activa === 'si' || _activa === 'true' || _activa === 'activa' || _activa === '1';
-      if (String(rows[i][0]).trim() === codigo && _esActiva) {
-        return {
-          success: true,
-          codigo: codigo,
-          fecha:  String(rows[i][7]  || ''),
-          staff:  String(rows[i][16] || ''),
-          fotos: {
-            antes_izq:   String(rows[i][9]  || ''),
-            antes_der:   String(rows[i][10] || ''),
-            despues_izq: String(rows[i][11] || ''),
-            despues_der: String(rows[i][12] || ''),
-            linea_izq:   String(rows[i][13] || ''),
-            linea_der:   String(rows[i][14] || '')
-          }
-        };
-      }
-    }
-    // No hay ficha activa — devolver vacío (no error, la staff puede crear evidencia sin ficha técnica previa)
-    return { success: true, codigo: codigo, fotos: {
-      antes_izq:'', antes_der:'', despues_izq:'', despues_der:'', linea_izq:'', linea_der:''
-    }};
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ============================================
-// FICHA FACIAL
-// ============================================
-// ── HISTORIAL DE VISITAS FACIALES ────────────────────────────
-
-function handleAddVisitaFacial(data) {
-  try {
-    const ws = getOrCreateSheet('HistorialFacial', [
-      'Código','Nombre','Fecha','Hora','Servicio','Precio','Staff','Procedimiento','Productos','Observaciones'
-    ]);
-    const tz  = 'America/Guayaquil';
-    const now = new Date();
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-
-    ws.appendRow([
-      data.codigo        || '',
-      data.nombre        || '',
-      fecha,
-      hora,
-      data.servicio      || '',
-      Number(data.precio || 0),
-      data.staff         || '',
-      data.procedimiento || '',
-      data.productosUsados || '',
-      data.obs           || ''
-    ]);
-
-    // NOTA: updateComision NO se llama aquí.
-    // La comisión se registra en handleConfirmarCobroNormal cuando Mikaela cobra.
-    // Llamarla aquí causaba duplicados (se contaba 2 veces por servicio facial).
-
-    return { success: true };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-function handleGetHistorialFacial(params) {
-  try {
-    const ws = getOrCreateSheet('HistorialFacial', [
-      'Código','Nombre','Fecha','Hora','Servicio','Precio','Staff','Procedimiento','Productos','Observaciones'
-    ]);
-    const data   = ws.getDataRange().getValues();
-    const codigo = String(params.codigo || '').trim();
-    if (!codigo) return { success: false, message: 'Falta código' };
-
-    const historial = [];
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() !== codigo) continue;
-      historial.push({
-        fecha:          data[i][2],
-        hora:           data[i][3],
-        servicio:       data[i][4],
-        precio:         Number(data[i][5] || 0),
-        staff:          data[i][6],
-        procedimiento:  data[i][7],
-        productosUsados:data[i][8],
-        obs:            data[i][9]
-      });
-    }
-    // Más reciente primero, máx 10
-    historial.reverse();
-    return { success: true, historial: historial.slice(0, 10) };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-function handleGetFichaFacial(params) {
-  const ws = getSheet('FichaFacial');
-  const data = ws.getDataRange().getValues();
-
-  for (let i = 2; i < data.length; i++) {
-    if (String(data[i][0]).trim() === String(params.codigo).trim()) {
-      return {
-        success: true,
-        ficha: {
-          fecha: data[i][2],
-          edad: data[i][3],
-          sexo: data[i][4],
-          biotipo: data[i][5],
-          fototipo: data[i][6],
-          tipoPiel: data[i][7],
-          signosLesiones: data[i][8],
-          signosHiper: data[i][9],
-          estadoPiel: data[i][10],
-          enfermedades: data[i][11],
-          antFamiliares: data[i][12],
-          alergias: data[i][13],
-          medicamentos: data[i][14],
-          quirurgicos: data[i][15],
-          esteticos: data[i][16],
-          obsExtra: data[i][17]
-        }
-      };
-    }
-  }
-  return { success: true, ficha: null };
-}
-
-function handleUpdateFichaFacial(data) {
-  const ws = getSheet('FichaFacial');
-  const allData = ws.getDataRange().getValues();
-  const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-
-  // Buscar si ya existe
-  for (let i = 4; i < allData.length; i++) {
-    if (allData[i][0] === data.codigo) {
-      const row = i + 1;
-      ws.getRange(row, 3).setValue(today);
-      ws.getRange(row, 4).setValue(data.edad || '');
-      ws.getRange(row, 5).setValue(data.sexo || '');
-      ws.getRange(row, 6).setValue(data.biotipo || '');
-      ws.getRange(row, 7).setValue(data.fototipo || '');
-      ws.getRange(row, 8).setValue(data.tipoPiel || '');
-      ws.getRange(row, 9).setValue(data.signosLesiones || '');
-      ws.getRange(row, 10).setValue(data.signosHiper || '');
-      ws.getRange(row, 11).setValue(data.estadoPiel || '');
-      ws.getRange(row, 12).setValue(data.enfermedades || '');
-      ws.getRange(row, 13).setValue(data.antFamiliares || data.antecedentes || '');
-      ws.getRange(row, 14).setValue(data.alergias || '');
-      ws.getRange(row, 15).setValue(data.medicamentos || '');
-      ws.getRange(row, 16).setValue(data.quirurgicos || '');
-      ws.getRange(row, 17).setValue(data.esteticos || '');
-      ws.getRange(row, 18).setValue(data.obsExtra || '');
-      return { success: true, updated: true };
-    }
-  }
-
-  // Crear nueva
-  ws.appendRow([
-    data.codigo, data.nombre || '', today,
-    data.edad || '', data.sexo || '', data.biotipo || '',
-    data.fototipo || '', data.tipoPiel || '',
-    data.signosLesiones || '', data.signosHiper || '', data.estadoPiel || '',
-    data.enfermedades || '', data.antFamiliares || data.antecedentes || '',
-    data.alergias || '', data.medicamentos || '', data.quirurgicos || '',
-    data.esteticos || '', data.obsExtra || ''
-  ]);
-
-  return { success: true, created: true };
-}
-
-// ============================================
-// FICHA CEJAS EFECTO POLVO (PIGMENTACIÓN)
-// Columnas: A=# | B=Código | C=Fecha | D=Color | E=Aguja | F=TipoSesion | G=Observaciones | H=Responsable | I=ProxRetoque
-// ============================================
-function handleGetFichaCejasPigmento(params) {
-  const ws = getSheet('FichaCejasPigmento');
-  if (!ws) return { success: true, fichas: [] };
-  
-  const data = ws.getDataRange().getValues();
-  const fichas = [];
-
-  // Detectar dónde empiezan los datos: buscar primera fila con código de cliente (C-XXXX)
-  var dataStartIdx = 1;
-  for (var di = 0; di < Math.min(data.length, 8); di++) {
-    if (String(data[di][1] || '').match(/^C-\d+$/)) { dataStartIdx = di; break; }
-    if (di >= 4 && String(data[di][1] || '').trim() !== '' && !String(data[di][1] || '').includes('#')) { dataStartIdx = di; break; }
-  }
-  for (let i = dataStartIdx; i < data.length; i++) {
-    const row = data[i];
-    if (!row[1]) continue; // Saltar filas vacías
-    if (String(row[1]).trim() === String(params.codigo || '').trim()) {
-      fichas.push({
-        id: row[0],
-        codigo: row[1],
-        fecha: row[2],
-        color: row[3],
-        aguja: row[4],
-        tipoSesion: row[5],
-        observaciones: row[6],
-        responsable: row[7],
-        proxRetoque: row[8]
-      });
-    }
+    show('staffHome');
+    await new Promise(r => setTimeout(r, 300));
+    loadStaffHome();
+    alert('✓ Servicio finalizado. Clienta enviada a cobrar con Mikaela.');
   }
   
-  return { success: true, fichas: fichas };
-}
+  async function finishSlotAndContinue(slot) {
+    // Prepara los datos del slot igual que finishSlot1/2 y llama finishAndContinue
+    window._finishingSlot = slot;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const promoData  = activePromos[clientKey];
+    const svcs       = slotServices[slot] || [];
+    const total      = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado')
+                          .reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const svcNames   = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado')
+                          .map(s => s.name).join(' + ');
 
-function handleAddFichaCejasPigmento(data) {
-  try {
-    var ws = getSheet('FichaCejasPigmento');
-    if (!ws) {
-      // Auto-crear la hoja si no existe
-      var ss = SpreadsheetApp.openById(SHEET_ID);
-      ws = ss.insertSheet('FichaCejasPigmento');
-      // Encabezados: ID | Código | Fecha | Color | Aguja | TipoSesión | Obs | Responsable | PróxRetoque
-      ws.getRange(1, 1, 1, 9).setValues([['ID','Código','Fecha','Color','Aguja','Tipo Sesión','Observaciones','Responsable','Próx. Retoque']]);
-      ws.getRange(1,1,1,9).setFontWeight('bold');
-    }
-    
-    const allData = ws.getDataRange().getValues();
-    const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-    
-    // Buscar último ID (empezar desde fila 6, índice 5 - filas 1-4=headers, fila 5=encabezados columnas)
-    // Detectar inicio de datos dinámicamente
-    var addStartIdx = 1;
-    for (var dj = 0; dj < Math.min(allData.length, 8); dj++) {
-      if (String(allData[dj][1] || '').match(/^C-\d+$/)) { addStartIdx = dj; break; }
-    }
-    let maxNum = 0;
-    for (let i = addStartIdx; i < allData.length; i++) {
-      const id = String(allData[i][0] || '').trim();
-      if (id) {
-        const num = parseInt(id);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
-      }
-    }
-    const newId = maxNum + 1;
-    
-    // Calcular próximo retoque si es "Nueva sesión"
-    let proxRetoque = '';
-    if (data.tipoSesion === 'Nueva sesión') {
-      const fechaActual = new Date();
-      // Agregar 37 días (promedio entre 30-45)
-      fechaActual.setDate(fechaActual.getDate() + 37);
-      proxRetoque = Utilities.formatDate(fechaActual, 'America/Guayaquil', 'dd/MM/yyyy');
-    }
-    
-    // Máximo 5 sesiones: eliminar la más antigua si se supera
-    var sesionesCliente = [];
-    for (var i = addStartIdx; i < allData.length; i++) {
-      if (String(allData[i][1]||'').trim() === String(data.codigo||'').trim()) sesionesCliente.push(i+1);
-    }
-    if (sesionesCliente.length >= 5) ws.deleteRow(sesionesCliente[0]);
+    window._finishingData = {
+      clientKey,
+      clientName,
+      total: String(total),
+      svcNames,
+      promoNombre  : promoData?.promo?.name || '',
+      precioRegular: promoData?.promo?.regular || String(total),
+      areasExtras  : [],
+      promasExtraPendientes: [],
+      idEspera     : slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '')
+    };
 
-    // Agregar fila
-    ws.appendRow([
-      newId,
-      data.codigo || '',
-      today,
-      data.color || '',
-      data.aguja || '',
-      data.tipoSesion || '',
-      data.observaciones || '',
-      data.responsable || '',
-      proxRetoque
-    ]);
-    
-    return { success: true, id: newId, proxRetoque: proxRetoque };
-  } catch (err) {
-    return { success: false, error: 'Error en handleAddFichaCejasPigmento: ' + err.toString() };
-  }
-}
-
-// ============================================
-// CIERRES Y PAGOS
-// ============================================
-function handleGetCierresSemana() {
-  const ws = getSheet('CierresSemana');
-  if (!ws) return { success: true, cierres: [] };
-  const data = ws.getDataRange().getValues();
-  const cierres = [];
-
-  // Fila 4 = encabezados (Semana|Desde|Hasta|Chica|Servicios|Facturado|Comision pagada|Fecha pago)
-  // Datos desde fila 5 = indice 4
-  for (let i = 4; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    const fechaPago = row[7] instanceof Date
-      ? Utilities.formatDate(row[7], 'America/Guayaquil', 'dd/MM/yyyy HH:mm')
-      : String(row[7] || '');
-    cierres.push({
-      semana: row[0],
-      desde: row[1],
-      hasta: row[2],
-      chica: row[3],
-      servicios: row[4],
-      facturado: Number(row[5] || 0),
-      comision: Number(row[6] || 0),
-      fechaPago: fechaPago
-    });
-  }
-  return { success: true, cierres: cierres };
-}
-
-function handleGetCierresPagos() {
-  const ws = getSheet('CierresPagos');
-  const data = ws.getDataRange().getValues();
-  const cierres = [];
-
-  for (let i = 4; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    cierres.push({
-      semana: row[0],
-      periodo: row[1],
-      fechaCierre: row[2] instanceof Date
-        ? Utilities.formatDate(row[2], 'America/Guayaquil', 'dd/MM/yyyy HH:mm')
-        : String(row[2] || ''),
-      chica: row[3],
-      area: row[4],
-      comisionPct: row[5],
-      servicios: row[6],
-      facturado: row[7],
-      comision: row[8],
-      estadoPago: row[9]
-    });
-  }
-  return { success: true, cierres: cierres };
-}
-
-function handleCierreSemanal(data) {
-  const wsCom = getSheet('Comisiones');
-  const wsPagos = getSheet('CierresPagos');
-  const comData = wsCom.getDataRange().getValues();
-  const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-
-  // Columnas Comisiones: A=Chica | B=Área | C=Servicios | D=Facturado | E=% Comisión | F=Comisión
-  // FIX: i=3 — María está en fila 4 (índice 3)
-  for (let i = 3; i < comData.length; i++) {
-    const row = comData[i];
-    if (!row[0]) continue;
-
-    // Guardar en CierresPagos
-    wsPagos.appendRow([
-      data.semana, data.periodo, today,
-      row[0], row[1], row[4], row[2], row[3], row[5], 'Pagado'
-    ]);
-
-    // Resetear comisiones a 0
-    wsCom.getRange(i + 1, 3).setValue(0); // col C = servicios
-    wsCom.getRange(i + 1, 4).setValue(0); // col D = facturado
-    wsCom.getRange(i + 1, 6).setValue(0); // col F = comisión
+    await finishAndContinue();
   }
 
-  // Actualizar cabecera de Comisiones con la nueva semana
-  try {
-    const nowDate = new Date();
-    const diaSemana = nowDate.getDay();
-    const diasDesdeElLunes = (diaSemana + 6) % 7;
-    const lunesProximo = new Date(nowDate);
-    lunesProximo.setDate(nowDate.getDate() - diasDesdeElLunes + 7); // próximo lunes
-    lunesProximo.setHours(0, 0, 0, 0);
-    const sabadoProximo = new Date(lunesProximo);
-    sabadoProximo.setDate(lunesProximo.getDate() + 5);
-
-    const fmt = (d) => Utilities.formatDate(d, 'America/Guayaquil', 'dd/MM/yyyy');
-    
-    // Número de semana del año
-    const primerDiaAnio = new Date(lunesProximo.getFullYear(), 0, 1);
-    const semanaNum = Math.ceil(((lunesProximo - primerDiaAnio) / 86400000 + primerDiaAnio.getDay() + 1) / 7);
-    
-    const nuevaLabel = 'Semana ' + semanaNum + ' · Lunes ' + fmt(lunesProximo) + ' — Sábado ' + fmt(sabadoProximo) + ' · Corte manual';
-    wsCom.getRange(2, 1).setValue(nuevaLabel);
-  } catch(e) {}
-
-  return { success: true, message: 'Semana cerrada y comisiones reseteadas' };
-}
-
-function handleVerificarCierreAutomatico() {
-  const wsCom = getSheet('Comisiones');
-  const comData = wsCom.getDataRange().getValues();
-  const now = new Date();
-  
-  // Obtener el lunes de la semana actual
-  const diaSemana = now.getDay(); // 0=Dom, 1=Lun...6=Sab
-  const diasDesdeElLunes = (diaSemana + 6) % 7;
-  const lunesActual = new Date(now);
-  lunesActual.setDate(now.getDate() - diasDesdeElLunes);
-  lunesActual.setHours(0, 0, 0, 0);
-  
-  // Leer la fecha de inicio guardada en la hoja (fila 2, col B)
-  const fechaInicioRaw = comData[1] ? comData[1][1] : null;
-  if (!fechaInicioRaw) return { success: false, message: 'No hay fecha de inicio en Comisiones' };
-  
-  let fechaInicio;
-  if (fechaInicioRaw instanceof Date) {
-    fechaInicio = fechaInicioRaw;
-  } else {
-    const partes = String(fechaInicioRaw).match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (!partes) return { success: false, message: 'Formato de fecha no reconocido' };
-    fechaInicio = new Date(Number(partes[3]), Number(partes[2])-1, Number(partes[1]));
-  }
-  fechaInicio.setHours(0, 0, 0, 0);
-  
-  // Si el lunes actual es posterior a la fecha de inicio guardada, hay que hacer cierre
-  if (lunesActual <= fechaInicio) {
-    return { success: true, cierreRealizado: false, message: 'Semana actual - no se necesita cierre' };
-  }
-  
-  // Calcular semana y período
-  const sabado = new Date(lunesActual);
-  sabado.setDate(lunesActual.getDate() + 5);
-  const fmt = (d) => Utilities.formatDate(d, 'America/Guayaquil', 'dd/MM/yyyy');
-  
-  // Obtener número de semana del año
-  const primerDiaAnio = new Date(lunesActual.getFullYear(), 0, 1);
-  const semanaNum = Math.ceil(((lunesActual - primerDiaAnio) / 86400000 + primerDiaAnio.getDay() + 1) / 7);
-  
-  const semanaLabel = 'Semana ' + semanaNum;
-  const periodoLabel = 'Lunes ' + fmt(lunesActual) + ' — Sábado ' + fmt(sabado);
-  
-  // Ejecutar cierre
-  handleCierreSemanal({ semana: semanaLabel, periodo: periodoLabel });
-  
-  // Actualizar fecha de inicio en fila 2
-  wsCom.getRange(2, 1).setValue(semanaLabel + ' · ' + periodoLabel + ' · Corte automático');
-  wsCom.getRange(2, 2).setValue(fmt(lunesActual));
-  wsCom.getRange(2, 3).setValue(fmt(sabado));
-  
-  return { success: true, cierreRealizado: true, message: 'Cierre automático realizado: ' + semanaLabel };
-}
-
-function handlePagoIndividual(data) {
-  const wsPagos = getSheet('CierresPagos');
-  const allData = wsPagos.getDataRange().getValues();
-
-  for (let i = 4; i < allData.length; i++) {
-    if (allData[i][3] === data.chica && allData[i][0] === data.semana && allData[i][9] !== 'Pagado') {
-      wsPagos.getRange(i + 1, 10).setValue('Pagado');
-      return { success: true };
-    }
-  }
-  return { success: false };
-}
-
-// ============================================
-// HISTORIAL OWNER
-// ============================================
-// Clientas frecuentes del mes, clasificadas POR ÁREA (cejas/facial/pestañas/depilación).
-// Una clienta es "frecuente" en un área si tiene >2 visitas (días distintos) en esa área este mes.
-function handleGetClientasFrecuentes(params) {
-  const ws = getSheet('HistorialOwner');
-  if (!ws) return { success: true, clientas: [], mapa: {}, mes: '' };
-  const data = ws.getDataRange().getValues();
-  const tz = 'America/Guayaquil';
-  const mesActual = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
-  const minVisitas = (params && Number(params.min)) ? Number(params.min) : 3; // "más de 2" = 3+
-  const DIAS_INACTIVIDAD = 30;   // pierde la estrella tras 30+ días sin venir
-  const _hoyMs = Date.now();
-  function _diasDesde(fechaYMD) { // fechaYMD = 'yyyy-MM-dd'
-    var p = String(fechaYMD).split('-');
-    if (p.length !== 3) return 9999;
-    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
-    return Math.floor((_hoyMs - d.getTime()) / 86400000);
-  }
-
-  function normArea(a) {
-    a = String(a || '').toLowerCase();
+  // Normaliza cualquier nombre de área (key, label con emoji/SVG, o texto con acentos)
+  // a una clave canónica para comparar de forma confiable.
+  function _areaCanon(s) {
+    var a = String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '');
+    if (a.indexOf('ceja') >= 0 || a.indexOf('depil') >= 0) return 'cejas';
+    if (a.indexOf('lifting') >= 0 || a.indexOf('retiro') >= 0) return 'cejas';
+    if (a.indexOf('pesta') >= 0) return 'pestanas';
     if (a.indexOf('facial') >= 0) return 'facial';
-    if (a.indexOf('pest') >= 0) return 'pestanas';
-    if (a.indexOf('depil') >= 0) return 'depilacion';
-    if (a.indexOf('cej') >= 0) return 'cejas';
-    return ''; // retiro/lifting u otras no clasifican por color
+    return a;
+  }
+  // Área canónica de una entrada de división: prioriza realArea (cejas/depilación guardan
+  // el nombre del servicio en `area`), si no usa el texto de `area`.
+  function _divAreaCanon(d) {
+    return _areaCanon((d && d.realArea) ? d.realArea : (d && d.area) || '');
   }
 
-  const porCliente = {}; // clave -> { codigo, nombre, diasTotal:{}, areas: { area: {dias} } }
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    const fechaRaw = row[0];
-    let fechaStr;
-    if (fechaRaw instanceof Date) {
-      fechaStr = Utilities.formatDate(fechaRaw, tz, 'yyyy-MM-dd');
-    } else {
-      const p = String(fechaRaw).split('/');
-      if (p.length === 3) {
-        fechaStr = p[2] + '-' + ('0' + p[1]).slice(-2) + '-' + ('0' + p[0]).slice(-2);
-      } else continue;
-    }
-    if (String(row[10] || '').toLowerCase() === 'producto') continue; // no contar productos
-    // Ya NO se filtra por mes calendario: la estrella se mantiene mientras la clienta
-    // siga viniendo (regla de inactividad de 30 días, más abajo), no se reinicia cada mes.
-
-    const codigo = String(row[2] || '').trim();
-    const nombre = String(row[3] || '').trim();
-    const clave = codigo || nombre;
-    if (!clave) continue;
-    const areaN = normArea(row[6]);
-    if (!porCliente[clave]) porCliente[clave] = { codigo: codigo, nombre: nombre, diasTotal: {}, areas: {}, ultimaVisita: fechaStr };
-    porCliente[clave].diasTotal[fechaStr] = true;
-    // 'yyyy-MM-dd' se compara lexicográficamente igual que cronológicamente
-    if (fechaStr > porCliente[clave].ultimaVisita) porCliente[clave].ultimaVisita = fechaStr;
-    if (nombre && !porCliente[clave].nombre) porCliente[clave].nombre = nombre;
-    if (areaN) {
-      if (!porCliente[clave].areas[areaN]) porCliente[clave].areas[areaN] = {};
-      porCliente[clave].areas[areaN][fechaStr] = true;
-    }
-  }
-
-  const lista = [];
-  const mapa = {}; // codigo -> [areas frecuentes]
-  Object.keys(porCliente).forEach(function(k) {
-    const c = porCliente[k];
-    const totalVisitas = Object.keys(c.diasTotal).length;
-    const areasFrec = [];
-    const areasConteo = {};
-    Object.keys(c.areas).forEach(function(ar) {
-      const n = Object.keys(c.areas[ar]).length;
-      areasConteo[ar] = n;
-      if (n >= minVisitas) areasFrec.push(ar);
+  async function finishAndContinue() {
+    // Pasar a otra área (devolver a lista de espera para que otra staff la tome)
+    closeModal();
+    
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot;
+    await ensureIdEsperaFresco(slot || 1); // ROBUSTEZ: resolver id fresco si el local está vacío
+    const clientKey = data.clientKey;
+    const displayName = data.clientName;
+    
+    console.log('🔍 finishAndContinue:', {
+      clientKey,
+      displayName,
+      activePromos: Object.keys(activePromos)
     });
-    // Estrella: la clienta debe (a) ser frecuente (3+ visitas en total, o frecuente en un
-    // área) y (b) haber venido en los últimos 30 días. Si pasa 30+ días sin venir, pierde
-    // la estrella; mientras siga viniendo seguido, la mantiene (clienta constante).
-    const diasSinVenir = _diasDesde(c.ultimaVisita);
-    const esFrecuente  = (areasFrec.length > 0 || totalVisitas >= minVisitas);
-    if (esFrecuente && diasSinVenir <= DIAS_INACTIVIDAD) {
-      lista.push({
-        codigo: c.codigo, nombre: c.nombre, visitas: totalVisitas,
-        areasFrecuentes: areasFrec, areasConteo: areasConteo, diasSinVenir: diasSinVenir
-      });
-      if (c.codigo && areasFrec.length > 0) mapa[c.codigo] = areasFrec;
-    }
-  });
-  lista.sort(function(a, b) { return b.visitas - a.visitas; });
-  return { success: true, clientas: lista, mapa: mapa, mes: mesActual };
-}
-
-function handleGetHistorial(params) {
-  const ws = getSheet('HistorialOwner');
-  const data = ws.getDataRange().getValues();
-  const hoy = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
-  const historial = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue;
-    // Formatear fecha correctamente si viene como Date object
-    const fechaRaw = row[0];
-    const fecha = fechaRaw instanceof Date
-      ? Utilities.formatDate(fechaRaw, 'America/Guayaquil', 'dd/MM/yyyy')
-      : String(fechaRaw || '');
-    // Columnas HistorialOwner: A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-    historial.push({
-      fecha: fecha,
-      hora: row[1] instanceof Date ? Utilities.formatDate(row[1], 'America/Guayaquil', 'HH:mm') : String(row[1] || ''),
-      codigo: row[2],
-      nombre: row[3],
-      esTop: row[4],
-      servicio: row[5],
-      area: row[6],
-      chica: row[7],
-      precio: Number(row[8] || 0),
-      comision: Number(row[9] || 0),
-      metodoPago: row[10],
-      notaAjuste: String(row[11] || '')
-    });
-  }
-
-  // Filtrar por período
-  const periodo = params && params.periodo ? params.periodo : 'hoy';
-  const filtrados = (periodo === 'todo' || periodo === 'all')
-    ? historial
-    : periodo === 'hoy'
-      ? historial.filter(h => h.fecha === hoy)
-      : historial;
-
-  // Separar productos de servicios
-  // FIX: los productos tienen metodoPago='Producto' — incluirlos aunque nombre esté vacío
-  const soloServicios = filtrados.filter(h => String(h.metodoPago || '').toLowerCase() !== 'producto');
-  const soloProductos = filtrados.filter(h => String(h.metodoPago || '').toLowerCase() === 'producto'
-                                           || String(h.area || '').toLowerCase() === 'producto');
-
-  // Agrupar servicios por staff
-  const porStaff = {};
-  soloServicios.forEach(h => {
-    const chica = h.chica || 'Sin asignar';
-    if (!porStaff[chica]) {
-      porStaff[chica] = { chica: chica, servicios: [], totalFacturado: 0, totalComision: 0 };
-    }
-    porStaff[chica].servicios.push({
-      cliente: h.nombre,
-      servicio: h.servicio,
-      precio: h.precio,
-      hora: h.hora,
-      fecha: h.fecha,
-      comision: h.comision,
-      staff: h.chica,
-      metodoPago: h.metodoPago,
-      notaAjuste: h.notaAjuste || ''
-    });
-    porStaff[chica].totalFacturado += h.precio;
-    porStaff[chica].totalComision += h.comision;
-  });
-
-  // Ordenar por facturado desc
-  const staffArray = Object.values(porStaff).sort((a, b) => b.totalFacturado - a.totalFacturado);
-
-  // Calcular total de productos
-  const totalProductos = soloProductos.reduce((s, p) => s + Number(p.precio || 0), 0);
-
-  return {
-    success: true,
-    historial: filtrados,
-    porStaff: staffArray,
-    ventasProductos: soloProductos.map(p => ({
-      cliente: p.nombre,
-      producto: p.servicio,
-      precio: p.precio,
-      hora: p.hora,
-      metodoPago: p.metodoPago
-    })),
-    totalProductos: totalProductos,
-    periodo: periodo
-  };
-}
-
-function addHistorialOwner(atencion, data) {
-  const ws = getSheet('HistorialOwner');
-  const now = new Date();
-  const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const hora = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-
-  // Col E = ID del ticket (LE-XXXX, SN-XXXX) para que getServiciosHoy no duplique
-  // El merge filtra colE.startsWith('LE-'|'SN-'|'SP-'), evitando duplicados con ListaEspera
-  const idTicket = String(atencion[0] || ''); // col A = ID del ticket
-  ws.appendRow([
-    fecha,                                    // A: Fecha
-    hora,                                     // B: Hora
-    atencion[3],                              // C: Codigo clienta
-    atencion[4],                              // D: Nombre clienta
-    idTicket,                                 // E: ID ticket (LE/SN/SP) para dedup merge
-    data.servicio || atencion[5] || '',       // F: Servicio
-    atencion[6] || data.area || '',           // G: Area
-    atencion[9] || data.chicaNombre || '',    // H: Staff nombre
-    data.totalCobrado || data.montoChica || 0, // I: Total cobrado
-    data.comision || 0,                       // J: Comision
-    data.metodoPago || 'Efectivo'             // K: Metodo pago
-  ]);
-}
-
-// ============================================
-// BLOQUEAR / DESBLOQUEAR USUARIO
-// ============================================
-function handleBloquearUsuario(data) {
-  const ws = getSheet('Usuarios');
-  const allData = ws.getDataRange().getValues();
-
-  for (let i = 2; i < allData.length; i++) {
-    if (String(allData[i][1]).trim() === data.userId) {
-      const row = i + 1;
-      ws.getRange(row, 7).setValue(data.bloquear ? 'Bloqueado' : 'Activo');
-      if (data.bloquear) {
-        ws.getRange(row, 8).setValue(Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy'));
-        ws.getRange(row, 9).setValue(data.motivo || '');
-      } else {
-        ws.getRange(row, 8).setValue('');
-        ws.getRange(row, 9).setValue('');
+    
+    // Obtener la promo activa para esta clienta
+    const promoData = activePromos[clientKey];
+    
+    console.log('🔍 promoData encontrado:', promoData);
+    
+    // Flujo sin promo: servicio de area cruzada (ej: facial agrega servicio de cejas)
+    if (!promoData || !promoData.promo) {
+      // ── Bug #1 fix: recalcular areasExtras desde slotServices en tiempo real ──
+      const _svcsActuales = slotServices[slot] || [];
+      const _staffArea = user?.area || '';
+      const areasExtras = [...new Set(
+        _svcsActuales
+          .filter(s => s.status === 'aprobado')
+          .map(s => {
+            const a = String(s.area || '').toLowerCase();
+            if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+            if (a.includes('lifting') || a.includes('retiro')) return 'cejas';
+            if (a.includes('pesta')) return 'pestanas';
+            if (a.includes('facial')) return 'facial';
+            return null;
+          })
+          .filter(a => a && a !== _staffArea)
+      )];
+      if (areasExtras.length === 0) {
+        alert('No hay áreas adicionales para continuar. Usá "Mandar a cobrar".');
+        return;
       }
-      return { success: true };
-    }
-  }
-  return { success: false };
-}
+      
+      const areaDisplayMap = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+      const areasLabel = areasExtras.map(a => areaDisplayMap[a] || a).join(', ');
+      
+      
+      try {
+        const myArea = user && user.area ? user.area : '';
+        const allSvcs = slotServices[slot] || [];
+        // Servicios completados (no rechazados ni pendientes)
+        const svcsRealizados = allSvcs.filter(function(s) {
+          return s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado';
+        });
+        // Servicios de la siguiente area (aprobados, area diferente)
+        const svcsExtras = allSvcs.filter(function(s) {
+          return s.status === 'aprobado' && s.area && s.area.toLowerCase() !== myArea.toLowerCase();
+        });
+        const servicioSiguiente = svcsExtras.map(function(s){ return s.name; }).join(' + ') || areasLabel;
+        const totalSiguiente = svcsExtras.reduce(function(sum,s){ return sum + Number(s.price||0); }, 0);
+        const totalRealizadoLaura = svcsRealizados.filter(function(s){ return !svcsExtras.includes(s); }).reduce(function(s,v){ return s+Number(v.price||0); }, 0);
 
-// ============================================
-// UTILIDADES
-// ============================================
-function updateVisitaClienta(codigo) {
-  const ws = getSheet('Clientas');
-  const data = ws.getDataRange().getValues();
-  const today = Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM/yyyy');
+        // Historial acumulado: muestra realizados + pendientes para la siguiente staff
+        const histRealizados = svcsRealizados.filter(function(s){ return !svcsExtras.includes(s); }).map(function(s){ return s.name + ' $' + s.price; }).join(' + ');
+        const servicioHistorial = (histRealizados ? '[✅' + (user && user.name ? user.name : '') + ': ' + histRealizados + '] | ' : '') + servicioSiguiente;
 
-  for (let i = 3; i < data.length; i++) {
-    if (data[i][0] === codigo) {
-      const row = i + 1;
-      ws.getRange(row, 5).setValue(today); // última visita
-      ws.getRange(row, 6).setValue((data[i][5] || 0) + 1); // total visitas
-      ws.getRange(row, 7).setValue((data[i][6] || 0) + 1); // visitas mes
+        const idEsperaActual = window._as1IdEspera || '';
+        const accionFin = idEsperaActual.startsWith('SN-') ? 'finalizarServicioNormal'
+                        : idEsperaActual.startsWith('SP-') ? 'finalizarServicioPromo'
+                        : 'finalizarAtencion';
+
+        const result = await apiPost(accionFin, {
+          idEspera: idEsperaActual,
+          chicaNombre: user && user.name ? user.name : '',
+          clienteNombre: displayName,
+          clienteCodigo: window._as1Client || '',
+          servicio: servicioHistorial || servicioSiguiente,
+          servicioSiguiente: servicioSiguiente,
+          total: String(totalSiguiente || 0),
+          promoNombre: '',
+          precioRegular: String(totalSiguiente || 0),
+          areaCompletada: myArea,
+          areasFaltantes: areasLabel,
+          nuevaArea: areasExtras[0]
+        });
+        
+        if (result.success) {
+          slotServices[slot] = [];
+          if (user && activeClients[user.name]) {
+            activeClients[user.name].splice(slot - 1, 1);
+            updateCapacityUI(user.name);
+          }
+          alert('Servicio completado. Pendiente: ' + areasLabel + '. La clienta volvio a lista de espera para continuar con ' + areasLabel + '.');
+          show('staffHome');
+        } else {
+          alert('Error: ' + (result.message || 'No se pudo procesar'));
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error al procesar');
+      }
       return;
     }
-  }
-}
-
-function getHistorialCliente(codigo) {
-  const ws = getSheet('Servicios');
-  const data = ws.getDataRange().getValues();
-  const historial = { cejas: [], depilacion: [], pestanas: [], facial: [] };
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    // Necesitamos cruzar con Atenciones para obtener el código de clienta
-    // Por simplicidad, buscamos por idAtencion
-  }
-
-  return historial;
-}
-
-// ============================================
-// ASIGNACIONES (Mikaela)
-// ============================================
-
-function handleAsignarServicioNormal(data) {
-  const ws = getSheet('ListaEspera');
-  const rows = ws.getDataRange().getValues();
-  
-  for (let i = 3; i < rows.length; i++) {
-    const row = rows[i];
-    const estado = String(row[8] || '').toLowerCase();
-    if (String(row[3]).trim() !== String(data.codigo).trim()) continue;
-    if (estado !== 'esperando' && estado !== 'en servicio') continue;
-    const fecha = row[1];
-    if (fecha instanceof Date && fecha.getFullYear() < 2000) continue;
-
-    ws.getRange(i + 1, 6).setValue(data.servicio);   // F: Servicio
-    ws.getRange(i + 1, 7).setValue(data.area);       // G: Área
-    ws.getRange(i + 1, 13).setValue(data.precio);    // M: Total/Precio
-    // Nota de la visita para la chica (recuadro "Nota Especial"). Solo si viene,
-    // para no borrar una observación previa cuando el campo queda vacío.
-    if (data.observaciones && String(data.observaciones).trim() !== '') {
-      ws.getRange(i + 1, 12).setValue(String(data.observaciones).trim()); // L: Observaciones
-    }
-    // Asignación a staff puntual (modelo centralizado por Mikaela)
-    if (data.chica && String(data.chica).trim() !== '') {
-      ws.getRange(i + 1, 10).setValue(String(data.chica).trim()); // J: TomadaPor/Asignada
-      if (estado !== 'en servicio') ws.getRange(i + 1, 9).setValue('Asignada'); // I: Estado
-    }
-    // Marcar como pendiente de confirmación del staff
-    if (estado === 'en servicio') {
-      ws.getRange(i + 1, 9).setValue('Pendiente-staff');
+    
+    const promo = promoData.promo;
+    const areaActual = user?.area || '';
+    
+    // Mapeo de áreas
+    const areaMap = {
+      'cejas': '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg> Cejas',
+      'depilacion': 'Depilación',
+      'pestanas': '👁 Pestañas',
+      'retiro_lifting': '👁 Lifting/Retiro',
+      'facial': '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z\"/><path d=\"M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z\"/><path d=\"M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z\"/><path d=\"M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z\"/><path d=\"M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z\"/><path d=\"M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z\"/></svg> Facial'
+    };
+    
+    // Encontrar la división correspondiente al área actual
+    // FIX: comparar por área canónica (realArea o texto normalizado), NO por el label con emoji
+    const miDivision = promo.division.find(d => _divAreaCanon(d) === _areaCanon(areaActual));
+    
+    if (!miDivision) {
+      alert('Error: No se encontró la división de precio para ' + areaActual + ' en esta promo.');
+      return;
     }
     
-    // ── ESPEJO en Lineas (escritura paralela — Fase 2). No afecta el flujo. ──
-    // Acá la clienta de la cola (SYNA o manual) ya tiene datos completos.
+    // Calcular áreas completadas y áreas faltantes
+    const areasCompletadas = promoData.completedAreas || [areaActual];
+    if (!areasCompletadas.includes(areaActual)) {
+      areasCompletadas.push(areaActual);
+    }
+    
+    // Obtener todas las áreas de la promo (canónico: usa realArea o texto normalizado)
+    const todasLasAreas = promo.division.map(d => _divAreaCanon(d)).filter(a => a);
+    
+    // Áreas que faltan
+    const areasFaltantes = todasLasAreas.filter(a => !areasCompletadas.includes(a));
+    
+    if (areasFaltantes.length === 0) {
+      alert('⚠️ Todas las áreas de la promo ya están completadas. Usá "Mandar a cobrar" en su lugar.');
+      return;
+    }
+    
+    // Siguiente área y su precio (match canónico por realArea/texto normalizado)
+    const siguienteArea = areasFaltantes[0];
+    const siguienteLabel = areaMap[siguienteArea];
+    const siguienteDivision = promo.division.find(d => _divAreaCanon(d) === _areaCanon(siguienteArea));
+    console.log('🔍 siguienteArea:', siguienteArea, '| siguienteLabel:', siguienteLabel, '| division areas:', promo.division.map(d=>d.area), '| siguienteDivision:', siguienteDivision);
+    
+    // Nombres de servicios faltantes
+    const serviciosFaltantes = areasFaltantes.map(a => {
+      const div = promo.division.find(d => _divAreaCanon(d) === _areaCanon(a));
+      return div ? String(div.servicio || div.area || a).replace('💅 ', '').replace('👁 ', '').replace('✨ ', '').replace(/(<svg[^>]*>.*?<\/svg>)\s*/g, '').trim() : a;
+    }).join(' + ');
+    
+    console.log('División calculada:', {
+      areaActual,
+      miDivision,
+      areasCompletadas,
+      areasFaltantes,
+      siguienteArea,
+      siguienteDivision,
+      serviciosFaltantes
+    });
+    
     try {
-      var _fLE = ws.getRange(i + 1, 1, 1, 18).getValues()[0];
-      lineaDesdeAsignacion(_fLE, 'ASIG');
-    } catch (eLin) { Logger.log('espejo ASIG: ' + eLin); }
-
-    return { success: true, message: 'Servicio asignado correctamente' };
-  }
-  
-  return { success: false, message: 'Clienta no encontrada en lista de espera' };
-}
-
-// La staff confirmó el servicio asignado por Mikaela → volver estado a "En servicio"
-function handleActualizarServicioSP(data) {
-  // Actualiza el servicio y total en un SP ticket cuando la staff cambia el servicio de enganche
-  try {
-    const ws = getSheet('ServicioPromo');
-    const rows = ws.getDataRange().getValues();
-    const idEspera = String(data.idEspera || '').trim();
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0] || '').trim() !== idEspera) continue;
-      // Actualizar servicio (col F=6) y total/precio de esta área (col M=13)
-      if (data.nuevoServicio) ws.getRange(i+1, 6).setValue(data.nuevoServicio);
-      if (data.nuevoPrecio !== undefined) ws.getRange(i+1, 13).setValue(Number(data.nuevoPrecio));
-      // Actualizar desglose si se proporciona
-      if (data.desgloseActualizado) ws.getRange(i+1, 18).setValue(JSON.stringify(data.desgloseActualizado));
-      // espejo Lineas: actualizar servicio y/o precio de la línea activa de este SP
-      try {
-        var _cambiosL = {};
-        if (data.nuevoServicio)          _cambiosL.servicio = data.nuevoServicio;
-        if (data.nuevoPrecio !== undefined) { _cambiosL.monto = Number(data.nuevoPrecio); _cambiosL.montoRegular = Number(data.nuevoPrecio); }
-        if (Object.keys(_cambiosL).length > 0) lineaActualizarPorCambio({ promoRef: idEspera, cambios: _cambiosL });
-      } catch (eLnSP) { Logger.log('espejo actualizarSP Lineas: ' + eLnSP); }
-      return { success: true };
-    }
-    return { success: false, message: 'SP ticket no encontrado: ' + idEspera };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
-function handleConfirmarServicioStaff(data) {
-  const idEspera = String(data.idEspera || '').trim();
-  if (!idEspera) return { success: false, message: 'idEspera requerido' };
-
-  const ws = getSheet('ListaEspera');
-  const rows = ws.getDataRange().getValues();
-  for (let i = 3; i < rows.length; i++) {
-    if (String(rows[i][0] || '').trim() !== idEspera) continue;
-    const estado = String(rows[i][8] || '').toLowerCase();
-    if (estado === 'pendiente-staff') {
-      ws.getRange(i + 1, 9).setValue('En servicio');
-      return { success: true };
-    }
-    return { success: true, message: 'Ya en servicio' };
-  }
-  return { success: false, message: 'Ticket no encontrado' };
-}
-
-function handleAsignarPromo(data) {
-  const ws = getSheet('ListaEspera');
-  const rows = ws.getDataRange().getValues();
-  
-  for (let i = 3; i < rows.length; i++) {
-    const row = rows[i];
-    const estado = String(row[8] || '').toLowerCase();
-    if (String(row[3]).trim() !== String(data.codigo).trim()) continue;
-    if (estado !== 'esperando' && estado !== 'en servicio' && estado !== 'asignada') continue;
-    const fecha = row[1];
-    if (fecha instanceof Date && fecha.getFullYear() < 2000) continue;
-
-    // ── 2da/3ra promo del MISMO combo (la clienta ya tiene una promo principal) ──
-    // En vez de pisarla o crear otro ticket, se apila en promasExtra (col R). Así a la
-    // staff le sale el botón "Yo sigo: siguiente" y la suma al MISMO ticket.
-    const yaTienePromoPrincipal = String(row[13] || '').trim() !== ''; // N(14): promoNombre
-    if (yaTienePromoPrincipal) {
-      let extras = [];
-      try { extras = JSON.parse(String(row[17] || '[]')); } catch (e) { extras = []; }
-      if (!Array.isArray(extras)) extras = [];
-      const nombreNuevo = String(data.promoNombre || '').trim();
-      const yaEsta = String(row[13] || '').trim() === nombreNuevo
-        || extras.some(function(p){ return p && String(p.nombre || '').trim() === nombreNuevo; });
-      if (yaEsta) return { success: true, message: 'Esa promo ya estaba en el ticket', modo: 'duplicada' };
-      extras.push({ nombre: data.promoNombre, precio: data.precioPromo, regular: data.precioRegular });
-      ws.getRange(i + 1, 18).setValue(JSON.stringify(extras)); // R(18): promasExtra (2a y 3a)
-      return { success: true, message: 'Promo agregada como siguiente del combo', modo: 'promasExtra', total: extras.length + 1 };
-    }
-
-    // ── 1ra promo del ticket (comportamiento normal) ──
-    ws.getRange(i + 1, 6).setValue(data.promoNombre + ' (PROMO)');
-    ws.getRange(i + 1, 13).setValue(data.precioPromo);
-    ws.getRange(i + 1, 14).setValue(data.promoNombre);
-    ws.getRange(i + 1, 15).setValue(data.precioRegular);
-    ws.getRange(i + 1, 18).setValue(''); // R(18): limpiar promasExtra stale (evita arrastrar promo vieja)
-    // Nota de la visita para la chica (recuadro "Nota Especial"). Solo si viene.
-    if (data.observaciones && String(data.observaciones).trim() !== '') {
-      ws.getRange(i + 1, 12).setValue(String(data.observaciones).trim()); // L: Observaciones
-    }
-    // Asignación a staff puntual (modelo centralizado por Mikaela)
-    if (data.chica && String(data.chica).trim() !== '') {
-      ws.getRange(i + 1, 10).setValue(String(data.chica).trim()); // J: TomadaPor/Asignada
-      if (estado !== 'en servicio') ws.getRange(i + 1, 9).setValue('Asignada'); // I: Estado
-    }
-    
-    return { success: true, message: 'Promo asignada correctamente' };
-  }
-  
-  return { success: false, message: 'Clienta no encontrada en lista de espera' };
-}
-
-// ============================================
-// REASIGNAR STAFF a un área/servicio pendiente (centralizado por Mikaela)
-// Sirve para las 4 fuentes: LE-, SN-, SP- y TM-.
-// NO fuerza "En servicio": deja el área asignada para que la staff la confirme/tome.
-//   data = { idEspera, chicaNombre, areaIdx? }  (areaIdx solo aplica a TM-, 1-based; 0 = primera pendiente)
-// ============================================
-function handleAsignarStaff(data) {
-  try {
-    const idEspera = String(data.idEspera || '').trim();
-    const chica    = String(data.chicaNombre || '').trim();
-    if (!idEspera) return { success: false, message: 'idEspera requerido' };
-    if (!chica)    return { success: false, message: 'Falta la staff' };
-
-    // ── TicketMulti (TM-) : setear staff del área pendiente ──
-    if (idEspera.indexOf('TM-') === 0) {
-      const ws = getTMSheet();
-      const last = ws.getLastRow();
-      if (last < 3) return { success: false, message: 'Ticket no encontrado' };
-      const rows = ws.getRange(3, 1, last - 2, 37).getValues();
-      const areaIdx = Number(data.areaIdx || 0); // 1-based (a.idx); 0 = primera 'Esperando'
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0]).trim() !== idEspera) continue;
-        const rowNum = i + 3;
-        for (let a = 0; a < 4; a++) {
-          const base   = TM_AREA_COL[a];
-          const tent   = String(rows[i][base] || '').trim();
-          const estado = String(rows[i][base + 3] || '').trim().toLowerCase();
-          if (!tent || estado !== 'esperando') continue;
-          if (areaIdx && (a + 1) !== areaIdx) continue;
-          ws.getRange(rowNum, base + 2 + 1).setValue(chica); // Staff del área (col base+2, 0-indexed)
-          // espejo Lineas: actualizar staff + servicio + monto del slot
-          try {
-            var _refTM = idEspera + ':' + (a + 1);  // base 1
-            var _wsL = _hojaLineas(); var _dL = _wsL.getDataRange().getValues();
-            for (var _li = 1; _li < _dL.length; _li++) {
-              if (String(_dL[_li][LX.promoRef] || '') !== _refTM) continue;
-              if (['cobrado','anulado'].indexOf(String(_dL[_li][LX.estado] || '')) >= 0) continue;
-              _wsL.getRange(_li + 1, LX.staff + 1).setValue(chica);
-              // Actualizar también area y precio si llegaron en el payload
-              if (data.area)  _wsL.getRange(_li + 1, LX.area + 1).setValue(data.area);
-              if (data.total) _wsL.getRange(_li + 1, LX.monto + 1).setValue(Number(data.total));
-              _wsL.getRange(_li + 1, LX.actualizada + 1).setValue(_ahora().stamp);
-              break;
-            }
-          } catch (eLnA) { Logger.log('espejo asignarStaff TM Lineas: ' + eLnA); }
-          return { success: true, message: 'Área reasignada a ' + chica, areaIdx: a + 1 };
-        }
-        return { success: false, message: 'No hay un área pendiente para reasignar' };
-      }
-      return { success: false, message: 'Ticket no encontrado' };
-    }
-
-    // ── ServicioNormal (SN-) / ServicioPromo (SP-) : setear col J = asignada a ──
-    if (idEspera.indexOf('SN-') === 0 || idEspera.indexOf('SP-') === 0) {
-      const esSP = idEspera.indexOf('SP-') === 0;
-      const ws = getOrCreateSheet(esSP ? 'ServicioPromo' : 'ServicioNormal', esSP ? COLS_PROMO : COLS_NORMAL);
-      const rows = ws.getDataRange().getValues();
-      for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() !== idEspera) continue;
-        const estado = String(rows[i][8] || '').toLowerCase().trim();
-        if (estado !== 'esperando' && estado !== 'en servicio') {
-          return { success: false, message: 'El servicio ya no está en espera' };
-        }
-        ws.getRange(i + 1, 10).setValue(chica); // J (col 10) = TomadaPor/Asignada
-        return { success: true, message: 'Reasignado a ' + chica };
-      }
-      return { success: false, message: 'Servicio no encontrado' };
-    }
-
-    // ── ListaEspera (LE-) : setear col J + estado 'Asignada' ──
-    {
-      const ws = getSheet('ListaEspera');
-      const rows = ws.getDataRange().getValues();
-      for (let i = 3; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() !== idEspera) continue;
-        const estado = String(rows[i][8] || '').toLowerCase().trim();
-        if (estado !== 'esperando' && estado !== 'asignada' && estado !== 'en servicio') {
-          return { success: false, message: 'La clienta ya no está en espera' };
-        }
-        ws.getRange(i + 1, 10).setValue(chica); // J: TomadaPor/Asignada
-        if (estado !== 'en servicio') ws.getRange(i + 1, 9).setValue('Asignada'); // I: Estado
-        return { success: true, message: 'Reasignada a ' + chica };
-      }
-      return { success: false, message: 'Clienta no encontrada en lista de espera' };
-    }
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ============================================
-// MANDAR A COBRO: pasa un ticket de "Por verificar" → "Por cobrar"
-// (Mikaela ya revisó el desglose). De ahí sigue el flujo de cobro normal.
-//   data = { idEspera }
-// ============================================
-function handleMandarACobro(data) {
-  try {
-    const idEspera = String(data.idEspera || '').trim();
-    if (!idEspera) return { success: false, message: 'idEspera requerido' };
-
-    if (idEspera.indexOf('TM-') === 0) {
-      const ws = getTMSheet();
-      const last = ws.getLastRow();
-      if (last < 3) return { success: false, message: 'Ticket no encontrado' };
-      const rows = ws.getRange(3, 1, last - 2, 37).getValues();
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0]).trim() !== idEspera) continue;
-        ws.getRange(i + 3, 6).setValue('Por cobrar');
-        return { success: true, message: 'Enviado a cobro' };
-      }
-      return { success: false, message: 'Ticket no encontrado' };
-    }
-
-    if (idEspera.indexOf('SN-') === 0 || idEspera.indexOf('SP-') === 0) {
-      const esSP = idEspera.indexOf('SP-') === 0;
-      const ws = getOrCreateSheet(esSP ? 'ServicioPromo' : 'ServicioNormal', esSP ? COLS_PROMO : COLS_NORMAL);
-      const rows = ws.getDataRange().getValues();
-      for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() !== idEspera) continue;
-        ws.getRange(i + 1, 9).setValue('Por cobrar');
-        return { success: true, message: 'Enviado a cobro' };
-      }
-      return { success: false, message: 'Servicio no encontrado' };
-    }
-
-    {
-      const ws = getSheet('ListaEspera');
-      const rows = ws.getDataRange().getValues();
-      for (let i = 3; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() !== idEspera) continue;
-        ws.getRange(i + 1, 9).setValue('Por cobrar');
-        return { success: true, message: 'Enviado a cobro' };
-      }
-      return { success: false, message: 'Clienta no encontrada' };
-    }
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ============================================
-// CLIENTA SE RETIRA: anula los servicios pendientes y manda a cobro
-// SOLO lo realizado. En TM borra staff+precio de áreas no completadas
-// (así el cobro las salta) y recalcula totales con lo completado.
-//   data = { idEspera }
-// ============================================
-function handleRetirarYCobrar(data) {
-  try {
-    const idEspera = String(data.idEspera || '').trim();
-    if (!idEspera) return { success: false, message: 'idEspera requerido' };
-
-    // ── TicketMulti ──
-    if (idEspera.indexOf('TM-') === 0) {
-      const ws = getTMSheet();
-      const last = ws.getLastRow();
-      if (last < 3) return { success: false, message: 'Ticket no encontrado' };
-      const rows = ws.getRange(3, 1, last - 2, 37).getValues();
-      for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][0]).trim() !== idEspera) continue;
-        const rowNum = i + 3;
-        let normalArr = [];
-        try { normalArr = JSON.parse(String(rows[i][36] || '[]')); } catch (e) {}
-        if (!Array.isArray(normalArr)) normalArr = [];
-
-        let completadas = 0, sumPromo = 0, sumNormal = 0;
-        for (let a = 0; a < 4; a++) {
-          const base = TM_AREA_COL[a];
-          const tent = String(rows[i][base] || '').trim();
-          if (!tent) continue;
-          const estado = String(rows[i][base + 3] || '').trim().toLowerCase();
-          if (estado === 'completado') {
-            completadas++;
-            const pp = Number(rows[i][TM_PRECIO_COL[a]] || 0);
-            const np = Number(normalArr[a] != null ? normalArr[a] : pp) || pp;
-            sumPromo += pp; sumNormal += np;
-          } else {
-            // Anular área pendiente: sin staff (el cobro la salta) y precio 0
-            ws.getRange(rowNum, base + 2 + 1).setValue('');         // staff
-            ws.getRange(rowNum, base + 3 + 1).setValue('Cancelado'); // estado área
-            ws.getRange(rowNum, TM_PRECIO_COL[a] + 1).setValue(0);   // precio área
-            normalArr[a] = 0;
-          }
-        }
-        if (completadas === 0) return { success: false, message: 'No hay servicios realizados para cobrar' };
-
-        ws.getRange(rowNum, 36).setValue(sumPromo);              // total promo (AJ)
-        ws.getRange(rowNum, 35).setValue(sumNormal || sumPromo); // total normal (AI)
-        ws.getRange(rowNum, 37).setValue(JSON.stringify(normalArr));
-        ws.getRange(rowNum, 6).setValue('Por cobrar');
-        // espejo Lineas: anular las líneas pendientes (las completadas quedan para cobro)
-        try { anularLineasPendientesPorRef(idEspera, 'retiro'); } catch (eLn) { Logger.log('espejo retiro Lineas: ' + eLn); }
-        return { success: true, message: 'Pendientes anulados; a cobro solo lo realizado' };
-      }
-      return { success: false, message: 'Ticket no encontrado' };
-    }
-
-    // ── ServicioPromo / ServicioNormal: cobrar lo ya acumulado ──
-    if (idEspera.indexOf('SP-') === 0 || idEspera.indexOf('SN-') === 0) {
-      const esSP = idEspera.indexOf('SP-') === 0;
-      const ws = getOrCreateSheet(esSP ? 'ServicioPromo' : 'ServicioNormal', esSP ? COLS_PROMO : COLS_NORMAL);
-      const rows = ws.getDataRange().getValues();
-      for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][0] || '').trim() !== idEspera) continue;
-        let det = [];
-        try { det = JSON.parse(String(rows[i][17] || '[]')); } catch (e) {}
-        const sumDet = Array.isArray(det) ? det.reduce(function (s, d) { return s + Number(d.monto || 0); }, 0) : 0;
-        const totalRealizado = sumDet > 0 ? sumDet : Number(rows[i][12] || 0);
-        if (totalRealizado <= 0) return { success: false, message: 'No hay servicios realizados para cobrar' };
-        ws.getRange(i + 1, 13).setValue(totalRealizado); // total = lo realizado
-        ws.getRange(i + 1, 9).setValue('Por cobrar');
-        try { anularLineasPendientesPorRef(idEspera, 'retiro'); } catch (eLn) { Logger.log('espejo retiro Lineas: ' + eLn); }
-        return { success: true, message: 'A cobro solo lo realizado' };
-      }
-      return { success: false, message: 'Servicio no encontrado' };
-    }
-
-    return { success: false, message: 'Este tipo de ticket no admite retiro parcial' };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ============================================
-// + SERVICIO EXTRA: agrega un servicio nuevo a un ticket ya "Por verificar"
-// y lo reabre a la lista para que una staff lo realice (gana su comisión) y
-// sume al MISMO ticket. Por ahora soportado en tickets combo/multi (TM-),
-// que ya manejan total = suma de áreas y comisión por área al cobrar.
-//   data = { idEspera, area, servicio, precio, chica }
-// ============================================
-function handleAgregarServicioExtra(data) {
-  try {
-    const idEspera = String(data.idEspera || '').trim();
-    const area     = String(data.area || '').trim();
-    const servicio = String(data.servicio || '').trim();
-    const precio   = Number(data.precio || 0);
-    const chica    = String(data.chica || '').trim();
-    if (!idEspera) return { success: false, message: 'idEspera requerido' };
-    if (!servicio || precio <= 0) return { success: false, message: 'Servicio y precio válidos requeridos' };
-
-    if (idEspera.indexOf('TM-') === 0) {
-      // Si el TM está en 'Por verificar' (la staff ya terminó y Mikaela verifica),
-      // el ticket original NO se toca — queda en 'Por verificar' esperando cobro.
-      // El servicio extra se crea como ticket SN- nuevo (mismo flujo que LE-/SN-/SP-).
-      // Así ambos tickets se cobran juntos cuando la segunda staff termine.
-      const wsTMEx = getTMSheet();
-      const lastEx = wsTMEx.getLastRow();
-      if (lastEx >= 3) {
-        const rowsEx = wsTMEx.getRange(3, 1, lastEx - 2, 6).getValues();
-        for (var tmei = 0; tmei < rowsEx.length; tmei++) {
-          if (String(rowsEx[tmei][0]).trim() !== idEspera) continue;
-          const estadoTMEx = String(rowsEx[tmei][5] || '').toLowerCase();
-          if (estadoTMEx === 'por verificar') {
-            // Leer código y nombre del TM para crear el SN-
-            var _codTMEx  = String(rowsEx[tmei][3] || '').trim();
-            var _nomTMEx  = String(rowsEx[tmei][4] || '').trim();
-            if (!_codTMEx && !_nomTMEx) return { success: false, message: 'No se encontraron datos de la clienta en el ticket TM.' };
-            // Crear ticket SN- nuevo para el servicio extra (el TM original no se modifica)
-            var tzSNEx = 'America/Guayaquil';
-            var nowSNEx = new Date();
-            var horaSNEx  = Utilities.formatDate(nowSNEx, tzSNEx, 'HH:mm');
-            var fechaSNEx = Utilities.formatDate(nowSNEx, tzSNEx, 'dd/MM/yyyy');
-            // Candado anti-duplicado
-            var wsDupEx = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-            var dupDataEx = wsDupEx.getDataRange().getValues();
-            for (var dzEx = 1; dzEx < dupDataEx.length; dzEx++) {
-              var dEstEx = String(dupDataEx[dzEx][8] || '').toLowerCase().trim();
-              if (dEstEx === 'cobrado' || dEstEx === 'completada' || dEstEx === 'cancelado') continue;
-              var dCodEx = String(dupDataEx[dzEx][3] || '').trim();
-              var dNomEx = String(dupDataEx[dzEx][4] || '').trim();
-              var dSvcEx = String(dupDataEx[dzEx][5] || '').trim().toLowerCase();
-              var dAreaEx= String(dupDataEx[dzEx][6] || '').trim().toLowerCase();
-              var mismaCliEx = (_codTMEx && dCodEx === _codTMEx) || (_nomTMEx && dNomEx === _nomTMEx);
-              if (mismaCliEx && dSvcEx === servicio.toLowerCase() && dAreaEx === area.toLowerCase()) {
-                return { success: true, newId: String(dupDataEx[dzEx][0] || ''), duplicado: true,
-                  message: 'Ese servicio extra ya estaba agregado para ' + (_nomTMEx || 'la clienta') + ' — no se duplicó.' };
-              }
-            }
-            var newIdSNEx = getNextIdNormal();
-            var obsSnEx = '➕ Servicio extra desde ticket ' + idEspera + ' (verificado, pendiente cobro conjunto)';
-            wsDupEx.appendRow([
-              newIdSNEx, fechaSNEx, horaSNEx, _codTMEx, _nomTMEx,
-              servicio, area, 'Normal', 'Esperando',
-              chica || '', '', obsSnEx,
-              precio, '', '', '', '', '',
-              'SN', precio, precio
-            ]);
-            // ── espejo Lineas: ata el extra al padre TM via obs ──────────────
-            try {
-              lineaDesdeServicioNormal({
-                ticketId: newIdSNEx, codigo: _codTMEx, nombre: _nomTMEx,
-                area: area, servicio: servicio, asignadaA: chica || '',
-                total: precio, observaciones: '(extra de ' + idEspera + ')'
-              });
-            } catch(eLnTM) { Logger.log('espejo extra TM: ' + eLnTM); }
-            return { success: true, newId: newIdSNEx,
-              message: 'Servicio extra creado como ticket nuevo (' + newIdSNEx + '). El ticket original queda en verificación.' };
-          }
-          break;
-        }
-      }
-      return { success: false, message: 'Ticket TM no encontrado o en estado no válido para agregar extra.' };
-    }
-
-    // ── Tickets simples / promo-dúo (LE-, SN-, SP-) ──────────────────────────
-    // Enfoque SEGURO: el servicio ya realizado queda CONGELADO en su ticket original
-    // (intacto, se cobra normal y su comisión se registra como siempre). El servicio
-    // EXTRA se crea como un ticket NUEVO (SN-) para la misma clienta, asignado a la
-    // nueva staff, y entra a su cola de "Esperando". Así ambos servicios se cobran sin
-    // tocar la lógica de comisiones ni arriesgar doble cobro. La lista de espera ya
-    // fusiona los tickets SN- "Esperando", por lo que la nueva staff lo verá enseguida.
-    {
-      // 1) Leer código/nombre de la clienta desde el ticket original (según su tipo)
-      var codigoCli = '', nombreCli = '';
-      if (idEspera.indexOf('SP-') === 0 || idEspera.indexOf('SN-') === 0) {
-        var srcSheet = idEspera.indexOf('SP-') === 0 ? 'ServicioPromo' : 'ServicioNormal';
-        var srcCols  = idEspera.indexOf('SP-') === 0 ? COLS_PROMO : COLS_NORMAL;
-        var wsSrc = getOrCreateSheet(srcSheet, srcCols);
-        var srcData = wsSrc.getDataRange().getValues();
-        for (var s = 1; s < srcData.length; s++) {
-          if (String(srcData[s][0]).trim() === idEspera) {
-            codigoCli = String(srcData[s][3] || '').trim();   // D: Código
-            nombreCli = String(srcData[s][4] || '').trim();   // E: Nombre
-            break;
-          }
-        }
-      } else if (idEspera.indexOf('LE-') === 0) {
-        var wsLE = getSheet('ListaEspera');
-        var leData = wsLE.getDataRange().getValues();
-        for (var l = 3; l < leData.length; l++) {
-          if (String(leData[l][0]).trim() === idEspera) {
-            codigoCli = String(leData[l][3] || '').trim();    // D: Código
-            nombreCli = String(leData[l][4] || '').trim();    // E: Nombre
-            break;
-          }
-        }
-      }
-      if (!codigoCli && !nombreCli) {
-        return { success: false, message: 'No se encontró la clienta del ticket ' + idEspera };
-      }
-
-      // 2) Crear el ticket NUEVO para el servicio extra (no toca el original)
-      var tzEx = 'America/Guayaquil';
-      var nowEx = new Date();
-      var horaEx  = Utilities.formatDate(nowEx, tzEx, 'HH:mm');
-      var fechaEx = Utilities.formatDate(nowEx, tzEx, 'dd/MM/yyyy');
-      // ── CANDADO ANTI-DUPLICADO ──────────────────────────────────────────────
-      // Si ya existe un servicio extra IDÉNTICO pendiente para esta clienta (mismo
-      // servicio + área, aún no cobrado/cancelado), NO crear otro. Evita que re-intentos
-      // o doble-tap repitan el servicio en la lista de espera.
-      var wsDup = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-      var dupData = wsDup.getDataRange().getValues();
-      for (var dz = 1; dz < dupData.length; dz++) {
-        var dEstado = String(dupData[dz][8] || '').toLowerCase().trim();
-        if (dEstado === 'cobrado' || dEstado === 'completada' || dEstado === 'cancelado') continue;
-        var dCod  = String(dupData[dz][3] || '').trim();
-        var dNom  = String(dupData[dz][4] || '').trim();
-        var dSvc  = String(dupData[dz][5] || '').trim().toLowerCase();
-        var dArea = String(dupData[dz][6] || '').trim().toLowerCase();
-        var mismaCli = (codigoCli && dCod === codigoCli) || (nombreCli && dNom === nombreCli);
-        if (mismaCli && dSvc === servicio.toLowerCase() && dArea === area.toLowerCase()) {
-          return { success: true, newId: String(dupData[dz][0] || ''), duplicado: true,
-            message: 'Ese servicio extra ya estaba agregado para ' + (nombreCli || 'la clienta') + ' — no se duplicó.' };
-        }
-      }
-
-      var newIdEx = getNextIdNormal();
-      var wsNuevo = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-      var obsEx = '➕ Servicio extra agregado por admin (ticket original ' + idEspera + ' congelado)';
-      // Columnas COLS_NORMAL (21): ID,Fecha,Hora,Código,Nombre,Servicio,Área,Prioridad,
-      // Estado,Tomada por,Hora tomada,Obs,Total,Promo nombre,Método pago,Hora cobro,
-      // Total cobrado,Desglose,Tipo,Precio Normal,Precio Promo
-      wsNuevo.appendRow([
-        newIdEx, fechaEx, horaEx, codigoCli, nombreCli,
-        servicio, area, 'Normal', 'Esperando',
-        chica || '', '', obsEx,
-        precio, '', '', '', '', '',
-        'SN', precio, precio
-      ]);
-      // ── espejo Lineas ──────────────────────────────────────────────────────
-      try {
-        lineaDesdeServicioNormal({
-          ticketId: newIdEx, codigo: codigoCli, nombre: nombreCli,
-          area: area, servicio: servicio, asignadaA: chica || '',
-          total: precio, observaciones: '(extra de ' + idEspera + ')'
-        });
-      } catch(eLnEx) { Logger.log('espejo extra LE/SN/SP: ' + eLnEx); }
-
-      return {
-        success: true,
-        newId: newIdEx,
-        message: 'Servicio extra agregado como ticket nuevo para ' + (chica || 'la staff') + '. El servicio anterior queda congelado.'
-      };
-    }
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── AGREGAR PROMO EXTRA (Mikaela) ────────────────────────────────────────────
-// Igual que handleAgregarServicioExtra, pero el extra es una PROMO. El ticket
-// original (servicio ya completado) queda INTACTO; la promo se crea como un
-// ticket SP- NUEVO para la misma clienta, asignado a la staff elegida y en
-// 'Esperando' (col J = staff), por lo que se cobra y se comisiona APARTE.
-// Reusa handleAddServicioPromo (crea la fila + espejo en Lineas). Todo en
-// try/catch: si algo falla, no rompe nada del flujo vivo.
-//   data = { idEspera, promoNombre, precioPromo, precioRegular, area?, precioMiArea?, chica, observaciones? }
-function handleAgregarPromoExtra(data) {
-  try {
-    const idEspera     = String(data.idEspera || '').trim();
-    const promoNombre  = String(data.promoNombre || '').trim();
-    const precioPromo  = Number(data.precioPromo || 0);
-    const precioReg    = Number(data.precioRegular || precioPromo);
-    const area         = String(data.area || '').trim();
-    const precioMiArea = Number(data.precioMiArea || precioPromo);
-    const chica        = String(data.chica || '').trim();
-    if (!idEspera)        return { success: false, message: 'idEspera requerido' };
-    if (!promoNombre)     return { success: false, message: 'Falta la promo' };
-    if (precioPromo <= 0) return { success: false, message: 'Precio de promo inválido' };
-
-    // 1) Resolver código/nombre de la clienta desde el ticket original (según su tipo)
-    var codigoCli = '', nombreCli = '';
-    if (idEspera.indexOf('SP-') === 0 || idEspera.indexOf('SN-') === 0) {
-      var srcSheet = idEspera.indexOf('SP-') === 0 ? 'ServicioPromo' : 'ServicioNormal';
-      var srcCols  = idEspera.indexOf('SP-') === 0 ? COLS_PROMO : COLS_NORMAL;
-      var wsSrc = getOrCreateSheet(srcSheet, srcCols);
-      var srcData = wsSrc.getDataRange().getValues();
-      for (var s = 1; s < srcData.length; s++) {
-        if (String(srcData[s][0]).trim() === idEspera) {
-          codigoCli = String(srcData[s][3] || '').trim();   // D: Código
-          nombreCli = String(srcData[s][4] || '').trim();   // E: Nombre
-          break;
-        }
-      }
-    } else if (idEspera.indexOf('TM-') === 0) {
-      var wsTM = getTMSheet();
-      var lastTM = wsTM.getLastRow();
-      if (lastTM >= 3) {
-        var tmData = wsTM.getRange(3, 1, lastTM - 2, 5).getValues();
-        for (var t = 0; t < tmData.length; t++) {
-          if (String(tmData[t][0]).trim() === idEspera) {
-            codigoCli = String(tmData[t][3] || '').trim();  // D: Código
-            nombreCli = String(tmData[t][4] || '').trim();  // E: Nombre
-            break;
-          }
-        }
-      }
-    } else if (idEspera.indexOf('LE-') === 0) {
-      var wsLE = getSheet('ListaEspera');
-      var leData = wsLE.getDataRange().getValues();
-      for (var l = 3; l < leData.length; l++) {
-        if (String(leData[l][0]).trim() === idEspera) {
-          codigoCli = String(leData[l][3] || '').trim();    // D: Código
-          nombreCli = String(leData[l][4] || '').trim();    // E: Nombre
-          break;
-        }
-      }
-    }
-    if (!codigoCli && !nombreCli) {
-      return { success: false, message: 'No se encontró la clienta del ticket ' + idEspera };
-    }
-
-    // 2) Candado anti-duplicado: misma clienta + misma promo aún activa → no duplicar
-    var wsDup = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    var dupData = wsDup.getDataRange().getValues();
-    for (var dz = 1; dz < dupData.length; dz++) {
-      var dEstado = String(dupData[dz][8] || '').toLowerCase().trim();   // I: Estado
-      if (dEstado === 'cobrado' || dEstado === 'completada' || dEstado === 'cancelado') continue;
-      var dCod  = String(dupData[dz][3]  || '').trim();                  // D: Código
-      var dNom  = String(dupData[dz][4]  || '').trim();                  // E: Nombre
-      var dProm = String(dupData[dz][13] || '').trim().toLowerCase();    // N: Promo nombre
-      var mismaCli = (codigoCli && dCod === codigoCli) || (nombreCli && dNom === nombreCli);
-      if (mismaCli && dProm === promoNombre.toLowerCase()) {
-        return { success: true, newId: String(dupData[dz][0] || ''), duplicado: true,
-          message: 'Esa promo extra ya estaba agregada para ' + (nombreCli || 'la clienta') + ' — no se duplicó.' };
-      }
-    }
-
-    // 3) Crear el ticket SP- NUEVO (su propio ticket → se cobra aparte). El original no se toca.
-    var obsEx = '➕ Promo extra agregada por admin (ticket original ' + idEspera + ' intacto)' +
-                (data.observaciones ? ' · ' + String(data.observaciones).trim() : '');
-    var r = handleAddServicioPromo({
-      codigo:        codigoCli,
-      nombre:        nombreCli,
-      servicio:      promoNombre,
-      promoNombre:   promoNombre,
-      area:          area,
-      precioPromo:   precioPromo,
-      precioRegular: precioReg,
-      precioMiArea:  precioMiArea,
-      asignadaA:     chica,
-      observaciones: obsEx
-    });
-    if (r && r.success) {
-      try {
-        _pushMikaela('🏷 Promo extra agregada',
-          (nombreCli || 'Clienta') + ' · ' + promoNombre + (chica ? ' → ' + chica : ''));
-      } catch (e) {}
-      return { success: true, newId: r.id,
-        message: 'Promo extra agregada como ticket aparte (' + r.id + '). El servicio anterior queda intacto.' };
-    }
-    return { success: false, message: (r && r.message) || 'No se pudo crear la promo extra' };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ============================================
-// FACTURACIÓN (preparado para SRI)
-// → Las funciones viven ahora en NexServ_Facturacion.gs (mismo proyecto, ámbito global compartido):
-//     handleGetDatosFacturacion · handleGuardarFacturacion · handleGetFacturaciones
-//   Los `case` del router (getDatosFacturacion / getFacturaciones / guardarFacturacion) siguen aquí arriba.
-// ============================================
-
-// ============================================
-// AUTORIZACIONES DE SERVICIOS EXTRAS
-// ============================================
-
-function handleSolicitarAutorizacion(data) {
-  // Crear pestaña Autorizaciones si no existe
-  let ws = getSheet('Autorizaciones');
-  if (!ws) {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    ws = ss.insertSheet('Autorizaciones');
-    // Encabezados
-    ws.getRange(1, 1, 1, 14).setValues([[
-      'ID', 'Fecha', 'Hora', 'Cliente Código', 'Cliente Nombre', 
-      'Staff', 'Servicio', 'Área', 'Precio', 'Nota', 'Estado', 'Respuesta', 'idEsperaSP', 'esCambioPromo'
-    ]]);
-    ws.getRange(1, 1, 1, 14).setFontWeight('bold');
-    ws.setFrozenRows(1);
-  }
-  
-  // Generar ID único
-  const timestamp = new Date().getTime();
-  const id = 'AUTH-' + timestamp;
-  
-  // Agregar solicitud
-  const newRow = [
-    id,
-    new Date(),
-    Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm'),
-    data.clienteCodigo || '',
-    data.clienteNombre || '',
-    data.staffNombre || '',
-    data.servicioNombre || '',
-    data.servicioArea || '',
-    data.servicioPrecio || 0,
-    data.nota || '',
-    'pendiente',
-    '',
-    data.idEsperaSP || '',
-    data.esCambioPromo ? 'true' : 'false'
-  ];
-  
-  ws.appendRow(newRow);
-
-  // #3 Avisar a Mikaela que hay un servicio extra por aprobar
-  _pushMikaela('🟡 Servicio extra por aprobar',
-    String(data.staffNombre || 'Una chica') + ' pide aprobar: ' + String(data.servicioNombre || 'un servicio') +
-    (data.clienteNombre ? ' para ' + data.clienteNombre : '') +
-    (data.servicioPrecio ? ' ($' + data.servicioPrecio + ')' : ''));
-
-  return { 
-    success: true, 
-    message: 'Solicitud enviada al admin',
-    authId: id
-  };
-}
-
-function handleGetAutorizaciones() {
-  const ws = getSheet('Autorizaciones');
-  if (!ws) {
-    return { success: true, autorizaciones: [] };
-  }
-  
-  const data = ws.getDataRange().getValues();
-  const autorizaciones = [];
-  
-  const ahora = new Date();
-  const dosHorasAtras = new Date(ahora.getTime() - 2 * 60 * 60 * 1000);
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (!row[0]) continue; // fila vacia
-    const estado = String(row[10] || '').toLowerCase().trim();
-    if (!estado) continue;
-
-    // Pendientes: siempre incluir
-    if (estado === 'pendiente') {
-      autorizaciones.push({
-        id: String(row[0]),
-        clienteCodigo: String(row[3] || ''),
-        clienteNombre: String(row[4] || ''),
-        staffNombre: String(row[5] || ''),
-        servicioNombre: String(row[6] || ''),
-        servicioArea: String(row[7] || ''),
-        servicioPrecio: row[8],
-        nota: String(row[9] || ''),
-        estado: 'pendiente'
-      });
-      continue;
-    }
-
-    // Aprobadas/rechazadas: solo las ultimas 2 horas para sync del staff
-    const fechaRow = row[1] instanceof Date ? row[1] : null;
-    if (!fechaRow || fechaRow < dosHorasAtras) continue;
-
-    autorizaciones.push({
-      id: String(row[0]),
-      clienteCodigo: String(row[3] || ''),
-      clienteNombre: String(row[4] || ''),
-      staffNombre: String(row[5] || ''),
-      servicioNombre: String(row[6] || ''),
-      servicioArea: String(row[7] || ''),
-      servicioPrecio: row[8],
-      nota: String(row[9] || ''),
-      estado: estado
-    });
-  }
-  
-  return { success: true, autorizaciones: autorizaciones };
-}
-
-function handleAprobarAutorizacion(data) {
-  const ws = getSheet('Autorizaciones');
-  if (!ws) {
-    return { success: false, message: 'No hay solicitudes de autorización' };
-  }
-  
-  const rows = ws.getDataRange().getValues();
-  
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === String(data.authId).trim()) {
-      const now = new Date();
-      const horaAprobacion = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-      const fechaAprobacion = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-
-      // Actualizar estado en Autorizaciones
-      ws.getRange(i + 1, 11).setValue('aprobado');
-      ws.getRange(i + 1, 12).setValue('Aprobado por admin el ' + fechaAprobacion + ' ' + horaAprobacion);
-
-      const authStaff      = String(rows[i][5] || '');
-      const authCliente    = String(rows[i][4] || '');
-      const authCodigo     = String(rows[i][3] || '');
-      const authPrecio     = Number(rows[i][8] || 0);
-      const authServicio   = String(rows[i][6] || '');
-      const authArea       = String(rows[i][7] || '');
-
-      // ── Registrar en ServiciosExtras ──
-      try {
-        let wsExt = getSheet('ServiciosExtras');
-        if (!wsExt) {
-          const ss = SpreadsheetApp.openById(SHEET_ID);
-          wsExt = ss.insertSheet('ServiciosExtras');
-          wsExt.getRange(1, 1, 1, 11).setValues([[
-            'Fecha', 'Hora solicitud', 'Hora aprobación', 'Staff',
-            'Cliente', 'Código', 'Servicio extra', 'Área', 'Precio',
-            'Estado', 'ID Ticket (cobro final)'
-          ]]);
-          wsExt.getRange(1, 1, 1, 11).setFontWeight('bold');
-          wsExt.setFrozenRows(1);
-        }
-        wsExt.appendRow([
-          fechaAprobacion,
-          Utilities.formatDate(rows[i][1], 'America/Guayaquil', 'HH:mm'),
-          horaAprobacion,
-          authStaff, authCliente, authCodigo, authServicio, authArea,
-          authPrecio, 'Aprobado', ''
-        ]);
-      } catch(eExt) { Logger.log('Error escribiendo ServiciosExtras: ' + eExt); }
-
-      // ── Si la clienta tiene un TM activo, sumar el extra al precio del área ──
-      // Esto asegura que Mikaela vea el precio correcto en el panel y que el cobro sea exacto
-      if (authPrecio > 0 && authStaff && authCliente) {
-        try {
-          const wsTM = getTMSheet();
-          const tmRows = wsTM.getDataRange().getValues();
-          for (let t = 2; t < tmRows.length; t++) {
-            const tmId     = String(tmRows[t][0] || '').trim();
-            if (!tmId.startsWith('TM-')) continue;
-            const tmEstado = String(tmRows[t][5] || '').toLowerCase();
-            if (tmEstado === 'completado') continue;
-            const tmNombre = String(tmRows[t][4] || '').trim().toLowerCase();
-            if (tmNombre !== authCliente.toLowerCase()) continue;
-
-            // Encontrar el área de esta staff en el TM
-            for (let a = 0; a < 4; a++) {
-              const base      = TM_AREA_COL[a];
-              const areaStaff = String(tmRows[t][base + 2] || '').trim();
-              if (areaStaff !== authStaff) continue;
-              const estadoArea = String(tmRows[t][base + 3] || '').trim().toLowerCase();
-              if (estadoArea === 'completado') continue; // área ya cerrada, no sumar
-
-              // Sumar el precio del extra al TM_PRECIO_COL del área
-              const precioActual = Number(tmRows[t][TM_PRECIO_COL[a]] || 0);
-              const nuevoPrecio  = precioActual + authPrecio;
-              const tmRowNum     = t + 3;
-              wsTM.getRange(tmRowNum, TM_PRECIO_COL[a] + 1).setValue(nuevoPrecio);
-
-              // Recalcular total promo del TM (col 36 = AJ, idx 35)
-              const nuevosPrecios = TM_PRECIO_COL.map(function(c, idx) {
-                return idx === a ? nuevoPrecio : Number(tmRows[t][c] || 0);
-              });
-              const nuevoTotalPromo = nuevosPrecios.reduce(function(s, v) { return s + v; }, 0);
-              wsTM.getRange(tmRowNum, 36).setValue(nuevoTotalPromo); // col AJ = precioPromoTotal
-
-              Logger.log('TM ' + tmId + ': área ' + a + ' precio actualizado ' + precioActual + ' → ' + nuevoPrecio + ' (extra: ' + authServicio + ')');
-              break;
-            }
-            break; // solo el primer TM activo de esta clienta
-          }
-        } catch(eTM) { Logger.log('Error actualizando TM con extra: ' + eTM); }
-      }
-
-      // espejo Lineas: sumar el extra aprobado a la línea activa de esa clienta+área
-      try { lineaAgregarExtra(authCodigo, authArea, authStaff, authServicio, authPrecio); } catch (eLn) { Logger.log('espejo extra Lineas: ' + eLn); }
-
-      // ── FIX: si es un cambio de promo a SN, cancelar las otras áreas del SP- ──
-      const authIdEsperaSP = String(rows[i][12] || ''); // col M = idEsperaSP
-      const authEsCambioPromo = String(rows[i][13] || '').toLowerCase() === 'true'; // col N
-      if (authEsCambioPromo && authIdEsperaSP.startsWith('SP-')) {
-        try {
-          Logger.log('handleAprobarAutorizacion: cancelando áreas del SP- ' + authIdEsperaSP + ' excepto área de ' + authStaff);
-          // Buscar el SP- en ListaEspera y marcarlo como cancelado por cambio
-          const wsLE = getSheet('ListaEspera');
-          if (wsLE) {
-            const leRows = wsLE.getDataRange().getValues();
-            for (let le = 1; le < leRows.length; le++) {
-              if (String(leRows[le][0] || '').trim() === authIdEsperaSP) {
-                // Marcar el SP- como 'cancelado_cambio' para que no vuelva a aparecer
-                wsLE.getRange(le + 1, 7).setValue('cancelado_cambio');
-                Logger.log('SP- ' + authIdEsperaSP + ' marcado como cancelado_cambio en ListaEspera');
-                break;
-              }
-            }
-          }
-          // Anular las líneas del SP- en Lineas que NO son del área de esta staff
-          try { anularLineasPendientesPorRef(authIdEsperaSP, 'cambio_a_SN_' + authStaff); } catch(eLn2) {
-            Logger.log('anular Lineas SP- por cambio: ' + eLn2);
-          }
-        } catch(eSP) { Logger.log('Error cancelando SP- por cambio: ' + eSP); }
-      }
-
-      return { 
-        success: true, 
-        message: 'Servicio aprobado',
-        clienteCodigo: authCodigo,
-        clienteNombre: authCliente,
-        staffNombre: authStaff,
-        esCambioPromo: authEsCambioPromo,
-        idEsperaSP: authIdEsperaSP
-      };
-    }
-  }
-  
-  return { success: false, message: 'Solicitud no encontrada' };
-}
-
-function handleRechazarAutorizacion(data) {
-  const ws = getSheet('Autorizaciones');
-  if (!ws) {
-    return { success: false, message: 'No hay solicitudes de autorización' };
-  }
-  
-  const rows = ws.getDataRange().getValues();
-  
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === String(data.authId).trim()) {
-      // Actualizar estado
-      ws.getRange(i + 1, 11).setValue('rechazado');
-      ws.getRange(i + 1, 12).setValue('Rechazado por admin el ' + Utilities.formatDate(new Date(), 'America/Guayaquil', 'dd/MM HH:mm'));
+      // Llamar al backend para devolver a lista de espera
+      // totalAcumulado = lo que ya cobró esta área (promo + extras) + lo que cobrará la siguiente
+      const svcsActuales = slotServices[slot] || [];
+      const svcsAprobadosAhora = svcsActuales.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
       
-      return { 
-        success: true, 
-        message: 'Servicio rechazado',
-        clienteCodigo: rows[i][3],
-        clienteNombre: rows[i][4],
-        staffNombre: rows[i][5]
-      };
-    }
-  }
-  
-  return { success: false, message: 'Solicitud no encontrada' };
-}
+      // montoYaHecho = solo la parte de esta staff (no el total de la promo)
+      // Para promos multi-área usamos la memoria (slotServices) que tiene el precio de su área
+      const montoYaHechoMemoria = svcsAprobadosAhora.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      const montoYaHecho = montoYaHechoMemoria > 0 ? montoYaHechoMemoria : (Number(data.total) || 0);
+      const montoSiguiente = siguienteDivision ? (Number(siguienteDivision.monto) || 0) : 0;
+      const totalAcumulado = montoYaHecho + montoSiguiente;
 
+      // Desglose completo de esta staff (promo + todos los extras aprobados)
+      const desgloseEstaChica = svcsAprobadosAhora
+        .map(s => ({ staff: user?.name || '', servicio: s.name, area: s.area || '', monto: Number(s.price || 0) }));
 
-// ============================================
-// HISTORIAL DE SERVICIOS COBRADOS
-// ============================================
-
-function handleGetServiciosCobrados(data) {
-  const ws = getSheet("CierresPagos");
-  if (!ws) {
-    return { success: true, servicios: [] };
-  }
-  
-  const rows = ws.getDataRange().getValues();
-  const servicios = [];
-  const filtro = data.filtro || "hoy";
-  const tz = "America/Guayaquil";
-  const hoyStr = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd");
-
-  // Red de seguridad: ignorar filas IDÉNTICAS (mismo fecha+hora+cliente+staff+servicio+
-  // total+método+referencia). Si por un doble guardado quedó una fila repetida en
-  // CierresPagos, la caja no la cuenta dos veces. Las líneas de un combo NO se colapsan
-  // porque su referencia (col 8 = idTM-A1/A2) es distinta por línea.
-  const _vistos = {};
-
-  // Días hacia atrás según filtro (0 = solo hoy)
-  let diasAtras = 0;
-  if (filtro === "ayer") diasAtras = 1;
-  else if (filtro === "semana") diasAtras = 7;
-  else if (filtro === "mes") diasAtras = 30;
-
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    // Solo filas de cobro real: col A debe ser una Fecha (las filas de cierre semanal
-    // guardan un texto/número en col A y deben ignorarse aquí)
-    if (!(row[0] instanceof Date)) continue;
-    const fechaCobro = row[0];
-
-    // Saltar filas exactamente duplicadas
-    const _clave = [
-      Utilities.formatDate(fechaCobro, tz, "yyyy-MM-dd HH:mm"),
-      String(row[1] || ''), String(row[2] || ''), String(row[3] || ''),
-      String(row[4] || ''), String(row[5] || ''), String(row[6] || ''), String(row[7] || '')
-    ].join('|');
-    if (_vistos[_clave]) continue;
-    _vistos[_clave] = true;
-
-    const cobroStr = Utilities.formatDate(fechaCobro, tz, "yyyy-MM-dd");
-    if (filtro === "ayer") {
-      const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
-      if (cobroStr !== Utilities.formatDate(ayer, tz, "yyyy-MM-dd")) continue;
-    } else if (filtro === "hoy") {
-      if (cobroStr !== hoyStr) continue;
-    } else {
-      // semana / mes: incluir desde (hoy - diasAtras) en adelante
-      const limite = new Date(); limite.setDate(limite.getDate() - diasAtras);
-      if (cobroStr < Utilities.formatDate(limite, tz, "yyyy-MM-dd")) continue;
-    }
-
-    servicios.push({
-      fecha: Utilities.formatDate(fechaCobro, tz, "dd/MM/yyyy"),
-      hora: row[1],
-      clienteNombre: row[2],
-      staffNombre: row[3],
-      servicio: row[4],
-      total: row[5],
-      metodoPago: row[6],
-      // Si hay varios staff, parsear el detalle
-      serviciosDetalle: (function(){ try { return row[7] && String(row[7]).charAt(0) === '[' ? JSON.parse(row[7]) : null; } catch(e){ return null; } })()
-    });
-  }
-  
-  // Ordenar por fecha descendente
-  servicios.sort((a, b) => {
-    const dateA = new Date(a.fecha.split("/").reverse().join("-") + " " + a.hora);
-    const dateB = new Date(b.fecha.split("/").reverse().join("-") + " " + b.hora);
-    return dateB - dateA;
-  });
-  
-  return { success: true, servicios: servicios };
-}
-
-// ============================================
-// LIMPIEZA: quitar filas DUPLICADAS de CierresPagos (lo que ve la caja de Mikaela).
-// Ejecutar UNA vez desde el editor de Apps Script (botón ▶ Ejecutar) cuando un cobro
-// quedó registrado dos veces. Conserva la PRIMERA fila de cada grupo idéntico y borra
-// las repetidas. Es seguro: solo borra filas idénticas en TODAS las columnas
-// (fecha+hora+cliente+staff+servicio+total+método+referencia), por lo que las líneas
-// de un combo (referencia idTM-A1/A2 distinta) NO se tocan.
-// Devuelve cuántas filas borró y un detalle en el log.
-// ============================================
-function limpiarDuplicadosCierresPagos() {
-  const ws = getSheet('CierresPagos');
-  if (!ws) return { error: 'No existe la hoja CierresPagos' };
-  const data = ws.getDataRange().getValues();
-  const tz = 'America/Guayaquil';
-  const vistos = {};
-  const aBorrar = [];   // números de fila (1-indexados) a eliminar
-  const detalle = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const r = data[i];
-    if (!(r[0] instanceof Date)) continue; // ignorar filas de cierre semanal / encabezados raros
-    const fechaStr = Utilities.formatDate(r[0], tz, 'yyyy-MM-dd HH:mm');
-    const clave = [
-      fechaStr, String(r[1] || ''), String(r[2] || ''), String(r[3] || ''),
-      String(r[4] || ''), String(r[5] || ''), String(r[6] || ''), String(r[7] || '')
-    ].join('|');
-    if (vistos[clave]) {
-      aBorrar.push(i + 1);
-      detalle.push((i + 1) + ': ' + String(r[2] || '') + ' · ' + String(r[4] || '') + ' · $' + String(r[5] || '') + ' · ' + String(r[6] || ''));
-    } else {
-      vistos[clave] = true;
-    }
-  }
-
-  // Borrar de abajo hacia arriba para no descuadrar los índices
-  aBorrar.sort(function (a, b) { return b - a; }).forEach(function (fila) {
-    ws.deleteRow(fila);
-  });
-
-  Logger.log('Filas duplicadas borradas: ' + aBorrar.length);
-  detalle.forEach(function (d) { Logger.log('  borrada → ' + d); });
-  return { success: true, borradas: aBorrar.length, detalle: detalle };
-}
-function handleLimpiarAtenciones() {
-  try {
-    const ws = getSheet('Atenciones');
-    const lastRow = ws.getLastRow();
-    if (lastRow > 3) {
-      ws.deleteRows(4, lastRow - 3);
-    }
-    // Actualizar encabezados con la nueva estructura
-    ws.getRange(3, 1, 1, 12).setValues([[
-      'ID atención', 'Fecha', 'Hora entrada', 'Hora salida',
-      'Código cliente', 'Cliente', 'Staff', 'Servicio',
-      'Estado', 'Total', 'Método pago', 'ID Ticket (LE-)'
-    ]]);
-    return { success: true, message: 'Atenciones limpiadas. ' + (lastRow - 3) + ' registros eliminados.' };
-  } catch(e) {
-    return { success: false, message: e.toString() };
-  }
-}
-
-// ============================================
-// PRODUCTOS DE MARCA — hoja 'Marca' en Sheet de NexServ
-// Columnas: A=id, B=Nombre, C=Stock, D=Min, E=Precio, F=Unidad
-// Datos desde fila 2
-// ============================================
-
-function getMarcaSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let ws = ss.getSheetByName('Marca');
-  if (!ws) {
-    // Crear hoja Marca si no existe con los productos iniciales
-    ws = ss.insertSheet('Marca');
-    ws.getRange(1, 1, 1, 6).setValues([['ID', 'Nombre', 'Stock', 'Min', 'Precio', 'Unidad']]);
-    ws.getRange(1, 1, 1, 6).setFontWeight('bold');
-    ws.getRange(1, 1, 1, 6).setBackground('#1a1a1a');
-    ws.getRange(1, 1, 1, 6).setFontColor('white');
-    const productos = [
-      [1,  'Gel fijador de cejas tipo brow',  36,  5, 12, 'Unidad'],
-      [2,  'Gel fijador de cejas tipo rimel', 10,  5, 12, 'Unidad'],
-      [3,  'Pomada dark Brown',               12,  1, 10, 'Unidad'],
-      [4,  'Brocha 2 en 1 Pequeña',           56,  5,  5, 'Unidad'],
-      [5,  'Brocha 2 en 1 Grande',            14,  3,  8, 'Unidad'],
-      [6,  'Brocha Rubor',                    45,  5,  9, 'Unidad'],
-      [7,  'Brocha de Contorno',              18,  5,  9, 'Unidad'],
-      [8,  'Brocha de Cejas',                103,  5, 10, 'Unidad'],
-      [9,  'Brocha difuminar',                81,  5,  8, 'Unidad'],
-      [10, 'Brocha de Contorno (cejas)',       29,  5,  8, 'Unidad'],
-      [11, 'Tijera',                            2,  1,  9, 'Unidad'],
-      [12, 'Ventilador',                        4,  1, 15, 'Unidad'],
-      [13, 'Lápiz Dark Brown',                14,  3, 15, 'Unidad'],
-      [14, 'Lápiz Chocolate',                 11,  3, 15, 'Unidad'],
-      [15, 'Lápiz Gray',                       9,  3, 15, 'Unidad'],
-      [16, 'Lápiz Blonde',                     2,  2, 15, 'Unidad'],
-    ];
-    ws.getRange(2, 1, productos.length, 6).setValues(productos);
-    // Ajustar ancho columnas
-    ws.setColumnWidth(1, 40);
-    ws.setColumnWidth(2, 260);
-    ws.setColumnWidth(3, 70);
-    ws.setColumnWidth(4, 60);
-    ws.setColumnWidth(5, 80);
-    ws.setColumnWidth(6, 80);
-  }
-  return ws;
-}
-
-function handleGetMarcaProductos() {
-  try {
-    const ws = getMarcaSheet();
-    const lastRow = ws.getLastRow();
-    if (lastRow < 2) return { success: true, productos: [] };
-
-    const data = ws.getRange(2, 1, lastRow - 1, 6).getValues();
-    const productos = [];
-    for (let i = 0; i < data.length; i++) {
-      const nombre = String(data[i][1] || '').trim();
-      if (!nombre) continue;
-      productos.push({
-        nombre,
-        stock:  Number(data[i][2] || 0),
-        minimo: Number(data[i][3] || 0),
-        precio: Number(data[i][4] || 0),
-        rowNum: i + 2
+      const result = await apiPost('continuarPromoALista', {
+        idEspera: window._as1IdEspera || '',
+        chicaNombre: user?.name || '',
+        clienteNombre: displayName,
+        servicio: data.svcNames,
+        total: data.total,
+        promoNombre: data.promoNombre,
+        precioRegular: data.precioRegular,
+        areaCompletada: areaActual,
+        montoChica: String(montoYaHecho),
+        areasFaltantes: serviciosFaltantes,
+        nuevaArea: siguienteArea,
+        montoSiguienteArea: String(montoSiguiente),
+        totalAcumulado: String(totalAcumulado),
+        desgloseChica: JSON.stringify(desgloseEstaChica),
+        servicioActualizado: data.svcNames + ' (✅ completado)'
       });
-    }
-    return { success: true, productos };
-  } catch(e) {
-    return { success: false, productos: [], error: e.toString() };
-  }
-}
+      
+      if (result.success) {
+        // Limpiar slot usando clientKey normalizada
+        if (activePromos[clientKey]) delete activePromos[clientKey];
+        slotServices[slot] = [];
 
-// ============================================
-// REGISTRAR VENTA DE PRODUCTOS AL COBRAR
-// Descuenta stock en SIRA y registra en NexServ
-// ============================================
-// ── Bitácora permanente de observaciones que dejan las staff a la clienta ──
-// Hoja append-only: cada nota queda con fecha/área/staff, nunca se pisa una con otra.
-// Sirve para que en futuras citas cualquier staff se guíe y personalice el servicio.
-function getObservacionesClientaSheet() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let ws = ss.getSheetByName('ObservacionesClienta');
-  if (!ws) {
-    ws = ss.insertSheet('ObservacionesClienta');
-    ws.appendRow(['Fecha', 'Hora', 'Codigo', 'Cliente', 'Area', 'Staff', 'Observacion']);
-  }
-  return ws;
-}
-
-function handleAddObservacionClienta(data) {
-  try {
-    const codigo = String((data && data.codigo) || '').trim();
-    const obs    = String((data && data.observacion) || '').trim();
-    if (!codigo) return { success: false, error: 'Falta el código de la clienta' };
-    if (!obs)    return { success: false, error: 'Observación vacía' };
-    const now = new Date();
-    const tz  = 'America/Guayaquil';
-    const ws  = getObservacionesClientaSheet();
-    ws.appendRow([
-      Utilities.formatDate(now, tz, 'dd/MM/yyyy'),
-      Utilities.formatDate(now, tz, 'HH:mm'),
-      codigo,
-      String((data && data.cliente) || ''),
-      String((data && data.area) || ''),
-      String((data && data.staff) || ''),
-      obs
-    ]);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-function handleRegistrarVentaProductos(data) {
-  try {
-    const now = new Date();
-    const tz = 'America/Guayaquil';
-    const fechaStr = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-    const horaStr = Utilities.formatDate(now, tz, 'HH:mm');
-    const productos = data.productos || [];
-
-    // 1. DESCONTAR STOCK EN HOJA MARCA (NexServ)
-    try {
-      const wsMarca = getMarcaSheet();
-      const lastRow = wsMarca.getLastRow();
-      if (lastRow >= 2) {
-        const marcaData = wsMarca.getRange(2, 1, lastRow - 1, 5).getValues();
-        productos.forEach(prod => {
-          for (let i = 0; i < marcaData.length; i++) {
-            const nombreMarca = String(marcaData[i][1] || '').trim(); // col B
-            if (nombreMarca.toLowerCase() === String(prod.nombre || '').toLowerCase()) {
-              const rowNum = i + 2;
-              const stockActual = Number(marcaData[i][2] || 0); // col C
-              const nuevoStock = Math.max(0, stockActual - Number(prod.cantidad || 1));
-              wsMarca.getRange(rowNum, 3).setValue(nuevoStock); // col C = Stock
-              break;
-            }
-          }
-        });
-      }
-    } catch(eMarca) {
-      Logger.log('Error descontando stock Marca: ' + eMarca.toString());
-    }
-
-    // 2. GUARDAR EN CierresPagos de NexServ
-    // FIX: el método de pago iba fijo en 'Producto', que la caja no reconoce y
-    // contaba SIEMPRE como efectivo (una venta con tarjeta caía en efectivo).
-    // Ahora se guarda el método real que mandó el frontend. El producto se sigue
-    // identificando por el prefijo 🛍 en el nombre, no por el método.
-    // 'mixto' no se puede repartir bien para un producto suelto → cae a Efectivo.
-    let metodoVenta = String(data.metodoPago || '').trim();
-    if (!metodoVenta || /^mixto/i.test(metodoVenta)) metodoVenta = 'Efectivo';
-    const wsPagos = getSheet('CierresPagos');
-    productos.forEach(p => {
-      wsPagos.appendRow([
-        now,
-        horaStr,
-        data.clienteNombre || '',
-        'admin',
-        '🛍 ' + p.nombre + (p.cantidad > 1 ? ' x' + p.cantidad : ''),
-        Number(p.precio) * Number(p.cantidad || 1),
-        metodoVenta,
-        data.idEspera || ''
-      ]);
-    });
-
-    // 3. REGISTRAR EN HistorialOwner — columnas correctas:
-    // A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-    try {
-      const wsHist = getSheet('HistorialOwner');
-      wsHist.appendRow([
-        fechaStr,                                                                    // A: Fecha
-        horaStr,                                                                     // B: Hora
-        '',                                                                          // C: Codigo (no aplica para productos)
-        data.clienteNombre || 'Venta directa',                                      // D: Cliente — fallback para que el historial lo incluya siempre
-        '',                                                                          // E: Top
-        '🛍 ' + productos.map(p => p.nombre + (p.cantidad > 1 ? ' x'+p.cantidad : '')).join(', '), // F: Servicio
-        'Producto',                                                                  // G: Area
-        prop_('ADMIN_NOMBRE') || 'admin',                                           // H: Staff
-        Number(data.total || 0),                                                     // I: Valor
-        0,                                                                           // J: Comision (sin comisión)
-        'Producto'                                                                   // K: MetodoPago (para filtrar)
-      ]);
-    } catch(e) { Logger.log('Error guardando producto en HistorialOwner: ' + e); }
-
-    return { success: true };
-  } catch(e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-// ============================================
-// ELIMINAR SERVICIO — borra de HistorialOwner y revierte comisión
-// Disponible para Mikaela (admin) y Humberto (owner)
-// ============================================
-function handleEliminarServicio(data) {
-  try {
-    const fecha   = String(data.fecha   || '').trim();
-    const hora    = String(data.hora    || '').trim();
-    const cliente = String(data.cliente || '').trim().toLowerCase();
-    const staff   = String(data.staff   || '').trim().toLowerCase();
-    const servicio= String(data.servicio|| '').trim().toLowerCase();
-    const precio  = Number(data.precio  || 0);
-    const comision= Number(data.comision|| 0);
-    const tz = 'America/Guayaquil';
-    const esTM = staff === 'varios' || /ticket multi \(tm-/i.test(servicio);
-    const tmIdMatch = servicio.match(/tm-\d+/i);
-    const tmId = tmIdMatch ? tmIdMatch[0].toUpperCase() : null;
-    let eliminadoHist = false;
-    const staffsAfectados = {};
-
-    // 1. Eliminar de HistorialOwner
-    const wsHist = getSheet('HistorialOwner');
-    const histData = wsHist.getDataRange().getValues();
-    for (let i = histData.length - 1; i >= 3; i--) {
-      const rowFecha = histData[i][0] instanceof Date
-        ? Utilities.formatDate(histData[i][0], tz, 'dd/MM/yyyy')
-        : String(histData[i][0] || '');
-      const rowCliente  = String(histData[i][3] || '').trim().toLowerCase();
-      const rowStaff    = String(histData[i][7] || '').trim().toLowerCase();
-      const rowServicio = String(histData[i][5] || '').trim().toLowerCase();
-      const rowPrecio   = Number(histData[i][8] || 0);
-      const rowComision = Number(histData[i][9] || 0);
-      const matchFecha   = rowFecha === fecha;
-      const matchCliente = rowCliente.includes(cliente) || cliente.includes(rowCliente);
-      let debeEliminar = false;
-      if (esTM && tmId) {
-        const esFilaTM = rowServicio.includes(tmId.toLowerCase()) ||
-          (matchFecha && matchCliente && (rowStaff === 'varios' || rowServicio.includes('ticket multi')));
-        debeEliminar = matchFecha && matchCliente && esFilaTM;
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        
+        const promasExtMsg = (data.promasExtraPendientes || []).map(p => p.nombre).join(' + ');
+        const faltaTotal = serviciosFaltantes + (promasExtMsg ? ' + ' + promasExtMsg : '');
+        // Mostrar resumen completo con todos los servicios realizados (promo + extras)
+        const resumenServicios = svcsAprobadosAhora.map(s => s.name + ' $' + s.price).join(' + ');
+        alert('Servicio completado.\n\n' +
+              '- ' + areaActual.toUpperCase() + ': ' + resumenServicios + ' = $' + montoYaHecho + ' (completado)\n' +
+              '- Falta: ' + faltaTotal + '\n\n' +
+              'La clienta volvio a lista de espera para continuar.');
+        show('staffHome');
       } else {
-        const matchStaff   = staff === '' || rowStaff.includes(staff) || staff.includes(rowStaff);
-        const matchServicio= rowServicio.includes(servicio.substring(0, 15)) || servicio.includes(rowServicio.substring(0, 15));
-        debeEliminar = matchFecha && matchCliente && matchStaff && matchServicio;
+        alert('Error: ' + (result.message || 'No se pudo devolver a lista'));
       }
-      if (debeEliminar) {
-        if (rowStaff && rowStaff !== 'varios' && rowComision > 0) {
-          if (!staffsAfectados[rowStaff]) staffsAfectados[rowStaff] = { precio: 0, comision: 0 };
-          staffsAfectados[rowStaff].precio   += rowPrecio;
-          staffsAfectados[rowStaff].comision += rowComision;
-        }
-        wsHist.deleteRow(i + 1);
-        eliminadoHist = true;
-        if (!esTM) break;
-      }
-    }
-
-    // 2. Eliminar de ServicioNormal y ServicioPromo (lo que ve la staff en "Servicios de hoy")
-    try {
-      // ServicioNormal
-      const wsN = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-      const rowsN = wsN.getDataRange().getValues();
-      for (let i = rowsN.length - 1; i >= 1; i--) {
-        const rFechaN = rowsN[i][1] instanceof Date
-          ? Utilities.formatDate(rowsN[i][1], tz, 'dd/MM/yyyy')
-          : String(rowsN[i][1] || '');
-        const rClienteN = String(rowsN[i][4] || '').trim().toLowerCase();
-        const rStaffN   = String(rowsN[i][9] || '').trim().toLowerCase();
-        const matchN = rFechaN === fecha &&
-          (rClienteN.includes(cliente) || cliente.includes(rClienteN)) &&
-          (staff === '' || rStaffN.includes(staff) || staff.includes(rStaffN));
-        if (matchN) { wsN.deleteRow(i + 1); if (!esTM) break; }
-      }
-    } catch(eN2) {}
-
-    try {
-      // ServicioPromo
-      const wsP = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-      const rowsP = wsP.getDataRange().getValues();
-      for (let i = rowsP.length - 1; i >= 1; i--) {
-        const rFechaP = rowsP[i][1] instanceof Date
-          ? Utilities.formatDate(rowsP[i][1], tz, 'dd/MM/yyyy')
-          : String(rowsP[i][1] || '');
-        const rClienteP = String(rowsP[i][4] || '').trim().toLowerCase();
-        const rStaffP   = String(rowsP[i][9] || '').trim().toLowerCase();
-        const matchP = rFechaP === fecha &&
-          (rClienteP.includes(cliente) || cliente.includes(rClienteP)) &&
-          (staff === '' || rStaffP.includes(staff) || staff.includes(rStaffP));
-        if (matchP) { wsP.deleteRow(i + 1); if (!esTM) break; }
-      }
-    } catch(eP2) {}
-
-    // 3. Eliminar de TicketMulti si es TM
-    if (esTM && tmId) {
-      try {
-        const wsTM = getTMSheet();
-        const tmRows = wsTM.getDataRange().getValues();
-        for (let i = tmRows.length - 1; i >= 2; i--) {
-          if (String(tmRows[i][0] || '').trim().toUpperCase() === tmId) {
-            // espejo Lineas: anular TODOS los slots del TM antes de borrar la fila
-            try {
-              for (let _s = 0; _s < 4; _s++) { anularLineaSlotTM(tmId, _s); }
-            } catch (eLnTM) { Logger.log('espejo eliminarServicio TM Lineas: ' + eLnTM); }
-            wsTM.deleteRow(i + 1);
-            break;
-          }
-        }
-      } catch(eTM2) {}
-    }
-
-    // espejo Lineas: si es un servicio individual (no TM), anular (NO borrar) la línea
-    // del servicio eliminado, dejando el registro con estado 'anulado' y quién lo quitó.
-    // El caso TM ya se maneja arriba con anularLineaSlotTM.
-    if (!esTM) {
-      try { anularLineaEliminada(data.cliente, data.staff, data.servicio, precio, data.staff); }
-      catch (eLnEl) { Logger.log('espejo eliminar Lineas: ' + eLnEl); }
-    }
-
-    // 4. Eliminar de CierresPagos (lo que ve la caja chica)
-    // FIX: antes se identificaba la fila por cliente+fecha+que el TOTAL coincidiera
-    // (Math.abs(rowTotal - precio) < 0.5). El total NO es confiable: un servicio puede
-    // estar en el historial con un monto distinto al de cada fila de pago (cobros
-    // divididos, promo vs regular, $20 combinado vs dos $10). Cuando no coincidía,
-    // la fila quedaba huérfana en caja chica aunque sí se borrara del historial.
-    // Ahora se identifica por la misma identidad que HistorialOwner:
-    // cliente + fecha + staff + servicio. El total solo se usa de respaldo cuando
-    // no llega servicio. Col: [2]=Cliente [3]=Staff [4]=Servicio [5]=Total.
-    try {
-      const wsPagos = getSheet('CierresPagos');
-      const pagosData = wsPagos.getDataRange().getValues();
-      for (let i = pagosData.length - 1; i >= 1; i--) {
-        const rowCliente2  = String(pagosData[i][2] || '').trim().toLowerCase();
-        const rowStaff2    = String(pagosData[i][3] || '').trim().toLowerCase();
-        const rowServicio2 = String(pagosData[i][4] || '').trim().toLowerCase();
-        const rowTotal2    = Number(pagosData[i][5] || 0);
-        const rowFecha2    = pagosData[i][0] instanceof Date
-          ? Utilities.formatDate(pagosData[i][0], tz, 'dd/MM/yyyy')
-          : String(pagosData[i][0] || '');
-        const matchFecha2   = rowFecha2 === fecha;
-        const matchCliente2 = rowCliente2.includes(cliente) || cliente.includes(rowCliente2);
-        let matchPago;
-        if (esTM && tmId) {
-          // TM: puede tener varias filas (una por área) → borrar todas las del cliente/fecha
-          matchPago = matchFecha2 && matchCliente2;
-        } else {
-          const matchStaff2 = staff === '' || rowStaff2.includes(staff) || staff.includes(rowStaff2);
-          // Preferir identidad por servicio; si no llega servicio, usar total como respaldo
-          const matchServicio2 = servicio !== '' &&
-            (rowServicio2.includes(servicio.substring(0, 15)) || servicio.includes(rowServicio2.substring(0, 15)));
-          const matchTotalFallback = servicio === '' && Math.abs(rowTotal2 - precio) < 0.5;
-          matchPago = matchFecha2 && matchCliente2 && matchStaff2 && (matchServicio2 || matchTotalFallback);
-        }
-        if (matchPago) {
-          wsPagos.deleteRow(i + 1);
-          if (!esTM) break;
-        }
-      }
-    } catch(e) {}
-
-    // 5. Revertir comisiones
-    try {
-      const wsComm = getSheet('Comisiones');
-      const commData = wsComm.getDataRange().getValues();
-      const staffsParaRevertir = esTM && Object.keys(staffsAfectados).length > 0
-        ? staffsAfectados
-        : (staff !== '' ? { [staff]: { precio: precio, comision: comision } } : {});
-      for (const [staffNombre, montos] of Object.entries(staffsParaRevertir)) {
-        for (let i = commData.length - 1; i >= 3; i--) {
-          const rowChica = String(commData[i][0] || '').trim().toLowerCase();
-          if (rowChica.includes(staffNombre) || staffNombre.includes(rowChica)) {
-            wsComm.getRange(i + 1, 4).setValue(Math.max(0, Number(commData[i][3]||0) - montos.precio));
-            wsComm.getRange(i + 1, 6).setValue(Math.max(0, Number(commData[i][5]||0) - montos.comision));
-            break;
-          }
-        }
-      }
-    } catch(e) {}
-
-    if (!eliminadoHist) {
-      // Intentar matching más flexible — solo por cliente + staff + precio (sin fecha estricta)
-      const wsHist2 = getSheet('HistorialOwner');
-      const histData2 = wsHist2.getDataRange().getValues();
-      for (let i = histData2.length - 1; i >= 3; i--) {
-        const rowCliente2  = String(histData2[i][3] || '').trim().toLowerCase();
-        const rowStaff2    = String(histData2[i][7] || '').trim().toLowerCase();
-        const rowServicio2 = String(histData2[i][5] || '').trim().toLowerCase();
-        const rowPrecio2   = Number(histData2[i][8] || 0);
-        const rowHora2     = histData2[i][1] instanceof Date
-          ? Utilities.formatDate(histData2[i][1], tz, 'HH:mm')
-          : String(histData2[i][1] || '');
-        const matchCliente2  = rowCliente2.includes(cliente) || cliente.includes(rowCliente2);
-        const matchStaff2    = staff === '' || rowStaff2.includes(staff) || staff.includes(rowStaff2);
-        const matchServicio2 = rowServicio2.includes(servicio.substring(0, 12)) || servicio.includes(rowServicio2.substring(0, 12));
-        const matchPrecio2   = Math.abs(rowPrecio2 - precio) < 0.5;
-        const matchHora2     = !hora || rowHora2 === hora || rowHora2.startsWith(hora.substring(0,5));
-        if (matchCliente2 && matchStaff2 && matchServicio2 && matchPrecio2 && matchHora2) {
-          const rowStaff2Val  = String(histData2[i][7] || '');
-          const rowComision2  = Number(histData2[i][9] || 0);
-          if (rowStaff2Val && rowComision2 > 0) {
-            if (!staffsAfectados[rowStaff2Val.toLowerCase()]) staffsAfectados[rowStaff2Val.toLowerCase()] = { precio: 0, comision: 0 };
-            staffsAfectados[rowStaff2Val.toLowerCase()].precio   += rowPrecio2;
-            staffsAfectados[rowStaff2Val.toLowerCase()].comision += rowComision2;
-          }
-          wsHist2.deleteRow(i + 1);
-          eliminadoHist = true;
-          break;
-        }
-      }
-    }
-
-    if (!eliminadoHist) {
-      return { success: false, error: 'No se encontró el registro en HistorialOwner. Verificá que el servicio no haya sido eliminado ya.' };
-    }
-
-    return { success: true, eliminado: true };
-  } catch(e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-// ============================================================
-// PESTAÑAS NUEVAS: ServicioNormal y ServicioPromo
-// ============================================================
-
-var COLS_NORMAL = [
-  'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área','Prioridad',
-  'Estado','Tomada por','Hora tomada','Observaciones','Total',
-  'Promo nombre','Método pago','Hora cobro','Total cobrado','Desglose (JSON)',
-  'Tipo','Precio Normal','Precio Promo'
-];
-
-var COLS_PROMO = [
-  'ID','Fecha','Hora llegada','Código','Nombre','Servicio','Área actual','Prioridad',
-  'Estado','Tomada por','Hora tomada','Observaciones','Total acumulado',
-  'Promo nombre','Precio promo','Precio regular','Área completada','Desglose staff (JSON)',
-  'Tipo','Precio Normal','Precio Promo','Promos Extra (JSON)'
-];
-
-function getOrCreateSheet(nombre, columnas) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let ws = ss.getSheetByName(nombre);
-  if (!ws) {
-    ws = ss.insertSheet(nombre);
-    ws.getRange(1, 1, 1, columnas.length).setValues([columnas]);
-    ws.getRange(1, 1, 1, columnas.length).setFontWeight('bold').setBackground('#f0f0f0');
-    ws.setFrozenRows(1);
-    ws.setColumnWidth(1, 90);
-    ws.setColumnWidth(5, 160);
-    ws.setColumnWidth(6, 200);
-  }
-  return ws;
-}
-
-function handleInicializarPestanas() {
-  try {
-    getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    return { success: true, message: 'Pestañas ServicioNormal y ServicioPromo listas' };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── Generar ID único para ServicioPromo ──────────────────────
-function getNextIdPromo() {
-  const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-  const data = ws.getDataRange().getValues();
-  let max = 0;
-  for (let i = 1; i < data.length; i++) {
-    const id = String(data[i][0] || '');
-    if (id.startsWith('SP-')) {
-      const n = parseInt(id.replace('SP-', '')) || 0;
-      if (n > max) max = n;
+    } catch (err) {
+      console.error(err);
+      alert('Error al devolver a lista de espera');
     }
   }
-  return 'SP-' + String(max + 1).padStart(4, '0');
-}
+  
+  async function finishAndNextPromo() {
+    // Finalizar la parte actual y activar la siguiente promo del ticket
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot || 1;
+    const siguientePromo = data.promasExtraPendientes && data.promasExtraPendientes[0];
 
-// ── AGREGAR clienta a ServicioPromo ──────────────────────────
-function handleAddServicioPromo(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const now = new Date();
-    const tz = 'America/Guayaquil';
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-    const id    = getNextIdPromo();
+    if (!siguientePromo) { alert('No hay siguiente promo'); return; }
 
-    const precioPromo   = Number(data.precioPromo   || data.total || 0);
-    const precioRegular = Number(data.precioRegular || precioPromo);
-    // precioMiArea = precio de la primera área que va a atender
-    const precioMiArea  = Number(data.precioMiArea  || precioPromo);
+    closeModal();
 
-    const promasExtraJSON = data.promasExtra && data.promasExtra.length > 0
-      ? JSON.stringify(data.promasExtra) : '';
-
-    ws.appendRow([
-      id,                          // A: ID
-      fecha,                       // B: Fecha
-      hora,                        // C: Hora llegada
-      _san(data.codigo    || ''), // D: Código cliente
-      _san(data.nombre    || ''), // E: Nombre
-      _san(data.servicio  || data.promoNombre || ''), // F: Servicio
-      _san(data.area      || ''), // G: Área actual
-      data.prioridad || 'Normal',  // H: Prioridad
-      'Esperando', // I: Estado (la asignación va en col J; la lectura deriva asignadaA)
-      data.asignadaA || '',        // J: Tomada por
-      '',                          // K: Hora tomada
-      _san(data.observaciones || ''), // L: Observaciones
-      precioMiArea,                // M: Total acumulado (precio de esta área)
-      data.promoNombre || '',      // N: Promo nombre
-      precioPromo,                 // O: Precio promo total
-      precioRegular,               // P: Precio regular total
-      '',                          // Q: Área completada
-      '',                          // R: Desglose staff JSON
-      'SP',                        // S: Tipo
-      precioRegular,               // T: Precio Normal total
-      precioPromo,                 // U: Precio Promo total
-      promasExtraJSON              // V: Promos Extra pendientes (JSON)
-    ]);
-
-    // espejo Lineas: promo → 1 linea (promoRef = id del ticket SP-)
     try {
-      lineaDesdeServicioPromo({
-        codigo: data.codigo, nombre: data.nombre,
-        servicio: data.servicio || data.promoNombre, area: data.area,
-        asignadaA: data.asignadaA, promoRef: id,
-        precioPromo: precioPromo, precioRegular: precioRegular,
-        observaciones: data.observaciones
+      // Finalizar la atencion actual (cobra la parte ya realizada)
+      // Las promasExtra restantes son las que vienen despues de la que se activa ahora
+      const promasExtraRestantes = data.promasExtraPendientes.slice(1);
+
+      const result = await apiPost('finalizarAtencion', {
+        idEspera: window._as1IdEspera || '',
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        clienteCodigo: window._as1Client || '',
+        servicio: data.svcNames,
+        total: data.total,
+        promoNombre: data.promoNombre,
+        precioRegular: data.precioRegular,
+        siguientePromo: siguientePromo.nombre,
+        siguientePromoPrecio: siguientePromo.precio,
+        siguientePromoRegular: siguientePromo.regular,
+        siguientePromoArea: siguientePromo._area || 'cejas',
+        promasExtraRestantes: promasExtraRestantes
       });
-    } catch (eLn) {}
-    return { success: true, id: id, message: 'Clienta agregada a ServicioPromo' };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
 
-// ── Generar ID único para ServicioNormal ──────────────────────
-function getNextIdNormal() {
-  const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-  const data = ws.getDataRange().getValues();
-  let max = 0;
-  for (let i = 1; i < data.length; i++) {
-    const id = String(data[i][0] || '');
-    if (id.startsWith('SN-')) {
-      const n = parseInt(id.replace('SN-', '')) || 0;
-      if (n > max) max = n;
-    }
-  }
-  return 'SN-' + String(max + 1).padStart(4, '0');
-}
-
-// ── AGREGAR clienta a ServicioNormal ─────────────────────────
-function handleAddServicioNormal(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const now = new Date();
-    const tz = 'America/Guayaquil';
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-
-    // ── FIX: guardia anti-duplicado ──────────────────────────────────────
-    // Caso real: Mikaela asignó "Retoque efecto polvo" a Rosa para Paula
-    // Espinoza y el sistema creó 4 tickets SN- idénticos (mismo código,
-    // servicio, área y precio) en el mismo minuto, 3 de ellos cayendo a
-    // Keyla. Causa: getNextIdNormal() no tiene protección de duplicado por
-    // contenido — un doble-tap, doble-click sin debounce, o un reintento
-    // automático del fetch del frontend dispara handleAddServicioNormal
-    // varias veces y cada una crea su propia fila con un ID distinto.
-    // El LockService global solo serializa el ORDEN de escritura, no impide
-    // que 4 llamadas reales se ejecuten una tras otra y generen 4 filas.
-    // Esta guardia revisa las últimas filas de HOY: si ya existe una entrada
-    // con el mismo código+servicio+área+total creada en los últimos 90
-    // segundos, se devuelve esa fila existente en vez de crear una nueva.
-    const ventanaMs = 90 * 1000;
-    const dataAll = ws.getDataRange().getValues();
-    for (let i = dataAll.length - 1; i >= Math.max(1, dataAll.length - 30); i--) {
-      const r = dataAll[i];
-      if (String(r[3] || '') !== String(data.codigo || '')) continue;
-      if (String(r[5] || '') !== String(data.servicio || '')) continue;
-      if (String(r[6] || '') !== String(data.area || '')) continue;
-      if (Number(r[12] || 0) !== Number(data.total || 0)) continue;
-      if (String(r[1] || '') !== fecha) continue;
-      // Mismo código+servicio+área+total+fecha → comparar hora (HH:mm) contra ventana
-      const horaPrevia = String(r[2] || '');
-      const [hPrev, mPrev] = horaPrevia.split(':').map(Number);
-      const [hNow, mNow]   = hora.split(':').map(Number);
-      if (isNaN(hPrev) || isNaN(mPrev)) continue;
-      const minutosPrev = hPrev * 60 + mPrev;
-      const minutosNow  = hNow * 60 + mNow;
-      if (Math.abs(minutosNow - minutosPrev) * 60000 <= ventanaMs) {
-        Logger.log('[AddServicioNormal] Duplicado detectado y bloqueado: ' + r[0] + ' para ' + data.codigo);
-        return { success: true, id: String(r[0]), message: 'Servicio ya estaba registrado (duplicado evitado)', duplicadoEvitado: true };
-      }
-    }
-
-    const id = getNextIdNormal();
-
-    ws.appendRow([
-      id,                          // A: ID
-      fecha,                       // B: Fecha
-      hora,                        // C: Hora llegada
-      _san(data.codigo   || ''),   // D: Código cliente
-      _san(data.nombre   || ''),   // E: Nombre
-      _san(data.servicio || ''),   // F: Servicio
-      _san(data.area     || ''),   // G: Área
-      data.prioridad|| 'Normal',   // H: Prioridad
-      'Esperando', // I: Estado (la asignación va en col J; la lectura deriva asignadaA)
-      data.asignadaA|| '',         // J: Tomada por
-      '',                          // K: Hora tomada
-      _san(data.observaciones || ''), // L: Observaciones
-      Number(data.total || 0),     // M: Total
-      '',                          // N: Promo nombre
-      '',                          // O: Método pago
-      '',                          // P: Hora cobro
-      '',                          // Q: Total cobrado
-      data.serviciosDetalle ? JSON.stringify(data.serviciosDetalle) : '', // R: Desglose JSON (servicios combinados)
-      'SN',                        // S: Tipo (SN=normal, SP=promo)
-      Number(data.total || 0),     // T: Precio Normal
-      ''                           // U: Precio Promo
-    ]);
-
-    // ── ESPEJO en Lineas (escritura paralela — Fase 2). No afecta el flujo. ──
-    try { data.ticketId = id; lineaDesdeServicioNormal(data); } catch (eLin) { Logger.log('espejo SN: ' + eLin); }
-
-    return { success: true, id: id, message: 'Clienta agregada a ServicioNormal' };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── LEER lista de ServicioPromo ───────────────────────────────
-function handleGetServicioPromo(params) {
-  try {
-    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const data = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const area = params && params.area ? String(params.area).toLowerCase() : '';
-
-    const esperando  = [];
-    const enServicio = [];
-    const porCobrar  = [];
-    const porVerificar = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const row    = data[i];
-      const estado = String(row[8] || '').toLowerCase().trim();
-      if (!['esperando','en servicio','por cobrar','por verificar'].includes(estado)) continue;
-      const rowArea = String(row[6] || '').toLowerCase();
-      if (area && !rowArea.includes(area) && area !== 'todas') continue;
-
-      const tipo         = String(row[18] || 'SP').trim();
-      const precioNormal = Number(row[19] || row[15] || 0);
-      const precioPromo  = Number(row[20] || row[14] || 0);
-
-      const item = {
-        idEspera    : String(row[0] || ''),
-        fecha       : String(row[1] || ''),
-        horaLlegada : row[2] instanceof Date ? Utilities.formatDate(row[2], tz, 'HH:mm') : String(row[2]||''),
-        codigo      : String(row[3] || ''),
-        nombre      : String(row[4] || ''),
-        servicio    : String(row[5] || ''),
-        area        : String(row[6] || ''),
-        prioridad   : String(row[7] || 'Normal'),
-        estado      : String(row[8] || ''),
-        tomadaPor   : String(row[9] || ''),
-        asignadaA   : (estado === 'esperando' && String(row[9] || '').trim()) ? String(row[9]).trim() : '',
-        horaTomada  : row[10] instanceof Date ? Utilities.formatDate(row[10], tz, 'HH:mm') : String(row[10]||''),
-        observaciones: String(row[11] || ''),
-        total       : tipo === 'SP' ? String(precioPromo) : String(precioNormal),
-        promoNombre : String(row[13] || ''),
-        metodoPago  : String(row[14] || ''),
-        tipo        : tipo,
-        precioNormal: String(precioNormal),
-        precioPromo : String(precioPromo),
-        precioRegular: String(precioNormal),
-        precioMiArea: String(Number(row[12] || 0)),  // col M = monto de esta área
-        serviciosDetalle: (function(){ try { return row[17] ? JSON.parse(row[17]) : null; } catch(e) { return null; } })(), // col R
-        promasExtra: (function(){ try { return row[21] ? JSON.parse(row[21]) : []; } catch(e) { return []; } })(), // col V
-        fuente      : 'ServicioPromo'
-      };
-
-      if (estado === 'esperando')    esperando.push(item);
-      else if (estado === 'en servicio') enServicio.push(item);
-      else if (estado === 'por cobrar')  porCobrar.push(item);
-      else if (estado === 'por verificar') porVerificar.push(item);
-    }
-
-    return { success: true, esperando, enServicio, porCobrar, porVerificar };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── LEER lista de ServicioNormal ──────────────────────────────
-function handleGetServicioNormal(params) {
-  try {
-    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const data = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const area = params && params.area ? String(params.area).toLowerCase() : '';
-
-    const esperando  = [];
-    const enServicio = [];
-    const porCobrar  = [];
-    const porVerificar = [];
-
-    for (let i = 1; i < data.length; i++) {
-      const row    = data[i];
-      const estado = String(row[8] || '').toLowerCase().trim();
-      if (!['esperando','en servicio','por cobrar','por verificar'].includes(estado)) continue;
-
-      // Filtro por área si viene
-      const rowArea = String(row[6] || '').toLowerCase();
-      if (area && !rowArea.includes(area) && area !== 'todas') continue;
-
-      const tipo         = String(row[18] || 'SN').trim(); // S: Tipo SN/SP
-      const precioNormal = Number(row[19] || row[12] || 0); // T: Precio Normal
-      const precioPromo  = Number(row[20] || 0);            // U: Precio Promo
-
-      const item = {
-        idEspera    : String(row[0] || ''),
-        fecha       : String(row[1] || ''),
-        horaLlegada : row[2] instanceof Date ? Utilities.formatDate(row[2], tz, 'HH:mm') : String(row[2]||''),
-        codigo      : String(row[3] || ''),
-        nombre      : String(row[4] || ''),
-        servicio    : String(row[5] || ''),
-        area        : String(row[6] || ''),
-        prioridad   : String(row[7] || 'Normal'),
-        estado      : String(row[8] || ''),
-        tomadaPor   : String(row[9] || ''),
-        asignadaA   : (estado === 'esperando' && String(row[9] || '').trim()) ? String(row[9]).trim() : '',
-        horaTomada  : row[10] instanceof Date ? Utilities.formatDate(row[10], tz, 'HH:mm') : String(row[10]||''),
-        observaciones: String(row[11] || ''),
-        total       : String(row[12] || '0'),
-        promoNombre : String(row[13] || ''),
-        metodoPago  : String(row[14] || ''),
-        tipo        : tipo,
-        precioNormal: String(precioNormal),
-        precioPromo : String(precioPromo),
-        // precioRegular para compatibilidad con cobrarDesdeBtn
-        precioRegular: tipo === 'SP' ? String(precioNormal) : String(precioNormal),
-        serviciosDetalle: (function(){ try { return row[17] ? JSON.parse(row[17]) : null; } catch(e) { return null; } })(), // col R = servicios combinados
-        fuente      : 'ServicioNormal'
-      };
-
-      if (estado === 'esperando')   esperando.push(item);
-      else if (estado === 'en servicio') enServicio.push(item);
-      else if (estado === 'por cobrar')  porCobrar.push(item);
-      else if (estado === 'por verificar') porVerificar.push(item);
-    }
-
-    return { success: true, esperando, enServicio, porCobrar, porVerificar };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── TOMAR clienta de ServicioPromo ───────────────────────────
-function handleTomarServicioPromo(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
-
-    for (let i = 1; i < rows.length; i++) {
-      const id     = String(rows[i][0] || '').trim();
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      if (estado !== 'esperando') continue;
-
-      // Asignación directa: si col J tiene una chica y no es quien intenta tomar, bloquear
-      const asignadaA = String(rows[i][9] || '').trim();
-      if (asignadaA && asignadaA !== String(data.chicaNombre || '').trim()) {
-        return { success: false, message: 'Esta clienta está asignada a ' + asignadaA + '. Solo ella puede tomarla.' };
-      }
-
-      const row = i + 1;
-      ws.getRange(row, 9).setValue('En servicio');
-      ws.getRange(row, 10).setValue(data.chicaNombre || '');
-      ws.getRange(row, 11).setValue(hora);
-
-      // espejo Lineas: la chica tomó → línea a 'en_servicio'
-      try { marcarLineaEnServicioPorCodigo(String(rows[i][3]||''), String(data.idEspera||''), String(rows[i][6]||''), String(rows[i][13]||rows[i][5]||''), data.chicaNombre||''); } catch (eLn) {}
-
-      // Crear registro en Atenciones
-      try {
-        const wsA = getSheet('Atenciones');
-        const fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
-        const aData = wsA.getDataRange().getValues();
-        let maxAt = 0;
-        for (let j = 3; j < aData.length; j++) {
-          const aid = String(aData[j][0]||'');
-          if (aid.startsWith('AT-')) { const n = parseInt(aid.replace('AT-','')); if (n > maxAt) maxAt = n; }
+      if (result.success) {
+        // Limpiar slot actual
+        delete activePromos[normalizeClientKey(data.clientName)];
+        slotServices[slot] = [];
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
         }
-        const atId = 'AT-' + String(maxAt + 1).padStart(4, '0');
-        wsA.appendRow([atId, fecha, hora, '', String(rows[i][3]||''), String(rows[i][4]||''),
-          data.chicaNombre||'', String(rows[i][5]||''), 'En servicio', '', '', id, String(rows[i][6]||'')]);
-      } catch(eA) {}
-
-      _pushMikaela('👤 Clienta tomada', String(data.chicaNombre || 'Una chica') + ' tomó a ' + String(rows[i][4] || 'una clienta') + (rows[i][5] ? ' · ' + rows[i][5] : ''));
-      return { success: true, message: 'Clienta tomada' };
-    }
-    return { success: false, message: 'Ticket SP no encontrado' };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
-// ── FINALIZAR servicio promo → Por cobrar ─────────────────────
-function handleFinalizarServicioPromo(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-
-    for (let i = 1; i < rows.length; i++) {
-      const id     = String(rows[i][0] || '').trim();
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      if (estado !== 'en servicio') continue;
-
-      const row = i + 1;
-      ws.getRange(row, 9).setValue('Por verificar');
-        try { _avisarMikaelaClientaLista((data && (data.clienteNombre || data.clientName)) || '', (data && (data.servicio || data.promoNombre)) || ''); } catch(e){}
-      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
-      if (data.total) ws.getRange(row, 13).setValue(Number(data.total));
-      if (data.serviciosDetalle) ws.getRange(row, 18).setValue(JSON.stringify(data.serviciosDetalle));
-      // espejo Lineas: servicio terminado → línea a 'completado' (= por cobrar)
-      try { marcarLineaCompletadaPorCodigo(String(rows[i][3]||''), String(data.idEspera||''), String(rows[i][6]||''), data.promoNombre||String(rows[i][13]||rows[i][5]||'')); } catch (eLn) {}
-      // Si la staff CAMBIÓ la promo durante la atención, actualizar la promo del ticket
-      // (col 14 = promoNombre, col 20 = precio regular, col 21 = precio promo) para que el
-      // cobro use la promo nueva y no la que asignó Mikaela.
-      if (data.promoNombre)   ws.getRange(row, 14).setValue(String(data.promoNombre));
-      if (data.precioRegular) ws.getRange(row, 20).setValue(Number(data.precioRegular));
-      if (data.precioPromo)   ws.getRange(row, 21).setValue(Number(data.precioPromo));
-
-      // Actualizar Atenciones
-      try { cerrarAtencion(id, data.chicaNombre || String(rows[i][9]||''),
-        String(rows[i][4]||''), data.servicio || String(rows[i][5]||''),
-        Number(data.total || rows[i][12] || 0), '', 'Por cobrar'); } catch(eA) {}
-
-      return { success: true };
-    }
-    return { success: false, message: 'Ticket SP no encontrado' };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
-// ── CONFIRMAR COBRO de ServicioPromo ─────────────────────────
-function handleConfirmarCobroPromo(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioPromo', COLS_PROMO);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const now = new Date();
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-
-    for (let i = 1; i < rows.length; i++) {
-      const id = String(rows[i][0] || '').trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      const estado = String(rows[i][8] || '').toLowerCase();
-      // ── IDEMPOTENCIA: si ya fue cobrada, devolver éxito sin re-procesar.
-      // (Antes el filtro INCLUÍA 'completad' → re-cobraba y duplicaba la comisión.) ──
-      if (estado.includes('completad')) {
-        return { success: true, yaCobrado: true, message: 'Este ticket ya estaba cobrado.' };
-      }
-      if (!estado.includes('cobrar') && !estado.includes('pendiente')) continue;
-
-      const metodoPago   = data.metodoPago || 'Efectivo';
-      const precioNormal = Number(rows[i][19] || rows[i][15] || 0); // T: Precio Normal total
-      const precioPromo  = Number(rows[i][20] || rows[i][14] || 0); // U/O: Precio Promo
-      const precioMiArea = Number(rows[i][12] || 0);                // M: precio de esta area
-
-      const codigoCliente = String(rows[i][3] || '');
-      const nombreCliente = String(rows[i][4] || '');
-      const servicio      = String(rows[i][5] || '');
-      const area          = String(rows[i][6] || '');
-      const chicaNombre   = String(rows[i][9] || '');
-      const notaAjuste    = _san(data.notaAjuste || '');
-
-      // FIX: si precioNormal es 0 (col T/P de ServicioPromo vacía porque el combo
-      // no tenía sumaIndividual en Paquetes), buscar el precio regular por nombre
-      // en _mapaRegularPromos_ antes de liquidar — si no, Tarjeta cobra el mismo
-      // precio que Efectivo porque el motor usa precioNormal como base para tarjeta.
-      let precioNormalFinal = precioNormal;
-      if (precioNormalFinal === 0 || precioNormalFinal === precioPromo) {
+        // Quitar la promo que acabamos de activar de las pendientes
+        window._takingPromasExtra = (window._takingPromasExtra || []).slice(1);
         try {
-          var regMap = _mapaRegularPromos_();
-          // Limpiar extras concatenados del nombre antes de buscar en Paquetes
-          var nombreBase = String(servicio || '').split('+')[0].trim();
-          var nombreNorm = _normNombrePromo_(nombreBase);
-          if (regMap[nombreNorm] && regMap[nombreNorm] > 0) {
-            precioNormalFinal = regMap[nombreNorm];
-          }
-        } catch(eReg) {}
-      }
-
-      // ── FUENTE DE VERDAD: Lineas (monto y montoRegular actualizados) ──────────
-      // Lineas se actualiza cuando la staff cambia la promo durante el servicio.
-      // ServicioPromo puede tener precioNormal obsoleto (ej: precio de la promo
-      // original antes del cambio que hizo María). Leer Lineas primero evita cobrar
-      // el precio regular de la promo anterior en lugar del precio actual.
-      let lineas = [];
-      let _fuenteLineas = false;
-      try {
-        const _lnCobro = getLineasParaCobro(id);
-        if (_lnCobro && _lnCobro.length > 0) {
-          lineas = _lnCobro;
-          _fuenteLineas = true;
-          Logger.log('[CobroSP] fuente=Lineas items=' + lineas.length + ' id=' + id);
-        }
-      } catch(eLnC) { Logger.log('[CobroSP] Lineas error: ' + eLnC); }
-
-      // ── FALLBACK: serviciosDetalle del frontend o ServicioPromo ──────────────
-      if (!_fuenteLineas) {
-        Logger.log('[CobroSP] fuente=legacy id=' + id);
-        let _fd = null;
-        if (data.serviciosDetalle) {
-          try { _fd = (typeof data.serviciosDetalle === 'string') ? JSON.parse(data.serviciosDetalle) : data.serviciosDetalle; } catch (e) { _fd = null; }
-        }
-        if (_fd && _fd.length > 0) {
-          lineas = _fd.map(function (p) {
-            return {
-              staff: String(p.staff || chicaNombre),
-              area: String(p.area || area),
-              servicio: String(p.servicio || servicio),
-              precioRegular: Number(p.montoNormal || precioNormalFinal || 0),
-              precioPromo: Number(p.monto || 0)
-            };
-          });
-        } else {
-          lineas = [{
-            staff: chicaNombre, area: area, servicio: servicio,
-            precioRegular: precioNormalFinal > 0 ? precioNormalFinal : precioMiArea,
-            precioPromo: precioMiArea > 0 ? precioMiArea : precioPromo
-          }];
-        }
-      }
-
-      // Motor unico: tarjeta=regular / efectivo=promo, reparte comision, suma extras
-      const liq = liquidarCobro_(lineas, metodoPago, precioNormalFinal);
-      const totalCobrado = liq.total;
-
-      const row = i + 1;
-      ws.getRange(row, 9).setValue('Completada');
-      ws.getRange(row, 15).setValue(metodoPago);
-      ws.getRange(row, 16).setValue(hora);
-      ws.getRange(row, 17).setValue(totalCobrado);
-
-      try { updateVisitaClienta(codigoCliente); } catch (e) {}
-
-      // Comision + historial: UNA sola vez, al cobro final, por cada staff que participo
-      try {
-        const wsH = getSheet('HistorialOwner');
-        liq.lineas.forEach(function (l) {
-          if (l.staff && l.monto > 0) { try { updateComision(l.staff, l.monto); } catch (eC) {} }
-          wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, id,
-            l.servicio, l.area, l.staff, l.monto, l.comision, metodoPago, notaAjuste]);
-        });
-      } catch (eH) {}
-
-      try {
-        getSheet('CierresPagos').appendRow([now, hora, nombreCliente, chicaNombre, servicio, totalCobrado, metodoPago, 'promo']);
-      } catch (eP) {}
-
-      try { cerrarAtencion(id, chicaNombre, nombreCliente, servicio, totalCobrado, metodoPago, 'Completado'); } catch (eA) {}
-
-      // espejo Lineas: marcar cobradas todas las lineas de este combo (promoRef = idEspera)
-      try { marcarLineasPorPromoRef(data.idEspera, metodoPago); } catch (eLn) {}
-      return { success: true, totalCobrado: totalCobrado };
-    }
-    return { success: false, message: 'Ticket SP no encontrado para cobro' };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// ── TOMAR clienta de ServicioNormal ──────────────────────────
-function handleTomarServicioNormal(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
-
-    for (let i = 1; i < rows.length; i++) {
-      const id     = String(rows[i][0] || '').trim();
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      if (estado !== 'esperando') continue;
-
-      // Asignación directa: si col J tiene una chica y no es quien intenta tomar, bloquear
-      const asignadaA = String(rows[i][9] || '').trim();
-      if (asignadaA && asignadaA !== String(data.chicaNombre || '').trim()) {
-        return { success: false, message: 'Esta clienta está asignada a ' + asignadaA + '. Solo ella puede tomarla.' };
-      }
-
-      const row = i + 1;
-      ws.getRange(row, 9).setValue('En servicio');
-      ws.getRange(row, 10).setValue(data.chicaNombre || '');
-      ws.getRange(row, 11).setValue(hora);
-
-      // espejo Lineas: la chica tomó → línea a 'en_servicio'
-      try { marcarLineaEnServicioPorCodigo(String(rows[i][3]||''), String(data.idEspera||''), String(rows[i][6]||''), String(rows[i][5]||''), data.chicaNombre||''); } catch (eLn) {}
-
-      // Crear registro en Atenciones para que el panel de staff lo vea
-      try {
-        const wsA = getSheet('Atenciones');
-        const fecha = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
-        const codigoCliente = String(rows[i][3]||'');
-        const nombreCliente = String(rows[i][4]||'');
-        const servicio      = String(rows[i][5]||'');
-        const area          = String(rows[i][6]||'');
-        // Buscar último ID de atención
-        const aData = wsA.getDataRange().getValues();
-        let maxAt = 0;
-        for (let j = 3; j < aData.length; j++) {
-          const aid = String(aData[j][0]||'');
-          if (aid.startsWith('AT-')) { const n = parseInt(aid.replace('AT-','')); if (n > maxAt) maxAt = n; }
-        }
-        const atId = 'AT-' + String(maxAt + 1).padStart(4, '0');
-        // Columnas Atenciones: A=ID | B=Fecha | C=HoraEntrada | D=HoraSalida | E=CódigoCliente | F=Cliente | G=Staff | H=Servicio | I=Estado | J=Total | K=MetodoPago | L=idEspera
-        wsA.appendRow([atId, fecha, hora, '', codigoCliente, nombreCliente,
-          data.chicaNombre||'', servicio, 'En servicio', '', '', id, area]);
-      } catch(eA) {}
-
-      _pushMikaela('👤 Clienta tomada', String(data.chicaNombre || 'Una chica') + ' tomó a ' + String(rows[i][4] || 'una clienta') + (rows[i][5] ? ' · ' + rows[i][5] : ''));
-      return { success: true, message: 'Clienta tomada' };
-    }
-    return { success: false, message: 'Ticket no encontrado o no está esperando' };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── FINALIZAR servicio normal → Por cobrar ────────────────────
-function handleFinalizarServicioNormal(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
-
-    for (let i = 1; i < rows.length; i++) {
-      const id     = String(rows[i][0] || '').trim();
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      if (estado !== 'en servicio') continue;
-
-      const row = i + 1;
-
-      // Si viene nuevaArea → devolver a lista de espera para siguiente staff
-      if (data.nuevaArea && !data.esRetiro) {
-        ws.getRange(row, 9).setValue('Esperando');
-        ws.getRange(row, 10).setValue('');
-        ws.getRange(row, 11).setValue('');
-        ws.getRange(row, 7).setValue(String(data.nuevaArea).toLowerCase());
-        ws.getRange(row, 6).setValue(data.servicio || data.servicioSiguiente || '');
-        ws.getRange(row, 13).setValue(Number(data.total || 0));
-        const obsActual = _soloTextoSistemaObs(String(rows[i][11] || ''));
-        ws.getRange(row, 12).setValue((obsActual ? obsActual + ' | ' : '') + '✅ ' + (data.areaCompletada||'') + ' completado por ' + (data.chicaNombre||'') + ' · Sigue: ' + (data.areasFaltantes||''));
-        if (data.chicaNombre && data.montoChica && Number(data.montoChica) > 0) {
-          updateComision(data.chicaNombre, Number(data.montoChica));
-        }
-        return { success: true, message: 'Área completada, clienta devuelta a lista de espera' };
-      }
-
-      ws.getRange(row, 9).setValue('Por verificar');
-        try { _avisarMikaelaClientaLista((data && (data.clienteNombre || data.clientName)) || '', (data && (data.servicio || data.promoNombre)) || ''); } catch(e){}
-      if (data.servicio) ws.getRange(row, 6).setValue(data.servicio);
-      ws.getRange(row, 13).setValue(Number(data.total || rows[i][12] || 0));
-      if (data.serviciosDetalle) ws.getRange(row, 18).setValue(JSON.stringify(data.serviciosDetalle));
-      // espejo Lineas: servicio terminado → línea a 'completado' (= por cobrar)
-      try { marcarLineaCompletadaPorCodigo(String(rows[i][3]||''), String(data.idEspera||''), String(rows[i][6]||''), data.servicio||String(rows[i][5]||'')); } catch (eLn) {}
-
-      // Actualizar Atenciones a "Por cobrar"
-      try {
-        cerrarAtencion(data.idEspera,
-          data.chicaNombre || String(rows[i][9]||''),
-          String(rows[i][4]||''),
-          data.servicio || String(rows[i][5]||''),
-          Number(data.total || rows[i][12] || 0),
-          '', 'Por cobrar');
-      } catch(eA) {}
-
-      // NOTA: la comisión se registra SOLO en handleConfirmarCobroNormal (al cobrar)
-      // NO llamar updateComision aquí para evitar doble registro
-
-      return { success: true, message: 'Servicio finalizado, listo para cobrar' };
-    }
-    return { success: false, message: 'Ticket no encontrado' };
-  } catch(e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ── CONFIRMAR cobro de ServicioNormal ─────────────────────────
-function handleConfirmarCobroNormal(data) {
-  try {
-    const ws = getOrCreateSheet('ServicioNormal', COLS_NORMAL);
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const now = new Date();
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-
-    for (let i = 1; i < rows.length; i++) {
-      const id     = String(rows[i][0] || '').trim();
-      const estado = String(rows[i][8] || '').toLowerCase().trim();
-      if (id !== String(data.idEspera).trim()) continue;
-      // ── IDEMPOTENCIA: si ya fue cobrada, devolver éxito sin re-procesar ──
-      if (estado === 'completada' || estado === 'completado') {
-        return { success: true, yaCobrado: true, message: 'Este ticket ya estaba cobrado.' };
-      }
-      if (!['por cobrar','en servicio'].includes(estado)) continue;
-
-      const row = i + 1;
-      const metodoPago = data.metodoPago || 'Efectivo';
-
-      const codigoCliente = String(rows[i][3] || '');
-      const nombreCliente = String(rows[i][4] || '');
-      const servicio      = String(rows[i][5] || '');
-      const area          = String(rows[i][6] || '');
-      const chicaNombre   = String(rows[i][9] || '');
-
-      const tipo            = String(rows[i][18] || 'SN').trim();
-      const precioNormalRow = Number(rows[i][19] || rows[i][12] || 0);
-      const precioPromoRow  = Number(rows[i][20] || 0);
-      const totalFrontend   = Number(data.totalCobrado || 0);
-
-      // Armar lineas (hechos) para el motor unico
-      let lineas = [];
-      let _fd = null;
-      if (data.serviciosDetalle) {
-        try { _fd = (typeof data.serviciosDetalle === 'string') ? JSON.parse(data.serviciosDetalle) : data.serviciosDetalle; } catch (e) { _fd = null; }
-      }
-      if (_fd && _fd.length > 0) {
-        lineas = _fd.map(function (p) {
-          return {
-            staff: String(p.staff || chicaNombre),
-            area: String(p.area || area),
-            servicio: String(p.servicio || servicio),
-            precioRegular: Number(p.montoNormal || 0),
-            precioPromo: Number(p.monto || 0)
-          };
-        });
-      } else {
-        const reg  = (tipo === 'SP') ? precioNormalRow : (totalFrontend > 0 ? totalFrontend : precioNormalRow);
-        const prom = (tipo === 'SP') ? (precioPromoRow > 0 ? precioPromoRow : totalFrontend) : 0;
-        lineas = [{ staff: chicaNombre, area: area, servicio: servicio, precioRegular: reg, precioPromo: prom }];
-      }
-
-      const liq = liquidarCobro_(lineas, metodoPago, precioNormalRow);
-      const totalCobrado = liq.total;
-
-      ws.getRange(row, 9).setValue('Completada');
-      ws.getRange(row, 15).setValue(metodoPago);
-      ws.getRange(row, 16).setValue(hora);
-      ws.getRange(row, 17).setValue(totalCobrado);
-
-      // TOP flag (estrella)
-      let topStr = '';
-      try {
-        const wsC = getSheet('Clientas');
-        const cData = wsC.getDataRange().getValues();
-        for (let j = 3; j < cData.length; j++) {
-          if (String(cData[j][0]).trim() === codigoCliente.trim()) {
-            if (String(cData[j][7]||'').toLowerCase().includes('s\u00ed')) topStr = '\u2b50';
-            break;
-          }
-        }
-      } catch (e) {}
-
-      try { updateVisitaClienta(codigoCliente); } catch (e) {}
-
-      // Comision + historial: una sola vez, por cada staff que participo
-      try {
-        const wsH = getSheet('HistorialOwner');
-        liq.lineas.forEach(function (l) {
-          if (l.staff && l.monto > 0) { try { updateComision(l.staff, l.monto); } catch (eC) {} }
-          wsH.appendRow([fecha, hora, codigoCliente, nombreCliente, topStr,
-            l.servicio, l.area, l.staff, l.monto, l.comision, metodoPago]);
-        });
-      } catch (eH) {}
-
-      try {
-        const desgloseStr = data.serviciosDetalle && data.serviciosDetalle.length > 0 ? JSON.stringify(data.serviciosDetalle) : '';
-        getSheet('CierresPagos').appendRow([now, hora, nombreCliente, chicaNombre, servicio, totalCobrado, metodoPago, desgloseStr]);
-      } catch (eP) {}
-
-      try { cerrarAtencion(data.idEspera, chicaNombre, nombreCliente, servicio, totalCobrado, metodoPago, 'Completado'); } catch (eA) {}
-
-      // ServiciosExtras: llenar col K con este ID
-      try {
-        const wsExt = getSheet('ServiciosExtras');
-        if (wsExt) {
-          const extData = wsExt.getDataRange().getValues();
-          const cod = String(rows[i][3]||'').trim();
-          for (let e = 1; e < extData.length; e++) {
-            if (String(extData[e][5]||'').trim() === cod &&
-                String(extData[e][0]||'').trim() === fecha &&
-                String(extData[e][10]||'').trim() === '') {
-              wsExt.getRange(e+1, 11).setValue(id);
-            }
-          }
-        }
-      } catch (eE) {}
-
-      // espejo Lineas: marcar como cobradas TODAS las lineas de este ticket SN-
-      // usando el promoRef exacto (= id del SN-), igual que confirmarCobroMulti con TM-.
-      // Antes: marcarLineaCobradaPorCodigo (fuzzy) podia marcar la linea equivocada
-      // si la clienta tenia varios servicios activos el mismo dia.
-      try { marcarLineasPorPromoRef(id, metodoPago); } catch (eLn) { Logger.log('espejo cobro SN-: ' + eLn); }
-      return { success: true, message: 'Cobro confirmado' };
-    }
-    return { success: false, message: 'Ticket no encontrado' };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-
-// ============================================================
-// TICKET MULTI — Hoja TicketMulti
-// Columnas: A=ID, B=Fecha, C=HoraLlegada, D=Código, E=Nombre,
-//  F=Estado, G=Prioridad, H=Observaciones, I=MetodoPago, J=HoraCobro,
-//  K=A1Tentativo, L=A1Confirmado, M=A1Staff, N=A1Estado, O=A1Hora,
-//  P=A2Tentativo, Q=A2Confirmado, R=A2Staff, S=A2Estado, T=A2Hora,
-//  U=A3Tentativo, V=A3Confirmado, W=A3Staff, X=A3Estado, Y=A3Hora,
-//  Z=A4Tentativo, AA=A4Confirmado, AB=A4Staff, AC=A4Estado, AD=A4Hora,
-//  AE=PrecioA1, AF=PrecioA2, AG=PrecioA3, AH=PrecioA4,
-//  AI=PrecioNormalTotal, AJ=PreciopromoTotal, AK=TotalCobrado
-// ============================================================
-
-function getTMSheet() { return getSheet('TicketMulti'); }
-
-function nextTMId() {
-  const ws = getTMSheet();
-  const last = ws.getLastRow();
-  if (last < 3) return 'TM-0001';
-  const ids = ws.getRange(3, 1, last - 2, 1).getValues()
-    .map(r => String(r[0] || ''))
-    .filter(id => id.startsWith('TM-'))
-    .map(id => parseInt(id.replace('TM-', '')) || 0);
-  const max = ids.length ? Math.max(...ids) : 0;
-  return 'TM-' + String(max + 1).padStart(4, '0');
-}
-
-// Columnas base por área (0-indexed): área 1=col10(K), área 2=col15(P), área 3=col20(U), área 4=col25(Z)
-const TM_AREA_COL = [10, 15, 20, 25]; // col K, P, U, Z (0-indexed)
-const TM_PRECIO_COL = [30, 31, 32, 33]; // col AE, AF, AG, AH (0-indexed)
-
-function _catPromoDivision_(x) {
-  x = String(x || '').toLowerCase();
-  try { x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
-  if (x.indexOf('depil') >= 0 || x.indexOf('bikini') >= 0 || x.indexOf('axila') >= 0 || x.indexOf('pierna') >= 0 || x.indexOf('bigote') >= 0) return 'depilacion';
-  if (x.indexOf('lifting') >= 0 || x.indexOf('retiro') >= 0) return 'retiro_lifting';
-  if (x.indexOf('pest') >= 0) return 'pestanas';
-  if (x.indexOf('facial') >= 0 || x.indexOf('hidra') >= 0 || x.indexOf('limpieza') >= 0) return 'facial';
-  if (x.indexOf('cej') >= 0 || x.indexOf('pigment') >= 0) return 'cejas';
-  return x.replace(/[^a-z0-9]/g, '');
-}
-
-function _mapaDivisionPromos_() {
-  var mapa = {};
-  try {
-    var ws = getSheet('Paquetes');
-    var data = ws.getDataRange().getValues();
-    for (var i = 3; i < data.length; i++) {
-      var nombre = String(data[i][1] || '').trim();
-      var raw = String(data[i][9] || '').trim();
-      if (!nombre || !raw) continue;
-      var arr = [];
-      try { arr = JSON.parse(raw); } catch (e) { arr = []; }
-      if (!Array.isArray(arr) || !arr.length) continue;
-      var div = {};
-      arr.forEach(function(d) {
-        var key = _catPromoDivision_(d.realArea || d.area || d.servicio || '');
-        var monto = Number(d.monto || d.precio || d.total || 0);
-        if (!key || !(monto > 0)) return;
-        // FIX: si ya existe una entrada para esta área (ej. "depilacion") y hay otra
-        // entrada diferente del mismo área (ej. Axilas Y Depilación de cejas ambas
-        // caen en "depilacion"), crear una clave única para la segunda usando el
-        // nombre del servicio como sufijo, para que el TM las trate como slots
-        // separados en lugar de sumarlas en uno solo.
-        // Antes: div["depilacion"].monto = $33 + $41 = $74 (un solo slot → precio doble)
-        // Ahora: div["depilacion"] = $33  y  div["depilacion_2"] = $41 (dos slots)
-        if (div[key]) {
-          var idx = 2;
-          while (div[key + '_' + idx]) idx++;
-          key = key + '_' + idx;
-        }
-        div[key] = {
-          monto: monto,
-          regular: Number(d.regular || d.montoRegular || d.precioRegular || d.normal || 0),
-          areaBase: _catPromoDivision_(d.realArea || d.area || d.servicio || ''),
-          servicio: String(d.servicio || d.area || '')
-        };
-      });
-      mapa[_normNombrePromo_(nombre)] = div;
-    }
-  } catch (e) {}
-  return mapa;
-}
-
-function handleCrearTicketMulti(data) {
-  try {
-    const ws = getTMSheet();
-    const tz = 'America/Guayaquil';
-    const now = new Date();
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-    const id    = nextTMId();
-
-    // areas: array de { tentativo, area, precio, precioNormal, tipo }
-    const areas = data.areas || [];
-
-    // ── MODELO NUEVO: agrupar por área ───────────────────────
-    // Si la promo viene desde SYNA, NO se reparte proporcionalmente: se respeta
-    // la división exacta guardada en Paquetes (col J) para evitar decimales.
-    var divisionPromos = _mapaDivisionPromos_();
-    // Contador para asignar entradas de la misma área base en orden
-    var _divAreaCount = {};
-    areas.forEach(function(a) {
-      if (String(a.tipo || '').toLowerCase() !== 'promo') return;
-      var div = divisionPromos[_normNombrePromo_(a.tentativo || '')];
-      if (!div) return;
-      // Buscar el slot correcto: la primera entrada cuya areaBase coincide
-      // y que aún no fue consumida (para evitar asignar el mismo precio a ambas áreas)
-      var areaKey = _catPromoDivision_(a.area || a.tentativo || '');
-      var _countKey = _normNombrePromo_(a.tentativo || '') + '__' + areaKey;
-      if (!_divAreaCount[_countKey]) _divAreaCount[_countKey] = 0;
-      _divAreaCount[_countKey]++;
-      // Primera ocurrencia → key base; segunda → key_2; tercera → key_3; etc.
-      var slotKey = _divAreaCount[_countKey] === 1 ? areaKey : (areaKey + '_' + _divAreaCount[_countKey]);
-      var exact = div[slotKey] || div[areaKey]; // fallback a base si el slot numerado no existe
-      if (!exact || !(exact.monto > 0)) return;
-      a.precio = Math.round(Number(exact.monto) * 100) / 100;
-      if (exact.regular > 0) a.precioNormal = Math.round(Number(exact.regular) * 100) / 100;
-    });
-
-    // FIX: si algún área de promo no tiene precioNormal (la división no tenía 'regular'
-    // en Paquetes), buscar el precio regular del combo completo en _mapaRegularPromos_
-    // y distribuirlo proporcionalmente entre las áreas. Sin esto, montoRegular en Lineas
-    // queda igual al promo y la comisión del segundo staff se calcula sobre precio promo.
-    try {
-      var regMap = _mapaRegularPromos_();
-      areas.forEach(function(a) {
-        if (String(a.tipo || '').toLowerCase() !== 'promo') return;
-        if (a.precioNormal > 0 && a.precioNormal !== a.precio) return; // ya tiene regular real
-        // Limpiar extras concatenados antes de buscar en Paquetes
-        var nombreBase = String(a.tentativo || '').split('+')[0].trim();
-        var nombreNorm = _normNombrePromo_(nombreBase);
-        var regularTotal = regMap[nombreNorm] || 0;
-        if (regularTotal <= 0 || regularTotal <= a.precio) return;
-        a.precioNormal = Math.round(regularTotal * 100) / 100;
-      });
-    } catch(eReg) { Logger.log('[TM precioNormal fallback] ' + eReg); }
-
-    // Una promo = un ticket. Cada entrada de la división es un slot separado
-    // aunque compartan el mismo área base.
-    // FIX: antes se agrupaba por area key, sumando Axilas ($33) y Depilación de
-    // cejas ($41) en un solo slot "depilacion" ($74). Ahora cada entrada es su
-    // propio slot — el area del slot usa el nombre del servicio específico si
-    // están en la misma área base, para que el TM las registre por separado.
-    var porArea = {}, ordenAreas = [];
-    areas.forEach(function(a) {
-      var key = String(a.area || 'otro').trim();
-      if (!key) key = 'otro';
-      // Si ya existe un slot para esta área exacta, usar un sufijo único para
-      // que la segunda entrada tenga su propio slot en el TM en lugar de sumarse.
-      var slotKey = key;
-      if (porArea[slotKey]) {
-        var idx2 = 2;
-        while (porArea[slotKey + '_' + idx2]) idx2++;
-        slotKey = slotKey + '_' + idx2;
-      }
-      porArea[slotKey] = {
-        area: key,        // ← área real sin sufijo, la que va al TM
-        tentativo: a.tentativo || '',
-        precio: Math.round(Number(a.precio || 0) * 100) / 100,
-        precioNormal: Math.round(Number(a.precioNormal || a.precio || 0) * 100) / 100,
-        tipo: a.tipo || 'normal',
-        _nombres: [String(a.tentativo || '').trim()].filter(Boolean)
-      };
-      ordenAreas.push(slotKey);
-    });
-    var areasAgrupadas = ordenAreas.slice(0, 4).map(function(slotKey) {
-      var g = porArea[slotKey];
-      delete g._nombres;
-      return g;
-    });
-    // ── FIN AGRUPACIÓN ───────────────────────────────────────
-
-    // Construir fila de 37 columnas (A=0 → AK=36)
-    var row = Array(37).fill('');
-    row[0]  = id;
-    row[1]  = fecha;
-    row[2]  = hora;
-    row[3]  = data.codigo   || '';
-    row[4]  = data.nombre   || '';
-    row[5]  = 'Activo';
-    row[6]  = data.prioridad || 'Normal';
-    row[7]  = (data.secuencia && data.secuencia.length > 0)
-              ? 'SEQ:' + data.secuencia.join(',') + (data.observaciones ? '|' + data.observaciones : '')
-              : (data.observaciones || '');
-    row[8]  = '';
-    row[9]  = '';
-
-    var precioNormalTotal = 0;
-    var precioPromoTotal  = 0;
-
-    areasAgrupadas.forEach(function(a, i) {
-      if (i > 3) return;
-      var base = TM_AREA_COL[i];
-      row[base]     = (a.area || '') + '||' + (a.tentativo || '');
-      row[base + 1] = '';
-      row[base + 2] = (i === 0 && data.asignadaA) ? String(data.asignadaA).trim() : ''; // staff asignada al 1er servicio
-      row[base + 3] = 'Esperando';
-      row[base + 4] = '';
-      row[TM_PRECIO_COL[i]] = a.precio;
-      precioNormalTotal += a.precioNormal;
-      precioPromoTotal  += a.precio;
-    });
-
-    row[34] = precioNormalTotal;
-    row[35] = precioPromoTotal;
-    // row[36]: JSON array of precioNormal per area slot (for tarjeta recalculation)
-    var precioNormalPorArea = areasAgrupadas.map(function(a) { return a.precioNormal || a.precio || 0; });
-    row[36] = JSON.stringify(precioNormalPorArea);
-
-    ws.appendRow(row);
-    // espejo Lineas: 1 línea por slot del TM (promoRef = id:slot), agrupadas por visita
-    try { lineasDesdeTicketMulti(data, id, areasAgrupadas); } catch (eLn) { Logger.log('espejo TM crear: ' + eLn); }
-    return { success: true, id, areasCount: areasAgrupadas.length };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
-
-// ── Helpers de regular de promos (fuente: hoja Paquetes) ─────
-// Normaliza un nombre de combo para comparar sin acentos/símbolos.
-function _normNombrePromo_(s) {
-  s = String(s || '');
-  try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
-  return s.replace(/[^a-zA-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-}
-
-// Mapa { nombreComboNormalizado: regularTotal } desde Paquetes. Fuente de
-// verdad del precio REGULAR de cada promo. Si Paquetes no está, devuelve {}.
-// Construye un mapa { nombreCombo_normalizado → modeloPestanas } leyendo el campo
-// `servicios` (col C) de la hoja Paquetes.
-// Permite que el clasificador resuelva "Combo 7 Hawaiano" -> "Hawaiano" en lugar de
-// caer en "Otro modelo", ya que el campo servicios dice "Pestanas hawaiano + ...".
-var _cacheModelosPestanas_ = null;
-function _mapaModelosPestanas_() {
-  if (_cacheModelosPestanas_) return _cacheModelosPestanas_;
-  var mapa = {};
-  try {
-    var ws = getSheet('Paquetes');
-    if (!ws) return mapa;
-    var data = ws.getDataRange().getValues();
-    for (var i = 3; i < data.length; i++) {
-      var nombre = String(data[i][1] || '').trim();
-      var servicios = String(data[i][2] || '').toLowerCase();
-      if (!nombre || !servicios) continue;
-      if (servicios.indexOf('pesta') < 0 && servicios.indexOf('lifting') < 0
-       && servicios.indexOf('retiro') < 0) continue;
-      var modelo = '';
-      if (servicios.indexOf('mega volumen') >= 0)        modelo = 'Mega volumen';
-      else if (servicios.indexOf('volumen egipcio') >= 0 || servicios.indexOf('egipcio') >= 0) modelo = 'Volumen egipcio';
-      else if (servicios.indexOf('volumen ruso') >= 0)   modelo = 'Volumen ruso';
-      else if (servicios.indexOf('volumen brasile') >= 0 || servicios.indexOf('brasile') >= 0) modelo = 'Volumen brasilero';
-      else if (servicios.indexOf('volumen') >= 0)        modelo = 'Volumen';
-      else if (servicios.indexOf('aura') >= 0)           modelo = 'Aura';
-      else if (servicios.indexOf('tecnologico') >= 0)    modelo = 'Tecnologico';
-      else if (servicios.indexOf('hibrid') >= 0)         modelo = 'Hibridas';
-      else if (servicios.indexOf('kylie') >= 0)          modelo = 'Kylie';
-      else if (servicios.indexOf('rimel') >= 0)          modelo = 'Efecto rimel';
-      else if (servicios.indexOf('pelo a pelo') >= 0)    modelo = 'Pelo a pelo clasicas';
-      else if (servicios.indexOf('efecto seda') >= 0)    modelo = 'Efecto seda';
-      else if (servicios.indexOf('clasica') >= 0)        modelo = 'Clasicas';
-      else if (servicios.indexOf('natural') >= 0)        modelo = 'Natural';
-      else if (servicios.indexOf('hawaiano') >= 0)       modelo = 'Hawaiano';
-      // lifting y retiro son tratamientos, no modelos - modelo queda vacio
-      if (modelo) mapa[_normNombrePromo_(nombre)] = modelo;
-    }
-  } catch (e) { Logger.log('[mapaModelosPestanas] ' + String(e)); }
-  _cacheModelosPestanas_ = mapa;
-  return mapa;
-}
-
-function _mapaRegularPromos_() {
-  var mapa = {};
-  try {
-    var ws = getSheet('Paquetes');
-    if (!ws) return mapa;
-    var data = ws.getDataRange().getValues();
-    for (var i = 3; i < data.length; i++) {
-      var nombre = String(data[i][1] || '').trim();
-      if (!nombre) continue;
-      var reg = Number(data[i][4] || data[i][3] || 0);  // col E=regular (fallback col D=promo)
-      if (reg > 0) mapa[_normNombrePromo_(nombre)] = reg;
-    }
-  } catch (e) {}
-  return mapa;
-}
-
-// Regular total REAL de un ticket TM, re-derivado desde Paquetes: cada combo
-// promo cuenta su regular UNA sola vez; las áreas sueltas/extra cuentan su
-// propio precio. Evita el descuento doble-contado al cobrar con tarjeta.
-function _regularRealTM_(row, regMap) {
-  regMap = regMap || _mapaRegularPromos_();
-  // BLINDAJE: regular por área guardado al crear el ticket (col AK / índice 36).
-  // Es el respaldo cuando la etiqueta del área NO matchea un combo conocido por
-  // nombre (etiqueta de servicio suelto, combo renombrado, ticket de SYNA, etc.).
-  // Así en tarjeta NUNCA se cae al precio promo: si hay un regular por área guardado
-  // (mayor que el promo), se usa ese.
-  var normalArr = [];
-  try { normalArr = JSON.parse(String(row[36] || '[]')); } catch (e) {}
-  if (!Array.isArray(normalArr)) normalArr = [];
-  var vistos = {}, total = 0;
-  for (var i = 0; i < 4; i++) {
-    var base = TM_AREA_COL[i];
-    var raw = String(row[base] || '').trim();
-    if (!raw) continue;
-    if (String(row[base + 3] || '').toLowerCase() === 'cancelado') continue;
-    var tent = raw.indexOf('||') !== -1 ? raw.split('||')[1] : raw;
-    var k = _normNombrePromo_(tent);
-    if (regMap[k] !== undefined) {
-      if (!vistos[k]) { total += regMap[k]; vistos[k] = true; } // combo conocido: regular 1 vez
-    } else {
-      // No es un combo reconocido por nombre → usar el REGULAR por área guardado;
-      // si no hay (o es 0), recién ahí el precio del área. Nunca menos que el promo.
-      var regArea = Number(normalArr[i] || 0);
-      var promoArea = Number(row[TM_PRECIO_COL[i]] || 0);
-      if (!(regArea > 0)) regArea = promoArea;
-      if (regArea < promoArea) regArea = promoArea; // un regular guardado no puede ser menor al promo
-      total += regArea;
-    }
-  }
-  return Math.round(total * 100) / 100;
-}
-
-function handleGetTicketMulti(params) {
-  try {
-    const ws = getTMSheet();
-    const last = ws.getLastRow();
-    if (last < 3) return { success: true, activos: [], porCobrar: [] };
-
-    const rows = ws.getRange(3, 1, last - 2, 37).getValues();
-    const tz = 'America/Guayaquil';
-    const hoy = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy');
-
-    const activos = [], porCobrar = [], porVerificar = [];
-
-    // Mapa autoritativo de regular por combo (hoja Paquetes). Se usa para
-    // re-derivar el precio normal por área y evitar el descuento doble-contado
-    // de tickets creados por clientes/SYNA desactualizados.
-    const _regMapTM = _mapaRegularPromos_();
-
-    rows.forEach((row, idx) => {
-      const id     = String(row[0] || '').trim();
-      if (!id.startsWith('TM-')) return;
-      const estado = String(row[5] || '').toLowerCase();
-      if (estado === 'completado') return;
-
-      // Filtrar por chica si viene params.chica
-      const chica = params && params.chica ? String(params.chica).trim() : '';
-
-      // Construir areas
-      const areas = [];
-      TM_AREA_COL.forEach(function(base, i) {
-        const rawTentativo = String(row[base] || '').trim();
-        if (!rawTentativo) return;
-        // Parsear área del prefijo "area||servicio"
-        var areaVal = '';
-        var tentativoVal = rawTentativo;
-        if (rawTentativo.indexOf('||') !== -1) {
-          var parts = rawTentativo.split('||');
-          areaVal = parts[0];
-          tentativoVal = parts[1] || rawTentativo;
-        }
-        const precioPromoArea  = Number(row[TM_PRECIO_COL[i]] || 0);
-        const totalPromoTM     = Number(row[35] || 0);
-        const totalNormalTM    = Number(row[34] || 0);
-        // FIX: leer precioNormal por área desde row[36] (JSON array)
-        // Si no existe, calcular proporcionalmente como fallback
-        var precioNormalArea = precioPromoArea;
+          const _idEsperaAct = window._as1IdEspera || '';
+          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
+        } catch(eS2) {}
         try {
-          var normalArr = JSON.parse(String(row[36] || '[]'));
-          if (Array.isArray(normalArr) && normalArr[i] !== undefined) {
-            precioNormalArea = Number(normalArr[i]) || precioPromoArea;
-          } else if (totalPromoTM > 0 && totalNormalTM > 0) {
-            precioNormalArea = Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100;
-          }
-        } catch(eN) {
-          if (totalPromoTM > 0 && totalNormalTM > 0) {
-            precioNormalArea = Math.round(totalNormalTM * (precioPromoArea / totalPromoTM) * 100) / 100;
-          }
-        }
-        areas.push({
-          idx: i + 1,
-          area:         areaVal,
-          tentativo:    tentativoVal,
-          confirmado:   String(row[base + 1] || '').trim(),
-          staff:        String(row[base + 2] || '').trim(),
-          estado:       String(row[base + 3] || 'Esperando').trim(),
-          hora:         String(row[base + 4] || '').trim(),
-          precio:       precioPromoArea,
-          precioNormal: precioNormalArea
-        });
-      });
-
-      // Mantener precioNormal por área leído del TM. La división exacta viene de
-      // Paquetes.DIVISION al crear el ticket; no repartir proporcionalmente aquí.
-
-      const obsRaw = String(row[7] || '');
-      var secuencia = [];
-      var observaciones = obsRaw;
-      if (obsRaw.startsWith('SEQ:')) {
-        var seqPart = obsRaw.substring(4);
-        var pipeIdx = seqPart.indexOf('|');
-        if (pipeIdx !== -1) {
-          secuencia = seqPart.substring(0, pipeIdx).split(',').filter(Boolean);
-          observaciones = seqPart.substring(pipeIdx + 1);
-        } else {
-          secuencia = seqPart.split(',').filter(Boolean);
-          observaciones = '';
-        }
-      }
-
-      // Total REAL = suma de áreas activas (servicios + extras), no el campo guardado
-      // (que puede quedar desfasado al agregar un extra). Combo normal: la suma de
-      // áreas ya es el precio del combo, así que no cambia.
-      var _sumPromo = 0, _sumNormal = 0;
-      areas.forEach(function(a){
-        if (String(a.estado || '').toLowerCase() === 'cancelado') return;
-        _sumPromo  += Number(a.precio || 0);
-        _sumNormal += Number(a.precioNormal || a.precio || 0);
-      });
-
-      const item = {
-        idEspera:         id,
-        codigo:           String(row[3] || ''),
-        nombre:           String(row[4] || ''),
-        estado:           String(row[5] || ''),
-        prioridad:        String(row[6] || ''),
-        observaciones:    observaciones,
-        secuencia:        secuencia,
-        metodoPago:       String(row[8] || ''),
-        horaCobro:        String(row[9] || ''),
-        areas,
-        precioNormal:     _sumNormal || Number(row[34] || 0),
-        precioPromo:      _sumPromo  || Number(row[35] || 0),
-        totalCobrado:     Number(row[36] || 0),
-        rowIndex:         idx + 3,
-        fuente:           'TicketMulti'
-      };
-
-      if (estado === 'por verificar') {
-        porVerificar.push(item);
-      } else if (estado === 'por cobrar') {
-        porCobrar.push(item);
+          const _idEsperaAct = window._as1IdEspera || '';
+          if (_idEsperaAct) sessionStorage.setItem('nexserv_promasExtra_' + _idEsperaAct, JSON.stringify(window._takingPromasExtra));
+        } catch(eS2) {}
+        const AREA_LABELS_ALERT = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: 'Depilacion', pestanas: 'Pestanas', facial: 'Facial', retiro_lifting: 'Lifting' };
+        const parteActual = (user && user.area ? AREA_LABELS_ALERT[user.area] || user.area : 'Tu area');
+        const restantes = promasExtraRestantes.map(function(p){ return p.nombre; }).join(' + ');
+        var msgAlert = parteActual + ' completado. Siguiente: ' + siguientePromo.nombre + ' ($' + siguientePromo.precio + ')';
+        if (restantes) msgAlert += '. Pendiente despues: ' + restantes;
+        msgAlert += '. La clienta volvio a lista de espera.';
+        alert(msgAlert);
+        show('staffHome');
       } else {
-        // Si viene filtro por chica, solo incluir si tiene área asignada a esa chica
-        if (chica) {
-          const tieneArea = areas.some(a => a.staff === chica && a.estado !== 'Completado');
-          if (!tieneArea) return;
-        }
-        activos.push(item);
+        alert('Error: ' + (result.message || 'No se pudo procesar'));
       }
-    });
+    } catch (err) {
+      console.error(err);
+      alert('Error al procesar');
+    }
+  }
 
-    return { success: true, activos, porCobrar, porVerificar };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
+  async function finishAndRetire() {
+    // Retirar clienta: cobrar solo lo realizado, cancelar todo lo pendiente del ticket
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot || 1;
 
-function handleTomarAreaTicketMulti(data) {
-  try {
-    const ws = getTMSheet();
-    const rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    const tz = 'America/Guayaquil';
-    const hora = Utilities.formatDate(new Date(), tz, 'HH:mm');
+    // Solo los servicios aprobados del slot actual
+    const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    const totalRealizado = svcs.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const nombresRealizados = svcs.map(s => s.name).join(' + ') || data.svcNames;
 
-    // Familia de área para emparejar staff con el área correcta del ticket
-    function _famAreaTM(x) {
+    if (!confirm('La clienta se retira. Se cobrara solo lo realizado: ' + nombresRealizados + ' = $' + totalRealizado + '.\n\nLos servicios y promos pendientes se cancelan.')) return;
+
+    closeModal();
+
+    try {
+      // Finalizar la atención con el total parcial y marcar como "Por cobrar"
+      const result = await apiPost('finalizarAtencion', {
+        idEspera: window._as1IdEspera || '',
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        clienteCodigo: window._as1Client || '',
+        servicio: nombresRealizados,
+        total: String(totalRealizado),
+        promoNombre: '',
+        precioRegular: String(totalRealizado),
+        esRetiro: true
+      });
+
+      if (result.success) {
+        // Limpiar slot
+        delete activePromos[normalizeClientKey(data.clientName)];
+        slotServices[slot] = [];
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        alert('La clienta fue retirada. Mikaela puede proceder al cobro de $' + totalRealizado + '.');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo procesar el retiro'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al procesar el retiro');
+    }
+  }
+
+  async function finishAndReturn() {
+    // Devolver a lista de espera (la clienta NO continuará con otros servicios)
+    closeModal();
+    
+    const user = window.currentUser;
+    const data = window._finishingData;
+    const slot = window._finishingSlot;
+    
+    try {
+      const result = await apiPost('devolverALista', {
+        chicaNombre: user?.name || '',
+        clienteNombre: data.clientName,
+        motivo: 'no_continuara'
+      });
+      
+      if (result.success) {
+        // Limpiar slot
+        if (activePromos[data.clientName]) delete activePromos[data.clientName];
+        slotServices[slot] = [];
+
+        if (user && activeClients[user.name]) {
+          activeClients[user.name].splice(slot - 1, 1);
+          updateCapacityUI(user.name);
+        }
+        
+        alert('↩️ Clienta devuelta a lista de espera.');
+        show('staffHome');
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo devolver'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al devolver a lista');
+    }
+  }
+
+  function updateCapacityUI(chicaName) {
+    const clients = activeClients[chicaName] || [];
+    const count = clients.length;
+    const badge = document.getElementById('capacityBadge');
+    const slot1 = document.getElementById('slot1');
+    const slot2 = document.getElementById('slot2');
+    
+    badge.textContent = count + '/2 ocupada' + (count !== 1 ? 's' : '');
+    badge.style.background = count === 2 ? 'var(--danger-bg)' : count === 1 ? 'var(--warning-bg)' : 'var(--success-bg)';
+    badge.style.color = count === 2 ? 'var(--danger)' : count === 1 ? 'var(--warning)' : 'var(--success)';
+    
+    if (clients[0]) {
+      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clienteDisplay(clients[0].name, clients[0].code) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot1.style.border = '2px solid var(--success)';
+      slot1.style.background = 'var(--success-bg)';
+      slot1.dataset.active = 'true';
+    } else {
+      slot1.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>Libre';
+      slot1.style.border = '2px dashed var(--line)';
+      slot1.style.background = 'transparent';
+      slot1.dataset.active = 'false';
+    }
+    
+    if (clients[1]) {
+      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="#111"><path d="M15.4,15.4l-.3-1h-2s0,1.6,0,1.6c.5,0,.8.5.8,1.1h1.1c.3,0,.5.2.5.5s-.2.5-.5.5h-4.9c-.3,0-.5-.3-.5-.5s.2-.5.5-.5h1.1c0-.5.3-1,.8-1.1v-1.6s-2,0-2,0c-.7,0-1.3-.6-1.4-1.2l-1.2-7.3c0-.2.1-.4.4-.5s.4,0,.6,0c.7,0,1.3.5,1.4,1.2l.5,3.1h1.1c.7,0,1.2.5,1.4,1.1l.5,1.5h1.1c.6,0,1,.5,1.2,1l.3.5.4,1.3c0,.2.2.4.5.4h.8c.3,0,.5.2.5.5s-.2.5-.5.5-.5,0-.8,0c-.7,0-1.2-.4-1.4-1.1ZM11.8,10.9c0-.2-.3-.3-.4-.3h-.8s.3,1.6.3,1.6h1.4s-.4-1.3-.4-1.3Z"/><path d="M8.6,21.9c-.2,0-.3-.3-.2-.5s.3-.2.5-.2c2.2.8,4.5.7,6.6-.2,3.5-1.4,5.9-4.8,6-8.6s-.2-2.6-.7-3.9,0-.4.2-.5.4,0,.5.2c.7,1.6.9,3.2.8,4.9-.3,3.4-2.4,6.5-5.4,8.1s-2.6,1.1-4,1.2c-1.5.1-2.9,0-4.2-.6Z"/><path d="M3.8,7.4c-1,1.6-1.4,3.3-1.3,5.1s.2,2.1.6,3.1,0,.4-.2.5-.4,0-.5-.2c-.6-1.3-.8-2.8-.7-4.2.2-3.8,2.6-7.2,6-8.8s4.9-1.3,7.4-.5.3.3.2.5-.2.3-.4.3c-.7-.2-1.4-.4-2.1-.4s-1,0-1.5,0c-3,.2-5.9,2-7.5,4.6Z"/><path d="M19.6,6.3h-.7s-.7,0-.7,0c-.2,0-.4,0-.6,0s-.3-.2-.3-.4.1-.3.3-.3h.5s.6,0,.6,0c-.5-.6-1.1-1-1.7-1.4s-.3-.3-.2-.5.3-.3.5-.1c.7.4,1.3.9,1.9,1.5v-.6c0-.3,0-.7.4-.8s.4,0,.4.3,0,.5,0,.7v1.3c0,.2-.2.4-.4.4Z"/><path d="M4.6,19.4c0,.3,0,.6,0,.9s-.1.5-.4.5-.4-.2-.4-.5v-.7s0-1.1,0-1.1c0-.2.2-.3.4-.4h.8s1,0,1,0c.2,0,.3.2.3.3s0,.4-.2.4c-.3.1-.8,0-1.2.1.5.5.9.9,1.5,1.3s.2.3.1.5-.3.3-.5.2c-.6-.3-1.1-.8-1.6-1.3Z"/></svg></div><div style="font-weight: 700; font-size: 13px; color: var(--ink);">' + clienteDisplay(clients[1].name, clients[1].code) + '</div><div style="font-size: 11px; color: var(--ink-soft); margin-top: 2px;">En atención</div>';
+      slot2.style.border = '2px solid var(--info)';
+      slot2.style.background = 'var(--info-bg)';
+      slot2.dataset.active = 'true';
+    } else {
+      slot2.innerHTML = '<div style="margin-bottom: 4px;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.8,17.6l-.5-1.7h-3.2s0,2.6,0,2.6c.8.1,1.3.8,1.3,1.7h1.7c.5,0,.8.3.8.8s-.3.9-.7.9h-7.8c-.4,0-.7-.5-.7-.8s.3-.8.8-.8h1.8c0-.8.4-1.5,1.3-1.7v-2.6s-3.1,0-3.1,0c-1.1,0-2-.9-2.2-2l-1.9-11.6c0-.4.2-.7.6-.7s.7,0,1,0c1.1,0,2,.8,2.2,1.9l.9,4.8h1.7c1.1,0,1.9.8,2.2,1.8l.8,2.4h1.7c.9,0,1.6.8,1.9,1.6l.4.9.7,2c.1.3.4.6.7.6h1.2c.4,0,.8.4.8.8s-.3.8-.7.8-.9,0-1.3,0c-1,0-2-.7-2.3-1.7ZM11.2,10.5c0-.2-.4-.5-.6-.5h-1.3s.4,2.5.4,2.5h2.2s-.7-2-.7-2Z"/></svg></div>Libre';
+      slot2.style.border = '2px dashed var(--line)';
+      slot2.style.background = 'transparent';
+      slot2.dataset.active = 'false';
+    }
+  }
+
+  
+  // Sincronizar estados de autorización con el backend
+  function renderSecuenciaBanner(slotNum, secuencia) {
+    const banner = document.getElementById('as' + slotNum + 'SecuenciaBanner');
+    const items = document.getElementById('as' + slotNum + 'SecuenciaItems');
+    if (!banner || !items) return;
+    if (!secuencia || secuencia.length === 0) { banner.style.display = 'none'; return; }
+
+    const ICONS = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg>', pestanas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg>', retiro_lifting: '✨', facial: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d=\"M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d=\"M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d=\"M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d=\"M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d=\"M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg>' };
+    const LABELS = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting', facial: 'Facial' };
+
+    items.innerHTML = secuencia.map((area, i) => `
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="background: #e0e7ff; border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; color: #3730a3; display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 10px; font-weight: 800;">${i + 1}</span>
+          <span>${ICONS[area] || ''}</span>
+          <span>${LABELS[area] || area}</span>
+        </div>
+        ${i < secuencia.length - 1 ? '<span style="color:#93c5fd;font-size:14px;">→</span>' : ''}
+      </div>
+    `).join('');
+
+    banner.style.display = 'block';
+  }
+
+  // Recarga servicios adicionales (pendientes + aprobados) desde el backend
+  // MANDAMIENTO #3: ¿el servicio pertenece a la MISMA familia de área que la staff?
+  // Si NO, el servicio (enganche) se envía a la lista de espera de la otra área.
+  window.esMismaAreaM3 = function(staffArea, svcRef) {
+    function fam(x) {
       x = String(x || '').toLowerCase();
       if (x.indexOf('facial') >= 0 || x.indexOf('hidra') >= 0 || x.indexOf('limpieza') >= 0) return 'facial';
-      if (x.indexOf('pest') >= 0) return 'pestanas';
-      // FIX: retiro de pestañas, lifting de pestañas y retiro_lifting son servicios de
-      // pestañas — los realiza Yadira/Diana, no las chicas de cejas. Antes caía en 'cejas'
-      // porque el clasificador genérico encontraba 'lifting'/'retiro' y los mandaba ahí,
-      // lo que impedía que Yadira tomara el ticket y generaba 5-6 duplicados SN.
-      if (x.indexOf('retiro') >= 0 || x.indexOf('lifting') >= 0) return 'pestanas';
+      if (x.indexOf('lifting') >= 0 || x.indexOf('retiro') >= 0) return 'retiro_lifting';
+      if (x.indexOf('pest') >= 0 ||
+          x.indexOf('volumen') >= 0 || x.indexOf('pelo a pelo') >= 0) return 'pestanas';
       if (x.indexOf('cej') >= 0 || x.indexOf('depil') >= 0 || x.indexOf('bigote') >= 0 ||
-          x.indexOf('pigment') >= 0) return 'cejas';
+          x.indexOf('pigment') >= 0 || x.indexOf('brow') >= 0) return 'cejas';
       return x;
     }
-    const famStaff = _famAreaTM(data.chicaArea);
+    return fam(staffArea) === fam(svcRef);
+  };
 
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== data.idEspera) continue;
-      const rowNum = i + 3;
-      // Asignar SOLO el área que corresponde a la especialidad de la staff
-      // (primera en estado Esperando cuya familia de área coincide)
-      for (let a = 0; a < 4; a++) {
-        const base   = TM_AREA_COL[a];
-        const tent   = String(rows[i][base] || '').trim();
-        const estado = String(rows[i][base + 3] || '').trim();
-        if (!tent || estado !== 'Esperando') continue;
-        // Tipo de área (formato "area||servicio")
-        let areaTipo = tent;
-        if (tent.indexOf('||') !== -1) areaTipo = tent.split('||')[0];
-        // Si conocemos el área de la staff y NO coincide con esta área → saltar
-        if (famStaff && _famAreaTM(areaTipo) !== famStaff) continue;
-        // Marcar esta área como tomada
-        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio'); // Estado
-        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre); // Staff
-        ws.getRange(rowNum, base + 4 + 1).setValue(hora);             // Hora toma
-        ws.getRange(rowNum, 6).setValue('Activo');
-        // espejo Lineas: slot tomado → su línea (promoRef = id:slot) a 'en_servicio'
-        try { marcarLineaEnServicioPorCodigo(String(rows[i][3]||''), String(data.idEspera)+':'+(a + 1), areaTipo, (tent.indexOf('||')!==-1?tent.split('||')[1]:''), data.chicaNombre||''); } catch(eLn){}
-        try { _pushMikaela('👤 Clienta tomada', String(data.chicaNombre || 'Una chica') + ' tomó a ' + String(rows[i][4] || 'una clienta')); } catch(e){}
-        return { success: true, areaIdx: a + 1, hora };
-      }
-      return { success: false, message: 'No hay un área de tu especialidad disponible en este ticket' };
+  async function recargarAutorizacionesStaff(slotNum) {
+    const user = window.currentUser;
+    if (!user) return;
+    const clientCode = slotNum === 1 ? window._as1Client : window._as2Client;
+    if (!clientCode) return;
+
+    // Arrancar poll de inmediato si ya hay pendientes en memoria (sin esperar al backend)
+    const pollKeyImmediate = '_authPoll' + slotNum;
+    const hayPendientesYa = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+    if (hayPendientesYa && !window[pollKeyImmediate]) {
+      window[pollKeyImmediate] = setInterval(async () => {
+        const screenId = slotNum === 1 ? 'activeService' : 'activeService2';
+        const screenVisible = document.getElementById(screenId)?.classList.contains('active');
+        if (!screenVisible) { clearInterval(window[pollKeyImmediate]); window[pollKeyImmediate] = null; return; }
+        await recargarAutorizacionesStaff(slotNum);
+        const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+        if (!aunPendientes) { clearInterval(window[pollKeyImmediate]); window[pollKeyImmediate] = null; }
+      }, 8000);
     }
-    return { success: false, message: 'Ticket no encontrado' };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
 
-function handleConfirmarServicioMulti(data) {
-  // Staff confirma o cambia el servicio tentativo de su área
-  try {
-    const ws = getTMSheet();
-    const rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== data.idEspera) continue;
-      const rowNum = i + 3;
-      for (let a = 0; a < 4; a++) {
-        const base = TM_AREA_COL[a];
-        if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
-        // Escribir servicio confirmado y precio actualizado
-        ws.getRange(rowNum, base + 1 + 1).setValue(data.servicioConfirmado || rows[i][base]);
-        if (data.precioNuevo) {
-          const precioPromoNuevo = Number(data.precioNuevo);
-          ws.getRange(rowNum, TM_PRECIO_COL[a] + 1).setValue(precioPromoNuevo);
+    try {
+      const authResult = await apiGet('getAutorizaciones');
+      if (!authResult.success || !authResult.autorizaciones) return;
 
-          // FIX: buscar el precio REGULAR del nuevo combo en Paquetes y actualizarlo
-          // en Lineas y en TicketMulti col AK (normalArr[a]).
-          // Antes solo se escribía el precio promo — al cobrar con Tarjeta el sistema
-          // no encontraba montoRegular y usaba el promo como fallback, cobrando $50
-          // en vez del precio regular correcto del Combo 12 tupidas.
-          var precioRegularNuevo = precioPromoNuevo; // default: si no encuentra en Paquetes
-          try {
-            var regMap = _mapaRegularPromos_();
-            var nombreNuevo = _normNombrePromo_(data.servicioConfirmado || '');
-            if (regMap[nombreNuevo] !== undefined && regMap[nombreNuevo] > 0) {
-              precioRegularNuevo = regMap[nombreNuevo];
+      const staffName = user.name || '';
+      const myAuths = authResult.autorizaciones.filter(a =>
+        a.clienteCodigo === clientCode &&
+        a.staffNombre === staffName &&
+        (a.estado === 'pendiente' || a.estado === 'aprobado')
+      );
+
+      if (!slotServices[slotNum]) slotServices[slotNum] = [];
+
+      let changed = false;
+      // ── MANDAMIENTO #3: detección de familia de área centralizada en esMismaAreaM3() ──
+      const staffArea = user.area || 'cejas';
+
+      for (const auth of myAuths) {
+        const svcRef = auth.servicioArea || auth.servicioNombre || '';
+        const esDeOtraArea = !window.esMismaAreaM3(staffArea, svcRef);
+
+        if (auth.estado === 'aprobado' && esDeOtraArea) {
+          // ── Servicio aprobado de otra área → crear ticket SN para esa área ──
+          // Solo si no fue procesado ya (no existe en slotServices como 'enganche-enviado')
+          const yaEnviado = slotServices[slotNum].find(s => s.authId === auth.id && s.status === 'enganche-enviado');
+          if (!yaEnviado) {
+            // Marcar como enviado para no procesar dos veces
+            const existingEng = slotServices[slotNum].find(s => s.authId === auth.id);
+            if (existingEng) {
+              existingEng.status = 'enganche-enviado';
             } else {
-              // Buscar precio regular por área en el array guardado en col AK
-              var normalArr = [];
-              try { normalArr = JSON.parse(String(rows[i][36] || '[]')); } catch (e) {}
-              if (Array.isArray(normalArr) && normalArr[a] > 0) {
-                precioRegularNuevo = Math.max(precioPromoNuevo, Number(normalArr[a]));
-              }
+              slotServices[slotNum].push({
+                name: auth.servicioNombre, price: Number(auth.servicioPrecio||0),
+                area: auth.servicioArea||'', status: 'enganche-enviado', authId: auth.id
+              });
             }
-          } catch (eReg) { Logger.log('precioRegular cambio promo: ' + eReg); }
-
-          // Actualizar col AK (normalArr) con el nuevo regular por área
-          try {
-            var normalArrActual = [];
-            try { normalArrActual = JSON.parse(String(rows[i][36] || '[]')); } catch (e) {}
-            if (!Array.isArray(normalArrActual)) normalArrActual = [];
-            while (normalArrActual.length <= a) normalArrActual.push(0);
-            normalArrActual[a] = precioRegularNuevo;
-            ws.getRange(rowNum, 37).setValue(JSON.stringify(normalArrActual));
-          } catch (eAK) { Logger.log('actualizar AK cambio promo: ' + eAK); }
-
-          // Recalcular totales promo
-          const precios = TM_PRECIO_COL.map(c => Number(rows[i][c] || 0));
-          precios[a] = precioPromoNuevo;
-          const totalPromo = precios.reduce((s, v) => s + v, 0);
-          ws.getRange(rowNum, 36).setValue(totalPromo); // AJ
-
-          // FIX: también actualizar col M de ListaEspera con el nuevo total promo
-          // para que handleGetListaCompleta devuelva el precio correcto al tablero.
-          // Sin este fix, el cobro grupal tomaba el total original de LE (antes del cambio).
-          try {
-            const wsLE = getSheet('ListaEspera');
-            const leData = wsLE.getDataRange().getValues();
-            const tmId = String(rows[i][0] || '').trim(); // col A del TM = idEspera base
-            for (var li = 3; li < leData.length; li++) {
-              // Buscar la fila de LE cuyo ticket TM referenciado sea este
-              const leIdOrRef = String(leData[li][0] || '').trim();
-              const leRef = String(leData[li][13] || '').trim(); // col N = promoNombre/ref TM
-              if (leIdOrRef === tmId || leRef === tmId || leRef.startsWith(tmId + ':')) {
-                wsLE.getRange(li + 1, 13).setValue(totalPromo); // col M = total
-                break;
+            // Crear ticket SN para la otra área
+            const clientCodeEng = slotNum === 1 ? window._as1Client : window._as2Client;
+            const clientNameEng = slotNum === 1
+              ? document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || ''
+              : document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
+            LineaService.crearServicio( {
+              codigo: clientCodeEng || auth.clienteCodigo,
+              nombre: clientNameEng || auth.clienteNombre,
+              servicio: auth.servicioNombre,
+              area: auth.servicioArea || 'cejas',
+              precio: Number(auth.servicioPrecio || 0),
+              prioridad: 'Normal',
+              observaciones: 'Servicio adicional solicitado por ' + staffName + ' durante atención'
+            }).then(function(r) {
+              if (r && (r.ok || r.success)) {
+                showToast('✅ ' + auth.servicioNombre + ' enviado a lista de espera');
               }
-            }
-          } catch (eLE) { Logger.log('actualizar LE total cambio promo: ' + eLE); }
-
-          // Espejo a Lineas: actualizar monto (promo) y montoRegular del slot
-          try {
-            actualizarLineaPorPromoRef(
-              String(data.idEspera) + ':' + (a + 1),
-              {
-                servicio:     data.servicioConfirmado || '',
-                monto:        precioPromoNuevo,
-                montoRegular: precioRegularNuevo
-              }
-            );
-          } catch (eLn) { Logger.log('espejo Lineas cambio promo: ' + eLn); }
+            }).catch(function(){});
+            changed = true;
+          }
+          continue; // No agregar a slotServices de esta staff
         }
-        return { success: true };
+
+        // ── Servicio de la misma área → agregar/actualizar en slotServices ──
+        let existing = slotServices[slotNum].find(s => s.authId === auth.id);
+        if (!existing) {
+          existing = slotServices[slotNum].find(s => s.name === auth.servicioNombre && !s.authId);
+        }
+
+        if (existing) {
+          if (!existing.authId) { existing.authId = auth.id; changed = true; }
+          if (existing.status !== auth.estado) { existing.status = auth.estado; changed = true; }
+        } else if (!slotServices[slotNum].find(s => s.name === auth.servicioNombre)) {
+          slotServices[slotNum].push({
+            name: auth.servicioNombre,
+            price: Number(auth.servicioPrecio || 0),
+            area: auth.servicioArea || '',
+            status: auth.estado,
+            authId: auth.id,
+            note: auth.nota || '',
+            requestedBy: auth.staffNombre || staffName
+          });
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
+          if (s.status === 'pendiente' || s.status === 'rechazado' || s.status === 'enganche-enviado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
+        renderServicesForSlot(slotNum);
+        document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
+        document.getElementById('as' + slotNum + 'SvcCount').textContent =
+          slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
+        // CRÍTICO: Sincronizar al Sheet cuando cambia el estado de una autorización
+        // Esto asegura que el Sheet tenga el total correcto antes de finalizar
+        syncServiciosBackend(slotNum, totalRecalc);
+        // Re-evaluar los botones de finalizar (la aprobación pudo cambiar el flujo)
+        try { updateFinishButtons(slotNum); } catch(eUFB) {}
+      }
+
+      // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
+      const hayPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+      const pollKey = '_authPoll' + slotNum;
+
+      if (hayPendientes && !window[pollKey]) {
+        window[pollKey] = setInterval(async () => {
+          // Detener si el staff ya no esta en la pantalla activa
+          const screenId = slotNum === 1 ? 'activeService' : 'activeService2';
+          const screenVisible = document.getElementById(screenId)?.classList.contains('active');
+          if (!screenVisible) {
+            clearInterval(window[pollKey]);
+            window[pollKey] = null;
+            return;
+          }
+          await recargarAutorizacionesStaff(slotNum);
+          // Detener si ya no quedan pendientes
+          const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
+          if (!aunPendientes) {
+            clearInterval(window[pollKey]);
+            window[pollKey] = null;
+          }
+        }, 8000);
+      }
+
+      // Si ya no hay pendientes, asegurar que el poll este detenido
+      if (!hayPendientes && window[pollKey]) {
+        clearInterval(window[pollKey]);
+        window[pollKey] = null;
+      }
+
+    } catch (err) {
+      console.error('Error recargando autorizaciones del staff:', err);
+    }
+  }
+
+  // Detener polling al salir de pantallas de atención
+  function detenerPollAutorizaciones() {
+    if (window._authPoll1) { clearInterval(window._authPoll1); window._authPoll1 = null; }
+    if (window._authPoll2) { clearInterval(window._authPoll2); window._authPoll2 = null; }
+  }
+
+  async function syncAuthorizationStates(slot) {
+    const svcs = slotServices[slot] || [];
+    const pendingServices = svcs.filter(s => s.status === 'pendiente');
+    
+    if (pendingServices.length === 0) return;
+
+    try {
+      const result = await apiGet('getAutorizaciones');
+
+      if (result.success && result.autorizaciones) {
+        const user = window.currentUser;
+        const staffName = user ? user.name : '';
+        const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+
+        for (const svc of pendingServices) {
+          // Buscar por authId primero, luego por nombre+staff+cliente
+          let authInBackend = svc.authId
+            ? result.autorizaciones.find(a => a.id === svc.authId)
+            : null;
+
+          if (!authInBackend) {
+            authInBackend = result.autorizaciones.find(a =>
+              a.servicioNombre === svc.name &&
+              a.staffNombre === staffName &&
+              a.clienteCodigo === clientCode &&
+              (a.estado === 'aprobado' || a.estado === 'rechazado')
+            );
+          }
+
+          if (authInBackend) {
+            if (!svc.authId) svc.authId = authInBackend.id;
+            if (authInBackend.estado === 'aprobado') {
+              svc.status = 'aprobado';
+            } else if (authInBackend.estado === 'rechazado') {
+              svc.status = 'rechazado';
+            }
+          }
+        }
+
+        // Recalcular total y re-renderizar
+        const totalRecalc = svcs.reduce((sum, s) => {
+          if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
+        renderServicesForSlot(slot);
+        document.getElementById('as' + slot + 'Total').textContent = '$' + totalRecalc;
+        document.getElementById('as' + slot + 'SvcCount').textContent =
+          svcs.filter(s => s.status !== 'rechazado').length;
+        // Sincronizar cambio de estado con backend (actualiza col F en ListaEspera)
+        syncServiciosBackend(slot, totalRecalc);
+      }
+    } catch (err) {
+      console.error('Error sincronizando autorizaciones:', err);
+    }
+  }
+  
+  async function prepararYFinalizar(slot) {
+    const user = window.currentUser;
+    const slotStr = String(slot || 1);
+    const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey  = normalizeClientKey(clientName);
+    const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const clientCode = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+
+    // Sincronizar autorizaciones primero
+    await syncAuthorizationStates(slot);
+
+    const svcs = slotServices[slot] || [];
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      alert('⏳ Hay servicios pendientes de autorización de Mikaela. Esperá antes de finalizar.');
+      return;
+    }
+
+    const svcsOk = svcs.filter(s => s.status !== 'rechazado');
+    let total = svcsOk.reduce((s, v) => s + Number(v.price || 0), 0);
+    let svcNames = svcsOk.map(s => s.name).join(' + ');
+
+    // Si slotServices está vacío, intentar recuperar desde el panel activo
+    if (svcsOk.length === 0) {
+      const totalEl = document.getElementById('as' + slotStr + 'Total');
+      const totalFromPanel = totalEl ? Number((totalEl.textContent || '').replace('$','').trim()) : 0;
+      const svcCountEl = document.getElementById('as' + slotStr + 'SvcCount');
+      // Intentar obtener el servicio desde el backend
+      try {
+        const atenRes = await apiGet('getAtenciones', { chica: user?.name || '' });
+        if (atenRes.success && atenRes.atenciones) {
+          const aten = atenRes.atenciones.find(a => a.codigo === clientCode || a.nombre === clientName);
+          if (aten) {
+            svcNames = aten.servicio || aten.promoNombre || 'Servicio';
+            total = Number(aten.total || totalFromPanel || 0);
+            // Rellenar slotServices
+            slotServices[slot] = [{ name: svcNames, price: total, area: aten.area || '' }];
+          }
+        }
+      } catch(e) {}
+      if (!svcNames) svcNames = 'Servicio';
+      if (total === 0 && document.getElementById('as' + slotStr + 'Total')) {
+        total = Number((document.getElementById('as' + slotStr + 'Total').textContent || '0').replace('$','')) || 0;
       }
     }
-    return { success: false, message: 'No se encontró el área de esta staff' };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
 
-function handleCompletarAreaTicketMulti(data) {
-  try {
-    const ws = getTMSheet();
-    const rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    const tz = 'America/Guayaquil';
+    window._finishingSlot = slot;
+    window._finishingData = {
+      clientKey, clientName, svcNames,
+      total: String(total),
+      promoNombre: '',
+      precioRegular: String(total),
+      idEspera, clienteCodigo: clientCode,
+      areasExtras: [], promasExtraPendientes: []
+    };
 
-    for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== data.idEspera) continue;
-      var rowNum = i + 3;
+    try {
+      await finishAndSend();
+    } catch(e) {
+      alert('Error al finalizar: ' + e.message);
+    }
+  }
 
-      // Parsear secuencia desde observaciones
-      var obsRaw = String(rows[i][7] || '');
-      var secuencia = [];
-      if (obsRaw.startsWith('SEQ:')) {
-        var seqStr = obsRaw.substring(4).split('|')[0];
-        secuencia = seqStr.split(',').filter(Boolean);
+  // Quita cualquier etiqueta HTML/SVG de un label para usarlo en .textContent (evita que
+  // el código del icono SVG de un área se muestre como texto en los botones).
+  function _soloTexto(s) {
+    return String(s == null ? '' : s).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  }
+  window._soloTexto = _soloTexto;
+
+  async function finishSlot1() {
+    const user = window.currentUser;
+    const displayName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
+    const clientKey = normalizeClientKey(displayName);
+    
+    // Sincronizar estados con el backend primero
+    await syncAuthorizationStates(1);
+    
+    const svcs = slotServices[1] || [];
+    const _clientCode1 = window._as1Client || '';
+    
+    console.log('🔍 finishSlot1:', {
+      displayName,
+      clientKey,
+      services: svcs.length,
+      activePromos: Object.keys(activePromos)
+    });
+    
+    // Verificar si hay servicios pendientes de autorización
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      // Intentar sync una vez más antes de bloquear
+      await syncAuthorizationStates(1);
+      const stillPending = (slotServices[1] || []).some(s => s.status === 'pendiente');
+      if (stillPending) {
+        alert('No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.\n\nEsperá a que Mikaela apruebe o rechace los servicios adicionales.');
+        return;
+      }
+    }
+    
+    // Calcular total solo de servicios aprobados
+    const total = svcs.reduce((sum, s) => {
+      if (s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
+    
+    const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
+    const promoData = activePromos[clientKey];
+    
+    console.log('Promo data:', promoData);
+    console.log('Total:', total);
+    
+    // Detectar si hay servicios de areas cruzadas (ej: Laura facial agrega servicio de Cejas)
+    const areaMapInv = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', facial: 'facial' };
+    const areaDisplayMap = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+    const staffArea = user?.area || '';
+    const svcsAprobados = svcs.filter(s => s.status !== 'rechazado');
+    
+    // Áreas de servicios aprobados que NO son del área del staff
+    const areasExtras = [...new Set(
+      svcsAprobados
+        .map(s => {
+          const a = String(s.area || '').toLowerCase();
+          if (a.includes('ceja') || a.includes('depil')) return 'cejas';
+          if (a.includes('lifting') || a.includes('retiro')) return 'cejas';
+          if (a.includes('pesta')) return 'pestanas';
+          if (a.includes('facial')) return 'facial';
+          return null;
+        })
+        .filter(a => a && a !== staffArea)
+    )];
+    
+    const hayAreasExtras = areasExtras.length > 0;
+
+    // También detectar si hay múltiples servicios aprobados (aunque sean del mismo área)
+    // Ej: "Depilación de cejas $8" + "Depilación de bigote $4" → la staff puede hacer ambos o solo uno
+    const hayMultiplesServicios = svcsAprobados.length > 1 && !promoData;
+
+    // Promos extra pendientes (2a, 3a promo del ticket)
+    // Recuperar desde sessionStorage si _takingPromasExtra está vacío
+    if (!window._takingPromasExtra || window._takingPromasExtra.length === 0) {
+      const _idEsperaRec = window._as1IdEspera || '';
+      if (_idEsperaRec) {
+        try {
+          const _stored = sessionStorage.getItem('nexserv_promasExtra_' + _idEsperaRec);
+          if (_stored) window._takingPromasExtra = JSON.parse(_stored);
+        } catch(eR) {}
+      }
+      if ((!window._takingPromasExtra || window._takingPromasExtra.length === 0) && window._listaEsperaCache) {
+        const _ticket = (window._listaEsperaCache || []).find(w => w.id === _idEsperaRec);
+        if (_ticket && _ticket.promasExtra && _ticket.promasExtra.length > 0) {
+          window._takingPromasExtra = _ticket.promasExtra;
+        }
+      }
+    }
+    const promasExtraPendientes = (window._takingPromasExtra || []).filter(p => p && p.nombre);
+
+    // Guardar datos en variable global para usar en las opciones
+    // Si hay promo, el total es el precio de la promo + cualquier servicio extra aprobado (no de la promo)
+    let totalFinal;
+    let miPrecioPromo = 0;
+    if (promoData) {
+      // Servicios extra: aprobados que NO son la promo principal
+      const extrasAprobados = svcsAprobados.filter(s => s.name !== promoData.promo.name);
+      const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      // Usar el precio de la parte de ESTA staff (no el total de la promo)
+      miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea, promoData.completedAreas || []);
+      totalFinal = String(miPrecioPromo + totalExtras);
+    } else {
+      totalFinal = String(total);
+    }
+    const miPrecioRegular = promoData
+      ? (() => {
+          // Precio regular proporcional: si la promo tiene división, sumar el precio regular de mi área
+          // Como no tenemos precio regular por área, usamos la proporción: miPrecioPromo / promo.price * promo.regular
+          const ratio = (promoData.promo.price > 0) ? (miPrecioPromo / promoData.promo.price) : 1;
+          return Math.round(Number(promoData.promo.regular) * ratio);
+        })()
+      : total;
+    const precioRegularFinal = promoData
+      ? String(miPrecioRegular + (svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)))
+      : String(total);
+
+    window._finishingSlot = 1;
+    window._finishingData = {
+      clientKey: clientKey,
+      clientName: displayName,
+      svcNames,
+      total: totalFinal,
+      promoNombre: promoData ? promoData.promo.name : '',
+      precioRegular: precioRegularFinal,
+      areasExtras: areasExtras,
+      promasExtraPendientes: promasExtraPendientes
+    };
+
+    // ── TM: botones ya inline en panel — updateFinishButtons los renderiza ──
+    const _idEsp1 = window._as1IdEspera || '';
+    if (_idEsp1.startsWith('TM-')) {
+      updateFinishButtons(1);
+      return; // los botones cambian inline, no abrir modal
+    }
+
+    // Cerrar cualquier modal abierto primero
+    document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('active'));
+    
+    setTimeout(() => {
+      document.getElementById('finishClientName').textContent = clienteDisplay(displayName, window._as1Client);
+      if (promoData) {
+        document.getElementById('finishPromoInfo').style.display = 'block';
+        document.getElementById('finishPromoName').textContent = promoData.promo.name;
+      } else {
+        document.getElementById('finishPromoInfo').style.display = 'none';
       }
 
-      // Encontrar áreas de esta staff y marcarlas completadas.
-      // esUltima=true (Finalizar): marca TODAS las áreas de esta staff.
-      var areaCompletadaIdx = -1;
-      var areaCompletadaKey = '';
-      var esUltima = data.esUltima === true;
+      // ── Lógica de visibilidad de los 7 botones ──────────────────
+      const user = window.currentUser;
+      const myArea = user?.area || 'cejas';
+      const AREA_CAPS = {
+        'cejas':    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow',
+                     'retiro de lifting', 'lifting de pestañas', 'retiro de pestañas',
+                     'retiro lifting', 'retiro_lifting',
+                     'pestanas', 'pestañas', 'pest', 'lifting', 'retiro', 'volumen',
+                     'pelo a pelo', 'clasicas', 'clásicas', 'efecto'],
+        'pestanas': ['pestanas', 'pestañas', 'pestaña', 'lifting', 'retiro', 'volumen', 'pelo a pelo',
+                     'efecto aura', 'efecto muñeca', 'clasicas', 'clásicas', 'natural'],
+        'facial':   ['facial', 'hidra', 'limpieza']
+      };
+      const myCaps = AREA_CAPS[myArea] || [myArea];
 
-      // Leer % comisión de esta staff una sola vez
-      var pctStaff = 0.3;
-      try {
-        var wsComStaff = getSheet('Comisiones');
-        var comDataStaff = wsComStaff.getDataRange().getValues();
-        // FIX: i=3 — María está en fila 4 (índice 3)
-        for (var cj = 3; cj < comDataStaff.length; cj++) {
-          if (String(comDataStaff[cj][0]||'').trim() === data.chicaNombre) {
-            if (String(comDataStaff[cj][1]||'').toLowerCase().includes('facial') ||
-                String(comDataStaff[cj][4]||'').includes('40')) pctStaff = 0.4;
-            break;
-          }
-        }
-      } catch(ePct2) {}
-
-      for (var a = 0; a < 4; a++) {
-        var base = TM_AREA_COL[a];
-        if (String(rows[i][base + 2] || '').trim() !== data.chicaNombre) continue;
-        var estAreaActual = String(rows[i][base + 3] || '').trim();
-        if (estAreaActual === 'Completado') {
-          // Esta área ya estaba completa — continuar buscando la siguiente de esta staff
-          if (areaCompletadaIdx === -1) {
-            // Aún no encontramos la que hay que completar ahora — seguir buscando
-            continue;
-          }
-          // Ya registramos cuál completar — si no es esUltima, salimos
-          if (!esUltima) break;
-          continue;
-        }
-        // Primera área En servicio de esta staff = la que se completa ahora
-        if (areaCompletadaIdx === -1) {
-          areaCompletadaIdx = a;
-          var rawTent = String(rows[i][base] || '');
-          areaCompletadaKey = rawTent.indexOf('||') !== -1 ? rawTent.split('||')[0] : '';
-        }
-        ws.getRange(rowNum, base + 3 + 1).setValue('Completado');
-        // espejo Lineas: slot completado → su línea (promoRef = id:slot) a 'completado'
-        try { marcarLineaCompletadaPorCodigo(String(rows[i][3]||''), String(data.idEspera)+':'+(a + 1), '', '', data.chicaNombre || ''); } catch(eLn){}
-        var precioArea = Number(rows[i][TM_PRECIO_COL[a]] || 0);
-        // Comisión se registra SOLO en handleConfirmarCobroMulti (al cobrar), no aquí
-        // NOTA: HistorialOwner se escribe SOLO en handleConfirmarCobroMulti (al cobrar)
-        if (!esUltima) break;
-      }
-
-      // Determinar siguiente área usando la secuencia
-      // Áreas pendientes (con datos y no completadas, excluyendo la que acaba de completar)
-      var areasConDatos = [];
-      for (var a2 = 0; a2 < 4; a2++) {
-        var base2 = TM_AREA_COL[a2];
-        var tent2  = String(rows[i][base2] || '').trim();
-        if (!tent2) continue;
-        var est2   = String(rows[i][base2 + 3] || '').trim();
-        var aKey2  = tent2.indexOf('||') !== -1 ? tent2.split('||')[0] : '';
-        var tent2Label = tent2.indexOf('||') !== -1 ? tent2.split('||')[1] : tent2;
-        var precio2    = Number(rows[i][TM_PRECIO_COL[a2]] || 0);
-        areasConDatos.push({ idx: a2, key: aKey2, estado: est2, base: base2, tentativo: tent2Label, precio: precio2 });
-      }
-
-      // Áreas que aún no están completadas
-      // FIX: cuando esUltima=true, Lesly completó TODAS sus áreas en el loop anterior.
-      // rows[i] tiene valores viejos → excluir manualmente todas las áreas de esta staff
-      // (no solo areaCompletadaIdx) para que todasListas calcule correctamente.
-      var areasDeEstaStaff = new Set();
-      for (var ax = 0; ax < 4; ax++) {
-        if (String(rows[i][TM_AREA_COL[ax] + 2] || '').trim() === data.chicaNombre) {
-          areasDeEstaStaff.add(ax);
-        }
-      }
-      var areasPendientes = areasConDatos.filter(function(a) {
-        if (esUltima && areasDeEstaStaff.has(a.idx)) return false; // esta staff las completó todas
-        if (!esUltima && a.idx === areaCompletadaIdx) return false; // solo la recién completada
-        return a.estado !== 'Completado';
-      });
-
-      // FIX: cuando esUltima=true, áreas "Esperando" sin staff asignada = nadie las tomó.
-      // Si la clienta se retira antes de completar todas las áreas, esas áreas se cancelan.
-      // No deben volver a lista de espera — el TM pasa directo a "Por cobrar" con lo hecho.
-      // FIX BUG: "Terminé todo mi trabajo" con áreas pendientes (ej. promo pestañas+cejas
-      // pero la clienta solo se hizo pestañas) → TODO el valor se acredita a la staff que
-      // finaliza y el ticket pasa a cobro. (absorberPendientes lo manda el botón verde)
-      if (esUltima && data.absorberPendientes === true) {
-        for (var abz = 0; abz < 4; abz++) {
-          var baseAbz = TM_AREA_COL[abz];
-          if (!String(rows[i][baseAbz] || '').trim()) continue;
-          if (String(rows[i][baseAbz + 3] || '').trim() === 'Completado') continue;
-          // Reasignar a la staff que finaliza y marcar completada (conserva el precio del área)
-          ws.getRange(rowNum, baseAbz + 2 + 1).setValue(data.chicaNombre);
-          ws.getRange(rowNum, baseAbz + 3 + 1).setValue('Completado');
-          try { marcarLineaCompletadaPorCodigo(String(rows[i][3]||''), String(data.idEspera)+':'+(abz + 1), '', '', data.chicaNombre || ''); } catch(eLnAbz){}
-        }
-        areasPendientes = []; // todo a esta staff → todasListas = true
-      } else if (esUltima) {
-        var areasSinTomar = areasPendientes.filter(function(a) {
-          var staffArea = String(rows[i][TM_AREA_COL[a.idx] + 2] || '').trim();
-          return (!staffArea || a.estado === 'Esperando'); // nadie la tomó
+      const puedeTodo = promoData && promoData.promo && promoData.promo.division &&
+        promoData.promo.division.length > 0 &&
+        promoData.promo.division.every(d => {
+          // Normalizar: division.area puede tener emojis como '👁 Pestañas', '💅 Cejas'
+          const rawArea = String(d.area||'');
+          const dArea = rawArea.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+          const dSvc  = String(d.servicio||d.service||'').toLowerCase();
+          const dRealArea = String(d.realArea||'').toLowerCase();
+          return myCaps.some(cap => dArea.includes(cap) || dSvc.includes(cap) || dRealArea.includes(cap));
         });
-        if (areasSinTomar.length > 0 && areasSinTomar.length === areasPendientes.length) {
-          // TODAS las áreas pendientes son "Esperando" sin staff → la clienta se retira
-          // Cancelar esas áreas y mandar a cobro con lo que se hizo
-          for (var ac = 0; ac < 4; ac++) {
-            var baseC = TM_AREA_COL[ac];
-            if (!String(rows[i][baseC] || '').trim()) continue;
-            var estC = String(rows[i][baseC + 3] || '').trim();
-            var staffC = String(rows[i][baseC + 2] || '').trim();
-            if (estC === 'Esperando' && !staffC) {
-              ws.getRange(rowNum, baseC + 3 + 1).setValue('Cancelado');
+
+      const tieneSecuencia = promoData || hayAreasExtras || promasExtraPendientes.length > 0 || hayMultiplesServicios;
+
+      const esUltimaArea = promoData && promoData.completedAreas && promoData.promo.division &&
+        (promoData.completedAreas.length >= promoData.promo.division.length - 1);
+
+      // BTN 1: Yo hago toda la promo
+      const b1 = document.getElementById('finishDoAllBtn');
+      if (b1) b1.style.display = (puedeTodo && promoData) ? 'block' : 'none';
+
+      // ── CASO: Múltiples servicios en el slot (sin promo, mismo área) ──
+      // Ej: Depilación cejas $8 + Depilación bigote $4 → mostrar 2 botones específicos
+      if (hayMultiplesServicios && !promoData) {
+        const serviciosRestantes = svcsAprobados.slice(1); // el 2do, 3ro...
+        const nombresRestantes = serviciosRestantes.map(s => s.name).join(' + ');
+
+        // BTN A: "Termino yo el siguiente servicio"
+        const b2 = document.getElementById('finishSendBtn');
+        if (b2) {
+          b2.style.display = 'block';
+          b2.textContent = '✅ Ya terminé ambos servicios — cobrar';
+          b2.onclick = function() { closeModal(); finishAndSend(); };
+        }
+
+        // BTN 4: "Terminé mi parte — enviar a siguiente staff"
+        const b4 = document.getElementById('finishContinueBtn');
+        if (b4) {
+          b4.style.display = 'block';
+          b4.textContent = '➡️ Terminé mi parte — enviar a siguiente staff: ' + _soloTexto(nombresRestantes);
+          b4.onclick = function() { closeModal(); finishAndSendPartial(); };
+        }
+
+        // Ocultar otros botones
+        const b3 = document.getElementById('finishPromoCompleteBtn');
+        if (b3) b3.style.display = 'none';
+
+        const modal = document.getElementById('finishOptionsModal');
+        if (modal) { modal.querySelectorAll('.finish-extra-btn').forEach(b => b.remove()); modal.classList.add('active'); }
+        return; // salir del setTimeout
+      }
+
+      // Detectar si la promo tiene siguiente área (para botón compartir)
+      const promoTieneMultiArea = promoData && promoData.promo && promoData.promo.division && promoData.promo.division.length > 1;
+      const siguienteAreaPromo = promoTieneMultiArea
+        ? (promoData.promo.division.find(d => {
+            const da = String(d.area||'').toLowerCase();
+            const comp = (promoData.completedAreas || []).map(a => String(a).toLowerCase());
+            return !comp.some(c => da.includes(c) || c.includes(da));
+          }) || null)
+        : null;
+      const nombreSiguienteArea = siguienteAreaPromo
+        ? (String(siguienteAreaPromo.area||'').replace(/[^\w\s]/g,'').trim() || 'siguiente área')
+        : (areasExtras.length > 0 ? areasExtras.map(a => areaDisplayMap[a]||a).join(', ') : 'siguiente área');
+
+      // BTN "Compartir siguiente servicio" — visible cuando:
+      // 1. Hay promo multi-área con área pendiente
+      // 2. La staff PUEDE hacer el siguiente servicio (lifting/pest incluido para cejas)
+      //    pero QUIERE compartirlo con otra staff
+      // Nota: lifting de pestañas lo puede hacer todo el staff de cejas Y pestañas
+      const bCompartir = document.getElementById('finishShareNextBtn');
+      if (bCompartir) {
+        // Verificar si la staff puede hacer el siguiente servicio
+        const sigAreaStr = String(siguienteAreaPromo ? siguienteAreaPromo.area : '').toLowerCase();
+        const puedeSiguiente = myCaps.some(cap => sigAreaStr.replace(/[^\w\s]/gi,' ').includes(cap));
+        // Mostrar si hay promo multi-área, hay área pendiente, Y la staff puede hacerla
+        // (si no puede hacerla, la siguiente staff distinta lo toma automáticamente)
+        const mostrarCompartir = promoData && (promoTieneMultiArea || hayAreasExtras) && !esUltimaArea
+          && (puedeTodo || puedeSiguiente);
+        if (mostrarCompartir) {
+          bCompartir.style.display = 'block';
+          bCompartir.textContent = '🤝 Compartir siguiente servicio con otra staff: ' + _soloTexto(nombreSiguienteArea);
+          bCompartir.onclick = function() { closeModal(); compartirSiguienteServicio(); };
+        } else {
+          bCompartir.style.display = 'none';
+        }
+      }
+
+      // BTN 2: Finalizar servicio (flujo normal / promo)
+      const b2 = document.getElementById('finishSendBtn');
+      if (b2) {
+        if (promoData && tieneSecuencia && !esUltimaArea && !puedeTodo) {
+          b2.style.display = 'none';
+        } else {
+          b2.style.display = 'block';
+          b2.textContent = promoData ? '💰 Finalizar servicio (solo mi parte)' : '💰 Finalizar servicio';
+          b2.onclick = function() { closeModal(); finishAndSend(); };
+        }
+      }
+
+      // BTN 3: Promo completada (última área)
+      const b3 = document.getElementById('finishPromoCompleteBtn');
+      const esPromoCompartida = promoData && (promoData.completedAreas || []).length > 0;
+      if (b3) {
+        b3.style.display = (promoData && esUltimaArea && !puedeTodo) ? 'block' : 'none';
+        if (esPromoCompartida && esUltimaArea) {
+          b3.textContent = '&#x2705; Promo compartida completada &mdash; mandar a cobrar';
+          b3.style.background = 'linear-gradient(135deg,#2d6a4f,#1a4a32)';
+        } else {
+          b3.textContent = '&#x1F3AF; Promo completada &mdash; cobrar';
+          b3.style.background = '';
+        }
+      }
+
+      // BTN 4: Continuar siguiente área / promo
+      const b4 = document.getElementById('finishContinueBtn');
+      if (b4) {
+        if (tieneSecuencia && !esUltimaArea && !puedeTodo) {
+          b4.style.display = 'block';
+          const areasLabel = areasExtras.length > 0
+            ? areasExtras.map(a => areaDisplayMap[a] || a).join(', ')
+            : promasExtraPendientes.length > 0 ? promasExtraPendientes[0].nombre : 'siguiente área';
+          b4.textContent = '➡️ Continuar siguiente área: ' + _soloTexto(areasLabel);
+          b4.onclick = function() { finishAndContinue(); };
+        } else {
+          b4.style.display = 'none';
+        }
+      }
+
+      const modal = document.getElementById('finishOptionsModal');
+      if (modal) {
+        modal.querySelectorAll('.finish-extra-btn').forEach(b => b.remove());
+        modal.classList.add('active');
+      }
+    }, 100);
+  }
+
+  async function finishSlot2() {
+    const user = window.currentUser;
+    // Si la 2ª clienta es un ticket multi-área (TM-), usar el flujo TM correcto
+    const _idEsp2 = window._as2IdEspera || '';
+    if (_idEsp2.startsWith('TM-')) {
+      window._finishingSlot = 2;
+      await completarAreaMultiFinal();
+      return;
+    }
+    const clientName = document.getElementById('as2Name')?.textContent?.replace(' ⭐', '') || '';
+    
+    // Sincronizar estados con el backend primero
+    await syncAuthorizationStates(2);
+    
+    const svcs = slotServices[2] || [];
+    
+    // Verificar si hay servicios pendientes
+    const hasPending = svcs.some(s => s.status === 'pendiente');
+    if (hasPending) {
+      alert('⏳ No podés finalizar aún. Hay servicios pendientes de autorización de Mikaela.');
+      return;
+    }
+    
+    const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
+    const total = svcs.reduce((sum, s) => {
+      if (s.status === 'rechazado') return sum;
+      return sum + Number(s.price || 0);
+    }, 0);
+    const promoData = activePromos[normalizeClientKey(clientName)];
+    // montoComision = lo que realizó esta staff (suma de sus servicios)
+    const montoComision = total;
+
+    // Construir desglose
+    const desgloseSlot2 = svcs.filter(s => s.status !== 'rechazado').map(s => ({
+      staff: user?.name || '',
+      servicio: s.name,
+      area: s.area || '',
+      monto: Number(s.price || 0)
+    }));
+
+    // Leer desglose previo del sheet si es ticket SP- (áreas anteriores ya registradas)
+    let desgloseDelSheet2 = window._desgloseAcumulado || [];
+    const idEspera2 = window._as2IdEspera || '';
+    const esTicketSP2 = idEspera2.startsWith('SP-');
+    if (esTicketSP2 && desgloseDelSheet2.length === 0) {
+      try {
+        const spData2 = await LineaService.obtenerPorCobrarSP(idEsperaActual || idEspera2 || '');
+        if (spData2.success) {
+          const allSP2 = [...(spData2.esperando||[]), ...(spData2.enServicio||[]), ...(spData2.porCobrar||[])];
+          const miTicket2 = allSP2.find(t => t.idEspera === idEspera2);
+          if (miTicket2 && miTicket2.serviciosDetalle && miTicket2.serviciosDetalle.length > 0) {
+            desgloseDelSheet2 = miTicket2.serviciosDetalle;
+          }
+        }
+      } catch(e) {}
+    }
+    // Acumular sin duplicar
+    const desgloseAcumulado2 = [...desgloseDelSheet2];
+    desgloseSlot2.forEach(nuevo => {
+      const yaExiste = desgloseAcumulado2.some(ex => ex.staff === nuevo.staff && ex.servicio === nuevo.servicio);
+      if (!yaExiste) desgloseAcumulado2.push(nuevo);
+    });
+
+    try {
+      if (esTicketSP2) {
+        await LineaService.finalizarServicio( {
+          idEspera: idEspera2,
+          chicaNombre: user?.name || '',
+          clienteNombre: clientName,
+          servicio: svcNames,
+          total: String(total),
+          promoNombre: promoData ? promoData.promo.name : '',
+          precioPromo: promoData ? String(promoData.promo.price) : '',
+          precioRegular: promoData ? String(promoData.promo.regular || promoData.promo.price) : '',
+          serviciosDetalle: desgloseAcumulado2
+        });
+      } else {
+        await apiPost('finalizarAtencion', {
+          idEspera: idEspera2,
+          chicaNombre: user?.name || '',
+          clienteNombre: clientName,
+          servicio: svcNames,
+          total: String(total),
+          montoComision: String(montoComision),
+          promoNombre: promoData ? promoData.promo.name : '',
+          precioRegular: promoData ? String(promoData.promo.regular) : String(total),
+          serviciosDetalle: desgloseAcumulado2
+        });
+      }
+    } catch (err) { console.error(err); }
+
+    window._desgloseAcumulado = [];
+
+    if (promoData) delete activePromos[normalizeClientKey(clientName)];
+
+    if (user && activeClients[user.name]) {
+      activeClients[user.name].splice(1, 1);
+      updateCapacityUI(user.name);
+    }
+    alert('✓ Servicio finalizado. Mikaela procederá al cobro.');
+    show('staffHome');
+  }
+
+  // === RETIRO GRATIS / $10 ===
+
+  async function loadStaffHome() {
+    // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
+    if (window._siraActivo || window._resumenBackup) return;
+    // Guard adicional: verificar que los elementos clave existen antes de continuar
+    const _sectionCheck = document.getElementById('as1Section') || document.getElementById('as2Section');
+    if (!_sectionCheck && !document.getElementById('staffName')) return;
+    const user = window.currentUser;
+    if (!user || user.role !== 'staff') return;
+    
+    // 🔧 Asegurar que PROMOS esté cargado ANTES de procesar atenciones
+    await ensurePromosLoaded();
+
+    // Restaurar promos activas persistidas (después de cargar PROMOS)
+    restoreActivePromos();
+    
+    try {
+      const result = await apiGet('getAtenciones', { chica: user.name });
+      const section = document.getElementById('staffAtendiendoSection');
+      const list = document.getElementById('staffAtendiendoList');
+      // Guard tardío: verificar que el DOM sigue siendo el de staffHome (no fue reemplazado por SIRA)
+      if (!section || !list) return;
+      
+      if (result.success && result.atenciones && result.atenciones.length > 0) {
+        section.style.display = 'block';
+        
+        // Actualizar activeClients para doble atención
+        if (user.maxClients === 2) {
+          activeClients[user.name] = result.atenciones.map(a => ({ name: a.nombre, code: a.codigo, service: a.servicio }));
+          updateCapacityUI(user.name);
+        }
+        
+        list.innerHTML = result.atenciones.map((a, idx) => {
+          const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const slot = idx === 0 ? 'activeService' : 'activeService2';
+          // Ticket madre con subtickets: si la clienta tiene varios servicios,
+          // se listan adentro de una sola tarjeta (una tarjeta = una clienta).
+          const subs = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
+          const esMulti = subs.length > 1;
+          const subtitulo = esMulti
+            ? (subs.length + ' servicios · desde ' + a.horaToma)
+            : (a.servicio + ' · ' + a.area + ' · desde ' + a.horaToma);
+          const subticketsHtml = esMulti
+            ? '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">'
+              + subs.map(function(s){
+                  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg);border-radius:10px;">'
+                    + '<div style="font-size:12px;font-weight:600;color:var(--ink);">' + s.servicio + '</div>'
+                    + '<div style="font-size:11px;color:var(--ink-faint);font-weight:600;">' + (s.area || '') + (s.esPromo ? ' · promo' : '') + '</div>'
+                    + '</div>';
+                }).join('')
+              + '</div>'
+            : '';
+          return `
+          <div class="card" style="margin-bottom: 8px; padding: 16px; border-left: 4px solid var(--accent); cursor: pointer;" onclick="loadActiveService(${idx}); show('${slot}');">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink: 0;">${initials}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 16px;">${clienteDisplay(a.nombre, a.codigo)}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}</div>
+                <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${subtitulo}</div>
+              </div>
+              <div style="background: var(--accent); color: white; padding: 6px 14px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">Ver →</div>
+            </div>
+            ${subticketsHtml}
+          </div>`;
+        }).join('');
+        
+        // Precargar datos en activeService
+        const a1 = result.atenciones[0];
+        // Guardar codigo anterior ANTES de sobreescribir para comparar
+        const codigoAnterior = window._as1Client;
+        const mismaClienta = codigoAnterior === a1.codigo;
+        const tieneServicios = slotServices[1] && slotServices[1].length > 0;
+
+        // CRÍTICO: actualizar _as1IdEspera con el ID real del ticket activo (puede ser SP- o LE-)
+        window._as1IdEspera = a1.idEspera || window._as1IdEspera || '';
+        
+        window._as1Client     = a1.codigo;
+        window._as1ClientName = a1.nombre || '';
+        var _av1=document.getElementById('as1Avatar'); if(_av1) _av1.textContent = a1.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+        document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
+        pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
+        var _ac1=document.getElementById('as1Code'); if(_ac1) _ac1.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
+        var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+        _setNotaRecepcion(1, a1.observaciones);
+        renderSecuenciaBanner(1, a1.secuencia || []);
+
+        // Solo resetear slotServices si cambio la clienta o si esta completamente vacia
+        if (!mismaClienta || !tieneServicios) {
+          slotServices[1] = [];
+        }
+        
+        if (a1.servicio && a1.servicio !== '—') {
+          const clientKey1 = normalizeClientKey(a1.nombre);
+
+          if (a1.promoNombre && String(a1.promoNombre).trim() !== '') {
+            // Con promo: calcular el precio correspondiente al area del staff
+            const promoFull = PROMOS.find(p => p.name === a1.promoNombre);
+            if (promoFull) {
+              const myArea = user.area || 'cejas';
+              const myPrice = getMyPromoPrice(promoFull, myArea);
+
+              // Solo agregar si no existe ya
+              if (!slotServices[1].find(s => s.name === a1.promoNombre || s.name === a1.servicio)) {
+                slotServices[1].unshift({
+                  name: a1.promoNombre,
+                  price: myPrice,
+                  area: myArea
+                });
+              }
+              activePromos[clientKey1] = {
+                promo: promoFull,
+                startedBy: myArea,
+                completedAreas: (() => {
+                  try {
+                    const obsText = a1.observaciones || a1.obs || a1.obsGeneral || '';
+                    const match = obsText.match(/_completedAreas:(\[.*?\])/);
+                    return match ? JSON.parse(match[1]) : [];
+                  } catch(e) { return []; }
+                })(),
+                _metadata: { displayName: a1.nombre, clientCode: a1.codigo, loadedFrom: 'loadStaffHome' }
+              };
+              saveActivePromos(); // persistir en sessionStorage
+              // Restaurar promasExtra pendientes del ticket (2a, 3a promo independiente)
+              if (a1.promasExtra && a1.promasExtra.length > 0) {
+                window._takingPromasExtra = a1.promasExtra;
+                try { sessionStorage.setItem('nexserv_promasExtra_' + (a1.idEspera||''), JSON.stringify(a1.promasExtra)); } catch(eS) {}
+              }
+              // Actualizar botones de finalización con opciones de promo
+              setTimeout(() => updateFinishButtons(1), 300);
+            }
+          } else {
+            // Sin promo: precio normal del servicio
+            const price = a1.total || 0;
+            if (!slotServices[1].find(s => s.name === a1.servicio)) {
+              slotServices[1].unshift({
+                name: a1.servicio,
+                price: price,
+                area: a1.area
+              });
+            }
+            // Limpiar promo residual de esta clienta (puede ser un servicio nuevo sin promo)
+            if (activePromos[clientKey1]) {
+              delete activePromos[clientKey1];
+              saveActivePromos(); // actualizar localStorage
             }
           }
-          areasPendientes = []; // forzar todasListas = true
         }
+        renderServicesForSlot(1);
+        
+        // Actualizar total: solo servicios no pendientes y no rechazados
+        const total1 = slotServices[1].reduce((sum, s) => {
+          if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
+        var _at1=document.getElementById('as1Total'); if(_at1) _at1.textContent = '$' + total1;
+        var _asc1=document.getElementById('as1SvcCount'); if(_asc1) _asc1.textContent = slotServices[1].filter(s => s.status !== 'rechazado').length;
+        
+        if (user.area === 'pestanas') {
+          const _pk4 = a1.codigo.toLowerCase().replace(/-/g, '');
+          apiGet('getFichaPestanas', { codigo: a1.codigo }).then(pr4 => {
+            if (pr4.success && pr4.fichas && pr4.fichas.length > 0) {
+              if (!CLIENT_PROFILES[_pk4]) CLIENT_PROFILES[_pk4] = { name: a1.nombre, code: a1.codigo, pestanas: { fichas: [], history: [] } };
+              if (!CLIENT_PROFILES[_pk4].pestanas) CLIENT_PROFILES[_pk4].pestanas = { fichas: [], history: [] };
+              CLIENT_PROFILES[_pk4].pestanas.fichas = pr4.fichas;
+              CLIENT_PROFILES[_pk4].pestanas.ultimaVisita = pr4.ultimaVisita;
+            }
+            loadPestFichaQuick(_pk4, 1);
+          }).catch(() => loadPestFichaQuick(_pk4, 1));
+        }
+      } else {
+        if (section) section.style.display = 'none';
+      }
+      
+      // Actualizar contadores
+      const waitResult = await LineaService.obtenerListaEspera().then(function(l){ return {success:true, lista:l}; }).catch(function(){ return apiGet('getListaEspera'); });
+      if (waitResult.success) {
+        const allowed = AREA_FILTER[user.area] || [];
+        const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
+        // MODELO CENTRALIZADO: contar solo las asignadas a esta staff (igual que la lista)
+        const myCount = waitResult.lista.filter(w => {
+          const est = String(w.estado || w.status || '').toLowerCase();
+          if (est === 'en servicio' || est === 'completada') return false;
+          const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
+        }).length;
+        var _nb=document.getElementById('navBadge'); if(_nb) _nb.textContent = myCount;
+        var _nb2=document.getElementById('navBadge2'); if(_nb2) _nb2.textContent = myCount;
+        var _ps = document.getElementById('pendingStat'); if (_ps) { var _psv = _ps.querySelector('.value'); if (_psv) _psv.textContent = myCount; }
       }
 
-      var todasListas = areasPendientes.length === 0;
-
-      // Determinar si hay siguiente área según secuencia
-      var siguienteArea = null;
-      if (!todasListas && secuencia.length > 0) {
-        // Buscar en la secuencia cuál es la siguiente después de la completada
-        var posActual = secuencia.indexOf(areaCompletadaKey);
-        for (var s = posActual + 1; s < secuencia.length; s++) {
-          var candidata = areasPendientes.find(function(ap) { return ap.key === secuencia[s]; });
-          if (candidata) { siguienteArea = candidata; break; }
-        }
-        // Si no encontró por secuencia, tomar la primera pendiente
-        if (!siguienteArea) siguienteArea = areasPendientes[0];
-      } else if (!todasListas) {
-        siguienteArea = areasPendientes[0];
+      // Cargar servicios completados hoy
+      const _svHoy = await LineaService.obtenerServiciosHoy(user.name);
+      const servResult = { success: true, servicios: _svHoy };
+      const servList = document.getElementById('staffServiciosHoy');
+      if (!servList) return; // DOM reemplazado por SIRA — abortar
+      if (servResult.success && servResult.servicios && servResult.servicios.length > 0) {
+        const servicios = servResult.servicios;
+        
+        // Calcular totales del día
+        const totalDia = servicios.reduce((sum, s) => sum + Number(s.comision || 0), 0);
+        
+        // Actualizar contador de servicios
+        var _stHoy=document.querySelector('#staffHome .stat .value'); if(_stHoy) _stHoy.textContent = servicios.length;
+        
+        // Actualizar COMM_DATA con datos del día
+        COMM_DATA = {
+          value: '$' + totalDia.toFixed(2),
+          detail: servicios.length + ' servicios completados',
+          day: '$' + totalDia.toFixed(0),
+          items: servicios.map(s => '$' + Number(s.comision || 0).toFixed(2))
+        };
+        
+        if (!servList) return; // guard adicional — por si el DOM cambió entre await y el render
+        servList.innerHTML = '<div class="card" style="padding: 8px 20px;">' + servicios.map(s => {
+          const initials = (window.currentUser && window.currentUser.role === 'staff') ? (String(s.codigo||'').replace(/[^0-9]/g,'').slice(-2) || '·') : s.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+          const comision = Number(s.comision || 0).toFixed(2);
+          // Sanitizar servicio: si viene como JSON crudo, extraer nombre legible
+          let svcDisplay = String(s.servicio || '');
+          if (svcDisplay.trim().startsWith('[') || svcDisplay.trim().startsWith('{')) {
+            try {
+              const parsed = JSON.parse(svcDisplay);
+              if (Array.isArray(parsed)) svcDisplay = parsed.map(p => p.servicio || p.area || p.name || '').filter(Boolean).join(' + ');
+              else svcDisplay = parsed.servicio || parsed.nombre || parsed.name || svcDisplay;
+            } catch(e) { svcDisplay = svcDisplay.substring(0, 40); }
+          }
+          return `
+            <div class="client-row">
+              <div class="client-avatar">${initials}</div>
+              <div class="client-info">
+                <div class="client-name">${clienteDisplay(s.nombre, s.codigo)}</div>
+                <div class="client-meta">${svcDisplay} · $${s.total} · ${s.horaToma} · ${s.metodoPago}</div>
+              </div>
+              <div class="comm-hide" style="font-size: 13px; font-weight: 600; color: var(--success);">$${comision}</div>
+            </div>`;
+        }).join('') + '</div>';
+      } else {
+        var _stZero=document.querySelector('#staffHome .stat .value'); if(_stZero) _stZero.textContent = '0';
+        if (!servList) return; // guard — DOM puede haber cambiado
+        servList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">Sin servicios completados hoy</div>';
+        
+        // Reset COMM_DATA
+        COMM_DATA = {
+          value: '$0.00',
+          detail: '0 servicios completados',
+          day: '$0',
+          items: []
+        };
       }
+    } catch (err) {
+      console.error('Error cargando staff home:', err);
+    }
+  }
 
-      if (todasListas) {
-        ws.getRange(rowNum, 6).setValue('Por verificar');
-        try { _avisarMikaelaClientaLista(String(rows[i][4]||''), 'Combo / multi-servicio'); } catch(e){}
-        if (data.desgloseCompleto) {
-          try { ws.getRange(rowNum, 37).setValue(JSON.stringify(data.desgloseCompleto)); } catch(eD) {}
-        }
-        // NO escribir resumen en HistorialOwner aquí — cada área ya se registró individualmente
-      } else if (siguienteArea !== null) {
-        // Hay siguiente área — marcarla como "Esperando" para que aparezca en lista
-        // y limpiar el staff anterior de esa área (queda libre para tomar)
-        var nextBase = TM_AREA_COL[siguienteArea.idx];
-        ws.getRange(rowNum, nextBase + 3 + 1).setValue('Esperando'); // estado = Esperando
-        ws.getRange(rowNum, nextBase + 2 + 1).setValue('');           // limpiar staff asignada
-        ws.getRange(rowNum, nextBase + 4 + 1).setValue('');           // limpiar hora tomada
-        // Estado global del TM = "En espera" (para que Mikaela lo vea)
-        ws.getRange(rowNum, 6).setValue('En espera parcial');
-      }
+  function loadActiveService(idx) {
+    // Ya precargado en loadStaffHome
+  }
+  function setRetiro(isOurs, slot) {
+    const yesBtn = document.getElementById('retiroYes' + slot);
+    const noBtn = document.getElementById('retiroNo' + slot);
+    const priceEl = document.getElementById('as' + slot + 'ServicePrice');
+    const totalEl = document.getElementById('as' + slot + 'Total');
+    
+    if (isOurs) {
+      yesBtn.style.background = 'var(--success)';
+      yesBtn.style.color = 'white';
+      yesBtn.style.borderColor = 'var(--success)';
+      noBtn.style.background = 'var(--bg-card)';
+      noBtn.style.color = 'var(--ink)';
+      noBtn.style.borderColor = 'var(--line)';
+      priceEl.textContent = '$0';
+      totalEl.textContent = '$0';
+    } else {
+      noBtn.style.background = 'var(--warning)';
+      noBtn.style.color = 'white';
+      noBtn.style.borderColor = 'var(--warning)';
+      yesBtn.style.background = 'var(--bg-card)';
+      yesBtn.style.color = 'var(--ink)';
+      yesBtn.style.borderColor = 'var(--line)';
+      priceEl.textContent = '$10';
+      totalEl.textContent = '$10';
+    }
+  }
 
-      return {
-        success: true,
-        todasCompletadas: todasListas,
-        siguienteArea: siguienteArea ? (siguienteArea.tentativo || siguienteArea.key) : null,
-        siguientePrecio: siguienteArea ? Number(siguienteArea.precio || 0) : 0,
-        areasPendientes: areasPendientes.length
+  // === FICHA RÁPIDA DE PESTAÑAS EN ATENCIÓN ===
+  function getFichaActiva(clientKey) {
+    const client = CLIENT_PROFILES[clientKey];
+    const fichas = client?.pestanas?.fichas;
+    if (!fichas || fichas.length === 0) return null;
+    return fichas.find(f => f.activa) || fichas[0];
+  }
+
+  // Abrevia el tipo de pestaña a partir del nombre del servicio. Retoque => "R. ..."
+  function _abrevPestTipo(servicio) {
+    if (!servicio) return '—';
+    var s = String(servicio).trim();
+    var ret = /retoque/i.test(s);
+    s = s.replace(/retoque\s*(de\s*)?/i, '')
+         .replace(/pesta(ñ|n)as?/i, '')
+         .replace(/^\s*de\s+/i, '')
+         .replace(/efecto\s+/i, '')
+         .replace(/volumen\s+/i, '')
+         .replace(/pelo a pelo\s*/i, '')
+         .replace(/\s+/g, ' ')
+         .trim();
+    if (!s) s = 'Pestañas';
+    s = s.charAt(0).toUpperCase() + s.slice(1);
+    return (ret ? 'R. ' : '') + s;
+  }
+
+  // Barra "Última visita": tipo de pestaña (abreviado) · staff · fecha
+  function _ultVisitaBarHTML(client) {
+    var uv = client && client.pestanas ? client.pestanas.ultimaVisita : null;
+    if (!uv || !uv.servicio) return '';
+    var tipo = _abrevPestTipo(uv.servicio);
+    var staff = uv.staff || '—';
+    var fecha = uv.fecha || '—';
+    return '<div style="display:flex; align-items:center; gap:10px; background: var(--bg-card); border:1.5px solid var(--line); border-radius:14px; padding:10px 12px; margin-bottom:10px;">'
+      + '<div style="font-size:11px; font-weight:700; color:var(--ink-soft); white-space:nowrap;">Última visita</div>'
+      + '<div style="flex:1; text-align:center; font-size:12px; font-weight:800; color:var(--top-purple);">' + tipo + '</div>'
+      + '<div style="flex:1; text-align:center; font-size:12px; font-weight:600; color:var(--ink);">' + staff + '</div>'
+      + '<div style="font-size:11px; font-weight:600; color:var(--ink-faint); white-space:nowrap;">' + fecha + '</div>'
+      + '</div>';
+  }
+
+  function loadPestFichaQuick(clientKey, slot) {
+    const el = document.getElementById('pestFichaQuick' + slot);
+    if (!el) return;
+    const client = CLIENT_PROFILES[clientKey];
+    // Si el cliente no está en memoria aún, mostrar el estado sin ficha con el botón de evidencias
+    if (!client) {
+      el.style.display = 'block';
+      var _cfn = (window['_as' + slot + 'ClientName'] || clientKey || '');
+      var _cfc = (window['_as' + slot + 'Client'] || '');
+      el.innerHTML =
+        '<div style="background:var(--bg-card);border:2px dashed var(--top-purple);border-radius:20px;padding:18px;text-align:center;">'
+        + '<div style="font-size:24px;margin-bottom:6px;">👁</div>'
+        + '<div style="font-size:14px;font-weight:700;margin-bottom:4px;color:var(--top-purple);">Sin ficha de pestañas</div>'
+        + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Esta clienta no tiene ficha registrada</div>'
+        + '<button onclick="openNewPestFicha(\'' + clientKey + '\', ' + slot + ')" style="padding:14px 24px;background:var(--top-purple);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha de pestañas</button>'
+        + '</div>'
+        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\' staff)" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
+        + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
+        + 'Evidencia del trabajo realizado</button>';
+      return;
+    }
+    const fichas = client?.pestanas?.fichas;
+    const fichaActiva = getFichaActiva(clientKey);
+    
+    if (fichaActiva) {
+      const otherCount = fichas ? fichas.length - 1 : 0;
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div style="background: linear-gradient(135deg, var(--top-purple) 0%, #5b21b6 100%); color: white; border-radius: 20px; padding: 16px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 11px; font-weight: 600; opacity: 0.8;">👁 Ficha activa · ${client.name}</div>
+            <div style="background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700;">${fichaActiva.fecha || '—'}</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+            <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
+              <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Modelo</div>
+              <div style="font-size: 12px; font-weight: 800; margin-top: 2px;">${fichaActiva.modelo}</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
+              <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Diseño</div>
+              <div style="font-size: 12px; font-weight: 800; margin-top: 2px;">${fichaActiva.diseno}</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.15); border-radius: 12px; padding: 8px; text-align: center;">
+              <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Tallas</div>
+              <div style="font-size: 12px; font-weight: 800; margin-top: 2px;">${fichaActiva.tallas}</div>
+            </div>
+          </div>
+          ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
+        </div>
+        ${_ultVisitaBarHTML(client)}
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <div id="evPanelSlot_${slot}"></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
+        </div>
+        ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
+      `;
+    } else {
+      el.style.display = 'block';
+      el.innerHTML = `
+        <div style="background: var(--bg-card); border: 2px dashed var(--top-purple); border-radius: 20px; padding: 18px; text-align: center;">
+          <div style="font-size: 24px; margin-bottom: 6px;">👁</div>
+          <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px; color: var(--top-purple);">Sin ficha de pestañas</div>
+          <div style="font-size: 12px; color: var(--ink-soft); margin-bottom: 12px;">Esta clienta no tiene ficha registrada</div>
+          <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="padding: 14px 24px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">+ Crear ficha de pestañas</button>
+        </div>
+      `;
+    }
+  }
+
+  function showPestFichaHistory(clientKey, slot) {
+    const client = CLIENT_PROFILES[clientKey];
+    const fichas = client?.pestanas?.fichas || [];
+    const el = document.getElementById('pestFichaQuick' + slot);
+    
+    let histHtml = fichas.map((f, i) => `
+      <div style="background: ${f.activa ? 'var(--top-purple-bg)' : 'var(--bg-card)'}; border: 1.5px solid ${f.activa ? '#d4b5ff' : 'var(--line)'}; border-radius: var(--radius-sm); padding: 12px; margin-bottom: 8px; ${f.activa ? '' : 'opacity: 0.8;'}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 13px; font-weight: 700; color: ${f.activa ? 'var(--top-purple)' : 'var(--ink)'};">
+            ${f.activa ? '⭐ ACTIVA · ' : ''}${f.modelo} · ${f.diseno}
+          </div>
+          <span style="font-size: 10px; color: var(--ink-faint); font-weight: 600;">${f.fecha}</span>
+        </div>
+        <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500;">Tallas: ${f.tallas}</div>
+        ${f.obs ? '<div style="font-size: 11px; color: var(--ink-faint); margin-top: 4px; font-weight: 500;">📝 ' + f.obs + '</div>' : ''}
+        ${!f.activa ? '<button onclick="activatePestFicha(\'' + clientKey + '\', ' + i + ', ' + slot + ')" style="margin-top: 8px; padding: 8px 16px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">Usar esta ficha</button>' : ''}
+      </div>
+    `).join('');
+    
+    el.innerHTML = `
+      <div style="margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <div style="font-size: 13px; font-weight: 700;">📂 Historial de fichas (${fichas.length}/5)</div>
+          <button onclick="loadPestFichaQuick('${clientKey}', ${slot})" style="background: none; border: none; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer;">← Volver</button>
+        </div>
+        ${histHtml}
+      </div>
+    `;
+  }
+
+  function activatePestFicha(clientKey, fichaIdx, slot) {
+    const fichas = CLIENT_PROFILES[clientKey]?.pestanas?.fichas;
+    if (!fichas) return;
+    fichas.forEach(f => f.activa = false);
+    fichas[fichaIdx].activa = true;
+    loadPestFichaQuick(clientKey, slot);
+    alert('✅ Ficha activada: ' + fichas[fichaIdx].modelo + ' · ' + fichas[fichaIdx].diseno);
+  }
+
+  function openNewPestFicha(clientKey, slot) {
+    window._newPestClient = clientKey;
+    window._newPestSlot = slot;
+    document.getElementById('npfModelo').selectedIndex = 0;
+    document.getElementById('npfDiseno').selectedIndex = 0;
+    document.getElementById('npfTallas').value = '';
+    document.getElementById('npfObs').value = '';
+    document.getElementById('newPestFichaModal').classList.add('active');
+  }
+
+  function editPestanasFicha(clientKey) {
+    // Abrir modal de pestañas para editar desde el perfil de clienta
+    const client = CLIENT_PROFILES[clientKey];
+    if (!client) return;
+    
+    // Obtener la ficha activa o la más reciente
+    const fichas = client.pestanas?.fichas || [];
+    const ficha = fichas.find(f => f.activa) || fichas[0] || null;
+    
+    // Pre-llenar el formulario si existe ficha
+    if (ficha) {
+      document.getElementById('npfModelo').value = ficha.modelo || '';
+      document.getElementById('npfDiseno').value = ficha.diseno || '';
+      document.getElementById('npfTallas').value = ficha.tallas || '';
+      document.getElementById('npfObs').value = ficha.obs || '';
+    } else {
+      // Limpiar formulario para nueva ficha
+      document.getElementById('npfModelo').value = '';
+      document.getElementById('npfDiseno').value = '';
+      document.getElementById('npfTallas').value = '';
+      document.getElementById('npfObs').value = '';
+    }
+    
+    // Guardar referencia para saveNewPestFicha
+    window._newPestClient = clientKey;
+    window._newPestSlot = null; // No hay slot activo, es desde perfil
+    
+    // Abrir modal
+    document.getElementById('newPestFichaModal').classList.add('active');
+  }
+
+  async function saveNewPestFicha() {
+    const clientKey = window._newPestClient;
+    const slot = window._newPestSlot;
+    const modelo = document.getElementById('npfModelo').value;
+    const diseno = document.getElementById('npfDiseno').value;
+    const tallas = document.getElementById('npfTallas').value.trim();
+    const obs = document.getElementById('npfObs').value.trim();
+
+    if (!modelo) { alert('Seleccioná el modelo'); return; }
+
+    // Obtener código/nombre — preferir el código LIMPIO del slot, no el texto del elemento
+    // (as{N}Code muestra "C-0007 · Llegó 10:52"; hay que quedarse solo con "C-0007")
+    let clientCodigo = '', clientNombre = '';
+    const client = CLIENT_PROFILES[clientKey];
+    const slotNum = slot || 1;
+    clientCodigo = (slotNum === 1 ? window._as1Client : window._as2Client)
+                || (client && client.code)
+                || (document.getElementById('as' + slotNum + 'Code')?.textContent || '').split('·')[0].trim();
+    clientNombre = (client && client.name)
+                || (document.getElementById('as' + slotNum + 'Name')?.textContent || '').replace(' ⭐','').trim();
+    if (!client && clientCodigo) {
+      CLIENT_PROFILES[clientKey] = {
+        name: clientNombre, code: clientCodigo,
+        pestanas: { fichas: [], history: [] },
+        cejas: { history: [] }, depilacion: { history: [] }, facial: { history: [] }
       };
     }
-    return { success: false, message: 'Ticket no encontrado' };
-  } catch(e) { return { success: false, message: String(e) }; }
-}
 
-// ─── handleCompletarYTomarSiguienteAreaTM ─────────────────────────────────────
-function handleCompletarYTomarSiguienteAreaTM(data) {
-  var resultCompletar = handleCompletarAreaTicketMulti(data);
-  if (!resultCompletar.success) return resultCompletar;
-  if (resultCompletar.todasCompletadas) return resultCompletar;
-  try {
-    var ws   = getTMSheet();
-    // Forzar escritura de los setValue() de handleCompletarAreaTicketMulti antes de releer
-    try { SpreadsheetApp.flush(); } catch(eF) {}
-    // FIX: re-leer el sheet DESPUÉS de que handleCompletarAreaTicketMulti hizo sus cambios
-    // Si usamos rows stale, el slot recién completado todavía aparece como "En servicio"
-    // y podemos activar el mismo slot en vez del siguiente
-    var rowsFresh = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    var hora = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-    for (var i = 0; i < rowsFresh.length; i++) {
-      if (String(rowsFresh[i][0]).trim() !== data.idEspera) continue;
-      var rowNum = i + 3;
-      for (var a = 0; a < 4; a++) {
-        var base = TM_AREA_COL[a];
-        var tent = String(rowsFresh[i][base] || '').trim();
-        if (!tent) continue;
-        var estadoActual = String(rowsFresh[i][base + 3] || '').trim();
-        // Solo activar slots que están ESPERANDO (no los ya En servicio o Completado)
-        if (estadoActual !== 'Esperando') continue;
-        ws.getRange(rowNum, base + 2 + 1).setValue(data.chicaNombre || '');
-        ws.getRange(rowNum, base + 3 + 1).setValue('En servicio');
-        ws.getRange(rowNum, base + 4 + 1).setValue(hora);
-        ws.getRange(rowNum, 6).setValue('En servicio');
-        var tentLabel = tent.indexOf('||') !== -1 ? tent.split('||')[1] : tent;
-        // espejo Lineas: marcar el siguiente slot del TM como 'en servicio'
-        try {
-          var _areaTM = tent.indexOf('||') !== -1 ? tent.split('||')[0] : '';
-          marcarLineaEnServicioPorCodigo(String(rowsFresh[i][3] || ''), data.idEspera + ':' + (a + 1), _areaTM, tentLabel, data.chicaNombre || '');  // base 1
-        } catch (eLn) { Logger.log('espejo siguiente area TM Lineas: ' + eLn); }
-        return { success: true, todasCompletadas: false,
-          siguienteArea: tentLabel, siguientePrecio: Number(rowsFresh[i][TM_PRECIO_COL[a]] || 0),
-          areasPendientes: resultCompletar.areasPendientes };
+    // Guardar en Google Sheets
+    try {
+      const btn = document.querySelector('#newPestFichaModal .btn-primary');
+      if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+      const result = await apiPost('addFichaPestanas', {
+        codigo: clientCodigo, nombre: clientNombre,
+        modelo, diseno: diseno || '—', tallas: tallas || '—', obs
+      });
+
+      if (btn) { btn.disabled = false; btn.textContent = 'Guardar nueva ficha'; }
+
+      if (!result || !result.success) {
+        alert('Error al guardar ficha: ' + (result?.message || 'Error desconocido'));
+        return;
       }
-      break;
+    } catch(e) {
+      alert('Error de conexión al guardar ficha');
+      return;
     }
-  } catch(eT) {}
-  return resultCompletar;
-}
 
-function handleConfirmarCobroMulti(data) {
-  try {
-    const ws = getTMSheet();
-    const rows = ws.getRange(3, 1, ws.getLastRow() - 2, 37).getValues();
-    const tz = 'America/Guayaquil';
-    const now = new Date();
-    const hora  = Utilities.formatDate(now, tz, 'HH:mm');
-    const fecha = Utilities.formatDate(now, tz, 'dd/MM/yyyy');
+    // Actualizar memoria local
+    const clientLocal = CLIENT_PROFILES[clientKey];
+    if (clientLocal) {
+      if (!clientLocal.pestanas) clientLocal.pestanas = { fichas: [], history: [] };
+      if (!clientLocal.pestanas.fichas) clientLocal.pestanas.fichas = [];
+      clientLocal.pestanas.fichas.forEach(f => f.activa = false);
+      if (clientLocal.pestanas.fichas.length >= 5) clientLocal.pestanas.fichas.pop();
+      const today = new Date();
+      clientLocal.pestanas.fichas.unshift({
+        modelo, diseno: diseno || '—', tallas: tallas || '—', obs,
+        fecha: today.getDate().toString().padStart(2,'0') + '/' + (today.getMonth()+1).toString().padStart(2,'0') + '/' + today.getFullYear(),
+        activa: true
+      });
+    }
 
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() !== data.idEspera) continue;
-      const rowNum = i + 3;
-      // ── IDEMPOTENCIA: si el combo ya fue cobrado, NO re-procesar ──
-      const _estTM = String(rows[i][5] || '').trim().toLowerCase();
-      if (_estTM === 'completado' || _estTM === 'completada') {
-        return { success: true, yaCobrado: true, message: 'Este ticket ya estaba cobrado.' };
+    closeModal();
+    if (slot) loadPestFichaQuick(clientKey, slot);
+    showToast('✅ Ficha guardada: ' + modelo + (diseno ? ' · ' + diseno : ''));
+  }
+
+  // === CEJAS EFECTO POLVO ===
+  function openCejasPigmentoModal(codigo, clientName) {
+    window._cpCodigo = codigo;
+    window._cpNombre = clientName;
+    
+    // Limpiar campos
+    document.getElementById('cpColor').value = '';
+    document.getElementById('cpAguja').value = '';
+    document.getElementById('cpTipoSesion').value = '';
+    document.getElementById('cpObs').value = '';
+    document.getElementById('cpRetoqueAlert').style.display = 'none';
+    
+    document.getElementById('newCejasPigmentoModal').classList.add('active');
+  }
+  
+  // Mostrar alerta cuando selecciona "Nueva sesión"
+  document.addEventListener('DOMContentLoaded', function() {
+    const cpTipoSesion = document.getElementById('cpTipoSesion');
+    if (cpTipoSesion) {
+      cpTipoSesion.addEventListener('change', function() {
+        const alert = document.getElementById('cpRetoqueAlert');
+        alert.style.display = this.value === 'Nueva sesión' ? 'block' : 'none';
+      });
+    }
+  });
+  
+  async function saveCejasPigmentoFicha() {
+    const color = document.getElementById('cpColor').value.trim();
+    const aguja = document.getElementById('cpAguja').value.trim();
+    const tipoSesion = document.getElementById('cpTipoSesion').value;
+    const obs = document.getElementById('cpObs').value.trim();
+    
+    if (!color) { alert('⚠️ Ingresá el color utilizado'); return; }
+    if (!aguja) { alert('⚠️ Ingresá la aguja utilizada'); return; }
+    if (!tipoSesion) { alert('⚠️ Seleccioná el tipo de sesión'); return; }
+    
+    const codigo = window._cpCodigo;
+    const nombre = window._cpNombre;
+    const user = window.currentUser;
+    
+    try {
+      const result = await apiPost('addFichaCejasPigmento', {
+        codigo: codigo,
+        color: color,
+        aguja: aguja,
+        tipoSesion: tipoSesion,
+        observaciones: obs,
+        responsable: user?.name || ''
+      });
+      
+      if (result.success) {
+        closeModal();
+        
+        // Refrescar el tab si estamos en el perfil
+        if (currentProfileClient && currentProfileTab === 'pigmento') {
+          renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
+        }
+        
+        // Refrescar panel cejasQuick (siempre que estemos en panel de staff con cejas)
+        var _cs2 = window._currentCejasSlot || 1;
+        var _ce2 = document.getElementById('cejasQuick' + _cs2);
+        var _cod2 = codigo || window._currentCejasClientCodigo || window._cpCodigo || '';
+        var _nom2 = nombre || window._currentCejasClientNombre || window._cpNombre || '';
+        var _ck2 = _cod2.toLowerCase().replace(/-/g,'');
+        if (_ce2 && _cod2 && String((window.currentUser||{}).area||'').toLowerCase().includes('ceja')) {
+          _ce2.innerHTML = '';
+          _ce2.style.display = 'none';
+          setTimeout(function(){ loadCejasQuick(_ck2, _cs2, _cod2, _nom2); }, 400);
+        }
+        // Refrescar tab de perfil si está abierto
+        if (currentProfileClient && currentProfileTab === 'pigmento') {
+          renderPigmentoTab(document.getElementById('profileTabContent'), codigo, nombre);
+        }
+        showToast('✅ Sesión registrada: ' + tipoSesion + (result.proxRetoque ? ' · Próx. retoque: ' + result.proxRetoque : ''));
+      } else {
+        alert('❌ Error al guardar: ' + (result.error || 'Desconocido'));
       }
-      const metodoPago = data.metodoPago || 'Efectivo';
+    } catch (err) {
+      console.error('Error guardando ficha pigmento:', err);
+      alert('❌ Error de conexión al guardar la ficha');
+    }
+  }
 
-      const codigoCliente     = String(rows[i][3] || '');
-      const nombreCliente     = String(rows[i][4] || '');
-      const idTM              = String(rows[i][0] || '');
-      // Regular total re-derivado desde Paquetes (no del campo guardado, que
-      // pudo quedar inflado por descuento doble-contado). Fallback proporcional
-      // para tarjeta cuando una línea no trae su regular.
-      const precioNormalTotal = _regularRealTM_(rows[i]) || Number(rows[i][34] || 0);
+  // === PROMO EN LLEGADA (Mikaela) ===
+  // ========== MULTI-PROMO (hasta 3) ==========
+  let _arrPromos = [];
 
-      // ── PASO 4: Armar lineas desde Lineas (fuente de verdad) con fallback al legacy ──
-      let lineas = [];
-      let _fuenteLineas = false;
+  function addPromoSlot() {
+    if (_arrPromos.length >= 3) { alert('Máximo 3 promos por visita'); return; }
+    _arrPromos.push(null);
+    renderPromoSlots();
+  }
 
-      // Intento 1: leer desde Lineas (tiene montoRegular por área — resuelve bug comisión tarjeta)
+  function removePromoSlot(idx) {
+    _arrPromos.splice(idx, 1);
+    renderPromoSlots();
+  }
+
+  function updatePromoSlot(idx) {
+    const val = document.getElementById('arrPromoSelect_' + idx).value;
+    _arrPromos[idx] = val === '' ? null : PROMOS[parseInt(val)];
+    renderPromoSlots();
+  }
+
+  async function renderPromoSlots() {
+    await ensurePromosLoaded();
+    const container = document.getElementById('arrPromoSlots');
+    if (!container) return;
+    const btn = document.getElementById('addPromoBtn');
+    if (btn) btn.style.display = _arrPromos.length >= 3 ? 'none' : 'inline-block';
+    container.innerHTML = _arrPromos.map((promo, i) => `
+      <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%); border-radius: 16px; padding: 14px; margin-bottom: 10px; color: white;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div style="font-size: 12px; font-weight: 700;">Promo ${i + 1}</div>
+          <button onclick="removePromoSlot(${i})" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 3px 10px; border-radius: 20px; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">Quitar</button>
+        </div>
+        <select id="arrPromoSelect_${i}" onchange="updatePromoSlot(${i})" style="width: 100%; padding: 10px; border-radius: 10px; border: none; font-family: inherit; font-size: 13px; font-weight: 600; background: rgba(255,255,255,0.95); color: var(--ink);">
+          <option value="">Seleccionar promo...</option>
+          ${PROMOS.filter(p => p.active).map((p, pi) => '<option value="' + pi + '"' + (promo && promo.name === p.name ? ' selected' : '') + '>' + p.name + ' - $' + p.price + '</option>').join('')}
+        </select>
+        ${promo ? '<div style="margin-top: 6px; font-size: 11px; opacity: 0.9;">' + (promo.services || '') + ' — $' + promo.price + '</div>' : ''}
+      </div>
+    `).join('');
+
+    // ── MANDAMIENTO #8: actualizar indicador de tipo de ticket en tiempo real ──
+    const _resEl = document.getElementById('m8TicketResumen');
+    if (_resEl && window.clasificarTicketPromoM8) {
+      const _c8 = window.clasificarTicketPromoM8();
+      if (!_c8 || !_c8.tipo) {
+        _resEl.style.display = 'none';
+      } else {
+        const _iconos = { 1: '👤', 2: '🤝', 3: '🎯' };
+        const _colores = { 1: 'var(--success)', 2: 'var(--accent)', 3: 'var(--warning)' };
+        _resEl.style.display = 'block';
+        _resEl.style.color = _colores[_c8.tipo] || 'var(--ink-soft)';
+        _resEl.textContent = (_iconos[_c8.tipo] || '') + ' ' + (window.resumenTicketPromoM8 ? window.resumenTicketPromoM8() : _c8.nombre);
+      }
+    }
+  }
+
+  // Compatibilidad con _arrPromo (codigo existente)
+  Object.defineProperty(window, '_arrPromo', {
+    get() { return _arrPromos.find(p => p !== null) || null; },
+    set(v) { if (v === null) { _arrPromos = []; renderPromoSlots(); } else { _arrPromos[0] = v; renderPromoSlots(); } },
+    configurable: true
+  });
+
+  // ========== SECUENCIA DE SERVICIOS ==========
+  // NOTA: se usa window._secuencia para que getAreaPrioritaria() (mandamientos) pueda leerla.
+  window._secuencia = []; // [{area, label}]
+
+  const AREA_LABELS_SEC = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: 'Depilacion', pestanas: 'Pestanas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+  const AREA_ICONS_SEC = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg>', pestanas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg>', retiro_lifting: '✨', facial: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d=\"M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d=\"M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d=\"M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d=\"M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d=\"M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg>' };
+
+  function addAreaSecuencia(area) {
+    window._secuencia.push({ area, label: AREA_LABELS_SEC[area] || area });
+    renderSecuencia();
+  }
+
+  function removeSecuenciaItem(idx) {
+    window._secuencia.splice(idx, 1);
+    renderSecuencia();
+  }
+
+  function moveSecuencia(idx, dir) {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= window._secuencia.length) return;
+    [window._secuencia[idx], window._secuencia[newIdx]] = [window._secuencia[newIdx], window._secuencia[idx]];
+    renderSecuencia();
+  }
+
+  function renderSecuencia() {
+    // Usar el contenedor del formulario ACTIVO (promo o multi)
+    const tipoActivo = window._arrTipo || 'normal';
+    let list, empty;
+    if (tipoActivo === 'multi') {
+      list  = document.getElementById('secuenciaListMulti');
+      empty = document.getElementById('secuenciaEmptyMulti');
+    } else {
+      // Promo normal o normal — usar secuenciaList
+      list  = document.getElementById('secuenciaList');
+      empty = document.getElementById('secuenciaEmpty');
+    }
+    if (!list) {
+      // Fallback: cualquier visible
+      list  = document.getElementById('secuenciaListMulti') || document.getElementById('secuenciaList');
+      empty = document.getElementById('secuenciaEmptyMulti') || document.getElementById('secuenciaEmpty');
+    }
+    if (!list) return;
+    if (window._secuencia.length === 0) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    list.innerHTML = window._secuencia.map((s, i) => `
+      <div style="background: var(--bg-card); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px;">
+        <div style="background: var(--accent); color: white; border-radius: 50%; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0;">${i + 1}</div>
+        <div style="font-size: 16px;">${AREA_ICONS_SEC[s.area] || ''}</div>
+        <div style="flex: 1; font-size: 14px; font-weight: 700;">${s.label}</div>
+        <div style="display: flex; gap: 4px; flex-shrink: 0;">
+          ${i > 0 ? `<button onclick="moveSecuencia(${i},-1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↑</button>` : '<div style="width:30px"></div>'}
+          ${i < window._secuencia.length - 1 ? `<button onclick="moveSecuencia(${i},1)" style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--bg);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;">↓</button>` : '<div style="width:30px"></div>'}
+          <button onclick="removeSecuenciaItem(${i})" style="width:30px;height:30px;border-radius:50%;border:none;background:var(--danger-bg);color:var(--danger);font-size:14px;cursor:pointer;font-weight:700;">✕</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function resetArrivalExtras() {
+    _arrPromos = [];
+    window._secuencia = [];
+    renderSecuencia();
+    const slots = document.getElementById('arrPromoSlots');
+    if (slots) slots.innerHTML = '';
+    const btn = document.getElementById('addPromoBtn');
+    if (btn) btn.style.display = 'inline-block';
+    const empty = document.getElementById('secuenciaEmpty');
+    if (empty) empty.style.display = 'block';
+    const emptyMulti = document.getElementById('secuenciaEmptyMulti');
+    if (emptyMulti) emptyMulti.style.display = 'block';
+    const listMulti = document.getElementById('secuenciaListMulti');
+    if (listMulti) listMulti.innerHTML = '';
+  }
+
+  // Días de la semana siempre presentes (Lunes→Sábado)
+  var _DIAS_SEMANA = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+
+  // Backup del contenido original de la screen activa
+  window._resumenBackup = null;
+  window._resumenScreenId = null;
+
+  function closeResumenSemana() {
+    var screenId = window._resumenScreenId || 'staffHome';
+    var screen = document.getElementById(screenId);
+    if (screen && window._resumenBackup !== null) {
+      // Restaurar innerHTML original — los event handlers inline (onclick) siguen funcionando
+      screen.innerHTML = window._resumenBackup;
+      window._resumenBackup = null;
+      window._resumenScreenId = null;
+      // NO llamar loadStaffHome ni show() — evita errores de DOM
+      // El usuario ve el home exactamente como lo dejó
+    }
+  }
+
+  async function openResumenSemana() {
+    // Detectar la screen activa actual
+    var user = window.currentUser;
+    var screenId = (user && user.role === 'admin') ? 'mikaelHome'
+                 : (user && user.role === 'owner')  ? 'ownerHome'
+                 : 'staffHome';
+    window._resumenScreenId = screenId;
+    var screen = document.getElementById(screenId);
+    if (!screen) return;
+
+    // Guardar contenido original
+    window._resumenBackup = screen.innerHTML;
+    // Guardar el nav antes de reemplazar (para mantenerlo visible)
+    var _navEl = screen.querySelector('nav.nav');
+    var _navHtml = _navEl ? _navEl.outerHTML : '';
+    // Inyectar la vista de comisiones dentro de la screen activa
+    screen.innerHTML =
+      '<button class="back-btn" onclick="closeResumenSemana()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:16px;">Comisiones acumuladas</div>'
+      + '<div id="resumenSemanaContent"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div></div>'
+      + _navHtml;
+    var container = document.getElementById('resumenSemanaContent');
+    if (!user) return;
+    try {
+      var result = await apiGet('getServiciosSemana', { chica: user.name });
+
+      // Construir mapa de días con datos del backend
+      var diasMap = {};
+      if (result.success && result.dias) {
+        result.dias.forEach(function(d) { diasMap[d.dia] = d; });
+      }
+
+      // Calcular total sumando solo los días con datos
+      var totalSemana = 0;
+      _DIAS_SEMANA.forEach(function(nombre) {
+        if (diasMap[nombre]) totalSemana += diasMap[nombre].total || 0;
+      });
+
+      // Total semana — card destacada
+      var html =
+        '<div style="background:var(--chip,#f0ede6);border-radius:16px;padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;box-sizing:border-box;">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--ink-soft);white-space:nowrap;">Total semana</div>' +
+          '<div style="font-size:22px;font-weight:900;color:var(--success);white-space:nowrap;">$' + totalSemana.toFixed(2) + '</div>' +
+        '</div>';
+
+      // Un acordeón por cada día — siempre los 6 días, con $0 si no hay datos
+      _DIAS_SEMANA.forEach(function(nombre, idx) {
+        var dia = diasMap[nombre];
+        var total = dia ? (dia.total || 0) : 0;
+        var servicios = dia ? (dia.servicios || []) : [];
+        var tieneServicios = servicios.length > 0;
+        var colorTotal = total > 0 ? 'var(--success)' : 'var(--ink-faint)';
+
+        html +=
+          '<div style="margin-bottom:8px;width:100%;box-sizing:border-box;">' +
+            // Fila principal — toca para abrir/cerrar
+            '<div onclick="toggleDiaSemana(' + idx + ')" style="background:var(--bg-card,#fff);border-radius:14px;padding:13px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.07);">' +
+              '<div style="font-size:15px;font-weight:700;color:var(--ink);">' + nombre + '</div>' +
+              '<div style="display:flex;align-items:center;gap:10px;">' +
+                '<div style="font-size:17px;font-weight:800;color:' + colorTotal + ';">$' + total.toFixed(1) + '</div>' +
+                (tieneServicios
+                  ? '<div id="arrow-sem-' + idx + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>'
+                  : '<div style="width:14px;"></div>') +
+              '</div>' +
+            '</div>' +
+            // Panel desplegable — solo si hay servicios
+            (tieneServicios
+              ? '<div id="dia-detail-' + idx + '" style="display:none;background:var(--bg-card,#fff);border-radius:0 0 14px 14px;margin-top:-8px;padding:4px 18px 14px;border-top:1px solid var(--line,#eee);">' +
+                  servicios.map(function(s, si) {
+                    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;' + (si < servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                      '<div style="flex:1;">' +
+                        '<div style="font-size:13px;font-weight:700;color:var(--ink);">' + clienteDisplay(s.cliente, s.codigo) + '</div>' +
+                        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + s.hora + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
+                        '<div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">' + s.servicio + '</div>' +
+                      '</div>' +
+                      '<div style="font-size:15px;font-weight:800;color:var(--success);margin-left:12px;">$' + Number(s.comision || 0).toFixed(2) + '</div>' +
+                    '</div>';
+                  }).join('') +
+                '</div>'
+              : '<div id="dia-detail-' + idx + '" style="display:none;"></div>') +
+          '</div>';
+      });
+
+      container.innerHTML = '<div style="width:100%;box-sizing:border-box;">' + html + '</div>';
+    } catch (err) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--danger);">Error cargando datos</div>';
+    }
+  }
+
+  function toggleDiaSemana(idx) {
+    const detail = document.getElementById('dia-detail-' + idx);
+    const arrow = document.getElementById('arrow-sem-' + idx);
+    if (!detail) return;
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+  }
+
+  async function toggleArrivalPromo(show) {
+    if (show) addPromoSlot();
+  }
+
+  function updateArrivalPromo() {}
+
+  // === LLEGADA: CLIENTA EXISTENTE ===
+
+  // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
+  
+  function openAssignServiceModal(clientCode, clientName, extraTicketId) {
+    window._extraTicketId = extraTicketId || null;
+    window._assigningClient = { code: clientCode, name: clientName };
+    document.getElementById('assignSvcClientName').textContent = clientName;
+    document.getElementById('assignSvcArea').value = '';
+    document.getElementById('assignSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
+    var _svcNota = document.getElementById('assignSvcNota'); if (_svcNota) _svcNota.value = '';
+    document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    document.getElementById('assignServiceModal').classList.add('active');
+  }
+  
+  function openAssignServiceFromArrival() {
+    // Usar datos de newArrivalData
+    if (!window.newArrivalData || !window.newArrivalData.code || !window.newArrivalData.fullName) {
+      alert('Error: No se encontró información de la clienta');
+      return;
+    }
+    
+    openAssignServiceModal(window.newArrivalData.code, window.newArrivalData.fullName);
+  }
+  
+  function loadAssignServiceCatalog() {
+    const area = document.getElementById('assignSvcArea').value;
+    const sel = document.getElementById('assignSvcService');
+    sel.innerHTML = '<option value="">Seleccionar servicio...</option>';
+    document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    const staffSel = document.getElementById('assignSvcStaff');
+    if (staffSel) staffSel.innerHTML = opcionesStaff(area);
+    
+    if (!area) return;
+    
+    const catMap = { cejas: 'cejas', depilacion: 'depilacion', pestanas: 'pestanas', retiro_lifting: 'cejas', facial: 'facial' };
+    const catKey = catMap[area] || area;
+    const services = CATALOGO[catKey] || [];
+    
+    services.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ name: s.name, price: s.price, area: area });
+      opt.textContent = s.name + ' — $' + s.price;
+      sel.appendChild(opt);
+    });
+  }
+  
+  function updateAssignServicePrice() {
+    const val = document.getElementById('assignSvcService').value;
+    if (!val) { 
+      document.getElementById('assignSvcPriceDisplay').style.display = 'none'; 
+      return; 
+    }
+    const svc = JSON.parse(val);
+    document.getElementById('assignSvcPrice').textContent = '$' + svc.price;
+    document.getElementById('assignSvcPriceDisplay').style.display = 'block';
+  }
+  
+  async function confirmAssignService() {
+    const val = document.getElementById('assignSvcService').value;
+    if (!val) { 
+      alert('Seleccioná un servicio'); 
+      return; 
+    }
+    
+    const svc = JSON.parse(val);
+    const client = window._assigningClient;
+    const chica = (document.getElementById('assignSvcStaff') || {}).value || '';
+    if (!chica) { alert('Elegí qué staff la atiende'); return; }
+
+    console.log('[ServicioExtra] modo extra:', !!window._extraTicketId, '| ticket:', window._extraTicketId || '(ninguno)');
+    // ── Modo "+ Servicio Extra": agregar al ticket existente y reabrir a la lista ──
+    if (window._extraTicketId) {
+      const idEx = window._extraTicketId;
       try {
-        const _lnCobro = getLineasParaCobro(idTM);
-        if (_lnCobro && _lnCobro.length > 0) {
-          lineas = _lnCobro;
-          _fuenteLineas = true;
-          Logger.log('[CobroTM] fuente=Lineas, items=' + lineas.length);
-        }
-      } catch(eLnC) { Logger.log('[CobroTM] getLineasParaCobro error: ' + eLnC); }
-
-      // Fallback legacy: serviciosDetalle del frontend o slots de TicketMulti
-      if (!_fuenteLineas) {
-        Logger.log('[CobroTM] fuente=legacy (Lineas sin datos para ' + idTM + ')');
-        let _fd = null;
-        if (data.serviciosDetalle) {
-          try { _fd = (typeof data.serviciosDetalle === 'string') ? JSON.parse(data.serviciosDetalle) : data.serviciosDetalle; } catch (e) { _fd = null; }
-        }
-        if (_fd && _fd.length > 0) {
-          lineas = _fd.map(function (p) {
-            return {
-              staff: String(p.staff || ''),
-              area: String(p.area || 'multi'),
-              servicio: String(p.servicio || 'Servicio multi'),
-              precioRegular: Number(p.montoNormal || 0),
-              precioPromo: Number(p.monto || 0)
-            };
-          }).filter(function (l) { return l.staff; });
+        const rEx = await apiPost('agregarServicioExtra', {
+          idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
+        });
+        window._extraTicketId = null;
+        if (rEx && rEx.success) {
+          if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
+          closeModal();
+          loadMikaelaHome();
         } else {
-          for (let a = 0; a < 4; a++) {
-            const base = TM_AREA_COL[a];
-            const tent = String(rows[i][base] || '').trim();
-            if (!tent) continue;
-            const estA = String(rows[i][base + 3] || '').toLowerCase();
-            if (estA === 'cancelado') continue;
-            const staff = String(rows[i][base + 2] || '').trim();
-            if (!staff) continue;
-            const areaKey = tent.replace(/\|\|.*/, '').trim();
-            const confirm = (String(rows[i][base + 1] || '').replace(/.*\|\|/, '').trim()) || tent.replace(/.*\|\|/, '').trim();
-            lineas.push({
-              staff: staff,
-              area: areaKey || 'multi',
-              servicio: confirm || 'Servicio multi',
-              precioRegular: 0,
-              precioPromo: Number(rows[i][TM_PRECIO_COL[a]] || 0)
+          alert(((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar el servicio extra'));
+        }
+      } catch (err) {
+        window._extraTicketId = null;
+        console.error(err);
+        alert('Error al agregar servicio extra');
+      }
+      return;
+    }
+
+    try {
+      const result = await LineaService.asignarServicio( {
+        codigo: client.code,
+        servicio: svc.name,
+        area: svc.area,
+        precio: svc.price,
+        chica: chica,
+        observaciones: (document.getElementById('assignSvcNota') || {}).value || ''
+      });
+      
+      if (result.success) {
+        alert('✓ ' + client.name + ' asignada a ' + chica);
+        closeModal();
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo asignar'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al asignar servicio');
+    }
+  }
+  
+  // Pasar del modal de servicio al de promo (reusa el flujo de promo que YA existe).
+  // Así Mikaela asigna la promo directo, sin el workaround de mandar normal para que
+  // la staff la cambie (que era la raíz del lío de precios en combos).
+  function switchToAssignPromo() {
+    var c = window._assigningClient;
+    if (!c || !c.code) { alert('No se encontró la clienta'); return; }
+    // Si venía en modo "+ servicio extra", llevamos el id del ticket original al
+    // modal de promo para que la promo se cree como su PROPIO ticket (SP- aparte),
+    // sin tocar el servicio ya completado. Si no era extra, ticket = null (flujo normal).
+    var ticket = window._extraTicketId || null;
+    window._extraTicketId = null;
+    closeModal();
+    openAssignPromoModal(c.code, c.name, ticket);
+  }
+  window.switchToAssignPromo = switchToAssignPromo;
+
+  async function openAssignPromoModal(clientCode, clientName, extraTicketId) {
+    // extraTicketId sólo llega desde "+ Servicio Extra" → modo promo-extra (ticket aparte).
+    // Los botones "Redirigir promo" / "🏷 Promo" de la cola llaman sin él → modo normal.
+    window._extraPromoTicketId = extraTicketId || null;
+    window._assigningClient = { code: clientCode, name: clientName };
+    document.getElementById('assignPromoClientName').textContent = clientName;
+    const pStaff = document.getElementById('assignPromoStaff');
+    if (pStaff) pStaff.innerHTML = opcionesStaff(null); // todas las staff (la promo puede arrancar en cualquier área)
+
+    const list = document.getElementById('assignPromoList');
+    // Mostrar el modal de una vez, con placeholder mientras cargan las promos.
+    if (list) list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:16px;font-size:13px;">Cargando promos…</div>';
+    var _promoNota = document.getElementById('assignPromoNota'); if (_promoNota) _promoNota.value = '';
+    document.getElementById('assignPromoModal').classList.add('active');
+
+    // Asegurar que PROMOS esté cargado: en sesión nueva viene vacío y la lista salía en blanco.
+    await ensurePromosLoaded();
+
+    // Renderizar lista de promos activas
+    const active = PROMOS.filter(p => p.active);
+    if (!list) return;
+    if (active.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:16px;font-size:13px;">No hay promos activas. Activá alguna en la pantalla de Promociones.</div>';
+      return;
+    }
+    list.innerHTML = active.map((p, i) => `
+      <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="confirmAssignPromo(${i})">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div style="flex: 1;">
+            <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">${p.name}</div>
+            <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 6px;">${p.services}</div>
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+              ${p.division.map(d => '<span style="background: var(--bg); font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: var(--radius-pill); color: var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>').join('')}
+            </div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0; margin-left: 10px;">
+            <div style="font-size: 22px; font-weight: 800; color: var(--accent-deep);">$${p.price}</div>
+            <div style="font-size: 11px; color: var(--ink-faint); text-decoration: line-through;">$${p.regular}</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+  
+  async function confirmAssignPromo(promoIdx) {
+    const promo = PROMOS[promoIdx];
+    const client = window._assigningClient;
+    const chica = (document.getElementById('assignPromoStaff') || {}).value || '';
+    if (!chica) { alert('Elegí qué staff arranca la promo'); return; }
+
+    // ── Modo "+ Servicio Extra" cuando el extra ES una promo → ticket SP- APARTE ──
+    if (window._extraPromoTicketId) {
+      const idEx = window._extraPromoTicketId;
+      const firstDiv = (promo.division && promo.division[0]) ? promo.division[0] : null;
+      try {
+        const rEx = await apiPost('agregarPromoExtra', {
+          idEspera: idEx,
+          promoNombre: promo.name,
+          precioPromo: promo.price,
+          precioRegular: promo.regular,
+          area: firstDiv ? firstDiv.area : '',
+          precioMiArea: firstDiv ? firstDiv.monto : promo.price,
+          chica: chica,
+          observaciones: (document.getElementById('assignPromoNota') || {}).value || ''
+        });
+        window._extraPromoTicketId = null;
+        if (rEx && rEx.success) {
+          const msg = '✓ Promo extra "' + promo.name + '" agregada como ticket aparte → ' + chica;
+          if (typeof showToast === 'function') showToast(msg); else alert(msg);
+          closeModal();
+          loadMikaelaHome();
+        } else {
+          alert('Error: ' + ((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar la promo extra'));
+        }
+      } catch (err) {
+        window._extraPromoTicketId = null;
+        console.error(err);
+        alert('Error al agregar la promo extra');
+      }
+      return;
+    }
+
+    try {
+      const result = await apiPost('asignarPromo', {
+        codigo: client.code,
+        promoNombre: promo.name,
+        precioPromo: promo.price,
+        precioRegular: promo.regular,
+        chica: chica,
+        observaciones: (document.getElementById('assignPromoNota') || {}).value || ''
+      });
+      
+      if (result.success) {
+        alert('✓ Promo "' + promo.name + '" asignada a ' + chica);
+        closeModal();
+        loadMikaelaHome();
+      } else {
+        alert('Error: ' + (result.message || 'No se pudo asignar'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al asignar promo');
+    }
+  }
+
+  // === POR COBRAR (Mikaela) ===
+
+  // ── PRELISTA DE ESPERA (citas agendadas por SYNA) ──────────────────────────
+  // ===================== AGENDAR CITA (modal en cascada) =====================
+  function _acEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  window._acState = { tipo:'existente', codigo:'', nombre:'', servicios:[] };
+  const _AC_AREAS = [
+    { key:'cejas', label:'Cejas' },
+    { key:'pestanas', label:'Pestañas' },
+    { key:'facial', label:'Facial' },
+    { key:'depilacion', label:'Depilación' },
+    { key:'retiro_lifting', label:'Permanentes / Lifting' },
+    { key:'promos', label:'Promociones' }
+  ];
+
+  async function openAgendarCita(){
+    window._acState = { tipo:'existente', codigo:'', nombre:'', servicios:[{ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 }] };
+    try { if (typeof ensureCatalogoLoaded === 'function') await ensureCatalogoLoaded(); } catch(e){}
+    try { if (typeof ensurePromosLoaded === 'function') await ensurePromosLoaded(); } catch(e){}
+    acSetTipo('existente');
+    ['acBuscar','acNuevoNombre','acNuevoTel','acFecha','acHora'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    document.getElementById('acResultados').innerHTML='';
+    document.getElementById('acSeleccionada').style.display='none';
+    acRenderServicios();
+    document.getElementById('agendarCitaModal').classList.add('active');
+  }
+
+  function acSetTipo(t){
+    window._acState.tipo = t;
+    document.getElementById('acExistente').style.display = (t==='existente') ? 'block' : 'none';
+    document.getElementById('acNueva').style.display     = (t==='nueva')     ? 'block' : 'none';
+    var tabE=document.getElementById('acTabExist'), tabN=document.getElementById('acTabNueva');
+    tabE.style.background = (t==='existente') ? 'var(--accent-deep)' : 'var(--bg-soft, #efeae3)';
+    tabE.style.color      = (t==='existente') ? '#fff' : 'var(--ink)';
+    tabN.style.background = (t==='nueva') ? 'var(--accent-deep)' : 'var(--bg-soft, #efeae3)';
+    tabN.style.color      = (t==='nueva') ? '#fff' : 'var(--ink)';
+  }
+
+  async function _acEnsureClientas(){
+    if (window._acClientas && window._acClientas.length) return;
+    try { const r = await apiGet('getClientas'); window._acClientas = (r && r.clientas) ? r.clientas : []; }
+    catch(e){ window._acClientas = []; }
+  }
+  async function acBuscarCliente(q){
+    const cont = document.getElementById('acResultados');
+    q = String(q||'').trim().toLowerCase();
+    if (q.length < 2){ cont.innerHTML=''; return; }
+    await _acEnsureClientas();
+    const res = (window._acClientas||[]).filter(function(c){
+      return String(c.nombre||'').toLowerCase().includes(q)
+          || String(c.codigo||'').toLowerCase().includes(q)
+          || String(c.telefono||'').toLowerCase().includes(q);
+    }).slice(0,8);
+    if (!res.length){ cont.innerHTML='<div style="padding:10px;color:var(--ink-faint);font-size:12px;">Sin resultados</div>'; return; }
+    cont.innerHTML = res.map(function(c){
+      const cod=_acEsc(c.codigo), nom=_acEsc(c.nombre);
+      return '<div onclick="acSelectCliente(\''+cod+')" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;">'+nom+' <span style="color:var(--ink-faint);">· '+cod+'</span></div>';
+    }).join('');
+  }
+  function acSelectCliente(cod){
+    const c=(window._acClientas||[]).find(function(x){ return String(x.codigo)===String(cod); });
+    const nom=c ? String(c.nombre||'') : '';
+    window._acState.tipo='existente'; window._acState.codigo=cod; window._acState.nombre=nom;
+    document.getElementById('acResultados').innerHTML='';
+    document.getElementById('acBuscar').value='';
+    var sel=document.getElementById('acSeleccionada');
+    sel.style.display='block';
+    sel.innerHTML='✓ <b>'+_acEsc(nom)+'</b> · '+_acEsc(cod)+' <span onclick="acClearCliente()" style="color:var(--danger);cursor:pointer;margin-left:8px;font-weight:700;">cambiar</span>';
+  }
+  function acClearCliente(){ window._acState.codigo=''; window._acState.nombre=''; document.getElementById('acSeleccionada').style.display='none'; }
+
+  function acRenderServicios(){
+    const cont = document.getElementById('acServicios');
+    cont.innerHTML='';
+    window._acState.servicios.forEach(function(s, i){
+      const wrap=document.createElement('div');
+      wrap.style.cssText='border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;';
+      const h=document.createElement('div');
+      h.style.cssText='font-size:11px;font-weight:800;color:var(--ink-soft);margin-bottom:6px;display:flex;justify-content:space-between;';
+      h.innerHTML='<span>SERVICIO '+(i+1)+'</span>'+(window._acState.servicios.length>1?'<span data-rm="'+i+'" style="color:var(--danger);cursor:pointer;">✕ quitar</span>':'');
+      wrap.appendChild(h);
+      const selA=document.createElement('select');
+      selA.style.cssText='width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;margin-bottom:8px;background:var(--bg-card);color:var(--ink);';
+      selA.innerHTML='<option value="">Área…</option>'+_AC_AREAS.map(function(a){ return '<option value="'+a.key+'"'+(s.area===a.key?' selected':'')+'>'+a.label+'</option>'; }).join('');
+      selA.addEventListener('change', function(){ acOnAreaChange(i, this.value); });
+      wrap.appendChild(selA);
+      const selS=document.createElement('select');
+      selS.id='acSrvSel_'+i;
+      selS.style.cssText='width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:13px;background:var(--bg-card);color:var(--ink);';
+      selS.addEventListener('change', function(){ acOnServicioChange(i, this); });
+      wrap.appendChild(selS);
+      cont.appendChild(wrap);
+      acFillServicios(i, s.area, s);
+    });
+    cont.querySelectorAll('[data-rm]').forEach(function(el){ el.addEventListener('click', function(){ acRemoveServicio(parseInt(this.getAttribute('data-rm'),10)); }); });
+    const addBtn=document.getElementById('acAddBtn');
+    addBtn.textContent='+ Agregar servicio ('+window._acState.servicios.length+'/5)';
+    addBtn.style.display = window._acState.servicios.length>=5 ? 'none' : 'block';
+    acRenderPreview();
+  }
+  function acFillServicios(i, area, s){
+    const sel=document.getElementById('acSrvSel_'+i);
+    if(!sel) return;
+    if(!area){ sel.innerHTML='<option value="">Elegí el área primero</option>'; sel.disabled=true; return; }
+    sel.disabled=false;
+    if(area==='promos'){
+      const proms=((typeof PROMOS!=='undefined')?PROMOS:[]).filter(function(p){ return p.active!==false; });
+      sel._proms=proms;
+      sel.innerHTML='<option value="">Promo…</option>'+proms.map(function(p,idx){ return '<option value="promo:'+idx+'"'+((s.promoNombre&&s.promoNombre===p.name)?' selected':'')+'>'+_acEsc(p.name)+' — $'+p.price+'</option>'; }).join('');
+    } else {
+      const lista=((typeof CATALOGO!=='undefined')&&CATALOGO[area])?CATALOGO[area]:[];
+      sel._lista=lista;
+      sel.innerHTML='<option value="">Servicio…</option>'+lista.map(function(svc,idx){ return '<option value="srv:'+idx+'"'+((s.servicio&&s.servicio===svc.name&&!s.promoNombre)?' selected':'')+'>'+_acEsc(svc.name)+' — $'+svc.price+'</option>'; }).join('');
+    }
+  }
+  function acOnAreaChange(i, area){
+    const s=window._acState.servicios[i];
+    s.area=area; s.servicio=''; s.precio=0; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0;
+    acFillServicios(i, area, s);
+    acRenderPreview();
+  }
+  function acOnServicioChange(i, sel){
+    const s=window._acState.servicios[i];
+    const v=sel.value;
+    if(!v){ s.servicio=''; s.precio=0; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0; acRenderPreview(); return; }
+    if(v.indexOf('promo:')===0){
+      const p=(sel._proms||[])[parseInt(v.split(':')[1],10)];
+      if(p){ s.servicio=p.services||p.name; s.precio=p.price; s.promoNombre=p.name; s.precioPromo=p.price; s.precioRegular=p.regular||p.price; }
+    } else {
+      const svc=(sel._lista||[])[parseInt(v.split(':')[1],10)];
+      if(svc){ s.servicio=svc.name; s.precio=svc.price; s.promoNombre=''; s.precioPromo=0; s.precioRegular=0; }
+    }
+    acRenderPreview();
+  }
+  function acAddServicio(){
+    if(window._acState.servicios.length>=5) return;
+    window._acState.servicios.push({ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 });
+    acRenderServicios();
+  }
+  function acRemoveServicio(i){
+    window._acState.servicios.splice(i,1);
+    if(!window._acState.servicios.length) window._acState.servicios.push({ area:'', servicio:'', precio:0, promoNombre:'', precioPromo:0, precioRegular:0 });
+    acRenderServicios();
+  }
+  function acRenderPreview(){
+    const cont=document.getElementById('acPreview');
+    const items=window._acState.servicios.filter(function(s){ return s.servicio; });
+    if(!items.length){ cont.innerHTML=''; return; }
+    let total=0; const promosVistos={};
+    items.forEach(function(s){
+      if(s.promoNombre){ if(!promosVistos[s.promoNombre]){ promosVistos[s.promoNombre]=true; total+=Number(s.precioPromo)||0; } }
+      else total+=Number(s.precio)||0;
+    });
+    cont.innerHTML='<div style="margin-top:12px;padding:12px;background:var(--bg-soft,#f6f2ec);border-radius:12px;">'
+      +'<div style="font-size:11px;font-weight:800;color:var(--ink-soft);margin-bottom:8px;">PREVISUALIZACIÓN</div>'
+      +items.map(function(s){ return '<div style="font-size:13px;display:flex;justify-content:space-between;margin-bottom:3px;"><span>'+_acEsc(s.servicio)+(s.promoNombre?' <span style="color:var(--accent-deep);font-weight:700;">(promo)</span>':'')+'</span><span>$'+(s.promoNombre?s.precioPromo:s.precio)+'</span></div>'; }).join('')
+      +'<div style="font-size:14px;font-weight:800;display:flex;justify-content:space-between;margin-top:6px;border-top:1px solid var(--line);padding-top:6px;"><span>Total</span><span>$'+total+'</span></div>'
+      +'</div>';
+  }
+
+  async function acConfirmar(){
+    const st=window._acState;
+    let codigo=st.codigo, nombre=st.nombre;
+    if(st.tipo==='nueva'){
+      nombre=document.getElementById('acNuevoNombre').value.trim();
+      const tel=document.getElementById('acNuevoTel').value.trim();
+      if(!nombre){ alert('Poné el nombre de la clienta.'); return; }
+      try{
+        const rc=await apiPost('addClienta', { nombre:nombre, telefono:tel });
+        if(rc && rc.success && rc.codigo){ codigo=rc.codigo; window._acClientas=null; }
+        else { alert('No se pudo crear la clienta: '+((rc&&rc.message)||'intentá de nuevo.')); return; }
+      }catch(e){ console.error(e); alert('Error creando la clienta.'); return; }
+    } else if(!codigo){ alert('Elegí una clienta.'); return; }
+
+    const items=st.servicios.filter(function(s){ return s.servicio; });
+    if(!items.length){ alert('Agregá al menos un servicio.'); return; }
+
+    const fecha=document.getElementById('acFecha').value;
+    const hora=document.getElementById('acHora').value;
+    const areas=[]; const nombres=[]; let total=0;
+    let promoNombre='', precioPromo=0, precioRegular=0; const promosVistos={};
+    items.forEach(function(s){
+      if(s.area && s.area!=='promos' && areas.indexOf(s.area)<0) areas.push(s.area);
+      nombres.push(s.servicio);
+      if(s.promoNombre){
+        if(!promosVistos[s.promoNombre]){ promosVistos[s.promoNombre]=true; total+=Number(s.precioPromo)||0;
+          if(!promoNombre){ promoNombre=s.promoNombre; precioPromo=s.precioPromo; precioRegular=s.precioRegular; } }
+      } else total+=Number(s.precio)||0;
+    });
+    const payload={
+      codigo:codigo, nombre:nombre,
+      servicio:nombres.join(' + '),
+      area:areas[0]||(items[0]&&items[0].area)||'',
+      total:total, origen:'Mikaela',
+      horaAgendada:hora||'',
+      observaciones: fecha ? ('Fecha ' + fecha) : ''
+    };
+    if(promoNombre){ payload.promoNombre=promoNombre; payload.precioPromo=precioPromo; payload.precioRegular=precioRegular; }
+    if(areas.length>1){ payload.secuencia=areas; }
+
+    try{
+      const r=await apiPost('crearTicketSyna', payload);
+      if(r && r.success){
+        if(typeof showToast==='function') showToast('📅 Cita agendada para '+nombre);
+        closeModal();
+        if(typeof loadPrelista==='function') loadPrelista();
+      } else alert('No se pudo agendar: '+((r&&(r.message||r.error))||'intentá de nuevo.'));
+    }catch(e){ console.error(e); alert('Error de conexión.'); }
+  }
+  window.openAgendarCita=openAgendarCita; window.acSetTipo=acSetTipo; window.acBuscarCliente=acBuscarCliente;
+  window.acSelectCliente=acSelectCliente; window.acClearCliente=acClearCliente; window.acAddServicio=acAddServicio; window.acConfirmar=acConfirmar;
+
+  // ===== Validador de Prelista: detectar área y permitir reasignar =====
+  window._prelistaSel = window._prelistaSel || {};
+  const AREAS_PRELISTA = [['cejas','Cejas'],['pestañas','Pestañas'],['facial','Facial'],['depilacion','Depilación']];
+  function _prelistaAreaKey(area) {
+    const n = String(area || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (n.includes('ceja') || n.includes('pigment')) return 'cejas';
+    if (n.includes('lifting') || n.includes('retiro')) return 'cejas';
+    if (n.includes('pesta') || n.includes('volumen')) return 'pestañas';
+    if (n.includes('facial')) return 'facial';
+    if (n.includes('depil')) return 'depilacion';
+    return '';
+  }
+  function selPrelistaArea(citaId, key, btn) {
+    window._prelistaSel[citaId] = key;
+    const cont = btn.parentElement;
+    [...cont.querySelectorAll('button[data-k]')].forEach(function (b) {
+      const on = b.dataset.k === key;
+      b.style.background = on ? 'var(--accent)' : 'var(--bg)';
+      b.style.color = on ? '#fff' : 'var(--ink)';
+      b.style.borderColor = on ? 'var(--accent)' : 'var(--line)';
+    });
+    // refrescar el cartelito de validación de esa tarjeta
+    const badge = document.getElementById('prelistaBadge_' + citaId);
+    if (badge) {
+      badge.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--success);">'
+        + '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Área lista</span>';
+    }
+  }
+  window.selPrelistaArea = selPrelistaArea;
+
+  async function loadPrelista() {
+    const section = document.getElementById('prelistaSection');
+    const list    = document.getElementById('mkPrelistaList');
+    const countEl = document.getElementById('mkPrelistaCount');
+    if (!section || !list) return;
+    try {
+      const r = await apiGet('getPrelista');
+      const arr = (r && r.success && r.prelista) ? r.prelista : [];
+      if (countEl) countEl.textContent = arr.length;
+      if (arr.length === 0) { section.style.display = 'none'; list.innerHTML = ''; return; }
+      section.style.display = 'block';
+      list.innerHTML = arr.map(c => {
+        const ini = String(c.nombre || '?').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
+        const citaTxt = c.horaCita ? ('Cita ' + c.horaCita) : 'Cita agendada';
+        const servTxt = [c.servicio, c.promoNombre].filter(Boolean).join(' · ') || (c.servicio || 'Servicio por definir');
+        const nombreSafe = String(c.nombre || '').replace(/['"\\]/g, '');
+
+        // ── Validador: ¿el área que mandó SYNA es clara? ──
+        const areaRaw = String(c.area || '');
+        const compuesta = areaRaw.includes('+') || areaRaw.includes('/') || /,/.test(areaRaw);
+        const areaKey = compuesta ? '' : _prelistaAreaKey(areaRaw);
+        const needsReview = compuesta || !areaKey;
+        window._prelistaSel[c.id] = areaKey; // selección por defecto ('' si hay que revisar)
+
+        const badge = needsReview
+          ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--warning);"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path fill-rule="evenodd" d="M1 21h22L12 2 1 21Zm12-3h-2v-2h2v2Zm0-4h-2v-4h2v4Z"/></svg>Revisar área · SYNA mandó "' + (areaRaw || '—') + '"</span>'
+          : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--success);"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Área OK</span>';
+
+        const chips = AREAS_PRELISTA.map(function (a) {
+          const k = a[0], lbl = a[1], on = (k === areaKey);
+          return '<button type="button" data-k="' + k + '" onclick="selPrelistaArea(\'' + c.id + '\',\'' + k + '\',this)" '
+            + 'style="flex:1;padding:8px 4px;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+            + 'background:' + (on ? 'var(--accent)' : 'var(--bg)') + ';color:' + (on ? '#fff' : 'var(--ink)') + ';'
+            + 'border:1.5px solid ' + (on ? 'var(--accent)' : 'var(--line)') + ';">' + lbl + '</button>';
+        }).join('');
+
+        return '<div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:4px solid var(--' + (needsReview ? 'warning' : 'success') + ');">' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
+            '<div style="width:40px;height:40px;border-radius:50%;background:var(--warning-bg);color:var(--warning);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0;">' + ini + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-size:15px;font-weight:700;">' + (c.nombre || '—') + '</div>' +
+              '<div style="font-size:12px;color:var(--ink-soft);">' + servTxt + '</div>' +
+              '<div style="font-size:11px;color:var(--warning);font-weight:700;margin-top:2px;">🕐 ' + citaTxt + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div id="prelistaBadge_' + c.id + '" style="margin-bottom:8px;">' + badge + '</div>' +
+          '<div style="font-size:11px;color:var(--ink-faint);font-weight:700;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;">Área que la atiende</div>' +
+          '<div style="display:flex;gap:6px;margin-bottom:12px;">' + chips + '</div>' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button onclick="confirmarLlegadaCita(\'' + c.id + ')" style="flex:1;padding:11px;background:var(--success);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✓ Ya llegó → pasar a lista</button>' +
+            '<button onclick="cancelarCitaSyna(\'' + c.id + '\',\'' + nombreSafe + ')" style="padding:11px 14px;background:none;color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">✗</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      section.style.display = 'none';
+    }
+  }
+
+  async function confirmarLlegadaCita(id) {
+    // Validador: exigir que el área esté definida antes de pasar a la lista real
+    const AREA_LABEL = { 'cejas': 'cejas', 'pestañas': 'pestañas', 'facial': 'facial', 'depilacion': 'depilación' };
+    const sel = (window._prelistaSel && window._prelistaSel[id]) || '';
+    if (!sel) {
+      alert('⚠️ Revisá el área antes de pasarla.\n\nSYNA mandó un área poco clara. Tocá el área correcta (Cejas / Pestañas / Facial / Depilación) y después "Ya llegó".');
+      return;
+    }
+    const areaLabel = AREA_LABEL[sel] || sel;
+    try {
+      showToast('⏳ Confirmando llegada...');
+      const r = await apiPost('confirmarLlegada', { idEspera: id, area: areaLabel });
+      if (r && r.success) {
+        showToast('✓ Clienta pasó a Lista de espera');
+        loadPrelista();
+        loadMikaelaHome();
+      } else {
+        alert('No se pudo confirmar: ' + ((r && r.message) || 'error'));
+        loadPrelista();
+      }
+    } catch (e) {
+      alert('Error de conexión al confirmar');
+    }
+  }
+
+  async function cancelarCitaSyna(id, nombre) {
+    if (!confirm('¿Cancelar la cita de ' + (nombre || 'esta clienta') + '?\nSe marcará como "clienta no llegó".')) return;
+    try {
+      showToast('⏳ Cancelando cita...');
+      const r = await apiPost('cancelarCita', { idEspera: id });
+      if (r && r.success) {
+        showToast('Cita cancelada');
+        loadPrelista();
+      } else {
+        alert('No se pudo cancelar: ' + ((r && r.message) || 'error'));
+        loadPrelista();
+      }
+    } catch (e) {
+      alert('Error de conexión al cancelar');
+    }
+  }
+
+  // ===================== SWITCH 3 APPS (Nexserv / Syna / Sira) =====================
+  function switchApp(app) {
+    var yaEnSyna = (window._currentApp === 'syna'); // re-tap en "Syna" estando en Syna = volver al inicio de SYNA
+    ['nexserv','syna','sira'].forEach(function (t) {
+      var tab = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (tab) tab.style.display = (t === app) ? '' : 'none';
+      var btn = document.getElementById('appBtn_' + t);
+      if (btn) btn.classList.toggle('on', t === app);
+    });
+    // El FAB (+) y la barra inferior son de NexServ → solo en esa pestaña
+    var home = document.getElementById('mikaelaHome');
+    var fab = home ? home.querySelector('.fab') : null;
+    var nav = home ? home.querySelector('nav.nav') : null;
+    if (fab) fab.style.display = (app === 'nexserv') ? '' : 'none';
+    if (nav) nav.style.display = (app === 'nexserv') ? '' : 'none';
+    // En SYNA: ocultar el header "Buenos días, Mikaela" (no repetir el nombre / verse como una
+    // sola app) e igualar el fondo al crema de NexServ (#f5f5f3) para que TODO el fondo sea uniforme.
+    var mkHeader = document.getElementById('mkHomeHeader');
+    if (mkHeader) mkHeader.style.display = (app === 'syna') ? 'none' : '';
+    // Fondo uniforme crema en todo el contenedor (igual que NexServ).
+    var _synaBg = '#f5f5f3';
+    document.body.style.background = _synaBg;
+    var _phoneEl = document.querySelector('.phone');
+    if (_phoneEl) _phoneEl.style.background = _synaBg;
+    window._currentApp = app;
+    if (app === 'syna') loadSynaDashboard(true); // cada toque en Syna fuerza recarga y evita cache viejo en teléfono
+    // if (app === 'sira') loadSiraEmbed();  // cuando tengamos la URL embebible de SIRA
+  }
+  window.switchApp = switchApp;
+
+  // ===================== MÓDULO SYNA — dashboard en vivo =====================
+  // TODO: reemplazar por un apiGet real a SYNA (ej. getDashboardSemana) cuando SYNA
+  // confirme su endpoint. Hoy usa datos de ejemplo para ver el módulo funcionando.
+  var SYNA_URL_PWA = 'https://humbertods.github.io/syna-agenda/';   // SYNA PWA embebible en NexServ
+  var SYNA_EMBED_VERSION = '119';
+  function synaUrl_(params) {
+    var sep = SYNA_URL_PWA.indexOf('?') >= 0 ? '&' : '?';
+    var bust = Date.now ? Date.now() : new Date().getTime();
+    return SYNA_URL_PWA + sep + 'v=' + encodeURIComponent(SYNA_EMBED_VERSION) + '&r=' + encodeURIComponent(bust) + (params ? '&' + params : '');
+  }
+  function _synaMock() {
+    return {
+      semana: 'Semana — ', citasSemana: 0, confirmadas: 0, sinConfirmar: 0, proximas: 0,
+      porRealizar: 0, realizadas: 0, totalSemana: 0,
+      porArea: [
+        { nombre: 'Cejas', cant: 0, color: '#46b04a' },
+        { nombre: 'Pestañas', cant: 0, color: '#ff8a3d' },
+        { nombre: 'Facial', cant: 0, color: '#2196f3' },
+        { nombre: 'Depilación de bikini completo', cant: 0, color: '#9aa0a6' }
+      ],
+      proximasLista: [], enProceso: [],
+      atendidasHoy: [
+        { hora: '09:00', horaFin: '12:00', nombre: 'Yissell Siviria', servicio: 'Pestañas Classic Premium + Depilación + pigmento', area: 'Pestañas' },
+        { hora: '11:00', horaFin: '14:00', nombre: 'Omara Tapia', servicio: 'Retoque de pestañas volumen brasilero + Depilación + pigmento', area: 'Pestañas' }
+      ]
+    };
+  }
+  function renderSynaDashboard(d) {
+    d = d || _synaMock();
+    var set = function (id, v) { var e = document.getElementById(id); if (e) e.textContent = (v != null ? v : 0); };
+    set('synaWeek', d.semana || '');
+    set('snCitasSemana', d.citasSemana); set('snConfirmadas', d.confirmadas);
+    set('snSinConfirmar', d.sinConfirmar); set('snProximas', d.proximas);
+    set('snPorRealizar', d.porRealizar); set('snRealizadas', d.realizadas); set('snTotalSemana', d.totalSemana);
+    var areas = document.getElementById('snAreas');
+    if (areas) areas.innerHTML = (d.porArea || []).map(function (a) {
+      return '<div class="area-row"><div class="area-l"><span class="dot" style="background:' +
+        a.color + '"></span>' + a.nombre + '</div><div class="area-n">' + a.cant + '</div></div>';
+    }).join('');
+    var prox = document.getElementById('snProxList');
+    if (prox) prox.textContent = (d.proximasLista && d.proximasLista.length) ? '' : 'Nada pendiente de llegada';
+    var proc = document.getElementById('snProcesoList');
+    if (proc) proc.textContent = (d.enProceso && d.enProceso.length) ? '' : 'Ninguna cita en curso';
+    var atend = d.atendidasHoy || [];
+    var atendSub = document.getElementById('snAtendSub');
+    if (atendSub) atendSub.textContent = '· ' + atend.length;
+    var atendList = document.getElementById('snAtendList');
+    if (atendList) {
+      if (!atend.length) {
+        atendList.className = 'syna-empty';
+        atendList.textContent = 'Nada atendido aún hoy';
+      } else {
+        atendList.className = '';
+        atendList.innerHTML = atend.map(function (a) {
+          var horaFin = a.horaFin ? ('<div style="font-size:11px;color:var(--ink-faint);">' + a.horaFin + '</div>') : '';
+          var serv = [a.servicio, a.area].filter(Boolean).join(' · ');
+          return '<div style="display:flex;align-items:center;gap:12px;padding:11px 12px;margin-bottom:8px;background:var(--card,#fff);border:1px solid var(--line);border-left:3px solid #46b04a;border-radius:12px;">' +
+            '<div style="flex-shrink:0;text-align:center;min-width:42px;"><div style="font-size:13px;font-weight:800;">' + (a.hora || '') + '</div>' + horaFin + '</div>' +
+            '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:700;">' + (a.nombre || '—') + '</div>' +
+            '<div style="font-size:11px;color:var(--ink-soft);">' + serv + '</div></div>' +
+            '<div style="flex-shrink:0;color:#46b04a;"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>' +
+          '</div>';
+        }).join('');
+      }
+    }
+  }
+  // PARCHE-02: en teléfono el iframe embebido de SYNA no puede cargar su sesión
+  // (iOS/Android aíslan el almacenamiento del iframe) y SYNA muestra
+  // "no se pudo cargar el resumen". SYNA abierta sola sí funciona en el móvil,
+  // así que en móvil la abrimos en su propia pestaña. En PC se conserva el iframe.
+  function _esMovilSyna_() {
+    try {
+      var ua = navigator.userAgent || '';
+      if (/iPhone|iPad|iPod|Android/i.test(ua)) return true;
+      return !!(window.innerWidth && window.innerWidth <= 820);
+    } catch (e) { return false; }
+  }
+
+  function loadSynaDashboard(force) {
+    var slot = document.getElementById('synaFullFrame');
+    if (!slot) return;
+
+    // En móvil: no embeber. Mostrar tarjeta con botón que abre SYNA en pestaña propia.
+    // FIX iOS: el onclick debe estar en el atributo HTML del botón (no asignado con .onclick=)
+    // porque iOS Safari bloquea window.open cuando se llama desde un listener asignado
+    // programáticamente después del render — solo permite la apertura desde onclick inline.
+    if (_esMovilSyna_()) {
+      var synaDest = synaUrl_('embed=1&user=mikaela&view=reservar');
+      slot.innerHTML =
+        '<div style="padding:36px 24px;text-align:center;">' +
+          '<div style="font-size:15px;line-height:1.5;color:#666;margin-bottom:18px;">' +
+            'La agenda SYNA se abre en su propia pantalla en el teléfono.' +
+          '</div>' +
+          '<button onclick="window.open(\'' + synaDest.replace(/'/g, "\\'") + '\',\'_blank)" ' +
+            'style="background:#6C4CE0;color:#fff;border:0;border-radius:14px;' +
+            'padding:14px 24px;font-size:15px;font-weight:600;cursor:pointer;">' +
+            'Abrir SYNA' +
+          '</button>' +
+        '</div>';
+      return;
+    }
+
+    // PC: iframe embebido (comportamiento original).
+    // Sin force: si ya está cargado, conservar el estado de SYNA al cambiar de tab.
+    // force=true (re-tap del botón "Syna") → recarga a la pantalla principal de SYNA.
+    if (!force && slot.querySelector('iframe')) return;
+    slot.innerHTML = '<iframe src="' + synaUrl_('embed=1&user=mikaela') + '" allow="clipboard-write"></iframe>';
+  }
+  // Abre el PWA real de SYNA embebido (mismo dominio → iframe sin restricciones).
+  // view: 'agenda' | 'nueva' | 'copiloto' (deep-link best-effort; si SYNA todavía no soporta
+  // el parámetro, cae en su home igual y sigue siendo funcional).
+  function synaAbrirEmbed(view, titulo) {
+    var dash = document.getElementById('synaDashView');
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    var ttl  = document.getElementById('synaAgendaTitulo');
+    if (dash) dash.style.display = 'none';
+    if (ag)   ag.style.display = 'block';
+    if (ttl)  ttl.textContent = titulo || 'SYNA';
+    if (slot) {
+      var url = synaUrl_('embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : ''));
+      slot.className = '';
+      slot.innerHTML = '<iframe class="agenda-frame" src="' + url + '" allow="clipboard-write"></iframe>';
+    }
+  }
+  function synaAbrirAgenda()  { synaAbrirEmbed('agenda',   'Agenda en vivo'); }
+  function synaNuevaReserva() { synaAbrirEmbed('reservar', 'Nueva reserva'); }
+  function synaCopiloto()     { synaAbrirEmbed('copiloto', 'Copiloto'); }
+  function synaVolverDash() {
+    var dash = document.getElementById('synaDashView');
+    var ag   = document.getElementById('synaAgendaView');
+    var slot = document.getElementById('synaAgendaFrameSlot');
+    if (ag)   ag.style.display = 'none';
+    if (dash) dash.style.display = 'block';
+    if (slot) slot.innerHTML = ''; // descargar el iframe al volver (libera recursos)
+  }
+  window.synaAbrirAgenda = synaAbrirAgenda; window.synaVolverDash = synaVolverDash;
+  window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
+  window.synaAbrirEmbed = synaAbrirEmbed;
+
+  async function loadMikaelaHome() {
+    loadCajaChica();
+    loadPrelista();
+    const priBadge = {
+      'especial': '<span class="priority-badge especial">🔴 Especial</span>',
+      'tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
+      'normal': '<span class="priority-badge normal">🟢 Normal</span>',
+      'con el tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
+    };
+    const areaMap = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
+
+    try {
+      // Cargar lista de espera completa (esperando + en servicio)
+      const result = await apiGet('getListaCompleta');
+      
+      if (result.success) {
+        const esperando = result.esperando || [];
+        const enServicio = result.enServicio || [];
+        const porCobrar = result.porCobrar || [];
+        const completadas = result.completadas || [];
+
+        // Set de staff ocupadas ahora mismo (para marcar Disponible/Ocupada al reasignar)
+        const busyStaff = new Set();
+        enServicio.forEach(function(a){
+          if (LineaService.clasificarTicket(a).esMulti) {
+            a.areas.forEach(function(ar){
+              if (String(ar.estado||'').toLowerCase() === 'en servicio' && ar.staff)
+                busyStaff.add(String(ar.staff).trim().toLowerCase());
+            });
+          } else if (a.tomadaPor) {
+            String(a.tomadaPor).split(',').forEach(function(s){
+              const t = String(s).trim().toLowerCase();
+              if (t && t !== '—') busyStaff.add(t);
+            });
+          }
+        });
+
+        // Stats
+        var _mkE = document.getElementById('mkStatEspera');
+        var _mkS = document.getElementById('mkStatServicio');
+        var _mkC = document.getElementById('mkStatCobrar');
+        if (_mkE) _mkE.textContent = (esperando.length + completadas.length);
+        if (_mkS) _mkS.textContent = enServicio.length;
+        if (_mkC) _mkC.textContent = porCobrar.length;
+
+        // Lista de espera (clientas completadas para verificar van primero)
+        var _mkEC = document.getElementById('mkEsperaCount'); if (_mkEC) _mkEC.textContent = (esperando.length + completadas.length);
+        const esperaList = document.getElementById('mkEsperaList');
+        if (!esperaList) return; // Guard: inventario SIRA activo, DOM de mikaelaHome reemplazado
+        const completadasHTML = completadas.map(c => buildCompletadaCard(c)).join('');
+        if (esperando.length === 0 && completadas.length === 0) {
+          esperaList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">✨ No hay clientas esperando</div>';
+        } else {
+          esperaList.innerHTML = completadasHTML + esperando.map(w => {
+            const pri = String(w.prioridad || 'normal').toLowerCase();
+            const obs = String(w.observaciones || '');
+            const esContinuacion = obs.indexOf('✅') !== -1;
+            const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
+            // Cita confirmada que vino agendada por SYNA (solo le falta asignar staff)
+            const esSyna = obs.indexOf('SYNA') !== -1;
+            const _citaMatch = obs.match(/cita\s+([0-9]{1,2}:[0-9]{2})/i);
+            const _citaHora = _citaMatch ? _citaMatch[1] : '';
+            const synaBadge = esSyna
+              ? ' <span style="background:var(--warning);color:#fff;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">📅 Cita' + (_citaHora ? ' ' + _citaHora : '') + '</span>'
+              : '';
+            // Partes ya hechas, parseadas de las observaciones
+            const sigueMatch = obs.match(/Sigue:\s*([^|]+)/i);
+            const sigueTxt = sigueMatch ? sigueMatch[1].trim() : '';
+            const hechas = obs.split('|').map(s => s.trim()).filter(s => s.indexOf('✅') !== -1)
+              .map(s => s.replace(/·?\s*Sigue:.*/i, '').trim());
+            const hechasHTML = hechas.length
+              ? '<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">'
+                + hechas.map(h => '<div style="font-size:11px;color:var(--success);font-weight:600;">' + h + '</div>').join('')
+                + (sigueTxt ? '<div style="font-size:11px;color:var(--accent-deep);font-weight:700;margin-top:2px;">⏳ Falta: ' + sigueTxt + '</div>' : '')
+                + '</div>'
+              : '';
+
+            // ESTADO de la clienta (3 estados): Asignada a X · Por asignar · Mandar a cobro
+            let estadoLabel;
+            if (esContinuacion) {
+              estadoLabel = sigueTxt
+                ? '<strong style="color:var(--accent-deep);">Por asignar</strong> <span style="color:var(--ink-soft);">· falta pasar a la siguiente staff</span>'
+                : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
+            } else if (estaAsignada) {
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + w.tomadaPor;
+            } else {
+              estadoLabel = '<strong style="color:var(--ink-soft);">Por asignar</strong>';
+            }
+            const estadoHTML = '<div style="font-size:15px;margin:8px 0;"><span style="color:var(--ink);font-weight:800;">Estado:</span> ' + estadoLabel + '</div>';
+
+            // ── Control de reasignación (multi-servicio / promo-dúo) ──
+            const _fuente = w.fuente || '';
+            const _esMultiPromo = LineaService.clasificarTicket(w).esMulti || LineaService.clasificarTicket(w).tienePromo;
+            const _pendKey = _normAreaKey(esContinuacion
+              ? [sigueTxt, w.area, w.servicio, obs].join(' ')
+              : [w.area, w.servicio, obs].join(' '));
+            const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
+            const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
+            const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
+            const reassignHTML = (() => {
+              const selId   = 'reSel_'    + _uid;
+              const btnId   = 'reBtn_'    + _uid;
+              const retId   = 'retirar_'  + _uid;
+              return '<div style="margin-top:8px;">'
+                + '<select id="' + selId + '" data-btnid="' + btnId + '" data-action="toggleReasignar" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">'
+                + _staffOpcionesReasignar(_pendKey, busyStaff)
+                + '</select>'
+                + '<button id="' + btnId + '"'
+                + ' data-action="reasignar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-area-idx="' + (_areaIdxAttr||'') + '"'
+                + ' data-sel-id="' + selId + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
+                + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Reasignar</button>'
+                + '</div>'
+                + '<button id="' + retId + '"'
+                + ' data-action="retirar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' style="width:100%;margin-top:6px;padding:10px;background:var(--bg-card);color:#c0392b;border:1.5px solid #c0392b;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">🚪 Clienta se retira — cobrar lo realizado</button>';
+            })();
+            // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
+            // así que se asigna staff directo con el mismo dropdown que usa multi-área
+            // (no hace falta re-elegir el servicio). Si igual quiere cambiarlo, abajo
+            // quedan los botones Servicio/Promo. ──
+            const _syncAssignHTML = (() => {
+              const selId = 'syncSel_' + _uid;
+              const btnId = 'syncBtn_' + _uid;
+              return '<div style="margin-top:10px;">'
+                + '<div style="font-size:11px;color:var(--ink-soft);font-weight:700;margin-bottom:5px;">👤 Asignar a la chica:</div>'
+                + '<select id="' + selId + '" data-btnid="' + btnId + '" data-action="toggleReasignar" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">'
+                + _staffOpcionesReasignar(_pendKey, busyStaff)
+                + '</select>'
+                + '<button id="' + btnId + '"'
+                + ' data-action="reasignar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-area-idx=""'
+                + ' data-sel-id="' + selId + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
+                + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>'
+                + '</div>';
+            })();
+            // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
+            const _desgloseMultiHTML = _esMultiPromo
+              ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
+              : `<div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>`;
+
+            // Continuación: terminó una parte y vuelve para redirigir a la siguiente staff
+            if (esContinuacion) {
+              return `
+              <div class="waitlist-card" style="border:2px solid var(--accent);">
+                <div class="waitlist-top">
+                  <div class="waitlist-client">
+                    <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                    <div class="waitlist-name">${w.nombre} <span style="background:var(--accent);color:white;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">🔄 Para redirigir</span></div>
+                  </div>
+                </div>
+                ${estadoHTML}
+                ${hechasHTML}
+                ${reassignHTML}
+                <div style="display:flex;gap:6px;margin-top:10px;">
+                  <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
+                  <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
+                </div>
+              </div>`;
+            }
+
+            // Nueva o ya asignada: misma tarjeta con botones; el estado va en la línea "Estado:"
+            return `
+            <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}" data-tid="${w.idEspera || ''}" data-tname="${String(w.nombre || '').replace(/"/g,'')}"${estaAsignada ? ' style="border-left:4px solid var(--accent);"' : ''}>
+              <div class="waitlist-top">
+                <div class="waitlist-client">
+                  <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                  <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${synaBadge}</div>
+                </div>
+                ${priBadge[pri] || priBadge['normal']}
+              </div>
+              ${estadoHTML}
+              ${_desgloseMultiHTML}
+              ${_esMultiPromo ? reassignHTML : `${esSyna ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
+                <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+              </div>`}
+            </div>`;
+          }).join('');
+          // ── Event delegation para botones de reasignación (sin onclick inline) ──
+          const _esperaListEl = document.getElementById('mkEsperaList');
+          if (_esperaListEl && !_esperaListEl._reasignarBound) {
+            _esperaListEl._reasignarBound = true;
+            _esperaListEl.addEventListener('change', function(e) {
+              const sel = e.target;
+              if (!sel || sel.getAttribute('data-action') !== 'toggleReasignar') return;
+              const btnId = sel.getAttribute('data-btnid');
+              const btn = document.getElementById(btnId);
+              if (btn) btn.style.display = sel.value ? 'block' : 'none';
+            });
+            _esperaListEl.addEventListener('click', function(e) {
+              const btn = e.target.closest('button[data-action]');
+              if (!btn) return;
+              const action = btn.getAttribute('data-action');
+              if (action === 'reasignar') {
+                const idEspera = btn.getAttribute('data-id-espera') || '';
+                const areaIdx  = btn.getAttribute('data-area-idx')  || '';
+                const selId    = btn.getAttribute('data-sel-id')    || '';
+                const nombre   = btn.getAttribute('data-nombre')    || '';
+                const codigo   = btn.getAttribute('data-codigo')    || '';
+                reasignarStaff(idEspera, areaIdx, selId, nombre, codigo);
+              } else if (action === 'retirar') {
+                const idEspera = btn.getAttribute('data-id-espera') || '';
+                const nombre   = btn.getAttribute('data-nombre')    || '';
+                retirarYCobrar(idEspera, nombre);
+              } else if (action === 'asignarServicio') {
+                const codigo = btn.getAttribute('data-codigo') || '';
+                const nombre = btn.getAttribute('data-nombre') || '';
+                openAssignServiceModal(codigo, nombre);
+              } else if (action === 'asignarPromo') {
+                const codigo = btn.getAttribute('data-codigo') || '';
+                const nombre = btn.getAttribute('data-nombre') || '';
+                openAssignPromoModal(codigo, nombre);
+              }
             });
           }
         }
+
+        // En atención — fichas en vivo con historial de áreas
+        document.getElementById('mkAtencionCount').textContent = enServicio.length;
+        const atenList = document.getElementById('mkAtencionList');
+        if (enServicio.length === 0) {
+          atenList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas en atención</div>';
+        } else {
+          atenList.innerHTML = enServicio.map(a => {
+            const initials = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
+            const areaIcons = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg>', depilación: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M6.6,21.2c-2.5-1.4-4.1-4.1-4.1-7s.2-.5.3-.6c.6-.6,1.8-.9,2.6-1.1,1.1-.2,2.1-.4,3.2-.4h2.1c0,0,0-4.2,0-4.2,0-.2-.2-.3-.3-.3s-.3.1-.3.3v1.9c0,.5-.4,1-.9,1s-1-.4-1-1v-1.9c0-.2-.1-.3-.3-.3s-.3.1-.3.3c0,.5-.4,1-.9,1s-1-.4-1-1v-3.2c0-.9.7-1.6,1.6-1.6h12.7c.9,0,1.5.7,1.6,1.5s-.6,1.6-1.5,1.6h-7.3c0,.1,0,.2,0,.4v5.4c1.5.1,3,.3,4.4.9.6.3,1.3.6,1.3,1.4,0,1.3-.4,2.6-1,3.8s-1.8,2.3-3.1,3c-2.4,1.3-5.3,1.3-7.7,0ZM9.5,7.9c0-.6.4-1,1-1s.9.4.9,1v5.4c0,.2.1.4.3.4s.3-.1.3-.3v-6.8c0-.8.3-1.6.9-2.2s.2-.3.3-.5h-5.9c-.5,0-1,.4-1,.9v3.2c0,.2.1.3.3.3s.3-.1.3-.3c0-.5.4-1,1-1s.9.4.9,1v1.9c0,.2.2.3.3.3s.3-.1.3-.3v-1.9ZM20,5.7c.6,0,.9-.5.9-1s-.4-.9-.9-.9h-6.1c-.3.9-.8,1-1,1.9h7.2ZM17.6,14.1c-.8-.8-3.8-1.2-5-1.3v.5c0,.5-.5,1-1,.9s-.9-.4-.9-1v-.6c-2,0-4.5.1-6.3.8s-1.3.5-1.3.8,1.1.8,1.5.9c2.9.8,6.9.8,9.9.4.9-.1,1.7-.3,2.5-.7s1-.5.7-.8ZM7.9,16.4c-1.4-.1-3.5-.4-4.7-1.1.5,3.6,3.6,6.3,7.2,6.3s6.8-2.7,7.3-6.3c-.5.3-1.1.5-1.6.6-2.5.6-5.6.7-8.2.5Z"/></svg>', pestanas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg>', pestañas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg>', retiro_lifting: '✨', facial: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d=\"M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d=\"M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d=\"M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d=\"M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d=\"M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg>' };
+            const areaLabels = { cejas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.4,12.2l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.5-1.9c-.1-.3,0-.7.4-.8l8.4-2.7c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5Z\"/></svg>', depilacion: 'Depilación', depilación: 'Depilación', pestanas: '<svg class=\"nx-icon\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z\"/><path d=\"M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z\"/></svg> Pestañas', pestañas: 'Pestañas', retiro_lifting: 'Lifting/Retiro', facial: 'Facial' };
+
+            let timelineHTML = '';
+            const esTM = LineaService.clasificarTicket(a).esMulti;
+
+            if (esTM) {
+              // ── TICKET MULTI: desglose real por área ──
+              (a.areas || []).forEach((ar, arIdx) => {
+                const aKey = String(ar.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
+                const icon = areaIcons[aKey] || areaIcons[ar.area] || '🔄';
+                const label = areaLabels[aKey] || areaLabels[ar.area] || ar.area || 'Servicio';
+                const serv = ar.confirmado || ar.tentativo || '';
+                const precio = ar.precio || 0;
+                const est = String(ar.estado || '').toLowerCase();
+                const notLast = arIdx < (a.areas.length - 1);
+                if (est === 'completado') {
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO ✅</div></div>`;
+                } else if (est === 'en servicio') {
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
+                } else {
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${notLast?'border-bottom:1px solid var(--line);':''}">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv || 'Esperando asignación'}</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
+                }
+              });
+            } else {
+              // ── TICKET NORMAL / PROMO: timeline original ──
+              const obs = String(a.observaciones || '');
+              const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
+              partesPrevias.forEach(parte => {
+                const matchArea = parte.match(/✅\s*([\w\/áéíóúñ]+)\s+completad[ao] por\s+([^·]+)/i);
+                if (matchArea) {
+                  const areaComp = matchArea[1].trim().toLowerCase();
+                  const staffComp = matchArea[2].trim();
+                  const icon = areaIcons[areaComp] || '✅';
+                  const label = areaLabels[areaComp] || areaComp;
+                  let montoStr = '';
+                  if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+                    // Sumar TODAS las entradas de esa staff (promo + adicionales)
+                    const entradasStaff = a.serviciosDetalle.filter(d =>
+                      String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
+                      String(d.area||'').toLowerCase().includes(areaComp)
+                    );
+                    const montoTotal = entradasStaff.reduce((s, d) => s + Number(d.monto || 0), 0);
+                    if (montoTotal > 0) montoStr = ' · <strong>$' + montoTotal.toFixed(2) + '</strong>';
+                  }
+                  timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);">
+                    <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${staffComp}${montoStr}</div><div style="font-size:10px;color:var(--ink-faint);">✅ Completado</div></div>
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO</div></div>`;
+                }
+              });
+              const areaActualKey = String(a.area || '').toLowerCase().replace('ó','o').replace('ñ','n');
+              const iconActual = areaIcons[areaActualKey] || '🔄';
+              const labelActual = areaLabels[areaActualKey] || a.area || 'Servicio';
+              const servicioLimpio = String(a.servicio || '').replace('(continuación promo)', '').replace('(continuacion promo)', '').trim();
+              const esPendConf = a.pendienteConfirmacion === true;
+              const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
+              const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
+              const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
+              timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
+                <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
+                <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:${badgeColor};">${labelActual} · ${a.tomadaPor}</div>
+                <div style="font-size:11px;color:var(--ink-soft);">${servicioLimpio}</div>
+                <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf?' · Esperando confirmación':''}</div></div>
+                <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div></div>`;
+              if (a.promoNombre) {
+                const promoFull = (PROMOS || []).find(p => p.name === a.promoNombre);
+                if (promoFull && promoFull.division) {
+                  const areaActualNorm = String(a.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n');
+                  const areasYa = new Set([areaActualNorm]);
+                  partesPrevias.forEach(p => { const m = p.match(/✅\s*([\w\/]+)\s+completad/i); if (m) areasYa.add(m[1].trim().toLowerCase()); });
+                  promoFull.division.forEach(d => {
+                    const dArea = String(d.area||'').toLowerCase().replace('ó','o').replace('á','a').replace('é','e').replace('ñ','n').replace('pestañas','pestanas');
+                    if (![...areasYa].some(ya => dArea.includes(ya) || ya.includes(dArea))) {
+                      timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.5;">
+                        <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;">${areaIcons[dArea]||'⏳'}</div>
+                        <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${areaLabels[dArea]||d.area} · $${d.monto}</div></div>
+                        <div style="font-size:10px;font-weight:700;background:var(--bg);color:var(--ink-faint);padding:3px 8px;border-radius:100px;border:1px solid var(--line);">ESPERA</div></div>`;
+                    }
+                  });
+                }
+              }
+            } // fin else normal/promo
+
+            // TOTAL ACUMULADO.
+            // OJO promo repartida: el precio del combo es FIJO (ej. Combo 25 Clásicas = $47).
+            // Las partes en serviciosDetalle (pestañas $42 + cejas $5) son SUBDIVISIONES de
+            // ese precio, NO sumandos. Sumarlas encima de a.total daba el bug $42+$47=$89.
+            let totalAcumDisplay = Number(a.total) || 0;
+            const _promoFullTot = a.promoNombre ? (PROMOS || []).find(p => p.name === a.promoNombre) : null;
+            const _promoPrecioFijo = _promoFullTot ? Number(_promoFullTot.price || _promoFullTot.precio || 0) : 0;
+            if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+              const totalDetalle = a.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
+              if (totalDetalle > 0) {
+                if (_promoPrecioFijo > 0) {
+                  // Promo de precio fijo: el total ES el precio del combo. Nunca sumar las
+                  // partes del propio combo encima. (Si a.total ya incluye adicionales
+                  // reales fuera del combo, se respeta el mayor.)
+                  totalAcumDisplay = Math.max(_promoPrecioFijo, Number(a.total) || 0);
+                } else {
+                  // Multi-servicio SIN promo fija: sí se suman las partes hechas + la actual.
+                  totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
+                }
+              }
+            }
+            const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
+            const tmBadge = esTM ? ' <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>' : '';
+            const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
+
+            return `
+            <div style="background:var(--bg-card);border-radius:var(--radius-card);padding:14px 16px;margin-bottom:12px;box-shadow:var(--shadow-card);border-left:4px solid ${esTM?'var(--accent)':'var(--info)'};">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div class="client-avatar ${a.esTop ? 'is-top' : ''}" style="flex-shrink:0;">${initials}</div>
+                <div style="flex:1;">
+                  <div style="font-size:15px;font-weight:800;">${a.nombre}${a.esTop ? ' <span class="top-star">⭐</span>' : ''}${tmBadge}</div>
+                  <div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">${a.codigo} · llegó ${a.horaLlegada || '?'}</div>
+                </div>
+              </div>
+              ${promoStr}
+              <div style="background:var(--bg);border-radius:12px;padding:10px 12px;">
+                ${timelineHTML}
+              </div>
+              ${totalStr}
+            </div>`;
+          }).join('');
+        }
+
+        // Por cobrar
+        document.getElementById('porCobrarCount').textContent = porCobrar.length;
+        const cobrarList = document.getElementById('porCobrarList');
+        if (porCobrar.length === 0) {
+          cobrarList.innerHTML = '<div class="card" style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">No hay clientas por cobrar</div>';
+        } else {
+          window._mkPorCobrarData = porCobrar;
+          cobrarList.innerHTML = porCobrar.map(p => {
+            const esTM = LineaService.clasificarTicket(p).esMulti;
+            let desgloseData = p.serviciosDetalle;
+            if (desgloseData && desgloseData.length > 0 && !esTM) {
+              const staffsEnDesglose = [...new Set(desgloseData.map(d => d.staff))];
+              const ultimaStaff = staffsEnDesglose[staffsEnDesglose.length - 1];
+              desgloseData = desgloseData.map(d => ({
+                ...d,
+                congelado: d.staff !== ultimaStaff,
+                montoNormal: d.montoNormal || d.monto
+              }));
+            }
+            if (!desgloseData && esTM && p.areas) {
+              // ── MANDAMIENTO #4: incluir precioNormal para que tarjeta recalcule correctamente ──
+              desgloseData = p.areas.map(a => ({
+                staff: a.staff||'—', servicio: a.confirmado||a.tentativo, area: a.area,
+                monto: a.precio,
+                montoNormal: a.precioNormal || a.precio  // precio sin descuento promo
+              }));
+            }
+            const desgloseEnc = desgloseData ? encodeURIComponent(JSON.stringify(desgloseData)) : '';
+            return `
+            <div class="card" style="margin-bottom: 8px; padding: 14px; border-left: 4px solid ${esTM ? 'var(--accent)' : 'var(--success)'};">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="client-avatar ${p.esTop ? 'is-top' : ''}" style="flex-shrink: 0;">${p.nombre.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+                <div style="flex: 1;">
+                  <div style="font-weight: 700; font-size: 15px;">${p.nombre} ${p.esTop ? '<span class="top-star">⭐</span>' : ''}${esTM ? ' <span style=\"font-size:10px;background:var(--accent);color:white;padding:2px 7px;border-radius:100px;font-weight:700;\">MULTI</span>' : ''}</div>
+                  <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-top: 2px;">${p.servicio} · atendida por ${p.tomadaPor}</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px; align-items: flex-end;">
+                  <button onclick="cobrarDesdeBtn(this)" 
+                    data-id="${p.idEspera}"
+                    data-codigo="${p.codigo||''}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;')}"
+                    data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;')}"
+                    data-total="${p.total||'0'}"
+                    data-regular="${p.precioRegular||p.total||'0'}"
+                    data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;')}"
+                    data-desglose="${desgloseEnc}"
+                    style="padding: 10px 16px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Cobrar</button>
+                  <button data-action="mk-esperar"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-servicio="${(p.servicio||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-total="${p.total||'0'}"
+                    data-chica="${(p.tomadaPor||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-regular="${p.precioRegular||p.total||'0'}"
+                    data-promo="${(p.promoNombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-desglose="${desgloseEnc}"
+                    style="padding: 7px 12px; background: var(--bg); color: var(--ink-soft); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm1 11H7v-2h4V7h2v6z"/></svg>Esperar</button>
+                  <button data-action="mk-agregar-producto"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    data-total="${p.total||'0'}"
+                    style="padding: 7px 14px; background: var(--bg); color: var(--ink); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M7 7a5 5 0 0 1 10 0h2.5a1 1 0 0 1 1 .92l.96 12A2 2 0 0 1 19.46 22H4.54a2 2 0 0 1-1.99-2.08l.96-12A1 1 0 0 1 4.5 7H7Zm2 0h6a3 3 0 0 0-6 0Z"/></svg> + Producto</button>
+                  <button data-action="mk-borrar-ticket"
+                    data-id="${p.idEspera}"
+                    data-nombre="${(p.nombre||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}"
+                    style="padding: 6px 12px; background: var(--bg); color: var(--danger); border: 1.5px solid var(--danger); border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="vertical-align:-2px;margin-right:4px;"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg>Borrar</button>
+                </div>
+              </div>
+              <!-- Asignar cliente al cobro: aparece si hay clientas esperando asignación -->
+              <div id="asignarRow-${p.idEspera}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
+                <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:6px;">+ AGREGAR AL COBRO DE ESTA CLIENTA:</div>
+                <div id="asignarOpciones-${p.idEspera}" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+              </div>
+              <!-- Productos agregados a este ticket -->
+              <div id="productos-ticket-${p.idEspera}" style="margin-top: 8px;"></div>
+            </div>
+          `;
+          }).join('');
+          if (window._mkEsperandoCobro && window._mkEsperandoCobro.length > 0) mkActualizarAsignarOpciones();
+          mkRenderEsperandoCobro();
+        }
+        
+        // Autorizaciones pendientes
+        renderAuthorizations();
+        
+        // Auto-refresh inteligente: 8s si hay clientas en atención, 15s si no
+        if (window._mikaelaAutoRefresh) clearInterval(window._mikaelaAutoRefresh);
+        const refreshInterval = enServicio.length > 0 ? 8000 : 15000;
+        window._mikaelaAutoRefresh = setInterval(() => {
+          const currentScreen = document.querySelector('.screen.active');
+          if (currentScreen && currentScreen.id === 'mikaelaHome') {
+            loadMikaelaHome();
+          } else {
+            clearInterval(window._mikaelaAutoRefresh);
+          }
+        }, refreshInterval);
+      }
+    } catch (err) {
+      console.error('Error cargando dashboard Mikaela:', err);
+    }
+  }
+  
+  
+  function confirmarEliminarServicio(itemIdx) {
+    const item = window._historialItems && window._historialItems[itemIdx];
+    if (!item) return;
+    const msg = `¿Eliminar este registro?\n\n• Cliente: ${item.nombre || item.clienteNombre}\n• Servicio: ${item.servicio}\n• Staff: ${item.chica}\n• Monto: $${item.precio}\n\nEsto revertirá la comisión y eliminará el registro. No se puede deshacer.`;
+    if (!confirm(msg)) return;
+    eliminarServicio(item);
+  }
+
+  async function eliminarServicio(item) {
+    try {
+      showToast('⏳ Eliminando registro...');
+      const result = await apiPost('eliminarServicio', {
+        fecha: item.fecha,
+        hora: item.hora,
+        cliente: item.nombre || item.clienteNombre || '',
+        staff: item.chica || '',
+        servicio: item.servicio || '',
+        precio: item.precio || 0,
+        comision: item.comision || 0
+      });
+      if (result.success) {
+        showToast('✓ Registro eliminado correctamente');
+        loadServiciosHistory(); // recargar
+        if (typeof loadCajaChica === 'function') loadCajaChica(); // sincronizar caja chica
+      } else {
+        alert('Error al eliminar: ' + (result.error || 'desconocido'));
+      }
+    } catch(e) {
+      alert('Error de conexión al eliminar');
+    }
+  }
+
+  // Construye las opciones del selector de historial según el ROL y deja "Hoy" por defecto.
+  // Se llama al ABRIR la pantalla (no en cada refresh) para no perder la selección.
+  function _setupHistorySelectPorRol() {
+    const sel = document.getElementById('historyWeekSelect');
+    if (!sel) return;
+    const esOwner = window.currentUser && window.currentUser.role === 'owner';
+    if (esOwner) {
+      // Owner: acceso completo
+      sel.innerHTML = '<option value="hoy">Hoy</option>'
+        + '<option value="0">Esta semana</option>'
+        + '<option value="1">Semana pasada</option>'
+        + '<option value="2">Hace 2 semanas</option>'
+        + '<option value="3">Hace 3 semanas</option>';
+    } else {
+      // Mikaela / admin: solo Hoy + Semana (en curso)
+      sel.innerHTML = '<option value="hoy">Hoy</option>'
+        + '<option value="0">Semana</option>';
+    }
+    sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
+  }
+
+  async function loadServiciosHistory() {
+    const selVal = document.getElementById('historyWeekSelect')?.value || 'hoy';
+    const esHoy = selVal === 'hoy';
+    const semanaOffset = esHoy ? 0 : parseInt(selVal || '0');
+    const scopeLabel = esHoy ? 'Hoy'
+      : (semanaOffset === 0 ? 'Esta semana'
+        : semanaOffset === 1 ? 'Semana pasada'
+        : 'Hace ' + semanaOffset + ' semanas');
+    window._histScopeLabel = scopeLabel;
+    const list = document.getElementById('historyList');
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Cargando...</div>';
+
+    try {
+      // Calcular rango: HOY (solo el día) o la SEMANA (lunes–sábado con offset)
+      const now = new Date();
+      let lunes, sabado;
+      if (esHoy) {
+        lunes = new Date(now); lunes.setHours(0, 0, 0, 0);
+        sabado = new Date(now); sabado.setHours(23, 59, 59);
+      } else {
+        const dayOfWeek = (now.getDay() + 6) % 7;
+        lunes = new Date(now);
+        lunes.setDate(now.getDate() - dayOfWeek - (semanaOffset * 7));
+        lunes.setHours(0, 0, 0, 0);
+        sabado = new Date(lunes);
+        sabado.setDate(lunes.getDate() + 6);
+        sabado.setHours(23, 59, 59);
       }
 
-      // ── Calcular totales y comisiones ────────────────────────────────────────
-      // Si la fuente es Lineas, cada línea tiene precioRegular correcto por área.
-      // Calcular monto cobrado y comisión directamente sin liquidarCobro_().
-      let totalCobrado = 0;
-      const lineasConComision = lineas.map(function(l) {
-        let monto, comision;
-        // FIX: Tarjeta → precio regular / todo lo demás → precio promo.
-        // No usar esEfectivo (que dejaba Transferencia como "no efectivo").
-        const esTarjetaTM = (metodoPago || '').toLowerCase().indexOf('tarjeta') !== -1;
-        if (_fuenteLineas) {
-          monto = esTarjetaTM ? l.precioRegular : (l.precioPromo || l.precioRegular);
+      const result = await apiGet('getHistorial', { periodo: 'todo' });
+      if (!result.success || !result.historial) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin datos</div>';
+        return;
+      }
 
-          // FIX: si precioRegular === precioPromo (el combo no tenía regular en Lineas),
-          // buscar el precio regular en _mapaRegularPromos_ por nombre del combo.
-          // El nombre del servicio puede tener extras concatenados con "+"
-          // (ej. "Combo 7 Hawaiano + Solo pigmento") — extraer solo el nombre base
-          // (parte antes del "+") para que el lookup en Paquetes funcione correctamente.
-          let precioRegCom = l.precioRegular;
-          if (esTarjetaTM && precioRegCom <= l.precioPromo) {
-            try {
-              var rMapTM = _mapaRegularPromos_();
-              var nombreServTM = String(l.servicio || '');
-              // Limpiar extras concatenados: "Combo 7 Hawaiano + Solo pigmento" → "Combo 7 Hawaiano"
-              var nombreBaseTM = nombreServTM.split('+')[0].trim();
-              var nNormTM = _normNombrePromo_(nombreBaseTM);
-              if (rMapTM[nNormTM] && rMapTM[nNormTM] > l.precioPromo) {
-                precioRegCom = rMapTM[nNormTM];
-                monto = precioRegCom;
-              }
-            } catch(eR) {}
-          }
-          comision = _comisionLinea(l.area, l.precioPromo || monto, precioRegCom || monto, metodoPago);
-        } else {
-          // Fallback legacy: usar liquidarCobro_ para compatibilidad
-          const _liqSingle = liquidarCobro_([l], metodoPago, l.precioRegular || l.precioPromo || 0);
-          monto    = _liqSingle.total;
-          comision = (_liqSingle.lineas[0] || {}).comision || 0;
+      const DIAS_ORDER = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+      const DIAS_LABEL = { 1:'Lunes', 2:'Martes', 3:'Miercoles', 4:'Jueves', 5:'Viernes', 6:'Sabado', 0:'Domingo' };
+
+      // Filtrar y agrupar por dia -> staff — guardar referencia para eliminar
+      const porDia = {};
+      let totalSemana = 0, totalServicios = 0;
+      window._historialItems = []; // guardar todos los items para poder eliminarlos por índice
+
+      result.historial.forEach(function(h, globalIdx) {
+        const esProducto = String(h.area || '').toLowerCase() === 'producto'
+                        || String(h.metodoPago || '').toLowerCase() === 'producto';
+        if (!h.nombre && !h.clienteNombre && !esProducto) return;
+        const parts = String(h.fecha || '').split('/');
+        if (parts.length !== 3) return;
+        const fechaDate = new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0]));
+        if (fechaDate < lunes || fechaDate > sabado) return;
+
+        const diaN = DIAS_LABEL[fechaDate.getDay()] || 'Otro';
+        const diaSortKey = fechaDate.getDay();
+        const staff = String(h.chica || '—');
+        // Productos registrados con chica='admin' → mostrar como 'Mikaela'
+        const staffDisplay = (esProducto && (staff === 'admin' || staff === '—' || staff === ''))
+          ? 'Mikaela'
+          : staff;
+        const valor = Number(h.precio || 0);
+        // Para productos: el nombre de clienta está en col C (h.codigo), no col D (h.nombre='admin')
+        const clienteRaw = esProducto
+          ? (String(h.codigo || h.nombre || '') || 'Venta directa')
+          : String(h.nombre || h.clienteNombre || '');
+        const cliente = clienteDisplay(clienteRaw, String(h.codigo || h.code || '')) || '—';
+        const servicio = String(h.servicio || '—');
+        const hora = String(h.hora || '');
+        const metodo = String(h.metodoPago || 'Efectivo');
+        const itemIdx = window._historialItems.length;
+        window._historialItems.push({ ...h, _idx: itemIdx });
+
+        if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, count: 0, staff: {} };
+        if (!porDia[diaN].staff[staffDisplay]) porDia[diaN].staff[staffDisplay] = { nombre: staffDisplay, total: 0, servicios: [] };
+        porDia[diaN].staff[staffDisplay].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
+        porDia[diaN].staff[staffDisplay].total += valor;
+        porDia[diaN].total += valor;
+        porDia[diaN].count++;
+        totalSemana += valor;
+        totalServicios++;
+      });
+
+      // Stats de la SEMANA (por defecto). Al desplegar un día, las tarjetas muestran ese día.
+      window._histSemana = { count: totalServicios, total: totalSemana };
+      window._histDias = {};
+      document.getElementById('historyTotalCount').textContent = totalServicios;
+      document.getElementById('historyTotalAmount').textContent = '$' + totalSemana.toFixed(0);
+      document.getElementById('historyAvgAmount').textContent = totalServicios > 0 ? '$' + (totalSemana/totalServicios).toFixed(0) : '$0';
+      document.getElementById('historyCount').textContent = totalServicios;
+      var _scopeEl0 = document.getElementById('historyStatScope');
+      if (_scopeEl0) _scopeEl0.textContent = scopeLabel;
+
+      const dias = Object.values(porDia).sort(function(a,b){ return a.sortKey - b.sortKey; });
+
+      if (dias.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin cobros esta semana</div>';
+        return;
+      }
+
+      // ── HOY: desglose por STAFF directo (como la vista del owner, sin comisiones) ──
+      if (esHoy) {
+        const _hoyNom = DIAS_LABEL[new Date().getDay()];
+        const staffHoy = porDia[_hoyNom] ? Object.values(porDia[_hoyNom].staff).sort(function(a,b){ return b.total - a.total; }) : [];
+        if (!staffHoy.length) {
+          list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-faint);">Sin servicios cobrados hoy</div>';
+          return;
         }
-        totalCobrado += monto;
-        return Object.assign({}, l, { monto: monto, comision: comision });
-      });
+        list.innerHTML = staffHoy.map(function(s, si) {
+          const canDelete = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
+          return '<div style="margin-bottom:6px;">' +
+            '<div onclick="toggleHistStaff(0,' + si + ')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+              '<div><div style="font-size:15px;font-weight:700;">' + s.nombre + '</div>' +
+              '<div style="font-size:11px;color:var(--ink-soft);">' + s.servicios.length + ' servicio' + (s.servicios.length!==1?'s':'') + '</div></div>' +
+              '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<div style="font-size:16px;font-weight:800;">$' + s.total.toFixed(0) + '</div>' +
+                '<div id="arrow-staff-0-' + si + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>' +
+              '</div>' +
+            '</div>' +
+            '<div id="staff-hist-0-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
+              s.servicios.map(function(sv, svi) {
+                return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                  '<div style="flex:1;">' +
+                    '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
+                    '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                  '</div>' +
+                  '<div style="display:flex;align-items:center;gap:8px;">' +
+                    '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                    (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
+                  '</div>' +
+                '</div>';
+              }).join('') +
+            '</div>' +
+          '</div>';
+        }).join('');
+        return;
+      }
 
-      ws.getRange(rowNum, 6).setValue('Completado');
-      ws.getRange(rowNum, 9).setValue(metodoPago);
-      ws.getRange(rowNum, 10).setValue(hora);
-      ws.getRange(rowNum, 37).setValue(totalCobrado);
-      // espejo Lineas: cobro del TM → cierra TODAS sus líneas (promoRef "id:*") a 'cobrado'
-      try { marcarLineasPorTicketMulti(String(rows[i][0]||''), metodoPago); } catch(eLn){}
+      // Incluir todos los días de la semana aunque esten vacios
+      const todosLosDias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+      const hoyNombre = DIAS_LABEL[new Date().getDay()];
 
-      const wsCierre = getSheet('CierresPagos');
-      const wsHist   = getSheet('HistorialOwner');
+      list.innerHTML = todosLosDias.map(function(diaNombre, di) {
+        const diaData = porDia[diaNombre];
+        const esHoy = diaNombre === hoyNombre && semanaOffset === 0;
+        const label = diaNombre + (esHoy ? ' (HOY)' : '');
+        const totalDia = diaData ? diaData.total : 0;
+        const countDia = diaData ? diaData.count : 0;
+        const staffList = diaData ? Object.values(diaData.staff) : [];
+        // Guardar el cuadre de cada día para mostrarlo en las tarjetas de arriba al desplegarlo
+        window._histDias[di] = { count: countDia, total: totalDia, label: label };
 
-      // Comision + historial por cada area/staff que participó
-      lineasConComision.forEach(function (l, idx) {
-        try {
-          wsCierre.appendRow([now, hora, nombreCliente, l.staff, l.servicio, l.monto, metodoPago, idTM + '-A' + (idx + 1)]);
-        } catch (eCierre) {}
-        try {
-          wsHist.appendRow([fecha, hora, codigoCliente, nombreCliente, idTM, l.servicio, l.area, l.staff, l.monto, l.comision, metodoPago]);
-        } catch (eHist) {}
-        try { if (l.staff && l.monto > 0) updateComision(l.staff, l.monto); } catch (eC) {}
-      });
+        return '<div style="margin-bottom:6px;">' +
+          '<div onclick="toggleHistDia(' + di + ')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card);">' +
+            '<div style="font-size:15px;font-weight:700;">' + label + '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px;">' +
+              '<div style="font-size:16px;font-weight:800;color:' + (totalDia > 0 ? 'var(--ink)' : 'var(--ink-faint)') + ';">$' + totalDia.toFixed(0) + '</div>' +
+              '<div id="arrow-dia-' + di + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>' +
+            '</div>' +
+          '</div>' +
+          '<div id="dia-hist-' + di + '" style="display:none;padding:0 4px;">' +
+            (staffList.length === 0
+              ? '<div style="padding:10px 12px;font-size:12px;color:var(--ink-faint);">Sin servicios</div>'
+              : staffList.map(function(s, si) {
+                  return '<div style="margin-top:4px;">' +
+                    '<div onclick="toggleHistStaff(' + di + ',' + si + ')" style="background:var(--chip);border-radius:12px;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;">' +
+                      '<div style="font-size:13px;font-weight:700;">' + s.nombre + '</div>' +
+                      '<div style="display:flex;align-items:center;gap:8px;">' +
+                        '<div style="font-size:14px;font-weight:800;">$' + s.total.toFixed(0) + '</div>' +
+                        '<div id="arrow-staff-' + di + '-' + si + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>' +
+                      '</div>' +
+                    '</div>' +
+                    '<div id="staff-hist-' + di + '-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
+                      s.servicios.map(function(sv, svi) {
+                        const canDelete = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
+                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                          '<div style="flex:1;">' +
+                            '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
+                            '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                          '</div>' +
+                          '<div style="display:flex;align-items:center;gap:8px;">' +
+                            '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                            (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
+                          '</div>' +
+                        '</div>';
+                      }).join('') +
+                    '</div>' +
+                  '</div>';
+                }).join('')
+            ) +
+          '</div>' +
+        '</div>';
+      }).join('');
 
-      return { success: true, totalCobrado: totalCobrado };
+    } catch(err) {
+      console.error('Error historial:', err);
+      document.getElementById('historyList').innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Error cargando datos</div>';
     }
-    return { success: false, message: 'Ticket no encontrado' };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// ============================================
-// PUSH NOTIFICATIONS (Web Push / VAPID)
-// ============================================
-
-// ── Credenciales FCM V1 — desde Propiedades del script (NO en el código) ──────
-// Configurar UNA sola vez en: Configuración del proyecto (⚙) → Propiedades del script:
-//   FCM_PROJECT_ID    = nexserv-7e1bb
-//   FCM_CLIENT_EMAIL  = firebase-adminsdk-fbsvc@nexserv-7e1bb.iam.gserviceaccount.com
-//   FCM_PRIVATE_KEY   = la clave privada en UNA sola línea con los \n escapados
-//                       (copiala de tu versión anterior: lo que estaba entre las comillas)
-function _fcmCreds_() {
-  var p = PropertiesService.getScriptProperties();
-  var projectId   = p.getProperty('FCM_PROJECT_ID');
-  var clientEmail = p.getProperty('FCM_CLIENT_EMAIL');
-  var privateKey  = p.getProperty('FCM_PRIVATE_KEY');
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Faltan credenciales FCM en Propiedades del script (FCM_PROJECT_ID / FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY). Configuralas en la Configuración del proyecto.');
   }
-  // El private key admite \n escapados (una línea) o saltos reales.
-  if (privateKey.indexOf('\\n') !== -1) privateKey = privateKey.replace(/\\n/g, '\n');
-  return { projectId: projectId, clientEmail: clientEmail, privateKey: privateKey };
-}
 
-function getFCMAccessToken() {
-  // Caché simple: reusar el token por 50 minutos
-  var cached = PropertiesService.getScriptProperties().getProperty('_fcm_token_cache');
-  if (cached) {
+  // Refresca las 3 tarjetas de arriba según el día desplegado (o la semana si no hay ninguno)
+  function _histRefrescarTarjetas() {
+    var diAbierto = -1;
+    for (var di = 0; di < 6; di++) {
+      var dd = document.getElementById('dia-hist-' + di);
+      if (dd && dd.style.display !== 'none') { diAbierto = di; break; }
+    }
+    var c  = document.getElementById('historyTotalCount');
+    var t  = document.getElementById('historyTotalAmount');
+    var av = document.getElementById('historyAvgAmount');
+    var sc = document.getElementById('historyStatScope');
+    var data, scope;
+    if (diAbierto >= 0 && window._histDias && window._histDias[diAbierto]) {
+      data  = window._histDias[diAbierto];
+      scope = data.label || 'Día';
+    } else {
+      data  = window._histSemana || { count: 0, total: 0 };
+      scope = window._histScopeLabel || 'Esta semana';
+    }
+    if (c)  c.textContent  = data.count || 0;
+    if (t)  t.textContent  = '$' + Number(data.total || 0).toFixed(0);
+    if (av) av.textContent = (data.count > 0) ? '$' + (data.total / data.count).toFixed(0) : '$0';
+    if (sc) sc.textContent = scope;
+  }
+  window._histRefrescarTarjetas = _histRefrescarTarjetas;
+
+  function toggleHistDia(di) {
+    var d = document.getElementById('dia-hist-' + di);
+    var a = document.getElementById('arrow-dia-' + di);
+    if (!d) return;
+    var open = d.style.display !== 'none';
+    // Acordeón: al abrir un día se cierran los demás, para que las tarjetas de arriba
+    // muestren el cuadre SOLO de ese día. Al cerrarlo, vuelven al total de la semana.
+    if (!open) {
+      for (var od = 0; od < 6; od++) {
+        if (od === di) continue;
+        var odd = document.getElementById('dia-hist-' + od);
+        var oarr = document.getElementById('arrow-dia-' + od);
+        if (odd) odd.style.display = 'none';
+        if (oarr) oarr.style.transform = '';
+      }
+    }
+    d.style.display = open ? 'none' : 'block';
+    if (a) a.style.transform = open ? '' : 'rotate(180deg)';
+    _histRefrescarTarjetas();
+  }
+
+  function toggleHistStaff(di, si) {
+    var d = document.getElementById('staff-hist-' + di + '-' + si);
+    var a = document.getElementById('arrow-staff-' + di + '-' + si);
+    if (!d) return;
+    var open = d.style.display !== 'none';
+    d.style.display = open ? 'none' : 'block';
+    if (a) a.style.transform = open ? '' : 'rotate(180deg)';
+  }
+
+    async function renderAuthorizations() {
+    console.log('🔍 renderAuthorizations called');
     try {
-      var c = JSON.parse(cached);
-      if (c.exp > Math.floor(Date.now()/1000) + 300) return c.token;
-    } catch(e) {}
+      // Cargar autorizaciones desde el backend
+      console.log('📡 Calling apiGet(getAutorizaciones)...');
+      const result = await apiGet('getAutorizaciones');
+      
+      console.log('📥 Backend response:', result);
+      
+      if (!result.success) {
+        console.error('❌ Error cargando autorizaciones:', result.message);
+        document.getElementById('authorizationsSection').style.display = 'none';
+        return;
+      }
+      
+      const requests = result.autorizaciones || [];
+      console.log('📋 Total autorizaciones recibidas:', requests.length);
+      console.log('📋 Autorizaciones:', requests);
+      
+      // Mikaela solo ve los PENDIENTES para aprobar/rechazar
+      const pendingRequests = requests.filter(r => r.estado === 'pendiente');
+      console.log('⏳ Autorizaciones PENDIENTES:', pendingRequests.length);
+      console.log('⏳ Pendientes:', pendingRequests);
+      
+      const authSection = document.getElementById('authorizationsSection');
+      const authList = document.getElementById('authorizationsList');
+      const authCount = document.getElementById('authCount');
+      
+      if (pendingRequests.length === 0) {
+        authSection.style.display = 'none';
+        return;
+      }
+      
+      authSection.style.display = 'block';
+      authCount.textContent = pendingRequests.length;
+      
+      authList.innerHTML = pendingRequests.map((req, idx) => `
+        <div class="card" style="background: linear-gradient(135deg, #fff3cd 0%, #ffe8a1 100%); border: 2px solid #ffc107; padding: 14px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <div style="font-size: 16px; font-weight: 800; color: #856404;">${req.clienteNombre}</div>
+              <div style="font-size: 12px; color: #856404; margin-top: 2px;">Solicitado por: <strong>${req.staffNombre}</strong> · ${req.fecha}</div>
+            </div>
+            <div style="background: #ff9800; color: white; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 100px;">PENDIENTE</div>
+          </div>
+          
+          <div style="background: white; border-radius: 12px; padding: 12px; margin-bottom: 12px;">
+            <div style="font-size: 13px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">${req.servicioNombre}</div>
+            <div style="font-size: 11px; color: #666; margin-bottom: 6px;">${req.servicioArea} · <strong style="font-size: 14px; color: #28a745;">$${req.servicioPrecio}</strong></div>
+            <div style="background: #f8f9fa; border-left: 3px solid #ffc107; padding: 8px 10px; border-radius: 6px; margin-top: 8px;">
+              <div style="font-size: 10px; font-weight: 600; color: #856404; margin-bottom: 3px;">💬 NOTA DEL STAFF:</div>
+              <div style="font-size: 11px; color: #333; font-style: italic;">"${req.nota || 'Sin nota'}"</div>
+            </div>
+          </div>
+          
+          <div style="display: flex; gap: 8px;">
+            <button data-action="approve-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error('Error rendering authorizations:', err);
+      document.getElementById('authorizationsSection').style.display = 'none';
+    }
   }
-  var creds = _fcmCreds_();
-  var now = Math.floor(Date.now() / 1000);
-  var header  = Utilities.base64EncodeWebSafe(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).replace(/=+$/, '');
-  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({
-    iss: creds.clientEmail,
-    sub: creds.clientEmail,
-    aud: 'https://oauth2.googleapis.com/token',
-    iat: now,
-    exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/firebase.messaging'
-  })).replace(/=+$/, '');
+  
+  window.closeResumenSemana = closeResumenSemana;
 
-  var signInput = header + '.' + payload;
-  var signature = Utilities.base64EncodeWebSafe(
-    Utilities.computeRsaSha256Signature(signInput, creds.privateKey)
-  ).replace(/=+$/, '');
+  // ── Módulo Inventario Staff (SIRA Engine — Fase 1) ──
+  // ══════════════════════════════════════════════════════════════
+  // SIRA ENGINE — Módulo Inventario integrado en NexServ
+  // ══════════════════════════════════════════════════════════════
+  var SIRA_URL = 'https://script.google.com/macros/s/AKfycbzyEBabD-2BXhSd1tmIXpWXwzHPWE5CoF4VcGD1c5ILkACl8FmWbQRTL0juM70sxZnw/exec';
+  var SIRA_TOKEN = 'sira_2026_nexserv_bridge_7f4c9a';
 
-  var jwt = signInput + '.' + signature;
+  async function _siraPost(action, data) {
+    data.token = SIRA_TOKEN;
+    data.action = action;
+    try {
+      // Google Apps Script requiere seguir redirects con credentials omit
+      var r = await fetch(SIRA_URL, {
+        method: 'POST',
+        redirect: 'follow',
+        headers: { 'Content-Type': 'text/plain' },  // GAS acepta text/plain para evitar preflight
+        body: JSON.stringify(data)
+      });
+      if (!r.ok) {
+        // Intentar leer el cuerpo del error
+        var errText = '';
+        try { errText = await r.text(); } catch(_){}
+        return { ok: false, success: false, error: 'HTTP ' + r.status + ': ' + errText.substring(0,100) };
+      }
+      return await r.json();
+    } catch(e) { return { success: false, ok: false, error: String(e) }; }
+  }
 
-  var tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    contentType: 'application/x-www-form-urlencoded',
-    payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt,
-    muteHttpExceptions: true
-  });
-
-  var tokenData = JSON.parse(tokenResp.getContentText());
-  if (!tokenData.access_token) throw new Error('Token error: ' + tokenResp.getContentText());
-  // Guardar en caché por 50 minutos
-  try {
-    PropertiesService.getScriptProperties().setProperty('_fcm_token_cache', JSON.stringify({
-      token: tokenData.access_token,
-      exp: Math.floor(Date.now()/1000) + 3000
-    }));
-  } catch(e) {}
-  return tokenData.access_token;
-}
-
-function handleGuardarPushSub(data) {
-  // Nuevo formato: se guarda el token FCM (string). Compat: si llega 'subscription', se intenta igual.
-  var token = data.token || data.subscription;
-  if (!data.staffKey || !token) return { success: false, error: 'Datos incompletos' };
-  PropertiesService.getScriptProperties().setProperty(data.staffKey, token);
-  Logger.log('[Push] Token guardado para: ' + data.staffName + ' key=' + data.staffKey);
-  return { success: true };
-}
-
-// Diagnóstico: ¿qué staff tienen la app/notificaciones activadas? (no expone el token)
-function handleListarPushSubs() {
-  var props = PropertiesService.getScriptProperties();
-  var mapa = {
-    'push_maria': 'María', 'push_keyla': 'Keyla', 'push_lesly': 'Lesly', 'push_rosa': 'Rosa',
-    'push_yadira': 'Yadira', 'push_diana': 'Diana', 'push_laura': 'Laura',
-    'push_mikaela': prop_('ADMIN_NOMBRE') || 'Admin', 'push_owner': prop_('OWNER_NOMBRE') || 'Owner'
+  window.abrirInventarioStaff = function() {
+    var user = window.currentUser;
+    if (!user) return;
+    var screen = document.getElementById('staffHome');
+    if (!screen) return;
+    // Guardar nav antes de reemplazar
+    var navEl = screen.querySelector('nav.nav');
+    var navHtml = navEl ? navEl.outerHTML : '';
+    window._siraBackup = screen.innerHTML;
+    window._siraScreenId = 'staffHome';
+    // Marcar que SIRA está activo para que loadStaffHome no crashee
+    window._siraActivo = true;
+    var area = String(user.area || '').toLowerCase();
+    var esPestanas = area.indexOf('pest') >= 0;
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioStaff()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraStaffContent">' + _siraRenderSecciones(esPestanas) + '</div>'
+      + navHtml;
+    // Cargar historial diario desde SIRA después de renderizar
+    setTimeout(function() { if (typeof _siraCargarMovsHoy === 'function') _siraCargarMovsHoy(); }, 200);
   };
-  var estado = {};
-  Object.keys(mapa).forEach(function (k) {
-    var t = props.getProperty(k);
-    estado[mapa[k]] = !!(t && String(t).length > 10);
-  });
-  return { success: true, estado: estado };
-}
 
-function handleEnviarPushStaff(data) {
-  if (!data.staffKeys || !data.titulo) return { success: false, error: 'Datos incompletos' };
+  function _siraRenderSecciones(esPestanas) {
+    // SVGs grandes para las cards
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_B = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M18.5 3h-13L3 14.5V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5.5L18.5 3Zm-1.74 3-1.5 7H8.74l-1.5-7h9.52ZM5 20v-4.5l.5-2.5h13l.5 2.5V20H5Z"/></svg>';
+    var SVG_K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5ZM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
 
-  var props = PropertiesService.getScriptProperties();
-  var enviados = 0;
-  var errores = [];
+    function card(svg, titulo, desc, tipo, bgCard, colorIcon) {
+      return '<button data-sira="' + tipo + '" onclick="_siraAccion(this.dataset.sira)" style="'
+        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
+        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
+        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
+        + '</button>';
+    }
 
-  // Obtener access token OAuth2 para FCM V1
-  var accessToken;
-  try {
-    accessToken = getFCMAccessToken();
-  } catch(e) {
-    return { success: false, error: 'Error obteniendo token FCM: ' + e.message };
+    var html =
+      card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',      'entrada', '#edf7f1', '#2d6a4f')
+      + card(SVG_S, 'Registrar Salida', 'Usé un producto en un servicio',        'salida',  '#f5f0e8', '#8b7355')
+      + card(SVG_B, 'Registrar Bebida', 'Café o té servido a una clienta',       'bebida',  '#fdf8ed', '#a07830');
+
+    if (esPestanas) {
+      html += card(SVG_K, 'Kit Lashista', 'Frasco + Funda + Tarjeta pestaña', 'kit', '#eef2ff', '#5b4fd4');
+    }
+
+    // Historial diario de movimientos de esta staff
+    var histHtml = '<div style="margin-top:24px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial diario</div>'
+      + '<div id="siraMovHoy"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
+      + '</div>';
+
+    return html + '<div id="siraFormContainer"></div><div id="siraFeedback"></div>' + histHtml;
   }
 
-  var fcmUrl = 'https://fcm.googleapis.com/v1/projects/' + _fcmCreds_().projectId + '/messages:send';
+  // Mapa de colores por tipo para los acordeones
+  var SIRA_COLORS = {
+    entrada: { bg:'#edf7f1', color:'#2d6a4f', btnBg:'#2d6a4f' },
+    salida:  { bg:'#f5f0e8', color:'#8b7355', btnBg:'#8b7355' },
+    bebida:  { bg:'#fdf8ed', color:'#a07830', btnBg:'#a07830' },
+    kit:     { bg:'#eef2ff', color:'#5b4fd4', btnBg:'#5b4fd4' }
+  };
 
-  data.staffKeys.forEach(function(key) {
-    var subStr = props.getProperty(key);
-    if (!subStr) {
-      errores.push(key + ': sin suscripción');
+  // Cache de productos de SIRA
+  window._siraProductos = null;
+
+  async function _siraCargarProductos() {
+    if (window._siraProductos) return window._siraProductos;
+    try {
+      var r = await fetch(SIRA_URL + '?action=getProductos&token=' + SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      window._siraProductos = (data.ok && data.productos) ? data.productos : [];
+    } catch(e) { window._siraProductos = []; }
+    return window._siraProductos;
+  }
+
+  window._siraAccion = function(tipo) {
+    var panelId = 'siraPanel_' + tipo;
+    var existing = document.getElementById(panelId);
+    if (existing) {
+      existing.style.maxHeight = '0';
+      existing.style.opacity = '0';
+      setTimeout(function() { if (existing.parentNode) existing.parentNode.removeChild(existing); }, 250);
+      return;
+    }
+    ['entrada','salida','bebida','kit'].forEach(function(t) {
+      var p = document.getElementById('siraPanel_' + t);
+      if (p && t !== tipo) { p.style.maxHeight='0'; p.style.opacity='0'; setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},200); }
+    });
+
+    var col = { entrada:{btn:'#2d6a4f'}, salida:{btn:'#8b7355'}, bebida:{btn:'#a07830'}, kit:{btn:'#5b4fd4'} }[tipo] || {btn:'#1a1a1a'};
+    var panel = document.createElement('div');
+    panel.id = panelId;
+    panel.style.cssText = 'overflow:hidden;max-height:0;opacity:0;transition:max-height .3s ease,opacity .25s ease;margin-bottom:10px;';
+    panel.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);"><div style="text-align:center;padding:16px;color:var(--ink-soft);">Cargando…</div></div>';
+
+    var cardBtn = document.querySelector('[data-sira="' + tipo + '"]');
+    if (cardBtn && cardBtn.parentNode) {
+      cardBtn.parentNode.insertBefore(panel, cardBtn.nextSibling);
+    } else {
+      var fb = document.getElementById('siraFormContainer');
+      if (fb) fb.appendChild(panel);
+    }
+
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        panel.style.maxHeight = '800px';
+        panel.style.opacity = '1';
+        setTimeout(function() { panel.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 150);
+      });
+    });
+
+    // Cargar productos y renderizar el formulario correcto
+    _siraCargarProductos().then(function(prods) {
+      _siraRenderForm(panel, tipo, prods, col.btn);
+    });
+  };
+
+  function _siraRenderForm(panel, tipo, prods, btnColor) {
+    var user = window.currentUser;
+    var staffNombre = user ? user.name : 'Staff';
+    var areas = ['Cejas','Pestañas','Depilaciones','Limpieza Facial','Coffee','Local','General'];
+
+    // Filtrar productos por tipo
+    var prodsFiltrados = tipo === 'bebida'
+      ? prods.filter(function(p){ return String(p.area||'').toLowerCase().indexOf('coffee') >= 0 || String(p.area||'').toLowerCase().indexOf('bebida') >= 0; })
+      : tipo === 'kit'
+      ? prods.filter(function(p){ return String(p.area||'').toLowerCase().indexOf('pesta') >= 0; })
+      : prods;
+
+    var html = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:18px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08);">';
+    var labels = { entrada:'Registrar Entrada', salida:'Registrar Salida', bebida:'Registrar Bebida', kit:'Kit Lashista' };
+    html += '<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:16px;">' + labels[tipo] + '</div>';
+
+    if (tipo === 'kit') {
+      // Kit: mostrar componentes y selector de cantidad
+      html += '<div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Frasco para shampo · Funda kit pestaña · Tarjeta pestaña</div>';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">¿Cuántos kits?</div>';
+      html += '<div style="display:flex;gap:8px;margin-bottom:16px;">';
+      [1,2,3,4,5].forEach(function(n){
+        html += '<button onclick="_siraSelectKit(' + n + ')" id="siraKitBtn' + n + '" style="flex:1;padding:14px 0;border-radius:12px;border:1.5px solid var(--line,#eee);background:var(--bg,#f8f8f6);font-family:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--ink);">' + n + '</button>';
+      });
+      html += '</div>';
+      html += '<input type="hidden" id="siraKitCantidad" value="">';
+      html += '<button onclick="_siraEnviar(\x27kit\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar kit</button>';
+
+    } else if (tipo === 'bebida') {
+      // Combos de bebida — select desplegable
+      var COMBOS_BEBIDA = ['Capuccino frío','Capuccino caliente','Café negro','Té de manzanilla c/m','Té de manzanilla','Té de anís','Té de frutos rojos','Té de frutos rojos c/J','Té relajante','Té de manzana con canela','Té de hierva luisa','Té de jamaica','Champagne','Vino tinto','Vino rosado'];
+      html += '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Cada combo descuenta bebida + servilleta + galleta</div>';
+      html += '<select id="siraProducto" onchange="_siraBebidaSelect(this)" style="width:100%;padding:13px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;margin-bottom:14px;">';
+      html += '<option value="">— Seleccionar combo —</option>';
+      COMBOS_BEBIDA.forEach(function(b){ html += '<option value="' + b + '">' + b + '</option>'; });
+      html += '</select>';
+      html += '<button onclick="_siraEnviar(\x27bebida\x27)" id="siraEnviarBtn" style="width:100%;padding:14px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;opacity:.4;" disabled>Confirmar combo</button>';
+    } else {
+      // Entrada / Salida: búsqueda de producto + área + contador
+      html += '<div style="margin-bottom:12px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Producto / Insumo</div>';
+      html += '<input id="siraProductoBuscar" placeholder="Buscar producto..." oninput="_siraFiltrarProds(this.value)" style="width:100%;padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px 12px 0 0;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      html += '<div id="siraProdLista" style="border:1.5px solid var(--line,#eee);border-top:none;border-radius:0 0 12px 12px;background:var(--bg-card,#fff);max-height:160px;overflow-y:auto;">';
+      // Mostrar todos al inicio
+      prodsFiltrados.slice(0, 15).forEach(function(p){
+        html += '<div onclick="_siraSelProd(\'' + p.nombre.replace(/'/g,"&#39;") + '\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line,#eee);color:var(--ink);" onmouseover="this.style.background=\'var(--bg,#f8f8f6)\'" onmouseout="this.style.background=\'\'">' + p.nombre + '<span style="font-size:11px;color:var(--ink-soft);margin-left:8px;">' + (p.area||'') + '</span></div>';
+      });
+      html += '</div>';
+      html += '<input type="hidden" id="siraProducto" value="">';
+      html += '</div>';
+
+      // Cantidad manual + Área en una sola fila
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="display:flex;gap:10px;align-items:flex-end;">';
+      // Cantidad (input numérico manual, sin +/-)
+      html += '<div style="flex:0 0 90px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Cantidad</div>';
+      html += '<input type="number" id="siraCantidad" value="1" min="1" max="999" inputmode="numeric" style="width:100%;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:18px;font-weight:800;background:var(--bg,#f8f8f6);color:var(--ink);text-align:center;box-sizing:border-box;">';
+      html += '</div>';
+      // Área (dropdown, ocupa el resto)
+      html += '<div style="flex:1;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Área</div>';
+      html += '<select id="siraArea" style="width:100%;padding:12px 10px;border:1.5px solid var(--line,#eee);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg,#f8f8f6);color:var(--ink);box-sizing:border-box;">';
+      // Auto-seleccionar área según la staff:
+      // bebida → Coffee siempre | kit → área staff | entrada/salida → área staff
+      var _defaultArea = tipo === 'bebida' ? 'Coffee'
+        : (function() {
+            var ua = String(user ? user.area || '' : '').toLowerCase();
+            if (ua.indexOf('pest') >= 0 || ua.indexOf('lifting') >= 0 || ua.indexOf('retiro') >= 0) return 'Pestañas';
+            if (ua.indexOf('facial') >= 0 || ua.indexOf('limpieza') >= 0) return 'Limpieza Facial';
+            if (ua.indexOf('coffee') >= 0) return 'Coffee';
+            if (ua.indexOf('local') >= 0) return 'Local';
+            if (ua.indexOf('depil') >= 0) return 'Depilaciones';
+            if (ua.indexOf('ceja') >= 0) return 'Cejas';
+            return 'Coffee'; // fallback
+          })();
+      areas.forEach(function(a){
+        html += '<option value="' + a + '"' + (a === _defaultArea ? ' selected' : '') + '>' + a + '</option>';
+      });
+      html += '</select>';
+      html += '</div>';
+      html += '</div></div>';
+
+      // Responsable (auto)
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;margin-bottom:7px;">Responsable</div>';
+      html += '<div style="padding:12px 14px;border:1.5px solid var(--line,#eee);border-radius:12px;background:var(--bg,#f8f8f6);font-size:15px;color:var(--ink);">' + staffNombre + '</div>';
+      html += '<input type="hidden" id="siraResponsable" value="' + staffNombre + '">';
+      html += '</div>';
+
+      html += '<button onclick="_siraEnviar(\x27' + tipo + '\x27)" id="siraEnviarBtn" style="width:100%;padding:15px;background:' + btnColor + ';color:#fff;border:none;border-radius:var(--radius-pill,24px);font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;">Confirmar ' + (tipo==='entrada'?'entrada':'salida') + '</button>';
+    }
+
+    // Cancelar
+      html += '<button data-sira-cancel="' + tipo + '" style="width:100%;padding:12px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-soft);cursor:pointer;margin-top:6px;">Cancelar</button>';
+    html += '</div>';
+    panel.innerHTML = html;
+
+    // Guardar productos para filtrado
+    window._siraProdsActuales = prodsFiltrados;
+  }
+
+  // Filtrar productos mientras se escribe
+  window._siraFiltrarProds = function(q) {
+    var lista = document.getElementById('siraProdLista');
+    if (!lista) return;
+    var prods = window._siraProdsActuales || [];
+    var filtrados = q.length < 1 ? prods.slice(0,15) : prods.filter(function(p){ return p.nombre.toLowerCase().indexOf(q.toLowerCase()) >= 0; });
+    lista.innerHTML = filtrados.length === 0
+      ? '<div style="padding:10px 14px;font-size:13px;color:var(--ink-soft);">Sin resultados</div>'
+      : filtrados.slice(0,15).map(function(p){
+          return '<div onclick="_siraSelProd(\'' + p.nombre.replace(/'/g,"&#39;") + '\')" style="padding:10px 14px;cursor:pointer;font-size:14px;border-bottom:1px solid var(--line,#eee);color:var(--ink);">' + p.nombre + '<span style="font-size:11px;color:var(--ink-soft);margin-left:8px;">' + (p.area||'') + '</span></div>';
+        }).join('');
+  };
+
+  window._siraSelProd = function(nombre) {
+    var inp = document.getElementById('siraProducto');
+    var buscar = document.getElementById('siraProductoBuscar');
+    var lista = document.getElementById('siraProdLista');
+    if (inp) inp.value = nombre;
+    if (buscar) buscar.value = nombre;
+    if (lista) lista.style.display = 'none';
+    // Habilitar botón Confirmar visualmente (feedback claro para la staff)
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.style.opacity = '1'; btn.style.transform = 'scale(1.01)'; setTimeout(function(){ if(btn) btn.style.transform=''; }, 200); }
+  };
+
+  window._siraSelectKit = function(n) {
+    [1,2,3,4,5].forEach(function(i) {
+      var b = document.getElementById('siraKitBtn' + i);
+      if (b) { b.style.background = i===n?'#5b4fd4':'var(--bg,#f8f8f6)'; b.style.color=i===n?'#fff':'var(--ink)'; b.style.borderColor=i===n?'#5b4fd4':'var(--line,#eee)'; }
+    });
+    var hid = document.getElementById('siraKitCantidad');
+    if (hid) hid.value = n;
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled=false; btn.style.opacity='1'; }
+  };
+
+  window._siraBebidaSelect = function(sel) {
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled = !sel.value; btn.style.opacity = sel.value ? '1' : '.4'; }
+  };
+
+  window._siraSelectBebida = function(el) {
+    var nombre = el.dataset.beb || '';
+    el.parentNode.querySelectorAll('button').forEach(function(b){ b.style.background='var(--bg,#f8f8f6)'; b.style.color='var(--ink)'; b.style.borderColor='var(--line,#eee)'; });
+    el.style.background='#a07830'; el.style.color='#fff'; el.style.borderColor='#a07830';
+    var inp = document.getElementById('siraProducto');
+    if (inp) inp.value = nombre;
+    var btn = document.getElementById('siraEnviarBtn');
+    if (btn) { btn.disabled=false; btn.style.opacity='1'; }
+  };
+
+  window._siraCambiarCantidad = function(delta) {
+    // _siraCambiarCantidad ya no actúa — la cantidad se ingresa directo en el input numérico
+    var hid = document.getElementById('siraCantidad');
+    if (!hid) return;
+    var n = Math.max(1, parseInt(hid.value||'1',10)+delta);
+    hid.value = n;
+  };
+
+  window._siraEnviar = async function(tipo) {
+    var user = window.currentUser;
+    var producto, cantidad, area, responsable;
+
+    if (tipo === 'kit') {
+      cantidad   = parseInt(document.getElementById('siraKitCantidad')?.value || '0', 10);
+      if (!cantidad) { if (typeof showToast==='function') showToast('Selecciona la cantidad de kits'); return; }
+      // Registrar los 3 componentes del kit
+      var kitItems = ['Frasco para shampo','Funda kit pestaña','Tarjeta pestaña'];
+      var btn2 = document.getElementById('siraEnviarBtn');
+      if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
+      var errores = 0;
+      for (var ki = 0; ki < kitItems.length; ki++) {
+        var rk = await _siraPost('movimientoNexserv', {
+          tipo:'salida', producto:kitItems[ki], cantidad:cantidad,
+          responsable: user ? user.name : 'Staff',
+          area: user ? user.area : 'Pestañas', nota:'Kit Lashista'
+        });
+        if (!rk || (!rk.ok && !rk.success)) errores++;
+      }
+      if (errores === 0) {
+        var p = document.getElementById('siraPanel_kit');
+        if (p) { p.style.maxHeight='0'; setTimeout(function(){if(p.parentNode)p.parentNode.removeChild(p);},300); }
+        if (typeof showToast==='function') showToast('✅ Kit Lashista ×' + cantidad + ' registrado en SIRA');
+        // Agregar kits al historial local
+        if (typeof _siraAgregarMovLocal === 'function') {
+          _siraAgregarMovLocal('salida', 'Frasco para shampo', cantidad, staffNomK, area);
+          _siraAgregarMovLocal('salida', 'Funda kit pestaña', cantidad, staffNomK, area);
+          _siraAgregarMovLocal('salida', 'Tarjeta pestaña', cantidad, staffNomK, area);
+        }
+        window._siraProductos = null; // invalidar cache
+      } else {
+        if (btn2) { btn2.textContent='Confirmar kit'; btn2.disabled=false; btn2.style.opacity='1'; }
+        if (typeof showToast==='function') showToast('⚠ Error al registrar algunos componentes del kit');
+      }
       return;
     }
 
-    try {
-      // Nuevo formato: subStr ES el token FCM. Compat: si quedó una suscripción vieja (JSON), se descarta.
-      var fcmToken = subStr;
-      if (subStr.charAt(0) === '{') {
-        errores.push(key + ': suscripción antigua, re-suscribir (volver a entrar a la app)');
-        return;
+    producto   = (document.getElementById('siraProducto')?.value || '').trim();
+    cantidad   = parseInt(document.getElementById('siraCantidad')?.value || '1', 10);
+    area       = (document.getElementById('siraArea')?.value || (user ? user.area : '')).trim();
+    responsable= (document.getElementById('siraResponsable')?.value || (user ? user.name : 'Staff')).trim();
+
+    if (tipo === 'bebida') {
+      if (!producto) { if (typeof showToast==='function') showToast('Selecciona un combo'); return; }
+      var btn2b = document.getElementById('siraEnviarBtn');
+      if (btn2b) { btn2b.textContent='Registrando…'; btn2b.disabled=true; }
+      var COMBOS_MAP = {
+        'Capuccino frío':         ['Capuccino frío','Servilleta logo','Galleta'],
+        'Capuccino caliente':     ['Capuccino caliente','Servilleta logo','Galleta'],
+        'Café negro':             ['Café negro','Servilleta logo','Galleta'],
+        'Té de manzanilla c/m':  ['Té de manzanilla c/m','Servilleta logo','Galleta'],
+        'Té de manzanilla':      ['Té de manzanilla','Servilleta logo','Galleta'],
+        'Té de anís':            ['Té de anís','Servilleta logo','Galleta'],
+        'Té de frutos rojos':    ['Té de frutos rojos','Servilleta logo','Galleta'],
+        'Té de frutos rojos c/J':['Té de frutos rojos c/J','Servilleta logo','Galleta'],
+        'Té relajante':          ['Té relajante','Servilleta logo','Galleta'],
+        'Té de manzana con canela':['Té de manzana con canela','Servilleta logo','Galleta'],
+        'Té de hierva luisa':    ['Té de hierva luisa','Servilleta logo','Galleta'],
+        'Té de jamaica':         ['Té de jamaica','Servilleta logo','Galleta'],
+        'Champagne':             ['Champagne','Servilleta logo','Galleta'],
+        'Vino tinto':            ['Vino tinto','Servilleta logo','Galleta'],
+        'Vino rosado':           ['Vino rosado','Servilleta logo','Galleta']
+      };
+      var staffNomB = user ? user.name : 'Staff';
+      var grupoB = staffNomB.replace(/ /g,'_') + '_combo_' + Date.now();
+      var nowB = new Date();
+      var fechaB = nowB.getFullYear() + '-' + String(nowB.getMonth()+1).padStart(2,'0') + '-' + String(nowB.getDate()).padStart(2,'0');
+      var horaB  = String(nowB.getHours()).padStart(2,'0') + ':' + String(nowB.getMinutes()).padStart(2,'0');
+      var itemsB = (COMBOS_MAP[producto] || [producto]).map(function(prod) {
+        return { tipo:'salida', producto:prod, cantidad:1, responsable:staffNomB, area:'Coffee', fecha:fechaB, hora:horaB, tipoUnidad:'Unidad', grupo:grupoB, esCombo:true, nombreCombo:producto };
+      });
+      var rb = await _siraPost('movimientoBatchNexserv', { movimientos: itemsB });
+      var p2b = document.getElementById('siraPanel_bebida');
+      if (rb && (rb.ok || rb.success)) {
+        if (p2b) {
+          p2b.innerHTML = '<div style="background:var(--bg-card,#fff);border-radius:16px;padding:24px 16px;text-align:center;"><div style="font-size:36px;margin-bottom:8px;">✅</div><div style="font-size:16px;font-weight:800;color:#2d6a4f;">Registrado en SIRA</div><div style="font-size:13px;color:var(--ink-soft);margin-top:4px;">' + producto + '</div></div>';
+          p2b.style.maxHeight = '200px';
+          setTimeout(function(){ if(p2b&&p2b.style){p2b.style.maxHeight='0';p2b.style.opacity='0';} setTimeout(function(){if(p2b&&p2b.parentNode)p2b.parentNode.removeChild(p2b);},300); }, 1800);
+        }
+        if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
+        window._siraProductos = null;
+      } else {
+        if (btn2b) { btn2b.textContent='Confirmar combo'; btn2b.disabled=false; btn2b.style.opacity='1'; }
+        if (typeof showToast==='function') showToast('⚠ ' + ((rb&&rb.error)||'Error al registrar'));
       }
+      return;
+    }
+    if (!producto) { if (typeof showToast==='function') showToast('Selecciona o escribe el producto'); return; }
 
-      var response;
-      if (fcmToken) {
-        // Usar FCM V1 API con el token
-        var fcmBody = {
-          message: {
-            token: fcmToken,
-            notification: {
-              title: data.titulo,
-              body: data.cuerpo || ''
-            },
-            webpush: {
-              headers: {
-                Urgency: 'high',  // entrega prioritaria (Android/Doze no la retrasa tanto)
-                TTL: '300'        // si no se entrega en 5 min, se descarta (no llega tarde y vieja)
-              },
-              notification: {
-                title: data.titulo,
-                body: data.cuerpo || '',
-                icon: 'https://humbertods.github.io/nexserv/icon-192.png',
-                tag: 'nexserv-cita',
-                renotify: true,
-                requireInteraction: false,
-                vibrate: [200, 100, 200]
-              },
-              fcm_options: {
-                link: 'https://humbertods.github.io/nexserv/'
-              }
-            }
-          }
-        };
+    var btn2 = document.getElementById('siraEnviarBtn');
+    if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
 
-        response = UrlFetchApp.fetch(fcmUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + accessToken,
-            'Content-Type': 'application/json'
-          },
-          payload: JSON.stringify(fcmBody),
-          muteHttpExceptions: true
+    var r = await _siraPost('movimientoNexserv', { tipo:tipo==='bebida'?'salida':tipo, producto:producto, cantidad:cantidad, responsable:responsable, area:area, nota:tipo==='bebida'?'Bebida servida':'' });
+
+    if (r && (r.ok || r.success)) {
+      var p2 = document.getElementById('siraPanel_' + tipo);
+      if (p2) {
+        p2.style.maxHeight = '0'; p2.style.opacity = '0';
+        setTimeout(function(){ if(p2&&p2.parentNode) p2.parentNode.removeChild(p2); }, 300);
+      }
+      if (typeof showToast==='function') showToast('✅ ' + producto + ' registrado en SIRA');
+      window._siraProductos = null;
+      // Agregar al historial local inmediatamente
+      if (typeof _siraAgregarMovLocal === 'function') _siraAgregarMovLocal(tipo, producto, cantidad, responsable, area);
+
+      // ── Confirmación central + WhatsApp (solo para ENTRADAS) ───────────
+      if (tipo === 'entrada') {
+        var nuevoStock = (r.nuevoStock != null) ? r.nuevoStock : (r.stockActual != null ? r.stockActual : null);
+        var _waParts = [
+          String.fromCodePoint(0x1F4E6) + ' *SIRA - Nuevo ingreso*',
+          '',
+          String.fromCodePoint(0x2705) + ' +' + cantidad + ' ' + producto,
+          String.fromCodePoint(0x1F4CD) + ' Area: ' + area,
+          String.fromCodePoint(0x1F464) + ' ' + responsable,
+          (nuevoStock != null ? (String.fromCodePoint(0x1F4CA) + ' Stock actual: ' + nuevoStock + ' unid.') : ''),
+          '',
+          '_Inventario actualizado_'
+        ];
+        var waMsg = _waParts.join('\n');
+        var waUrl = 'https://wa.me/?text=' + encodeURIComponent(waMsg);
+
+        // Modal centrado en pantalla
+        var overlay = document.createElement('div');
+        overlay.id = 'siraWaOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+        overlay.innerHTML =
+          '<div style="background:#fff;border-radius:24px;padding:32px 24px;width:100%;max-width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.18);">'
+          + '<div style="font-size:44px;margin-bottom:4px;">✅</div>'
+          + '<div style="font-size:18px;font-weight:900;color:#1a1a1a;margin-bottom:4px;">Registrado en SIRA</div>'
+          + '<div style="font-size:14px;color:#888;margin-bottom:6px;">+' + cantidad + ' ' + producto + '</div>'
+          + (nuevoStock != null
+              ? '<div style="font-size:13px;color:#555;background:#f5f5f5;border-radius:10px;padding:8px 12px;margin-bottom:20px;">📊 Stock actual: <strong>' + nuevoStock + ' unid.</strong></div>'
+              : '<div style="margin-bottom:20px;"></div>')
+          + '<a href="' + waUrl + '" target="_blank" rel="noopener" '
+          + 'style="display:block;width:100%;padding:15px;background:#25D366;color:#fff;border-radius:14px;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:10px;box-sizing:border-box;">'
+          + '📲 Notificar al grupo</a>'
+          + '<button onclick="document.getElementById(\'siraWaOverlay\').remove()" '
+          + 'style="width:100%;padding:12px;background:none;border:none;color:#888;font-size:14px;font-family:inherit;cursor:pointer;font-weight:600;">Cerrar</button>'
+          + '</div>';
+
+        // Cerrar al tocar fuera del modal
+        overlay.addEventListener('click', function(ev) {
+          if (ev.target === overlay) overlay.remove();
         });
-      } else {
-        errores.push(key + ': token vacío');
-        return;
+        document.body.appendChild(overlay);
       }
+    } else {
+      if (btn2) { btn2.textContent='Confirmar'; btn2.disabled=false; btn2.style.opacity='1'; }
+      if (typeof showToast==='function') showToast('⚠ ' + ((r&&r.error)||'Error al registrar'));
+    }
+  };
 
-      var code = response.getResponseCode();
-      var body = response.getContentText();
-      Logger.log('[Push] ' + key + ': HTTP ' + code + ' — ' + body.substring(0, 150));
 
-      if (code === 200 || code === 201) {
-        enviados++;
-      } else if (code === 404 || code === 410) {
-        props.deleteProperty(key);
-        errores.push(key + ': token expirado, eliminado');
-      } else {
-        errores.push(key + ': HTTP ' + code + ' — ' + body.substring(0, 80));
+  // ── Cache local de movimientos SIRA del día ────────────────────────────
+  window._siraMovsHoy = [];
+
+  // Render del historial diario en el panel staff
+  function _siraRenderMovHoy() {
+    var cont = document.getElementById('siraMovHoy');
+    if (!cont) return;
+    var user = window.currentUser;
+    var userName = user ? (user.name || '') : '';
+
+    // Fecha de hoy en formato YYYY-MM-DD (que usa SIRA)
+    var hoy = (function() {
+      var d = new Date();
+      var tz = 'America/Guayaquil';
+      try {
+        // Usar formato local Ecuador
+        var p = new Date(d.toLocaleString('en-US', { timeZone: tz }));
+        var mm = String(p.getMonth()+1).padStart(2,'0');
+        var dd = String(p.getDate()).padStart(2,'0');
+        return p.getFullYear() + '-' + mm + '-' + dd;
+      } catch(e) {
+        return d.toISOString().slice(0,10);
+      }
+    })();
+
+    // Filtrar movimientos de esta staff y de hoy
+    var mios = (window._siraMovsHoy || []).filter(function(m) {
+      var resp = String(m.responsable || m.resp || '').trim();
+      var fecha = String(m.fecha || '').trim().slice(0, 10); // YYYY-MM-DD
+      return resp === userName && fecha === hoy;
+    });
+
+    if (mios.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Todavía no registraste nada hoy</div>';
+      return;
+    }
+
+    // Mostrar en orden inverso (más reciente primero)
+    var html = '';
+    [...mios].reverse().forEach(function(m) {
+      var tipo = String(m.tipo || '').toLowerCase(); // 'entrada' o 'salida'
+      var esEntrada = tipo === 'entrada';
+      var cant = Number(m.cantidad || m.cant || 1);
+      var prod = String(m.producto || '');
+      var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
+      var bgIcon   = esEntrada ? '#edf7f1' : '#fff0f0';
+      var iconSvg  = esEntrada
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+
+      html += '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.</div>'
+        + '</div>'
+        + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
+        + '</div>';
+    });
+
+    cont.innerHTML = html;
+  }
+
+  // Cargar movimientos desde SIRA backend y renderizar
+  async function _siraCargarMovsHoy() {
+    try {
+      var r = await fetch(window.SIRA_URL + '?action=getMovimientos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      if (data && (data.ok || data.success)) {
+        window._siraMovsHoy = data.movimientos || [];
       }
     } catch(e) {
-      errores.push(key + ': ' + e.message);
+      // silencioso — el historial mostrará los registros locales
+    }
+    _siraRenderMovHoy();
+  }
+
+  // Agregar movimiento local inmediatamente después de registrar
+  function _siraAgregarMovLocal(tipo, producto, cantidad, responsable, area) {
+    var hoy = (function() {
+      try {
+        var p = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+        return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
+      } catch(e) { return new Date().toISOString().slice(0,10); }
+    })();
+    window._siraMovsHoy = window._siraMovsHoy || [];
+    window._siraMovsHoy.push({
+      tipo:        tipo,
+      producto:    producto,
+      cantidad:    cantidad,
+      cant:        cantidad,
+      responsable: responsable,
+      resp:        responsable,
+      area:        area,
+      fecha:       hoy,
+      tipoUnidad:  'Unidad',
+    });
+    _siraRenderMovHoy();
+    if (typeof _siraRenderMovAdmin === 'function') _siraRenderMovAdmin();
+  }
+
+  window._siraRenderMovHoy   = _siraRenderMovHoy;
+  window._siraCargarMovsHoy  = _siraCargarMovsHoy;
+  window._siraAgregarMovLocal = _siraAgregarMovLocal;
+
+
+  // ── Wrappers admin para Entrada/Salida desde panel Mikaela ──────────────
+  // Llama a _siraAccion pero redirige el panel al contenedor correcto (admin)
+  function _siraAccionAdmin(tipo, triggerBtn) {
+    // Marcar temporalmente el card con data-sira para que _siraAccion lo encuentre
+    // e inserte el panel justo debajo del card tocado (no al final)
+    var cardEl = triggerBtn || document.querySelector('[data-action="sira-admin-' + tipo + '"]');
+    var addedSira = false;
+    if (cardEl && !cardEl.dataset.sira) {
+      cardEl.dataset.sira = tipo;
+      addedSira = true;
+    }
+    // Asegurar que siraFormContainer existe como fallback
+    var adminCont = document.getElementById('siraAdminFormContainer');
+    var tempId = false;
+    if (adminCont) { adminCont.id = 'siraFormContainer'; tempId = true; }
+
+    if (typeof _siraAccion === 'function') _siraAccion(tipo);
+
+    // Restaurar IDs y atributos
+    if (addedSira && cardEl) delete cardEl.dataset.sira;
+    if (tempId) {
+      var restored = document.getElementById('siraFormContainer');
+      if (restored) restored.id = 'siraAdminFormContainer';
+    }
+  }
+  window._siraAccionAdmin = _siraAccionAdmin;
+
+  // Ver inventario: carga productos de SIRA y los muestra inline
+  async function _siraVerInventarioAdmin() {
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    if (!window._siraInvAdminBackup) window._siraInvAdminBackup = screen.innerHTML;
+
+    var html = '<div style="padding:0 0 90px;">';
+    html += '<button onclick="_cerrarInvAdmin()" style="display:inline-flex;align-items:center;gap:6px;background:none;border:none;font-family:inherit;font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;padding:16px 16px 8px;">&#8592; Mi panel</button>';
+    html += '<div style="padding:0 16px 16px;">';
+    html += '<div style="font-size:22px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>';
+    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:16px;">SIRA ENGINE</div>';
+    // Buscador
+    html += '<div style="position:relative;margin-bottom:12px;">';
+    html += '<span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--ink-faint);">&#128269;</span>';
+    html += '<input id="invAdminSearch" type="text" placeholder="Buscar producto..." oninput="_invAdminFiltrar()" style="width:100%;padding:13px 14px 13px 42px;border:none;border-radius:20px;font-family:inherit;font-size:15px;background:#f0f0ee;color:var(--ink);box-sizing:border-box;">';
+    html += '</div>';
+    // Filtro área
+    html += '<div style="position:relative;margin-bottom:16px;">';
+    html += '<select id="invAdminArea" onchange="_invAdminFiltrar()" style="width:100%;padding:14px 16px;border:none;border-radius:20px;font-family:inherit;font-size:15px;font-weight:700;background:#1a1a1a;color:#fff;box-sizing:border-box;appearance:none;-webkit-appearance:none;cursor:pointer;">';
+    html += '<option value="">Todas las &#225;reas</option>';
+    html += '<option value="Cejas">Cejas</option>';
+    html += '<option value="Pest&#241;as">Pesta&#241;as</option>';
+    html += '<option value="Coffee">Coffee</option>';
+    html += '<option value="Local">Local</option>';
+    html += '<option value="General">General</option>';
+    html += '</select>';
+    html += '<span style="position:absolute;right:16px;top:50%;transform:translateY(-50%);color:#fff;pointer-events:none;">&#9660;</span>';
+    html += '</div>';
+    // Lista
+    html += '<div id="invAdminLista"><div style="text-align:center;padding:40px;color:var(--ink-faint);">Cargando...</div></div>';
+    html += '</div></div>';
+
+    screen.innerHTML = html;
+
+    window._invAdminProds = [];
+    try {
+      var r = await fetch(window.SIRA_URL + '?action=getProductos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      window._invAdminProds = (data && (data.ok || data.success)) ? (data.productos || []) : [];
+    } catch(e) { window._invAdminProds = []; }
+    _invAdminFiltrar();
+  }
+
+  function _invAdminFiltrar() {
+    var q    = (document.getElementById('invAdminSearch')  && document.getElementById('invAdminSearch').value  || '').toLowerCase().trim();
+    var area = (document.getElementById('invAdminArea')    && document.getElementById('invAdminArea').value    || '');
+    var lista = document.getElementById('invAdminLista');
+    if (!lista) return;
+
+    var prods = (window._invAdminProds || []).filter(function(p) {
+      var matchQ    = !q    || String(p.nombre||'').toLowerCase().indexOf(q) >= 0;
+      var matchArea = !area || String(p.area||'').toLowerCase() === area.toLowerCase();
+      return matchQ && matchArea;
+    });
+
+    if (prods.length === 0) {
+      lista.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink-faint);font-size:14px;">Sin productos</div>';
+      return;
+    }
+
+    lista.innerHTML = prods.map(function(p) {
+      var stock    = Number(p.stock != null ? p.stock : (p.cantidad != null ? p.cantidad : -1));
+      var stockMin = Number(p.stockMin || p.min || 5);
+      var agotado  = stock === 0;
+      var bajo     = stock > 0 && stock <= stockMin;
+      var stockColor = agotado ? '#c0392b' : bajo ? '#e67e22' : '#2d6a4f';
+      var stockLabel = stock < 0 ? '—' : String(stock);
+      var alerta     = agotado || bajo;
+
+      // Imagen del producto — SIRA devuelve URL o vacío
+      var imgUrl = p.imagen || p.foto || p.url || '';
+      var imgUrl = p.imagen || p.foto || p.url || '';
+      var imgHtml = imgUrl
+        ? ('<div style="width:48px;height:48px;border-radius:12px;background:#f5f0e8;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;"><img src="' + imgUrl + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'📦\'"></div>')
+        : '<div style="width:48px;height:48px;border-radius:12px;background:#f5f0e8;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">&#128230;</div>';
+
+      var unidad = p.unidad || p.tipoUnidad || 'Unidad';
+
+      return '<div style="display:flex;align-items:center;gap:14px;background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="flex-shrink:0;">' + imgHtml + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:15px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.nombre||'') + '</div>'
+          + '<div style="font-size:12px;color:#888;margin-top:2px;">' + (p.area||'') + ' · ' + unidad + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;">'
+          + '<div style="font-size:22px;font-weight:900;color:' + stockColor + ';line-height:1;">' + stockLabel + '</div>'
+          + '<div style="font-size:10px;color:' + stockColor + ';font-weight:600;">unid.</div>'
+          + (alerta ? '<div style="width:8px;height:8px;border-radius:50%;background:' + stockColor + ';margin:3px auto 0;"></div>' : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  function _cerrarInvAdmin() {
+    var screen = document.getElementById('mikaelaHome');
+    if (screen && window._siraInvAdminBackup) {
+      screen.innerHTML = window._siraInvAdminBackup;
+      window._siraInvAdminBackup = null;
+    }
+  }
+  window._cerrarInvAdmin = _cerrarInvAdmin;
+  window._invAdminFiltrar = _invAdminFiltrar;
+  window._siraVerInventarioAdmin = _siraVerInventarioAdmin;
+
+  window.cerrarInventarioStaff = function() {
+    var screen = document.getElementById(window._siraScreenId || 'staffHome');
+    if (screen && window._siraBackup) {
+      screen.innerHTML = window._siraBackup;
+      window._siraBackup = null;
+      window._siraActivo = false;
+    }
+  };
+  // ── Inventario Mikaela/Admin ──────────────────────────────────────────────
+  // ── Render de secciones ADMIN (Mikaela) — diferente a las de staff ──────
+  function _siraRenderSeccionesAdmin() {
+    var SVG_E = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_S = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    var SVG_G = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7Zm10 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>';
+    var SVG_I = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Zm-7 3a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm1 10h-2v-6h2v6Z"/></svg>';
+
+    function card(svg, titulo, desc, accion, bgCard, colorIcon) {
+      return '<button data-action="' + accion + '" style="'
+        + 'width:100%;text-align:left;padding:20px 20px 18px;border:none;cursor:pointer;'
+        + 'background:' + bgCard + ';border-radius:18px;margin-bottom:12px;'
+        + 'font-family:inherit;display:block;box-shadow:0 1px 4px rgba(0,0,0,.06);">'
+        + '<div style="color:' + colorIcon + ';margin-bottom:10px;">' + svg + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + colorIcon + ';margin-bottom:4px;">' + titulo + '</div>'
+        + '<div style="font-size:13px;color:var(--ink-soft,#888);font-weight:500;">' + desc + '</div>'
+        + '</button>';
+    }
+
+    // Formulario de Gastos Varios embebido (aparece al tocar la card)
+    // Formulario Gastos Varios — estructura SIRA (escribe en 💸 Gastos Varios via gastoVarios)
+    var _GV_CATS = [
+      { v:'Envio', l:'🚚 Envío' }, { v:'Reparacion', l:'🔧 Reparación' },
+      { v:'Servicio', l:'⚡ Servicio' }, { v:'Transporte', l:'🚕 Transporte' },
+      { v:'Insumo extra', l:'🛒 Insumo extra' }, { v:'Otro', l:'📎 Otro' }
+    ];
+    var _gvCatOpts = _GV_CATS.map(function(c){ return '<option value="' + c.v + '">' + c.l + '</option>'; }).join('');
+    var _fldStyle = 'width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);color:var(--ink);box-sizing:border-box;margin-bottom:10px;';
+    var _lblStyle = 'font-size:11px;font-weight:700;color:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;display:block;';
+    var formGastos = '<div id="siraAdminGastosForm" style="display:none;background:var(--bg-card);border-radius:16px;padding:18px;margin-bottom:12px;">'
+      + '<div style="font-size:15px;font-weight:800;margin-bottom:16px;">Registrar gasto</div>'
+      + '<label style="' + _lblStyle + '">Categoría</label>'
+      + '<select id="siraGvCategoria" style="' + _fldStyle + '">' + _gvCatOpts + '</select>'
+      + '<label style="' + _lblStyle + '">Descripción</label>'
+      + '<input id="siraGvDesc" placeholder="Ej: Envío desde Quito" style="' + _fldStyle + '">'
+      + '<label style="' + _lblStyle + '">Monto $</label>'
+      + '<input id="siraGvMonto" type="number" min="0" step="0.01" placeholder="0.00" style="' + _fldStyle + '">'
+      + '<label style="' + _lblStyle + '">Responsable</label>'
+      + '<select id="siraGvResponsable" style="' + _fldStyle + '">'
+      + '<option value="Mikaela">Mikaela</option><option value="Humberto">Humberto</option></select>'
+      + '<label style="' + _lblStyle + '">Notas <span style="font-weight:400;text-transform:none;">opcional</span></label>'
+      + '<input id="siraGvNotas" placeholder="Ej: Transferencia realizada" style="' + _fldStyle + '">'
+      + '<div style="display:flex;gap:10px;margin-top:4px;">'
+      + '<button onclick="cerrarSiraAdminGastosForm()" style="flex:1;padding:13px;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--ink-soft);">Cancelar</button>'
+      + '<button onclick="confirmarSiraAdminGasto()" id="siraGvBtn" style="flex:2;padding:13px;background:#c0392b;border:none;border-radius:12px;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;color:white;">Confirmar gasto</button>'
+      + '</div></div>';
+
+    return card(SVG_E, 'Registrar Entrada',  'Llegó material o producto nuevo',   'sira-admin-entrada', '#edf7f1', '#2d6a4f')
+      + card(SVG_S, 'Registrar Salida',   'Se usó un producto en el salón',      'sira-admin-salida',  '#f5f0e8', '#8b7355')
+      + card(SVG_G, 'Gastos Varios',      'Registrar un gasto de caja chica',    'sira-admin-gastos',  '#fff0f0', '#c0392b')
+      + formGastos
+      + card(SVG_I, 'Ver Inventario',     'Stock actual de productos SIRA',       'sira-admin-inv',     '#f0f4ff', '#2c5282')
+      + '<div id="siraAdminFormContainer"></div>'
+      + '<div id="siraAdminFeedback"></div>'
+      + '<div style="margin-top:24px;">'
+      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial diario</div>'
+      + '<div id="siraMovHoyAdmin"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
+      + '</div>';
+  }
+
+  window.abrirInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    if (!screen) return;
+    var navEl = screen.querySelector('nav.nav');
+    var navHtml = navEl ? navEl.outerHTML : '';
+    window._siraAdminBackup = screen.innerHTML;
+    window._siraAdminActivo = true;
+    screen.innerHTML =
+      '<button class="back-btn" onclick="cerrarInventarioAdmin()">← Mi panel</button>'
+      + '<div style="font-size:20px;font-weight:900;color:var(--ink);margin-bottom:2px;">Inventario</div>'
+      + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">SIRA Engine</div>'
+      + '<div id="siraAdminContent">' + _siraRenderSeccionesAdmin() + '</div>'
+      + navHtml;
+    // Cargar historial diario (todos los movimientos, no filtrado por staff)
+    setTimeout(function() { _siraCargarMovsAdmin(); }, 200);
+  };
+
+  window.cerrarSiraAdminGastosForm = function() {
+    var f = document.getElementById('siraAdminGastosForm');
+    if (f) f.style.display = 'none';
+  };
+
+  window.confirmarSiraAdminGasto = async function() {
+    var cat    = (document.getElementById('siraGvCategoria')  && document.getElementById('siraGvCategoria').value)  || 'Otro';
+    var desc   = (document.getElementById('siraGvDesc').value   || '').trim();
+    var monto  = parseFloat(document.getElementById('siraGvMonto').value || 0) || 0;
+    var resp   = (document.getElementById('siraGvResponsable') && document.getElementById('siraGvResponsable').value) || 'Mikaela';
+    var notas  = (document.getElementById('siraGvNotas')       && document.getElementById('siraGvNotas').value       || '').trim();
+    if (!desc)     { if (typeof showToast==='function') showToast('⚠ Escribe la descripción'); return; }
+    if (monto <= 0){ if (typeof showToast==='function') showToast('⚠ Ingresa un monto válido'); return; }
+
+    // Fecha y hora Ecuador (formato SIRA: YYYY-MM-DD y HH:mm)
+    var _now = new Date();
+    var _tz  = function(d) { try { return new Date(d.toLocaleString('en-US', { timeZone: 'America/Guayaquil' })); } catch(e) { return d; } };
+    var _ec  = _tz(_now);
+    var _fecha = _ec.getFullYear() + '-' + String(_ec.getMonth()+1).padStart(2,'0') + '-' + String(_ec.getDate()).padStart(2,'0');
+    var _hora  = String(_ec.getHours()).padStart(2,'0') + ':' + String(_ec.getMinutes()).padStart(2,'0');
+
+    var btn = document.getElementById('siraGvBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+
+    // Enviar a SIRA via bridge (escribe en 💸 Gastos Varios, no en Movimientos ni CajaChica)
+    var res = await _siraPost('gastoVarios', {
+      fecha:       _fecha,
+      hora:        _hora,
+      categoria:   cat,
+      descripcion: desc,
+      monto:       monto,
+      responsable: resp,
+      notas:       notas
+    });
+
+    if (btn) { btn.disabled = false; btn.textContent = 'Confirmar gasto'; }
+    if (res && (res.ok || res.success)) {
+      document.getElementById('siraGvDesc').value  = '';
+      document.getElementById('siraGvMonto').value = '';
+      if (document.getElementById('siraGvNotas'))  document.getElementById('siraGvNotas').value = '';
+      if (typeof showToast==='function') showToast('✅ Gasto registrado en SIRA');
+      cerrarSiraAdminGastosForm();
+    } else {
+      if (typeof showToast==='function') showToast('⚠ ' + ((res&&(res.error||res.message))||'No se pudo guardar'));
+    }
+  };
+
+  window.cerrarInventarioAdmin = function() {
+    var screen = document.getElementById('mikaelaHome');
+    window._siraAdminActivo = false;
+    if (screen && window._siraAdminBackup) {
+      screen.innerHTML = window._siraAdminBackup;
+    }
+    window._siraAdminBackup = null;
+    setTimeout(function() { if (typeof loadMikaelaHome === 'function') loadMikaelaHome(); }, 100);
+  };
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT DELEGATION HUB — nexserv-main-2
+// ═══════════════════════════════════════════════════════════════════════════
+
+  // ── Historial admin: TODOS los movimientos del día (no filtrado por staff) ──
+  async function _siraCargarMovsAdmin() {
+    try {
+      var r = await fetch(window.SIRA_URL + '?action=getMovimientos&token=' + window.SIRA_TOKEN + '&_t=' + Date.now());
+      var data = await r.json();
+      if (data && (data.ok || data.success)) {
+        window._siraMovsHoy = data.movimientos || [];
+      }
+    } catch(e) {}
+    _siraRenderMovAdmin();
+  }
+
+  function _siraRenderMovAdmin() {
+    var cont = document.getElementById('siraMovHoyAdmin');
+    if (!cont) return;
+
+    var hoy = (function() {
+      try {
+        var p = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+        return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
+      } catch(e) { return new Date().toISOString().slice(0,10); }
+    })();
+
+    // Admin ve TODOS los movimientos de hoy, ordenados más reciente primero
+    var movs = (window._siraMovsHoy || []).filter(function(m) {
+      return String(m.fecha || '').slice(0,10) === hoy;
+    });
+
+    if (movs.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
+      return;
+    }
+
+    var html = '';
+    [...movs].reverse().forEach(function(m) {
+      var tipo     = String(m.tipo || '').toLowerCase();
+      var esEntrada = tipo === 'entrada';
+      var cant     = Number(m.cantidad || m.cant || 1);
+      var prod     = String(m.producto || '');
+      var resp     = String(m.responsable || m.resp || '');
+      var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
+      var bgIcon   = esEntrada ? '#edf7f1' : '#fff0f0';
+      var iconSvg  = esEntrada
+        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
+        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+
+      html += '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+          + '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.' + (resp ? ' · ' + resp : '') + '</div>'
+        + '</div>'
+        + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
+        + '</div>';
+    });
+
+    cont.innerHTML = html;
+  }
+
+  window._siraCargarMovsAdmin = _siraCargarMovsAdmin;
+  window._siraRenderMovAdmin  = _siraRenderMovAdmin;
+
+(function _installDelegationHub() {
+  document.addEventListener('click', function _delegationHandler(e) {
+    // Handler secundario: botón Cancelar de SIRA (usa data-sira-cancel en lugar de data-action)
+    var cancelTarget = e.target.closest('[data-sira-cancel]');
+    if (cancelTarget) {
+      e.stopPropagation();
+      var _tipoCancel = cancelTarget.dataset.siraCancel || '';
+      if (_tipoCancel && typeof _siraAccion === 'function') _siraAccion(_tipoCancel);
+      return;
+    }
+    var target = e.target.closest('[data-action]');
+    if (!target) return;
+    var action   = target.dataset.action;
+    var id       = target.dataset.id       || '';
+    var nombre   = target.dataset.nombre   || '';
+    var total    = target.dataset.total    || '0';
+    var servicio = target.dataset.servicio || '';
+    var tomada   = target.dataset.tomada   || '';
+    var regular  = target.dataset.regular  || total;
+    var promo    = target.dataset.promo    || '';
+    var desglose = target.dataset.desglose || '';
+    var key      = target.dataset.key      || id;
+    var staff    = target.dataset.staff;
+    var cod      = target.dataset.cod      || id;
+    var tipo     = target.dataset.tipo     || '';
+
+    switch (action) {
+      case 'esperar-cobro':
+        e.stopPropagation();
+        if (typeof mkEsperarAsignacion === 'function')
+          mkEsperarAsignacion(id, nombre, servicio, total, tomada, regular, promo, desglose);
+        break;
+      case 'agregar-producto':
+        e.stopPropagation();
+        if (typeof openAgregarProducto === 'function') openAgregarProducto(id, nombre, total);
+        break;
+      case 'eliminar-ticket':
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function') eliminarTicketEspera(id, nombre);
+        break;
+      case 'abrir-evidencias':
+        e.stopPropagation();
+        if (typeof abrirEvidenciasPestanas === 'function') {
+          var sName = (staff !== undefined && staff !== '')
+            ? staff : ((window.currentUser && window.currentUser.name) || 'staff');
+          abrirEvidenciasPestanas(key, nombre, sName);
+        }
+        break;
+      case 'mantener-ficha':
+        e.stopPropagation();
+        if (typeof showToast === 'function') showToast('✅ Se mantiene la ficha actual para este servicio.');
+        break;
+      case 'approve-auth':
+        e.stopPropagation();
+        if (typeof approveAuthorization === 'function') approveAuthorization(id);
+        break;
+      case 'reject-auth':
+        e.stopPropagation();
+        if (typeof rejectAuthorization === 'function') rejectAuthorization(id);
+        break;
+      case 'ac-select':
+        e.stopPropagation();
+        if (typeof acSelectCliente === 'function') acSelectCliente(cod);
+        break;
+      case 'confirmar-cita':
+        e.stopPropagation();
+        if (typeof confirmarLlegadaCita === 'function') confirmarLlegadaCita(id);
+        break;
+      case 'cancelar-cita':
+        e.stopPropagation();
+        if (typeof cancelarCitaSyna === 'function') cancelarCitaSyna(id, nombre);
+        break;
+      case 'sira-accion':
+        e.stopPropagation();
+        if (typeof _siraAccion === 'function') _siraAccion(tipo);
+        break;
+
+      case 'mk-esperar':
+        e.stopPropagation();
+        if (typeof mkEsperarAsignacion === 'function') {
+          var _d = target.dataset;
+          mkEsperarAsignacion(_d.id, _d.nombre, _d.servicio, _d.total, _d.chica, _d.regular, _d.promo, _d.desglose);
+        }
+        break;
+
+      case 'mk-agregar-producto':
+        e.stopPropagation();
+        if (typeof openAgregarProducto === 'function') {
+          var _d2 = target.dataset;
+          openAgregarProducto(_d2.id, _d2.nombre, _d2.total);
+        }
+        break;
+
+      case 'mk-borrar-ticket':
+        e.stopPropagation();
+        if (typeof eliminarTicketEspera === 'function') {
+          var _d3 = target.dataset;
+          eliminarTicketEspera(_d3.id, _d3.nombre);
+        }
+        break;
+
+      // ── Inventario Admin (Mikaela) ──────────────────────────────────
+      case 'sira-admin-entrada':
+        e.stopPropagation();
+        if (typeof _siraAccionAdmin === 'function') _siraAccionAdmin('entrada', target);
+        break;
+      case 'sira-admin-salida':
+        e.stopPropagation();
+        if (typeof _siraAccionAdmin === 'function') _siraAccionAdmin('salida', target);
+        break;
+      case 'sira-admin-gastos': {
+        e.stopPropagation();
+        var gf = document.getElementById('siraAdminGastosForm');
+        if (gf) gf.style.display = (gf.style.display === 'none' || gf.style.display === '') ? 'block' : 'none';
+        break;
+      }
+      case 'sira-admin-inv':
+        e.stopPropagation();
+        if (typeof _siraVerInventarioAdmin === 'function') _siraVerInventarioAdmin();
+        break;
     }
   });
-
-  return { success: true, enviados: enviados, errores: errores };
-}
-
-// Aviso a Mikaela: una staff dejó una clienta lista para cobro
-// Aviso genérico a Mikaela (push)
-function _pushMikaela(titulo, cuerpo) {
-  try {
-    handleEnviarPushStaff({ staffKeys: ['push_mikaela'], titulo: titulo, cuerpo: cuerpo });
-  } catch (e) {}
-}
-
-function _avisarMikaelaClientaLista(nombre, servicio) {
-  try {
-    var n = String(nombre || '').trim() || 'Una clienta';
-    var s = String(servicio || '').trim();
-    handleEnviarPushStaff({
-      staffKeys: ['push_mikaela'],
-      titulo: '📩 Clienta lista para cobro',
-      cuerpo: n + (s ? ' · ' + s : '')
-    });
-  } catch (e) {}
-}
-const CAJA_TZ = 'America/Guayaquil';
-
-function getCajaSheet_() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let ws = ss.getSheetByName('CajaChica');
-  if (!ws) {
-    ws = ss.insertSheet('CajaChica');
-    ws.appendRow(['Fecha','Hora','Tipo','Descripcion','Monto','Responsable','RegistradoPor','Estado','Snapshot','MetodoGasto']);
-    ws.getRange(1, 1, 1, 10).setFontWeight('bold');
-  } else if (ws.getLastColumn() < 10) {
-    // Hoja antigua sin la columna de método: la agregamos.
-    ws.getRange(1, 10).setValue('MetodoGasto').setFontWeight('bold');
-  }
-  return ws;
-}
-function cajaHoy_()        { return Utilities.formatDate(new Date(), CAJA_TZ, 'dd/MM/yyyy'); }
-function cajaFechaStr_(v)  { return (v instanceof Date) ? Utilities.formatDate(v, CAJA_TZ, 'dd/MM/yyyy') : String(v || '').trim(); }
-
-function handleGetCajaChica(params) {
-  const fecha = (params && params.fecha) ? String(params.fecha) : cajaHoy_();
-  const ws = getCajaSheet_();
-  const rows = ws.getDataRange().getValues();
-  let apertura = null, cerrada = false, cierre = null;
-  const gastos = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (cajaFechaStr_(r[0]) !== fecha) continue;
-    const tipo = String(r[2] || '').toLowerCase();
-    if (String(r[7] || 'activo').toLowerCase() === 'anulado') continue;
-    if (tipo === 'apertura') {
-      apertura = Number(r[4]) || 0;
-    } else if (tipo === 'gasto') {
-      gastos.push({ id: i + 1, hora: r[1], descripcion: r[3], monto: Number(r[4]) || 0, responsable: r[5] || '', registradoPor: r[6] || '', metodo: String(r[9] || 'efectivo').toLowerCase().indexOf('transf') >= 0 ? 'transferencia' : 'efectivo' });
-    } else if (tipo === 'cierre') {
-      cerrada = true;
-      try { cierre = r[8] ? JSON.parse(r[8]) : null; } catch (e) { cierre = null; }
-    }
-  }
-  return { success: true, fecha: fecha, apertura: apertura, gastos: gastos, cerrada: cerrada, cierre: cierre };
-}
-
-function handleAddGastoCaja(data) {
-  const ws = getCajaSheet_();
-  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
-  const metodo = String(data.metodoGasto || 'efectivo').toLowerCase().indexOf('transf') >= 0 ? 'transferencia' : 'efectivo';
-  ws.appendRow([cajaHoy_(), hora, 'gasto', String(data.descripcion || '').trim(), Number(data.monto) || 0,
-                String(data.responsable || '').trim(), String(data.registradoPor || '').trim(), 'activo', '', metodo]);
-  return { success: true };
-}
-
-function handleAddAperturaCaja(data) {
-  const ws = getCajaSheet_();
-  const hoy = cajaHoy_();
-  const rows = ws.getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (cajaFechaStr_(rows[i][0]) === hoy &&
-        String(rows[i][2] || '').toLowerCase() === 'apertura' &&
-        String(rows[i][7] || 'activo').toLowerCase() !== 'anulado') {
-      ws.getRange(i + 1, 5).setValue(Number(data.monto) || 0);
-      ws.getRange(i + 1, 7).setValue(String(data.registradoPor || '').trim());
-      return { success: true, actualizada: true };
-    }
-  }
-  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
-  ws.appendRow([hoy, hora, 'apertura', 'Base de caja', Number(data.monto) || 0, '', String(data.registradoPor || '').trim(), 'activo', '']);
-  return { success: true, actualizada: false };
-}
-
-function handleAnularGastoCaja(data) {
-  const ws = getCajaSheet_();
-  const fila = Number(data.id) || 0;
-  if (fila < 2) return { error: 'Fila inválida' };
-  const r = ws.getRange(fila, 1, 1, 9).getValues()[0];
-  if (String(r[2] || '').toLowerCase() !== 'gasto') return { error: 'No es un gasto' };
-  ws.getRange(fila, 8).setValue('anulado');
-  return { success: true };
-}
-
-function handleCerrarCaja(data) {
-  const ws = getCajaSheet_();
-  const hoy = cajaHoy_();
-  const rows = ws.getDataRange().getValues();
-  for (let i = 1; i < rows.length; i++) {
-    if (cajaFechaStr_(rows[i][0]) === hoy &&
-        String(rows[i][2] || '').toLowerCase() === 'cierre' &&
-        String(rows[i][7] || 'activo').toLowerCase() !== 'anulado') {
-      return { error: 'La caja de hoy ya fue cerrada.' };
-    }
-  }
-  const hora = Utilities.formatDate(new Date(), CAJA_TZ, 'HH:mm:ss');
-  const snap = data.snapshot || {};
-  ws.appendRow([hoy, hora, 'cierre', 'Cierre de caja', Number(snap.totalNeto) || 0, '',
-                String(data.registradoPor || '').trim(), 'activo', JSON.stringify(snap)]);
-  return { success: true };
-}
-
-function handleGetCajaHistorico(params) {
-  const ws = getCajaSheet_();
-  const rows = ws.getDataRange().getValues();
-  const cierres = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
-    if (String(r[2] || '').toLowerCase() !== 'cierre') continue;
-    if (String(r[7] || 'activo').toLowerCase() === 'anulado') continue;
-    let snap = null;
-    try { snap = r[8] ? JSON.parse(r[8]) : null; } catch (e) {}
-    cierres.push({ fecha: cajaFechaStr_(r[0]), hora: r[1], totalNeto: Number(r[4]) || 0, snapshot: snap });
-  }
-  cierres.reverse();
-  return { success: true, cierres: cierres };
-}
-/* ===================== /CAJA CHICA ===================== */
-
-// ============================================
-// CIERRE DE MES — resumen generalizado para el Owner
-// Junta HistorialOwner (facturación + comisiones + clientas por staff)
-// y CajaChica (gastos internos del mes). El gasto de SIRA es un sistema
-// externo y se ingresa manualmente desde la app.
-// params: { mes: 1-12, anio: 2026 } — si faltan usa el mes/año actual.
-// ============================================
-function _mesAnioDeFecha_(v) {
-  // Devuelve {mes, anio} a partir de un Date o string 'dd/MM/yyyy'
-  if (v instanceof Date) {
-    return {
-      mes:  Number(Utilities.formatDate(v, 'America/Guayaquil', 'M')),
-      anio: Number(Utilities.formatDate(v, 'America/Guayaquil', 'yyyy'))
-    };
-  }
-  const s = String(v || '').trim();
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return { mes: Number(m[2]), anio: Number(m[3]) };
-  return { mes: 0, anio: 0 };
-}
-
-function handleGetCierreMes(params) {
-  try {
-    const tz = 'America/Guayaquil';
-    const now = new Date();
-    const mes  = (params && params.mes)  ? Number(params.mes)  : Number(Utilities.formatDate(now, tz, 'M'));
-    const anio = (params && params.anio) ? Number(params.anio) : Number(Utilities.formatDate(now, tz, 'yyyy'));
-
-    // ---- 1) HistorialOwner: facturación, comisiones, clientas, por staff ----
-    // Columnas: A=Fecha B=Hora C=Codigo D=Cliente E=Top/ID F=Servicio G=Area H=Staff I=Valor J=Comision K=MetodoPago
-    const wsH = getSheet('HistorialOwner');
-    const dataH = wsH ? wsH.getDataRange().getValues() : [];
-    const porStaff = {};      // nombre -> { chica, servicios, generado, comision }
-    const clientasSet = {};   // clave cliente -> true (clientas únicas con servicio)
-    let generadoServicios = 0, comisionTotal = 0, numServicios = 0;
-    let generadoProductos = 0, numProductos = 0;
-
-    for (let i = 3; i < dataH.length; i++) {
-      const row = dataH[i];
-      if (!row[0]) continue;
-      const ma = _mesAnioDeFecha_(row[0]);
-      if (ma.mes !== mes || ma.anio !== anio) continue;
-
-      const metodo  = String(row[10] || '').toLowerCase();
-      const cliente = String(row[3] || '').trim();
-      const staff   = String(row[7] || '').trim() || 'Sin asignar';
-      const valor   = row[8] instanceof Date ? 0 : Number(row[8]) || 0;
-      const comision= row[9] instanceof Date ? 0 : Number(row[9]) || 0;
-
-      if (metodo === 'producto') {
-        generadoProductos += valor;
-        numProductos += 1;
-        continue; // los productos no cuentan como servicio ni comisión de staff
-      }
-
-      numServicios += 1;
-      generadoServicios += valor;
-      comisionTotal += comision;
-      if (cliente) clientasSet[cliente.toLowerCase()] = true;
-
-      if (!porStaff[staff]) porStaff[staff] = { chica: staff, servicios: 0, generado: 0, comision: 0 };
-      porStaff[staff].servicios += 1;
-      porStaff[staff].generado  += valor;
-      porStaff[staff].comision  += comision;
-    }
-
-    const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
-    const staffArray = Object.values(porStaff)
-      .map(s => ({ chica: s.chica, servicios: s.servicios, generado: r2(s.generado), comision: r2(s.comision) }))
-      .sort((a, b) => b.generado - a.generado);
-    const generadoTotal = generadoServicios + generadoProductos;
-    const numClientas = Object.keys(clientasSet).length;
-
-    // ---- 2) CajaChica: gastos internos del mes ----
-    // Columnas: A=Fecha B=Hora C=Tipo D=Descripcion E=Monto F=Responsable G=RegistradoPor H=Estado
-    let gastoCajaChica = 0, numGastosCaja = 0;
-    const wsC = getCajaSheet_();
-    const dataC = wsC ? wsC.getDataRange().getValues() : [];
-    for (let i = 1; i < dataC.length; i++) {
-      const r = dataC[i];
-      if (String(r[2] || '').toLowerCase() !== 'gasto') continue;
-      if (String(r[7] || 'activo').toLowerCase() === 'anulado') continue;
-      const ma = _mesAnioDeFecha_(r[0]);
-      if (ma.mes !== mes || ma.anio !== anio) continue;
-      gastoCajaChica += Number(r[4]) || 0;
-      numGastosCaja += 1;
-    }
-
-    // ---- 3) SIRA: total de "Gastos Varios" del mes (sistema externo, solo lectura) ----
-    const sira = _getSiraGastosMes_(mes, anio);
-
-    return {
-      success: true,
-      mes: mes,
-      anio: anio,
-      staff: staffArray,
-      numClientas: numClientas,
-      numServicios: numServicios,
-      generadoServicios: r2(generadoServicios),
-      generadoProductos: r2(generadoProductos),
-      numProductos: numProductos,
-      generadoTotal: r2(generadoTotal),
-      comisionTotal: r2(comisionTotal),
-      gastoCajaChica: r2(gastoCajaChica),
-      numGastosCaja: numGastosCaja,
-      gastoSIRA:            sira.ok ? sira.total : 0,
-      siraOk:               sira.ok,
-      siraFuente:           sira.fuente || '',
-      siraTotalProductos:   sira.ok ? (sira.totalProductos    || 0) : 0,
-      siraTotalGastosVarios:sira.ok ? (sira.totalGastosVarios || 0) : 0,
-      siraCount:            sira.count || 0,
-      siraError:            sira.ok ? '' : (sira.error || ''),
-      guardado: _buscarCierreGuardado_(mes, anio)
-    };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-// Consulta la API de SIRA y obtiene el total de gastos del mes desde el cierre
-// mensual de SIRA (granTotal = totalProductos + totalGastosVarios).
-// Si SIRA no tiene cierre cerrado para ese mes, suma los gastos varios sueltos
-// como fallback. Devuelve { ok, total, totalProductos, totalGastosVarios, fuente, error }.
-function _getSiraGastosMes_(mes, anio) {
-  try {
-    if (!SIRA_API_URL) {
-      return { ok: false, total: 0, error: 'SIRA no configurada en este entorno' };
-    }
-    const token = 'sira_2026_nexserv_bridge_7f4c9a';
-
-    // ── Intento 1: leer desde el cierre mensual de SIRA (fuente más completa) ──
-    try {
-      const urlCierres = SIRA_API_URL + '?action=getCierres&token=' + token + '&_t=' + Date.now();
-      const respC = UrlFetchApp.fetch(urlCierres, { muteHttpExceptions: true, followRedirects: true });
-      if (respC.getResponseCode() === 200) {
-        const jsonC = JSON.parse(respC.getContentText());
-        if (jsonC && jsonC.ok && Array.isArray(jsonC.cierres)) {
-          // Buscar el cierre del mes/año exacto (puede haber varios — tomar el más reciente)
-          const cierresMes = jsonC.cierres.filter(function(c) {
-            return Number(c.mesNum) === Number(mes) && Number(c.anio) === Number(anio);
-          });
-          if (cierresMes.length > 0) {
-            // El más reciente es el último guardado
-            const cierre = cierresMes[cierresMes.length - 1];
-            return {
-              ok:                true,
-              total:             Math.round(Number(cierre.granTotal        || 0) * 100) / 100,
-              totalProductos:    Math.round(Number(cierre.totalProductos   || 0) * 100) / 100,
-              totalGastosVarios: Math.round(Number(cierre.totalGastosVarios|| 0) * 100) / 100,
-              fuente:            'cierre'
-            };
-          }
-        }
-      }
-    } catch(eCierres) { Logger.log('[SIRA getCierres] ' + eCierres); }
-
-    // ── Fallback: sumar gastos varios + costo de productos usados en el mes ──
-    // Se usa cuando SIRA aún no tiene el cierre cerrado (se hace al final del día).
-    // getGastosVarios → gastos varios sueltos del mes
-    // getMovimientos + getProductos → costo de productos consumidos (salidas × costo unitario)
-    // Así el total coincide con lo que SIRA mostrará al cerrar el mes.
-
-    // Traer las tres fuentes en paralelo (UrlFetchApp no tiene Promise.all,
-    // pero podemos hacerlo con fetchAll para reducir latencia)
-    var urlGastos  = SIRA_API_URL + '?action=getGastosVarios&token=' + token + '&_t=' + Date.now();
-    var urlMovs    = SIRA_API_URL + '?action=getMovimientos&token='  + token + '&_t=' + (Date.now()+1);
-    var urlProds   = SIRA_API_URL + '?action=getProductos&token='    + token + '&_t=' + (Date.now()+2);
-
-    var responses;
-    try {
-      responses = UrlFetchApp.fetchAll([
-        { url: urlGastos, muteHttpExceptions: true },
-        { url: urlMovs,   muteHttpExceptions: true },
-        { url: urlProds,  muteHttpExceptions: true }
-      ]);
-    } catch(eFetch) {
-      return { ok: false, total: 0, error: 'fetchAll SIRA: ' + String(eFetch) };
-    }
-
-    // ── Gastos varios ──
-    var totalGastosVarios = 0, countGastos = 0;
-    try {
-      var jsonG = JSON.parse(responses[0].getContentText());
-      if (jsonG && jsonG.ok && Array.isArray(jsonG.gastos)) {
-        jsonG.gastos.forEach(function(g) {
-          var f = String((g && g.fecha) || '');
-          var m = f.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-          if (!m) return;
-          if (Number(m[1]) === Number(anio) && Number(m[2]) === Number(mes)) {
-            totalGastosVarios += Number(g.monto) || 0;
-            countGastos++;
-          }
-        });
-      }
-    } catch(eG) { Logger.log('[SIRA fallback gastos] ' + eG); }
-
-    // ── Costo de productos usados (movimientos de salida del mes) ──
-    var totalProductos = 0;
-    try {
-      var jsonP = JSON.parse(responses[2].getContentText());
-      var costoPorNombre = {};
-      if (jsonP && jsonP.ok && Array.isArray(jsonP.productos)) {
-        jsonP.productos.forEach(function(p) {
-          if (p.nombre) costoPorNombre[String(p.nombre).toLowerCase().trim()] = Number(p.costo) || 0;
-        });
-      }
-
-      var jsonM = JSON.parse(responses[1].getContentText());
-      if (jsonM && jsonM.ok && Array.isArray(jsonM.movimientos)) {
-        jsonM.movimientos.forEach(function(mv) {
-          // Solo salidas confirmadas del mes
-          var tipo = String(mv.tipo || '').toLowerCase();
-          if (tipo !== 'salida' && tipo !== 'uso' && tipo !== 'consumo') return;
-          var f = String(mv.fecha || '');
-          var m = f.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-          if (!m) return;
-          if (Number(m[1]) !== Number(anio) || Number(m[2]) !== Number(mes)) return;
-          var nombreProd = String(mv.producto || '').toLowerCase().trim();
-          var costo = costoPorNombre[nombreProd] || 0;
-          var cantidad = Number(mv.cantidad) || 0;
-          totalProductos += costo * cantidad;
-        });
-      }
-    } catch(eM) { Logger.log('[SIRA fallback movimientos] ' + eM); }
-
-    var granTotal = totalGastosVarios + totalProductos;
-    return {
-      ok:                true,
-      total:             Math.round(granTotal * 100) / 100,
-      totalProductos:    Math.round(totalProductos * 100) / 100,
-      totalGastosVarios: Math.round(totalGastosVarios * 100) / 100,
-      fuente:            'gastos_sueltos',
-      count:             countGastos
-    };
-  } catch(e) {
-    return { ok: false, total: 0, error: e.toString() };
-  }
-}
-
-// ============================================
-// HISTORIAL DE CIERRES DE MES (registro durable y auditable)
-// Hoja "CierresMes" — un registro por mes (se actualiza si se vuelve a guardar)
-// ============================================
-function getCierresMesSheet_() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let ws = ss.getSheetByName('CierresMes');
-  if (!ws) {
-    ws = ss.insertSheet('CierresMes');
-    ws.appendRow(['FechaCierre','Mes','Anio','Periodo','Clientas','Servicios',
-                  'GeneradoServicios','GeneradoProductos','GeneradoTotal','Comisiones',
-                  'GastoCajaChica','GastoSIRA','TotalGeneral','DetalleStaff','RegistradoPor']);
-    ws.getRange(1, 1, 1, 15).setFontWeight('bold').setBackground('#1a1a1a').setFontColor('white');
-  }
-  return ws;
-}
-
-function _buscarCierreGuardado_(mes, anio) {
-  try {
-    const ws = getCierresMesSheet_();
-    const rows = ws.getDataRange().getValues();
-    for (let i = 1; i < rows.length; i++) {
-      if (Number(rows[i][1]) === Number(mes) && Number(rows[i][2]) === Number(anio)) {
-        return {
-          fechaCierre: rows[i][0] instanceof Date
-            ? Utilities.formatDate(rows[i][0], 'America/Guayaquil', 'dd/MM/yyyy HH:mm')
-            : String(rows[i][0] || ''),
-          gastoSIRA: Number(rows[i][11]) || 0,
-          totalGeneral: Number(rows[i][12]) || 0,
-          registradoPor: String(rows[i][14] || '')
-        };
-      }
-    }
-  } catch (e) {}
-  return null;
-}
-
-function handleGuardarCierreMes(data) {
-  try {
-    const tz = 'America/Guayaquil';
-    const mes  = Number(data.mes);
-    const anio = Number(data.anio);
-    if (!mes || !anio) return { success: false, error: 'Mes o año inválido' };
-
-    const ws = getCierresMesSheet_();
-    const rows = ws.getDataRange().getValues();
-    const ahora = Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm');
-    const periodo = ('0' + mes).slice(-2) + '/' + anio;
-    const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
-
-    const fila = [
-      ahora, mes, anio, periodo,
-      Number(data.numClientas) || 0,
-      Number(data.numServicios) || 0,
-      r2(data.generadoServicios),
-      r2(data.generadoProductos),
-      r2(data.generadoTotal),
-      r2(data.comisionTotal),
-      r2(data.gastoCajaChica),
-      r2(data.gastoSIRA),
-      r2(data.totalGeneral),
-      JSON.stringify(data.staff || []),
-      String(data.registradoPor || '')
-    ];
-
-    // Upsert: un solo registro por mes/año
-    for (let i = 1; i < rows.length; i++) {
-      if (Number(rows[i][1]) === mes && Number(rows[i][2]) === anio) {
-        ws.getRange(i + 1, 1, 1, fila.length).setValues([fila]);
-        return { success: true, actualizado: true, fechaCierre: ahora };
-      }
-    }
-    ws.appendRow(fila);
-    return { success: true, actualizado: false, fechaCierre: ahora };
-  } catch (e) {
-    return { success: false, error: e.toString() };
-  }
-}
-
-function handleGetCierresMesHistorico() {
-  try {
-    const ws = getCierresMesSheet_();
-    const rows = ws.getDataRange().getValues();
-    const cierres = [];
-    for (let i = 1; i < rows.length; i++) {
-      const r = rows[i];
-      if (!r[1] || !r[2]) continue;
-      let staff = [];
-      try { staff = r[13] ? JSON.parse(r[13]) : []; } catch (e) {}
-      cierres.push({
-        fechaCierre: r[0] instanceof Date
-          ? Utilities.formatDate(r[0], 'America/Guayaquil', 'dd/MM/yyyy HH:mm')
-          : String(r[0] || ''),
-        mes: Number(r[1]) || 0,
-        anio: Number(r[2]) || 0,
-        periodo: String(r[3] || ''),
-        numClientas: Number(r[4]) || 0,
-        numServicios: Number(r[5]) || 0,
-        generadoServicios: Number(r[6]) || 0,
-        generadoProductos: Number(r[7]) || 0,
-        generadoTotal: Number(r[8]) || 0,
-        comisionTotal: Number(r[9]) || 0,
-        gastoCajaChica: Number(r[10]) || 0,
-        gastoSIRA: Number(r[11]) || 0,
-        totalGeneral: Number(r[12]) || 0,
-        staff: staff,
-        registradoPor: String(r[14] || '')
-      });
-    }
-    cierres.sort((a, b) => (b.anio - a.anio) || (b.mes - a.mes));
-    return { success: true, cierres: cierres };
-  } catch (e) {
-    return { success: false, error: e.toString(), cierres: [] };
-  }
-}
-
-// ============================================
-// SESIONES / DISPOSITIVOS ACTIVOS + AUTORIZACIÓN (seguridad Owner)
-// Hoja "Sesiones": A=Staff B=DeviceId C=Dispositivo D=Rol E=Login F=UltimoPing G=Estado H=Aprobacion
-// SEC_MODE (ScriptProperties): 'abierto' = dispositivos nuevos se aprueban solos | 'estricto' = quedan pendientes
-// ============================================
-function getSesionesSheet_() {
-  return getOrCreateSheet('Sesiones', ['Staff', 'DeviceId', 'Dispositivo', 'Rol', 'Login', 'UltimoPing', 'Estado', 'Aprobacion']);
-}
-function getModoSeguridad_() {
-  return PropertiesService.getScriptProperties().getProperty('SEC_MODE') || 'abierto';
-}
-function setModoSeguridad_(modo) {
-  PropertiesService.getScriptProperties().setProperty('SEC_MODE', modo === 'estricto' ? 'estricto' : 'abierto');
-}
-
-function handlePingSesion(data) {
-  try {
-    const staff = String((data && data.staffName) || '').trim();
-    const dev   = String((data && data.deviceId) || '').trim();
-    if (!staff || !dev) return { success: false, message: 'faltan datos' };
-    const ws = getSesionesSheet_();
-    const rows = ws.getDataRange().getValues();
-    const ahora = new Date();
-    const evento = String((data && data.evento) || 'ping');
-    const estadoConn = evento === 'logout' ? 'Cerrada' : 'Activa';
-    const rol = String((data && data.rol) || '');
-    // Aviso al Owner cuando una STAFF inicia sesión (no en cada ping, solo en login)
-    if (evento === 'login' && rol && rol !== 'owner' && rol !== 'admin') {
-      try {
-        const tz = 'America/Guayaquil';
-        handleEnviarPushStaff({
-          staffKeys: ['push_owner'],
-          titulo: staff + ' inició sesión',
-          cuerpo: String((data && data.dispositivo) || 'Dispositivo')
-                  + ' · ' + Utilities.formatDate(ahora, tz, 'HH:mm')
-                  + ' · ' + Utilities.formatDate(ahora, tz, 'dd/MM/yyyy')
-        });
-      } catch (e) {}
-    }
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === staff && String(rows[i][1]).trim() === dev) {
-        ws.getRange(i + 1, 6).setValue(ahora);       // UltimoPing
-        ws.getRange(i + 1, 7).setValue(estadoConn);  // Estado conexión
-        if (data && data.dispositivo) ws.getRange(i + 1, 3).setValue(String(data.dispositivo));
-        if (evento === 'login') ws.getRange(i + 1, 5).setValue(ahora); // Login
-        let aprob = String(rows[i][7] || '').trim();
-        if (!aprob) { aprob = 'aprobado'; ws.getRange(i + 1, 8).setValue(aprob); }
-        return { success: true, aprobacion: aprob, modo: getModoSeguridad_() };
-      }
-    }
-    // Dispositivo NUEVO
-    let aprobacion = 'aprobado';
-    if (rol !== 'owner' && getModoSeguridad_() === 'estricto') aprobacion = 'pendiente';
-    ws.appendRow([staff, dev, String((data && data.dispositivo) || ''), rol, ahora, ahora, estadoConn, aprobacion]);
-    if (aprobacion === 'pendiente') {
-      try {
-        handleEnviarPushStaff({
-          staffKeys: ['push_owner'],
-          titulo: '🔒 Dispositivo nuevo sin autorizar',
-          cuerpo: staff + ' abrió la app en un dispositivo no reconocido (' + String((data && data.dispositivo) || '') + '). Autorízalo o bloquéalo en Seguridad app.'
-        });
-      } catch (e) {}
-    }
-    return { success: true, aprobacion: aprobacion, modo: getModoSeguridad_() };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-function handleEstadoDispositivo(data) {
-  try {
-    const staff = String((data && data.staffName) || '').trim();
-    const dev   = String((data && data.deviceId) || '').trim();
-    const ws = getSesionesSheet_();
-    const rows = ws.getDataRange().getValues();
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === staff && String(rows[i][1]).trim() === dev) {
-        return { success: true, aprobacion: String(rows[i][7] || 'aprobado'), modo: getModoSeguridad_() };
-      }
-    }
-    return { success: true, aprobacion: 'desconocido', modo: getModoSeguridad_() };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function handleSetAprobacion(data) {
-  try {
-    const staff  = String((data && data.staff) || '').trim();
-    const dev    = String((data && data.deviceId) || '').trim();
-    const estado = String((data && data.estado) || '').trim(); // aprobado | bloqueado
-    if (!staff || !dev || !estado) return { success: false, message: 'faltan datos' };
-    const ws = getSesionesSheet_();
-    const rows = ws.getDataRange().getValues();
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === staff && String(rows[i][1]).trim() === dev) {
-        ws.getRange(i + 1, 8).setValue(estado);
-        return { success: true };
-      }
-    }
-    return { success: false, message: 'no encontrado' };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function handleSetModoSeguridad(data) {
-  try {
-    setModoSeguridad_(String((data && data.modo) || 'abierto'));
-    return { success: true, modo: getModoSeguridad_() };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function handleGetSesiones() {
-  try {
-    const ws = getSesionesSheet_();
-    const rows = ws.getDataRange().getValues();
-    const tz = 'America/Guayaquil';
-    const ahora = new Date();
-    const sesiones = [];
-    for (let i = 1; i < rows.length; i++) {
-      if (!rows[i][0]) continue;
-      const ultimo = rows[i][5] instanceof Date ? rows[i][5] : null;
-      const login  = rows[i][4] instanceof Date ? rows[i][4] : null;
-      const minutos = ultimo ? Math.floor((ahora - ultimo) / 60000) : 999999;
-      const estado = String(rows[i][6] || '');
-      const activo = estado !== 'Cerrada' && minutos <= 3;
-      sesiones.push({
-        staff: rows[i][0],
-        deviceId: rows[i][1],
-        dispositivo: rows[i][2],
-        rol: rows[i][3],
-        login: login ? Utilities.formatDate(login, tz, 'dd/MM HH:mm') : '',
-        ultimoPing: ultimo ? Utilities.formatDate(ultimo, tz, 'dd/MM HH:mm') : '',
-        minutosDesde: minutos,
-        activo: activo,
-        aprobacion: String(rows[i][7] || 'aprobado')
-      });
-    }
-    sesiones.sort(function(a, b){
-      const pa = a.aprobacion === 'pendiente' ? 0 : 1;
-      const pb = b.aprobacion === 'pendiente' ? 0 : 1;
-      return (pa - pb) || (b.activo - a.activo) || (a.minutosDesde - b.minutosDesde);
-    });
-    return { success: true, sesiones: sesiones, modo: getModoSeguridad_() };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// ═══════════════ HISTORIAL DE SOLUCIONES (panel Soluciones) ═══════════════
-function getSolucionesSheet_() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  let ws = ss.getSheetByName('SolucionesLog');
-  if (!ws) {
-    ws = ss.insertSheet('SolucionesLog');
-    ws.appendRow(['Fecha', 'Hora', 'Usuario', 'Accion', 'Cliente', 'idEspera', 'Detalle']);
-  }
-  return ws;
-}
-
-function handleRegistrarSolucion(data) {
-  try {
-    const ws = getSolucionesSheet_();
-    const now = new Date();
-    const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-    const hora  = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-    ws.appendRow([
-      fecha,
-      hora,
-      String(data.usuario  || ''),
-      String(data.accion   || ''),
-      String(data.cliente  || ''),
-      String(data.idEspera || ''),
-      String(data.detalle  || '')
-    ]);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-function handleGetSolucionesLog() {
-  try {
-    const ws = getSolucionesSheet_();
-    const last = ws.getLastRow();
-    if (last < 2) return { success: true, registros: [] };
-    const vals = ws.getRange(2, 1, last - 1, 7).getValues();
-    const registros = [];
-    for (let i = vals.length - 1; i >= 0; i--) { // más reciente primero
-      const r = vals[i];
-      if (!r[0] && !r[3]) continue;
-      registros.push({
-        fecha:    String(r[0] || ''),
-        hora:     String(r[1] || ''),
-        usuario:  String(r[2] || ''),
-        accion:   String(r[3] || ''),
-        cliente:  String(r[4] || ''),
-        idEspera: String(r[5] || ''),
-        detalle:  String(r[6] || '')
-      });
-    }
-    return { success: true, registros: registros };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-function handleBorrarSolucionesLog() {
-  try {
-    const ws = getSolucionesSheet_();
-    const last = ws.getLastRow();
-    if (last >= 2) ws.deleteRows(2, last - 1); // borra los datos, conserva el encabezado
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: String(e) };
-  }
-}
-
-// ============================================================================
-// INTEGRACIÓN SYNA  ·  Prelista de espera
-// ----------------------------------------------------------------------------
-// Flujo:
-//   1) SYNA crea el ticket (cuando llega la hora agendada) → estado 'Prelista'.
-//      No aparece en la cola normal de Mikaela ni en la de la staff.
-//   2) Mikaela ve la cita en "Prelista de espera" y:
-//        · "Ya llegó"      → handleConfirmarLlegada → estado 'Esperando'
-//                            (entra a la Lista de espera real y sigue el flujo normal)
-//        · "Cancelar cita" → handleCancelarCita → estado 'Cancelado'
-//
-// Reutiliza la hoja ListaEspera y sus mismas columnas, así que una vez
-// confirmada, la clienta fluye por el sistema sin ningún caso especial.
-// Columnas: A=ID B=Fecha C=HoraLlegada D=Código E=Nombre F=Servicio G=Área
-//           H=Prioridad I=Estado J=TomadaPor K=HoraToma L=Obs M=Total
-//           N=PromoNombre O=PrecioPromo P=PrecioRegular Q=Secuencia R=PromasExtra
-// ============================================================================
-
-// SYNA → NexServ : crear ticket que entra a la Prelista de espera.
-// Acepta los mismos campos que addListaEspera. Mínimo recomendado: nombre, servicio, area.
-// Campo extra opcional: horaAgendada (la hora de la cita, para que Mikaela la vea).
-function handleCrearTicketSyna(data) {
-  data = data || {};
-  const ws = getSheet('ListaEspera');
-  const allData = ws.getDataRange().getValues();
-
-  // Siguiente ID LE-XXXX
-  let maxNum = 0;
-  for (let i = 3; i < allData.length; i++) {
-    const id = String(allData[i][0] || '');
-    if (id.startsWith('LE-')) {
-      const num = parseInt(id.replace('LE-', ''));
-      if (num > maxNum) maxNum = num;
-    }
-  }
-  const id = 'LE-' + String(maxNum + 1).padStart(4, '0');
-
-  const now   = new Date();
-  const fecha = Utilities.formatDate(now, 'America/Guayaquil', 'dd/MM/yyyy');
-  const hora  = Utilities.formatDate(now, 'America/Guayaquil', 'HH:mm');
-
-  const horaAgendada = String(data.horaAgendada || data.horaCita || '').trim();
-  const origen = String(data.origen || 'SYNA').trim();
-  // Dejamos rastro del origen y la hora de la cita en observaciones
-  const obs = (data.observaciones ? String(data.observaciones) + ' · ' : '') +
-              '📅 Agendada por ' + origen + (horaAgendada ? ' · cita ' + horaAgendada : '');
-
-  const secuenciaStr = (data.secuencia && data.secuencia.length > 0)
-    ? JSON.stringify(data.secuencia.map(s => s.area || s)) : '';
-  const promasExtraStr = (data.promasExtra && data.promasExtra.length > 0)
-    ? (typeof data.promasExtra === 'string' ? data.promasExtra : JSON.stringify(data.promasExtra)) : '';
-
-  ws.appendRow([
-    id, fecha, hora,                       // A,B,C
-    data.codigo || '', data.nombre || '',  // D,E
-    data.servicio || '', data.area || '',  // F,G
-    data.prioridad || 'Normal',            // H
-    estadoInicial,                         // I  ← Prelista para agenda / Esperando para atender ahora
-    '', '',                                // J,K (sin tomar)
-    obs,                                   // L
-    data.total || 0,                       // M
-    data.promoNombre || '',                // N
-    data.precioPromo || '',                // O
-    data.precioRegular || '',              // P
-    secuenciaStr,                          // Q
-    promasExtraStr                         // R
-  ]);
-
-  // Si la cita trae un abono (depósito de reserva), lo registramos para esta clienta
-  try {
-    if (Number(data.abono) > 0) {
-      handleRegistrarAbono({ codigo: data.codigo, cliente: data.nombre, monto: Number(data.abono), origen: 'SYNA', idEspera: id });
-    }
-  } catch (eAb) {}
-
-  // Avisar a Mikaela según el flujo: Prelista o lista directa.
-  try {
-    if (estadoInicial === 'Esperando') {
-      _pushMikaela('✅ Clienta en lista de espera', String(data.nombre || 'Una clienta') + ' está lista para asignar staff.');
-    } else {
-      _pushMikaela(
-        '📅 Cita agendada',
-        String(data.nombre || 'Una clienta') +
-          (horaAgendada ? ' · cita ' + horaAgendada : '') +
-          '. Confirmá su llegada en Prelista.'
-      );
-    }
-  } catch (e) {}
-
-  // espejo Lineas: SYNA crea la clienta en Lineas igual que addListaEspera.
-  // Si el estado es 'Prelista' se guarda como 'esperando' (cola virtual);
-  // confirmarLlegada la actualizara cuando la clienta llega de verdad.
-  try {
-    lineaDesdeListaEspera({
-      codigo:       data.codigo,
-      nombre:       data.nombre,
-      servicio:     data.servicio,
-      area:         data.area,
-      total:        data.total || 0,
-      promoNombre:  data.promoNombre || '',
-      precioPromo:  data.precioPromo || 0,
-      precioRegular: data.precioRegular || 0,
-      asignadaA:    '',
-      observaciones: obs
-    }, 'SYNA');
-  } catch (eLn) { Logger.log('espejo crearTicketSyna Lineas: ' + eLn); }
-
-  return { success: true, id: id, estado: estadoInicial };
-}
-
-// Mikaela lee las citas en Prelista (pendientes de confirmar llegada)
-function handleGetPrelista() {
-  const ws = getSheet('ListaEspera');
-  const data = ws.getDataRange().getValues();
-  const prelista = [];
-
-  for (let i = 3; i < data.length; i++) {
-    const row = data[i];
-    const id = String(row[0] || '').trim();
-    if (!id.startsWith('LE-')) continue;
-    if (String(row[8] || '').toLowerCase().trim() !== 'prelista') continue;
-    if (row[1] instanceof Date && row[1].getFullYear() < 2000) continue;
-
-    const horaLlegada = row[2] instanceof Date
-      ? Utilities.formatDate(row[2], 'America/Guayaquil', 'HH:mm')
-      : String(row[2] || '');
-
-    // Extraer la hora de la cita desde observaciones (si SYNA la mandó)
-    const obs = String(row[11] || '');
-    const m = obs.match(/cita\s+([0-9]{1,2}:[0-9]{2})/i);
-
-    prelista.push({
-      id: id,
-      fecha: row[1],
-      horaRegistro: horaLlegada,
-      horaCita: m ? m[1] : '',
-      codigo: row[3],
-      nombre: row[4],
-      servicio: row[5],
-      area: row[6],
-      prioridad: row[7],
-      observaciones: obs,
-      total: Number(row[12] || 0),
-      promoNombre: row[13] || '',
-      precioPromo: row[14] || '',
-      precioRegular: row[15] || ''
-    });
-  }
-
-  return { success: true, prelista: prelista };
-}
-
-// Mikaela confirma "ya llegó la clienta" → Prelista pasa a Esperando (entra a la lista real)
-function handleConfirmarLlegada(data) {
-  data = data || {};
-  const ws  = getSheet('ListaEspera');
-  const all = ws.getDataRange().getValues();
-  const id  = String(data.idEspera || data.idListaEspera || data.id || '').trim();
-  const now = Utilities.formatDate(new Date(), 'America/Guayaquil', 'HH:mm');
-
-  for (let i = 3; i < all.length; i++) {
-    if (String(all[i][0]).trim() === id) {
-      const row = i + 1;
-      const estado = String(ws.getRange(row, 9).getValue()).toLowerCase().trim();
-      if (estado !== 'prelista') {
-        return { success: false, message: 'Esta cita ya no está en prelista.' };
-      }
-      ws.getRange(row, 9).setValue('Esperando'); // col I = Estado → entra a lista real
-      ws.getRange(row, 3).setValue(now);          // col C = Hora de llegada real (para el orden de espera)
-      // Validador de prelista: Mikaela puede corregir el área (y opcional el servicio) que
-      // mandó SYNA antes de que la cita entre a la lista real, para reasignarla bien.
-      if (data.area != null && String(data.area).trim() !== '') {
-        ws.getRange(row, 7).setValue(String(data.area).trim().toLowerCase()); // col G = Área (minúsculas, como el resto del sistema)
-      }
-      if (data.servicio != null && String(data.servicio).trim() !== '') {
-        ws.getRange(row, 6).setValue(String(data.servicio).trim());  // col F = Servicio
-      }
-      try {
-        _pushMikaela('✅ Clienta confirmada', String(all[i][4] || 'Clienta') + ' pasó a la Lista de espera.');
-      } catch (e) {}
-      // espejo Lineas: la clienta confirma llegada → si ya existe la línea (SYNA/addListaEspera
-      // la creó como 'esperando'), lineaDesdeListaEspera tiene dedup y no duplica.
-      // Si no existe (ticket SYNA muy viejo sin espejo), la crea ahora.
-      try {
-        var _rowLL = ws.getRange(i + 1, 1, 1, 18).getValues()[0];
-        lineaDesdeListaEspera({
-          codigo:       String(_rowLL[3] || ''),
-          nombre:       String(_rowLL[4] || ''),
-          servicio:     String(_rowLL[5] || ''),
-          area:         String(_rowLL[6] || ''),
-          total:        Number(_rowLL[12] || 0),
-          promoNombre:  String(_rowLL[13] || ''),
-          precioPromo:  Number(_rowLL[14] || 0),
-          precioRegular: Number(_rowLL[15] || 0),
-          asignadaA:    '',
-          observaciones: String(_rowLL[11] || '')
-        }, 'LE_LLEGADA');
-      } catch (eLn) { Logger.log('espejo confirmarLlegada Lineas: ' + eLn); }
-      return { success: true, id: id };
-    }
-  }
-  return { success: false, message: 'Cita no encontrada.' };
-}
-
-// Mikaela cancela la cita (la clienta no llegó) → estado 'Cancelado'
-function handleCancelarCita(data) {
-  data = data || {};
-  const ws  = getSheet('ListaEspera');
-  const all = ws.getDataRange().getValues();
-  const id  = String(data.idEspera || data.idListaEspera || data.id || '').trim();
-
-  for (let i = 3; i < all.length; i++) {
-    if (String(all[i][0]).trim() === id) {
-      const row = i + 1;
-      const estado = String(ws.getRange(row, 9).getValue()).toLowerCase().trim();
-      if (estado !== 'prelista') {
-        return { success: false, message: 'Esta cita ya no se puede cancelar desde aquí.' };
-      }
-      ws.getRange(row, 9).setValue('Cancelado'); // col I
-      const obsPrev = String(ws.getRange(row, 12).getValue() || '');
-      const motivo = String(data.motivo || 'clienta no llegó');
-      ws.getRange(row, 12).setValue((obsPrev ? obsPrev + ' · ' : '') + '❌ Cancelada (' + motivo + ')'); // col L
-      // espejo Lineas: anular cualquier línea de esta cita (no-op si era prelista sin servicio)
-      try { anularLineasPorRef(id, motivo); } catch (eLn) { Logger.log('espejo cancelar Lineas: ' + eLn); }
-      return { success: true, id: id };
-    }
-  }
-  return { success: false, message: 'Cita no encontrada.' };
-}
-// ════════════════════════════════════════════════════════════════════════
-// MÓDULO: REPORTE DE SERVICIOS (Owner/Admin)
-// ════════════════════════════════════════════════════════════════════════
-// Fuente de datos: unifica Lineas (desde 18/06/2026, estado='cobrado') +
-// HistorialOwner (histórico completo desde el inicio del salón) para cubrir
-// cualquier rango de fechas sin duplicar ni crear hojas nuevas.
-//
-// Lineas aporta: metodoPago, comision, montoRegular (precio sin descuento).
-// HistorialOwner aporta: el histórico anterior al 18/06 con el esquema
-//   A=Fecha B=Hora C=Codigo D=Cliente E=Top F=Servicio G=Area H=Staff I=Valor
-//
-// Para evitar contar dos veces el mismo servicio en el período de solape
-// (desde que existe Lineas), las filas de HistorialOwner posteriores a la
-// fecha de corte de Lineas se EXCLUYEN — Lineas manda en ese rango porque
-// trae más detalle (metodoPago, comision).
-// ════════════════════════════════════════════════════════════════════════
-
-var REPORTE_LINEAS_FECHA_CORTE = '2026-06-18'; // desde esta fecha, Lineas es la única fuente
-
-// ── Clasificador de categoría + modelo/variante desde texto libre ────────
-// No depende de un catálogo fijo — deriva de patrones en el texto del
-// área y el nombre del servicio. Se ajusta agregando patrones nuevos
-// sin tocar el resto del módulo.
-// Sanitiza el campo `servicio`: algunas filas antiguas guardaron el JSON de
-// serviciosDetalle directamente en la celda en vez del nombre legible
-// (ej. '{"nombre":"Retoque de pestañas efecto Aura","precio":35}'). Esto se
-// mostraba crudo en "Servicios en baja"/"Top servicios". Si detecta JSON,
-// intenta extraer el campo `nombre`; si falla, descarta la fila a vacío en
-// vez de mostrar basura.
-// Calcula la duración en minutos entre hora_toma y hora_devuelta de Lineas.
-// Ambas pueden venir como Date completo (timestamp) o como texto 'HH:mm'.
-// Devuelve null si falta alguno de los dos datos (servicio sin cerrar
-// correctamente, o registro antiguo sin estas columnas).
-function _calcularDuracionMinutos_(horaTomaRaw, horaDevueltaRaw) {
-  function aMinutosDelDia(v) {
-    if (!v) return null;
-    if (Object.prototype.toString.call(v) === '[object Date]') {
-      return v.getHours() * 60 + v.getMinutes() + (v.getSeconds() / 60);
-    }
-    var s = String(v).trim();
-    var m = s.match(/^(\d{1,2}):(\d{2})/);
-    if (m) return Number(m[1]) * 60 + Number(m[2]);
-    return null;
-  }
-  var t1 = aMinutosDelDia(horaTomaRaw);
-  var t2 = aMinutosDelDia(horaDevueltaRaw);
-  if (t1 === null || t2 === null) return null;
-  var diff = t2 - t1;
-  if (diff < 0) diff += 24 * 60; // cruzó medianoche (caso raro pero posible)
-  if (diff <= 0 || diff > 480) return null; // descartar 0 o más de 8h (dato corrupto)
-  return Math.round(diff * 10) / 10;
-}
-
-function _limpiarNombreServicio_(valor) {
-  var s = String(valor || '').trim();
-  if (!s) return '';
-  if (s.charAt(0) === '{' || s.charAt(0) === '[') {
-    try {
-      var parsed = JSON.parse(s);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].nombre) {
-        return parsed.map(function(p){ return p.nombre; }).join(' + ');
-      }
-      if (parsed && parsed.nombre) return String(parsed.nombre);
-      return ''; // JSON sin campo nombre reconocible — mejor vacío que basura
-    } catch (e) {
-      return ''; // no es JSON válido pero empieza con { — descartar por seguridad
-    }
-  }
-  return s;
-}
-
-function _clasificarServicio_(areaRaw, servicioRaw) {
-  var area = String(areaRaw || '').toLowerCase();
-  var serv = String(servicioRaw || '').toLowerCase();
-
-  // FIX: la categoría se decide SOLO por el campo `area` de Lineas, nunca por
-  // `servicio`. El nombre del servicio en un TM multi-área puede arrastrar
-  // texto de la otra área (ej. área=pestañas, servicio="Combo 7 Hawaiano +
-  // Solo pigmento") — si se mezcla con `area` para clasificar, una línea de
-  // pestañas termina contada como Cejas solo porque el nombre del combo
-  // menciona "pigmento". `area` es el dato confiable: cada línea en Lineas
-  // ya representa una sola área real (ver _registrarServicio_/lineasDesdeTicketMulti).
-  var categoria = 'Otros servicios';
-  if (area.indexOf('pesta') >= 0)                                  categoria = 'Pestañas';
-  else if (area.indexOf('facial') >= 0)                            categoria = 'Faciales';
-  else if (area.indexOf('depil') >= 0)                             categoria = 'Depilaciones';
-  else if (area.indexOf('cej') >= 0)                                categoria = 'Cejas';
-  else if (area.indexOf('retiro') >= 0)                             categoria = 'Retiro';
-  else if (area.indexOf('producto') >= 0)                           categoria = 'Productos';
-  else if (area === '') {
-    // Solo si el área llegó vacía (registros muy antiguos de HistorialOwner
-    // sin columna de área confiable) se cae al texto del servicio como único recurso.
-    var textoFallback = serv;
-    if (textoFallback.indexOf('pesta') >= 0)        categoria = 'Pestañas';
-    else if (textoFallback.indexOf('facial') >= 0)  categoria = 'Faciales';
-    else if (textoFallback.indexOf('depil') >= 0)   categoria = 'Depilaciones';
-    else if (textoFallback.indexOf('cej') >= 0 || textoFallback.indexOf('pigment') >= 0
-          || textoFallback.indexOf('brow') >= 0 || textoFallback.indexOf('shading') >= 0
-          || textoFallback.indexOf('lamina') >= 0)  categoria = 'Cejas';
-  }
-
-  // Para el modelo/variante SÍ es correcto leer el texto completo (área + servicio),
-  // ya que ahí buscamos palabras clave específicas (Volumen, Brow lamination, etc.)
-  // dentro del nombre del servicio de ESA línea, no para decidir a qué área pertenece.
-  var texto = area + ' ' + serv;
-
-  // Modelo/variante — solo aplica de forma útil a Pestañas y a Cejas
-  var modelo = '';
-  if (categoria === 'Pestañas') {
-    // FIX: el catálogo real usa nombres de "técnica de aplicación" (Aura, Tecnologico,
-    // egipcio, ruso, brasilero, pelo a pelo) en vez del genérico "volumen/híbridas/clásicas"
-    // que asumía el clasificador original — por eso el 82% de los servicios caían en
-    // "Otro modelo" y el dato quedaba ilegible para análisis.
-    // "Lifting de pestañas" es un TRATAMIENTO (no una montura nueva) y se excluye de este
-    // análisis de modelos — no debe competir en el ranking de modelos vendidos.
-    if (texto.indexOf('lifting') >= 0) {
-      modelo = ''; // se excluye explícitamente — ver filtro en obtenerTopModelosPestanas
-    }
-    else if (texto.indexOf('mega volumen') >= 0)        modelo = 'Mega volumen';
-    else if (texto.indexOf('volumen egipcio') >= 0
-          || texto.indexOf('egipcio') >= 0)             modelo = 'Volumen egipcio';
-    else if (texto.indexOf('volumen ruso') >= 0
-          || (texto.indexOf('ruso') >= 0))               modelo = 'Volumen ruso';
-    else if (texto.indexOf('volumen brasiler') >= 0
-          || texto.indexOf('brasiler') >= 0)             modelo = 'Volumen brasilero';
-    else if (texto.indexOf('volumen') >= 0)               modelo = 'Volumen';
-    else if (texto.indexOf('aura') >= 0)                  modelo = 'Aura';
-    else if (texto.indexOf('tecnologico') >= 0
-          || texto.indexOf('tecnológico') >= 0)           modelo = 'Tecnológico';
-    else if (texto.indexOf('hibrid') >= 0)                modelo = 'Híbridas';
-    else if (texto.indexOf('kylie') >= 0)                 modelo = 'Kylie';
-    else if (texto.indexOf('rimel') >= 0 || texto.indexOf('rímel') >= 0) modelo = 'Efecto rímel';
-    else if (texto.indexOf('pelo a pelo') >= 0)           modelo = 'Pelo a pelo clásicas';
-    else if (texto.indexOf('efecto seda') >= 0)           modelo = 'Efecto seda';
-    else if (texto.indexOf('clasica') >= 0 || texto.indexOf('clásica') >= 0) modelo = 'Clásicas';
-    else if (texto.indexOf('natural') >= 0)               modelo = 'Natural';
-    else if (texto.indexOf('hawaiano') >= 0)              modelo = 'Hawaiano';
-    else if (texto.indexOf('pigment') >= 0)               modelo = ''; // "Solo pigmento" no es montura de pestañas
-    else                                                   modelo = 'Otro modelo';
-    // FIX: si el modelo sigue siendo "Otro modelo", el nombre del servicio probablemente
-    // es el nombre de un combo (ej. "Combo 7 Hawaiano") que no tiene la palabra clave
-    // del modelo en su nombre pero sí en la descripción de servicios de Paquetes.
-    // Consultamos _mapaModelosPestanas_() que lee col C de Paquetes para resolver esto.
-    if (modelo === 'Otro modelo') {
-      try {
-        var mapaModelos = _mapaModelosPestanas_();
-        var nombreNorm = _normNombrePromo_(servicioRaw || '');
-        if (mapaModelos[nombreNorm]) modelo = mapaModelos[nombreNorm];
-      } catch(eMM) {}
-    }
-  } else if (categoria === 'Cejas') {
-    if (texto.indexOf('lamina') >= 0)              modelo = 'Brow lamination';
-    else if (texto.indexOf('shading') >= 0 || texto.indexOf('polvo') >= 0) modelo = 'Shading / efecto polvo';
-    else if (texto.indexOf('pigment') >= 0)        modelo = 'Pigmentación';
-    else if (texto.indexOf('depil') >= 0)          modelo = 'Depilación simple';
-    else                                            modelo = 'Otro';
-    // Combinados
-    var tieneCombo = (texto.indexOf('+') >= 0) || (texto.indexOf('depil') >= 0 && texto.indexOf('pigment') >= 0);
-    if (texto.indexOf('depil') >= 0 && texto.indexOf('lamina') >= 0 && texto.indexOf('pigment') >= 0) {
-      modelo = 'Depilación + Brow lamination + Pigmento';
-    } else if (texto.indexOf('depil') >= 0 && texto.indexOf('pigment') >= 0) {
-      modelo = 'Depilación + Pigmento';
-    }
-  } else if (categoria === 'Depilaciones') {
-    if (texto.indexOf('axila') >= 0)        modelo = 'Axilas';
-    else if (texto.indexOf('barbilla') >= 0) modelo = 'Barbilla';
-    else if (texto.indexOf('bigote') >= 0)   modelo = 'Bigote';
-    else if (texto.indexOf('pierna') >= 0)   modelo = 'Piernas';
-    else if (texto.indexOf('nariz') >= 0)    modelo = 'Nariz';
-    else                                      modelo = 'Otra zona';
-  } else if (categoria === 'Faciales') {
-    modelo = String(servicioRaw || '').trim() || 'Facial general';
-  }
-
-  return { categoria: categoria, modelo: modelo };
-}
-
-// ── Extractor unificado: HistorialOwner (completo) + Lineas (detalle desde 18/06) ──
-// Estrategia revisada:
-// - HistorialOwner es la fuente COMPLETA — incluye todo lo cobrado desde el inicio,
-//   productos vendidos, y todos los meses. Es la fuente que coincide con Reportes.
-// - Lineas aporta detalle adicional (metodoPago, comision, montoRegular, duracionMin)
-//   desde el 18/06. Para esas fechas, Lineas REEMPLAZA la fila de HistorialOwner
-//   (misma transaccion, mas detalle) usando deduplicacion por fecha+codigo+staff.
-// - Resultado: el total del Informe de Servicios debe coincidir con Reportes/HistorialOwner.
-function _obtenerServiciosUnificados_(fechaInicio, fechaFin) {
-  var fIni = new Date(fechaInicio + 'T00:00:00');
-  var fFin = new Date(fechaFin    + 'T23:59:59');
-  var corte = new Date(REPORTE_LINEAS_FECHA_CORTE + 'T00:00:00');
-
-  // ── PASO 1: Leer Lineas (desde corte) y construir mapa de dedup ──
-  var lineasMap = {}; // key = dd/MM/yyyy_codigo_staffLower
-  var filasLineas = [];
-  try {
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var wsL = ss.getSheetByName(LINEAS_HOJA);
-    if (wsL && wsL.getLastRow() > 1) {
-      var dL = wsL.getRange(2, 1, wsL.getLastRow() - 1, 24).getValues();
-      for (var i = 0; i < dL.length; i++) {
-        var r = dL[i];
-        if (String(r[LX.estado] || '').toLowerCase().trim() !== 'cobrado') continue;
-        var fecha = _parsearFechaLineas_(r[LX.fecha]);
-        if (!fecha || fecha < fIni || fecha > fFin || fecha < corte) continue;
-        var area     = String(r[LX.area] || '');
-        var servicio = _limpiarNombreServicio_(r[LX.servicio]);
-        var clasif   = _clasificarServicio_(area, servicio);
-        var staff    = String(r[LX.staff] || '').trim();
-        var codigo   = String(r[LX.codigo] || '').trim();
-        var fila = {
-          fecha: fecha, codigo: codigo, cliente: String(r[LX.cliente] || ''),
-          area: area, servicio: servicio, staff: staff,
-          monto: Number(r[LX.monto] || 0),
-          montoRegular: Number(r[LX.montoRegular] || r[LX.monto] || 0),
-          metodoPago: String(r[LX.metodoPago] || ''),
-          comision: Number(r[LX.comision] || 0),
-          duracionMin: _calcularDuracionMinutos_(r[LX.horaToma], r[LX.horaDevuelta]),
-          categoria: clasif.categoria, modelo: clasif.modelo, fuente: 'Lineas'
-        };
-        filasLineas.push(fila);
-        var fechaKey = Utilities.formatDate(fecha, 'America/Guayaquil', 'dd/MM/yyyy');
-        lineasMap[fechaKey + '_' + codigo + '_' + staff.toLowerCase()] = true;
-      }
-    }
-  } catch (eL) { Logger.log('[ReporteServicios] Error Lineas: ' + eL); }
-
-  // ── PASO 2: HistorialOwner — fuente completa para TODO el rango ──
-  // Excluir filas que Lineas ya tiene (mismo fecha+codigo+staff)
-  var filasHistorial = [];
-  try {
-    var wsH = getSheet('HistorialOwner');
-    var dH  = wsH.getDataRange().getValues();
-    for (var j = 3; j < dH.length; j++) {
-      var rowH  = dH[j];
-      var fechaH = _parsearFechaHistorial_(rowH[0]);
-      if (!fechaH || fechaH < fIni || fechaH > fFin) continue;
-      var staffH  = String(rowH[7] || '').trim();
-      var codigoH = String(rowH[2] || '').trim();
-      var fechaKeyH = Utilities.formatDate(fechaH, 'America/Guayaquil', 'dd/MM/yyyy');
-      if (lineasMap[fechaKeyH + '_' + codigoH + '_' + staffH.toLowerCase()]) continue;
-      var areaH    = String(rowH[6] || '');
-      var servicioH = _limpiarNombreServicio_(rowH[5]);
-      var clasifH  = _clasificarServicio_(areaH, servicioH);
-      filasHistorial.push({
-        fecha: fechaH, codigo: codigoH, cliente: String(rowH[3] || ''),
-        area: areaH, servicio: servicioH, staff: staffH,
-        monto: Number(rowH[8] || 0), montoRegular: Number(rowH[8] || 0),
-        metodoPago: '', comision: 0, duracionMin: null,
-        categoria: clasifH.categoria, modelo: clasifH.modelo, fuente: 'HistorialOwner'
-      });
-    }
-  } catch (eH) { Logger.log('[ReporteServicios] Error HistorialOwner: ' + eH); }
-
-  return filasHistorial.concat(filasLineas);
-}
-function _parsearFechaLineas_(fechaStr) {
-  // Lineas guarda fecha como 'dd/MM/yyyy' (ver imágenes) o como Date nativo de Sheets
-  if (!fechaStr) return null;
-  if (Object.prototype.toString.call(fechaStr) === '[object Date]') return fechaStr;
-  var s = String(fechaStr).trim();
-  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-  var m2 = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m2) return new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
-  return null;
-}
-
-function _parsearFechaHistorial_(value) {
-  if (!value) return null;
-  if (Object.prototype.toString.call(value) === '[object Date]') return value;
-  return _parsearFechaLineas_(value);
-}
-
-// ── Solo cuenta servicios FINALIZADOS / PAGADOS / CERRADOS ──────────────
-// En este sistema eso equivale a: Lineas estado='cobrado' (ya filtrado en
-// _obtenerServiciosUnificados_) y todo lo que llegó a HistorialOwner (que
-// SOLO se escribe al cobrar — nunca con cancelados/no asistió/reprogramados).
-// No se requiere filtro adicional: ambas fuentes ya excluyen esos casos
-// por diseño (ver handleCancelarCita y handleConfirmarCobroMulti).
-
-// ════════════════════════════════════════════════════════════════════════
-// FUNCIONES PÚBLICAS DEL REPORTE
-// ════════════════════════════════════════════════════════════════════════
-
-// Reporte general: totales, top servicios, top categoría, ranking staff
-function generarReporteServiciosNexserv(params) {
-  try {
-    params = params || {};
-    var fi = params.fechaInicio || _primerDiaMesActual_();
-    var ff = params.fechaFin    || _hoyStr_();
-    var staffFiltro = String(params.staff || '').trim();
-    var categoriaFiltro = String(params.categoria || '').trim();
-
-    var filas = _obtenerServiciosUnificados_(fi, ff);
-    if (staffFiltro)     filas = filas.filter(function(r){ return r.staff === staffFiltro; });
-    if (categoriaFiltro) filas = filas.filter(function(r){ return r.categoria === categoriaFiltro; });
-
-    var totalServicios = filas.length;
-    var ingresoTotal = filas.reduce(function(s, r){ return s + r.monto; }, 0);
-
-    // Por categoría
-    var porCategoria = {};
-    filas.forEach(function(r) {
-      if (!porCategoria[r.categoria]) porCategoria[r.categoria] = { categoria: r.categoria, cantidad: 0, ingreso: 0 };
-      porCategoria[r.categoria].cantidad++;
-      porCategoria[r.categoria].ingreso += r.monto;
-    });
-    var categorias = Object.keys(porCategoria).map(function(k){ return porCategoria[k]; })
-      .sort(function(a,b){ return b.ingreso - a.ingreso; });
-    var categoriaLider = categorias.length ? categorias[0].categoria : '';
-
-    // Top servicios (por nombre de servicio exacto)
-    var porServicio = {};
-    filas.forEach(function(r) {
-      var key = r.servicio || '(sin nombre)';
-      if (!porServicio[key]) porServicio[key] = { servicio: key, categoria: r.categoria, cantidad: 0, ingreso: 0 };
-      porServicio[key].cantidad++;
-      porServicio[key].ingreso += r.monto;
-    });
-    var topServicios = Object.keys(porServicio).map(function(k){ return porServicio[k]; })
-      .sort(function(a,b){ return b.cantidad - a.cantidad; });
-    var servicioMasVendido = topServicios.length ? topServicios[0].servicio : '';
-    var servicioMayorIngreso = topServicios.slice().sort(function(a,b){ return b.ingreso - a.ingreso; })[0];
-
-    // Ranking staff — incluye diferenciador Retoques vs Monturas nuevas
-    // (un "Retoque" es mantenimiento de una montura existente; el resto son
-    // ventas de montura nueva — distinción útil para medir captación vs retención)
-    var porStaff = {};
-    filas.forEach(function(r) {
-      var key = r.staff || '(sin asignar)';
-      if (!porStaff[key]) porStaff[key] = { staff: key, cantidad: 0, ingreso: 0, comision: 0, retoques: 0, monturasNuevas: 0 };
-      porStaff[key].cantidad++;
-      porStaff[key].ingreso += r.monto;
-      porStaff[key].comision += r.comision;
-      var esRetoque = String(r.servicio || '').toLowerCase().indexOf('retoque') >= 0;
-      if (esRetoque) porStaff[key].retoques++;
-      else porStaff[key].monturasNuevas++;
-    });
-    var rankingStaff = Object.keys(porStaff).map(function(k){ return porStaff[k]; })
-      .sort(function(a,b){ return b.cantidad - a.cantidad; });
-
-    // Ticket promedio por categoría
-    var ticketPromedioCategoria = categorias.map(function(c) {
-      return { categoria: c.categoria, ticketPromedio: c.cantidad ? Math.round((c.ingreso / c.cantidad) * 100) / 100 : 0 };
-    });
-
-    // Tiempo promedio por servicio (solo filas con duracionMin disponible —
-    // únicamente Lineas tiene hora_toma/hora_devuelta; HistorialOwner no).
-    var porServicioTiempo = {};
-    filas.forEach(function(r) {
-      if (r.duracionMin === null || r.duracionMin === undefined) return;
-      var key = r.servicio || '(sin nombre)';
-      if (!porServicioTiempo[key]) porServicioTiempo[key] = { servicio: key, categoria: r.categoria, suma: 0, count: 0 };
-      porServicioTiempo[key].suma += r.duracionMin;
-      porServicioTiempo[key].count++;
-    });
-    var tiempoPromedioServicio = Object.keys(porServicioTiempo).map(function(k) {
-      var t = porServicioTiempo[k];
-      return {
-        servicio: t.servicio,
-        categoria: t.categoria,
-        minutosPromedio: Math.round((t.suma / t.count) * 10) / 10,
-        muestras: t.count
-      };
-    }).sort(function(a,b){ return b.muestras - a.muestras; });
-
-    return {
-      success: true,
-      rangoFechas: { inicio: fi, fin: ff },
-      totalServicios: totalServicios,
-      ingresoTotal: Math.round(ingresoTotal * 100) / 100,
-      servicioMasVendido: servicioMasVendido,
-      categoriaLider: categoriaLider,
-      servicioMayorIngreso: servicioMayorIngreso ? servicioMayorIngreso.servicio : '',
-      categorias: categorias,
-      topServicios: topServicios.slice(0, 10),
-      rankingStaff: rankingStaff,
-      ticketPromedioCategoria: ticketPromedioCategoria,
-      tiempoPromedioServicio: tiempoPromedioServicio.slice(0, 10),
-      tablaResumen: filas.map(function(r) {
-        return {
-          fecha: Utilities.formatDate(r.fecha, 'America/Guayaquil', 'dd/MM/yyyy'),
-          cliente: r.cliente,
-          categoria: r.categoria,
-          servicio: r.servicio,
-          modelo: r.modelo,
-          staff: r.staff,
-          precio: r.monto,
-          metodoPago: r.metodoPago,
-          fuente: r.fuente
-        };
-      })
-    };
-  } catch (e) {
-    return { success: false, message: String(e) };
-  }
-}
-
-// Servicios filtrados por categoría con rango de fechas
-function obtenerServiciosPorCategoria(fechaInicio, fechaFin, categoria) {
-  try {
-    var filas = _obtenerServiciosUnificados_(fechaInicio, fechaFin);
-    if (categoria) filas = filas.filter(function(r){ return r.categoria === categoria; });
-    return { success: true, servicios: filas };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// Top servicios del mes completo
-function obtenerTopServiciosMes(mes, anio) {
-  try {
-    var rango = _rangoMes_(mes, anio);
-    var filas = _obtenerServiciosUnificados_(rango.inicio, rango.fin);
-    var porServicio = {};
-    filas.forEach(function(r) {
-      var key = r.servicio || '(sin nombre)';
-      if (!porServicio[key]) porServicio[key] = { servicio: key, categoria: r.categoria, cantidad: 0, ingreso: 0 };
-      porServicio[key].cantidad++;
-      porServicio[key].ingreso += r.monto;
-    });
-    var top = Object.keys(porServicio).map(function(k){ return porServicio[k]; })
-      .sort(function(a,b){ return b.cantidad - a.cantidad; });
-    return { success: true, mes: mes, anio: anio, top: top };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// Top modelos de pestañas del mes, con cantidad/ingreso/staff por modelo
-function obtenerTopModelosPestanas(mes, anio) {
-  try {
-    var rango = _rangoMes_(mes, anio);
-    var filas = _obtenerServiciosUnificados_(rango.inicio, rango.fin)
-      .filter(function(r){ return r.categoria === 'Pestañas'; });
-
-    var porModelo = {};
-    filas.forEach(function(r) {
-      // FIX: modelo='' significa Lifting de pestañas o Solo pigmento — son tratamientos
-      // sobre una montura existente, no la venta de un modelo nuevo. Se excluyen de este
-      // ranking para no inflar "Otro modelo" ni mezclarse con monturas reales.
-      if (!r.modelo) return;
-      var key = r.modelo;
-      if (!porModelo[key]) porModelo[key] = { modelo: key, cantidad: 0, ingreso: 0, porStaff: {} };
-      porModelo[key].cantidad++;
-      porModelo[key].ingreso += r.monto;
-      var st = r.staff || '(sin asignar)';
-      porModelo[key].porStaff[st] = (porModelo[key].porStaff[st] || 0) + 1;
-    });
-
-    var top = Object.keys(porModelo).map(function(k) {
-      var m = porModelo[k];
-      var staffTop = Object.keys(m.porStaff).sort(function(a,b){ return m.porStaff[b] - m.porStaff[a]; })[0] || '';
-      return {
-        modelo: m.modelo,
-        cantidad: m.cantidad,
-        ingreso: Math.round(m.ingreso * 100) / 100,
-        staffQueMasLoRealizo: staffTop
-      };
-    }).sort(function(a,b){ return b.cantidad - a.cantidad; });
-
-    return { success: true, mes: mes, anio: anio, modelos: top };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function obtenerReporteFaciales(mes, anio) {
-  return _reportePorCategoria_(mes, anio, 'Faciales');
-}
-function obtenerReporteCejas(mes, anio) {
-  return _reportePorCategoria_(mes, anio, 'Cejas');
-}
-function obtenerReporteDepilaciones(mes, anio) {
-  return _reportePorCategoria_(mes, anio, 'Depilaciones');
-}
-
-function _reportePorCategoria_(mes, anio, categoria) {
-  try {
-    var rango = _rangoMes_(mes, anio);
-    var filas = _obtenerServiciosUnificados_(rango.inicio, rango.fin)
-      .filter(function(r){ return r.categoria === categoria; });
-
-    var porModelo = {};
-    var clientesPorServicio = {}; // para faciales: clientes recurrentes
-    filas.forEach(function(r) {
-      var key = r.modelo || r.servicio || 'Otro';
-      if (!porModelo[key]) porModelo[key] = { nombre: key, cantidad: 0, ingreso: 0, porStaff: {} };
-      porModelo[key].cantidad++;
-      porModelo[key].ingreso += r.monto;
-      var st = r.staff || '(sin asignar)';
-      porModelo[key].porStaff[st] = (porModelo[key].porStaff[st] || 0) + 1;
-
-      if (categoria === 'Faciales') {
-        var cKey = r.codigo || r.cliente;
-        clientesPorServicio[cKey] = (clientesPorServicio[cKey] || 0) + 1;
-      }
-    });
-
-    var items = Object.keys(porModelo).map(function(k) {
-      var m = porModelo[k];
-      var staffTop = Object.keys(m.porStaff).sort(function(a,b){ return m.porStaff[b] - m.porStaff[a]; })[0] || '';
-      return { nombre: m.nombre, cantidad: m.cantidad, ingreso: Math.round(m.ingreso * 100) / 100, staffResponsable: staffTop };
-    }).sort(function(a,b){ return b.cantidad - a.cantidad; });
-
-    var clientesRecurrentes = 0;
-    if (categoria === 'Faciales') {
-      clientesRecurrentes = Object.keys(clientesPorServicio).filter(function(c){ return clientesPorServicio[c] > 1; }).length;
-    }
-
-    return {
-      success: true, mes: mes, anio: anio, categoria: categoria,
-      items: items,
-      clientesRecurrentes: clientesRecurrentes
-    };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function calcularTicketPromedioCategoria(fechaInicio, fechaFin) {
-  try {
-    var filas = _obtenerServiciosUnificados_(fechaInicio, fechaFin);
-    var porCategoria = {};
-    filas.forEach(function(r) {
-      if (!porCategoria[r.categoria]) porCategoria[r.categoria] = { categoria: r.categoria, cantidad: 0, ingreso: 0 };
-      porCategoria[r.categoria].cantidad++;
-      porCategoria[r.categoria].ingreso += r.monto;
-    });
-    var resultado = Object.keys(porCategoria).map(function(k) {
-      var c = porCategoria[k];
-      return { categoria: c.categoria, ticketPromedio: c.cantidad ? Math.round((c.ingreso / c.cantidad) * 100) / 100 : 0, cantidad: c.cantidad };
-    });
-    return { success: true, ticketPromedio: resultado };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-function obtenerRankingStaffServicios(fechaInicio, fechaFin) {
-  try {
-    var filas = _obtenerServiciosUnificados_(fechaInicio, fechaFin);
-    var porStaff = {};
-    filas.forEach(function(r) {
-      var key = r.staff || '(sin asignar)';
-      if (!porStaff[key]) porStaff[key] = { staff: key, cantidad: 0, ingreso: 0, comision: 0 };
-      porStaff[key].cantidad++;
-      porStaff[key].ingreso += r.monto;
-      porStaff[key].comision += r.comision;
-    });
-    var ranking = Object.keys(porStaff).map(function(k){ return porStaff[k]; })
-      .sort(function(a,b){ return b.cantidad - a.cantidad; });
-    return { success: true, ranking: ranking };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// Servicios en crecimiento / en baja: compara el mes actual contra el anterior
-function obtenerTendenciasServicios(mes, anio, categoria) {
-  try {
-    var rangoActual = _rangoMes_(mes, anio);
-    var mesAnt = mes === 1 ? 12 : mes - 1;
-    var anioAnt = mes === 1 ? anio - 1 : anio;
-    var rangoAnterior = _rangoMes_(mesAnt, anioAnt);
-
-    var filasActual   = _obtenerServiciosUnificados_(rangoActual.inicio, rangoActual.fin);
-    var filasAnterior = _obtenerServiciosUnificados_(rangoAnterior.inicio, rangoAnterior.fin);
-
-    // FIX: respetar el filtro de categoría — antes "Servicios en crecimiento/baja"
-    // mezclaba todas las categorías aunque la pantalla estuviera filtrada a Pestañas.
-    if (categoria) {
-      filasActual   = filasActual.filter(function(r){ return r.categoria === categoria; });
-      filasAnterior = filasAnterior.filter(function(r){ return r.categoria === categoria; });
-    }
-
-    function contarPorServicio(filas) {
-      var m = {};
-      filas.forEach(function(r){ m[r.servicio] = (m[r.servicio] || 0) + 1; });
-      return m;
-    }
-    var actual = contarPorServicio(filasActual);
-    var anterior = contarPorServicio(filasAnterior);
-
-    var todos = {};
-    Object.keys(actual).forEach(function(k){ todos[k] = true; });
-    Object.keys(anterior).forEach(function(k){ todos[k] = true; });
-
-    var tendencias = Object.keys(todos).map(function(k) {
-      var c1 = anterior[k] || 0;
-      var c2 = actual[k] || 0;
-      var variacion = c1 === 0 ? (c2 > 0 ? 100 : 0) : Math.round(((c2 - c1) / c1) * 100);
-      return { servicio: k, mesAnterior: c1, mesActual: c2, variacionPct: variacion };
-    });
-
-    var enCrecimiento = tendencias.filter(function(t){ return t.variacionPct > 0; })
-      .sort(function(a,b){ return b.variacionPct - a.variacionPct; }).slice(0, 5);
-    var enBaja = tendencias.filter(function(t){ return t.variacionPct < 0; })
-      .sort(function(a,b){ return a.variacionPct - b.variacionPct; }).slice(0, 5);
-
-    return { success: true, enCrecimiento: enCrecimiento, enBaja: enBaja };
-  } catch (e) { return { success: false, message: String(e) }; }
-}
-
-// ── Helpers de fecha ──────────────────────────────────────────────────
-function _primerDiaMesActual_() {
-  var d = new Date();
-  return Utilities.formatDate(new Date(d.getFullYear(), d.getMonth(), 1), 'America/Guayaquil', 'yyyy-MM-dd');
-}
-function _hoyStr_() {
-  return Utilities.formatDate(new Date(), 'America/Guayaquil', 'yyyy-MM-dd');
-}
-function _rangoMes_(mes, anio) {
-  var inicio = new Date(anio, mes - 1, 1);
-  var fin = new Date(anio, mes, 0); // último día del mes
-  return {
-    inicio: Utilities.formatDate(inicio, 'America/Guayaquil', 'yyyy-MM-dd'),
-    fin: Utilities.formatDate(fin, 'America/Guayaquil', 'yyyy-MM-dd')
-  };
-}
-
-// ── Endpoint público GET ─────────────────────────────────────────────
-// case 'getReporteServicios': result = handleGetReporteServicios(e.parameter); break;
-function handleGetReporteServicios(params) {
-  params = params || {};
-  var accion = String(params.accion || params.tipo || 'general').trim();
-  var mes = Number(params.mes) || (new Date()).getMonth() + 1;
-  var anio = Number(params.anio) || (new Date()).getFullYear();
-
-  switch (accion) {
-    case 'topModelosPestanas':   return obtenerTopModelosPestanas(mes, anio);
-    case 'faciales':             return obtenerReporteFaciales(mes, anio);
-    case 'cejas':                return obtenerReporteCejas(mes, anio);
-    case 'depilaciones':         return obtenerReporteDepilaciones(mes, anio);
-    case 'tendencias':           return obtenerTendenciasServicios(mes, anio, String(params.categoria || '').trim());
-    case 'rankingStaff': {
-      var rango = _rangoMes_(mes, anio);
-      return obtenerRankingStaffServicios(
-        params.fechaInicio || rango.inicio,
-        params.fechaFin    || rango.fin
-      );
-    }
-    case 'topServiciosMes':      return obtenerTopServiciosMes(mes, anio);
-    case 'general':
-    default:
-      return generarReporteServiciosNexserv({
-        fechaInicio: params.fechaInicio,
-        fechaFin: params.fechaFin,
-        staff: params.staff,
-        categoria: params.categoria
-      });
-  }
-}
+})();
