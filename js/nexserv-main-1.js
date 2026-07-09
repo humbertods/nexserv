@@ -4179,6 +4179,44 @@ function cerrarEvidenciasOverlay() {
   if (panel) panel.remove();
 }
 
+// ── Evidencias desde el Historial de servicios (Mikaela / owner) ─────────────
+// Mismo panel de fotos que usa la staff en Atención, pero anclado a la fila del
+// historial. Permite ver Y subir fotos de cualquier clienta ya atendida.
+function abrirEvidenciasHistorial(codigo, nombre, panelId) {
+  if (!codigo) { if (typeof showToast === 'function') showToast('Ese registro no tiene código de clienta'); return; }
+  var cont = document.getElementById(panelId);
+  if (!cont) return;
+
+  // Toggle: si este panel ya está abierto, cerrarlo
+  if (cont.firstChild) { cont.innerHTML = ''; return; }
+  // Cerrar cualquier otro panel de evidencias abierto en el historial
+  document.querySelectorAll('[id^="evHistPanel_"]').forEach(function (d) { d.innerHTML = ''; });
+
+  var staff = (window.currentUser && window.currentUser.name) || 'Mikaela';
+  cont.innerHTML =
+    '<div style="background:var(--bg);border-radius:14px;padding:12px;margin:8px 0;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">' +
+        '<button onclick="cerrarEvidenciasHistorial(\'' + panelId + '\')" style="background:var(--ink);color:#fff;border:0;border-radius:var(--radius-pill);padding:8px 14px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">← Cerrar</button>' +
+        '<div>' +
+          '<div style="font-size:13px;font-weight:800;color:var(--ink);">Evidencias del trabajo</div>' +
+          '<div style="font-size:11px;color:var(--ink-soft);">' + (nombre || '') + ' · ' + codigo + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="evLoading" style="text-align:center;padding:24px;color:#888;">Cargando…</div>' +
+    '</div>';
+
+  cont.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  _renderEvidenciasEnOverlay(codigo, nombre, staff);
+}
+
+function cerrarEvidenciasHistorial(panelId) {
+  var cont = document.getElementById(panelId);
+  if (cont) cont.innerHTML = '';
+}
+
+window.abrirEvidenciasHistorial  = abrirEvidenciasHistorial;
+window.cerrarEvidenciasHistorial = cerrarEvidenciasHistorial;
+
 async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
   var r = await apiGet('getEvidenciasPestanas', { codigo: codigo });
   var fotos = (r && r.fotos) ? r.fotos : {};
