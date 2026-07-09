@@ -187,8 +187,12 @@
             match = p.division.find(d => d.area === areaLabel);
           }
           if (match) {
-            const inp = row.querySelector('input');
+            const inp = row.querySelector('[data-field="promo"]') || row.querySelector('input');
             if (inp) inp.value = match.monto;
+            // Prellenar el regular guardado; si la promo es vieja y no lo tiene,
+            // dejar el que ya viene del catálogo (data-regular).
+            const inpReg = row.querySelector('[data-field="regular"]');
+            if (inpReg && match.regular != null && Number(match.regular) > 0) inpReg.value = match.regular;
           }
         });
         updateDepiSumaCheck();
@@ -219,8 +223,13 @@
       const key = row.dataset.area;
       const realArea = row.dataset.realarea || key;
       const servicio = row.dataset.servicio || '';
-      const inp = row.querySelector('input');
+      const inp = row.querySelector('[data-field="promo"]') || row.querySelector('input');
       const monto = parseFloat(inp?.value) || 0;
+      // Precio REGULAR por servicio: del campo editable; si está vacío, el que trae
+      // el catálogo (data-regular); si tampoco, cae al monto promo. Se guarda en la
+      // DIVISION para que el cobro con tarjeta use el regular real por servicio.
+      const inpReg = row.querySelector('[data-field="regular"]');
+      const regular = parseFloat(inpReg?.value) || parseFloat(row.dataset.regular) || monto;
       if (monto > 0) {
         if (key.startsWith('depi__')) {
           // Ítem individual de depilación: guardar con nombre del servicio
@@ -230,6 +239,7 @@
             realArea: 'depilacion',
             staff: AREA_STAFF['depilacion'] || AREA_STAFF['cejas'],
             monto: monto,
+            regular: regular,
             comm: AREA_COMM['depilacion']
           });
         } else if (key.startsWith('cejas__')) {
@@ -240,6 +250,7 @@
             realArea: 'cejas',
             staff: AREA_STAFF['cejas'],
             monto: monto,
+            regular: regular,
             comm: AREA_COMM['cejas']
           });
         } else {
@@ -247,6 +258,7 @@
             area: AREA_LABELS_TEXT[key] || key,
             staff: AREA_STAFF[key],
             monto: monto,
+            regular: regular,
             comm: AREA_COMM[key]
           });
         }
@@ -4425,4 +4437,3 @@ window.evSubirFotoDesdeInput = evSubirFotoDesdeInput;
 window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
-
