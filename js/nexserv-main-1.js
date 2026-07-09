@@ -3592,7 +3592,12 @@
       return true;
     });
     slotServices[slot] = _completadasSlot.concat(svcs);
-    const _activosSync = svcs.filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    // FIX doble cobro del extra (C-1027 Melany Castro): los servicios EXTRA aprobados
+    // por autorización (los que tienen authId) NO se fusionan al ticket. El backend ya
+    // los registra aparte en ServiciosExtras + su propia línea en LINEAS. Si los
+    // sumábamos acá, el total del ticket se inflaba y al finalizar se sumaban otra vez.
+    const _activosSync = _sinExtrasAut(svcs)
+      .filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const activeNames = _activosSync.map(s => s.name).join(' + ');
     if (!activeNames) return;
     const clientName = slot === 1
@@ -3641,7 +3646,8 @@
       slotServices[slot] = [{ name: promoData.promo.name, price: precioMiAreaAll, area: myAreaAll }];
     }
 
-    const svcsAprobados2 = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
+    // FIX doble cobro: los extras con authId van en su propia línea, no en el ticket.
+    const svcsAprobados2 = _sinExtrasAut(slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
     const totalFinal = svcsAprobados2.reduce((sum, s) => sum + Number(s.price || 0), 0) || (promoData ? Number(promoData.promo.price) : 0);
     const svcNames = promoData ? promoData.promo.name : (svcsAprobados2.map(s => s.name).join(' + ') || 'Servicio');
     const precioRegularFinal = promoData ? String(Number(promoData.promo.regular || promoData.promo.price)) : String(totalFinal);
