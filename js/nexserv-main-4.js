@@ -856,7 +856,7 @@
           s.servicios.map((sv, svi) =>
             '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
               '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
-              '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+              '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + _hhmm(sv.hora) + ' · ' + sv.metodo + '</div>' +
               '<div style="font-size:10px;color:var(--danger);margin-top:2px;">Com. $' + sv.comision.toFixed(2) + '</div>' +
               (sv.notaAjuste ? '<div style="font-size:10px;color:#8a6d00;background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:3px 7px;margin-top:4px;display:inline-block;">✏️ ' + sv.notaAjuste + '</div>' : '') + '</div>' +
               '<div style="display:flex;align-items:center;gap:8px;"><div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
