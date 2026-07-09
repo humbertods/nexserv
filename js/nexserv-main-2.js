@@ -1308,7 +1308,10 @@
       return sum + Number(s.price || 0);
     }, 0);
     
-    const svcNames = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || 'Servicio';
+    // FIX doble/triple cobro del extra (C-1027 Melany Castro, 09/07/2026):
+    // los EXTRAS aprobados por autorización (authId) ya viven en su propia línea de
+    // LINEAS — no se fusionan al nombre ni al total de este ticket.
+    const svcNames = _sinExtrasAut(svcs.filter(s => s.status !== 'rechazado')).map(s => s.name).join(' + ') || 'Servicio';
     const promoData = activePromos[clientKey];
     
     console.log('Promo data:', promoData);
@@ -1361,17 +1364,20 @@
 
     // Guardar datos en variable global para usar en las opciones
     // Si hay promo, el total es el precio de la promo + cualquier servicio extra aprobado (no de la promo)
+    // El ticket lleva SOLO lo suyo. Los extras con authId se cobran por su propia
+    // línea (LINEAS) — sumarlos acá los duplicaba, y como el total del ticket ya venía
+    // inflado por syncServiciosBackend, terminaban contados dos veces (69+15+15=99).
+    const svcsPropios = _sinExtrasAut(svcsAprobados);
+    const totalPropio = svcsPropios.reduce((sum, s) => sum + Number(s.price || 0), 0);
+
     let totalFinal;
     let miPrecioPromo = 0;
     if (promoData) {
-      // Servicios extra: aprobados que NO son la promo principal
-      const extrasAprobados = svcsAprobados.filter(s => s.name !== promoData.promo.name);
-      const totalExtras = extrasAprobados.reduce((sum, s) => sum + Number(s.price || 0), 0);
-      // Usar el precio de la parte de ESTA staff (no el total de la promo)
+      // Precio de la parte de ESTA staff en la promo — sin extras.
       miPrecioPromo = getMyPromoPrice(promoData.promo, staffArea, promoData.completedAreas || []);
-      totalFinal = String(miPrecioPromo + totalExtras);
+      totalFinal = String(miPrecioPromo);
     } else {
-      totalFinal = String(total);
+      totalFinal = String(totalPropio);
     }
     const miPrecioRegular = promoData
       ? (() => {
@@ -1380,10 +1386,9 @@
           const ratio = (promoData.promo.price > 0) ? (miPrecioPromo / promoData.promo.price) : 1;
           return Math.round(Number(promoData.promo.regular) * ratio);
         })()
-      : total;
-    const precioRegularFinal = promoData
-      ? String(miPrecioRegular + (svcsAprobados.filter(s => s.name !== promoData.promo.name).reduce((sum, s) => sum + Number(s.price || 0), 0)))
-      : String(total);
+      : totalPropio;
+    // Regular del ticket = regular de la promo. El extra aporta su propio regular en su línea.
+    const precioRegularFinal = String(miPrecioRegular);
 
     window._finishingSlot = 1;
     window._finishingData = {
