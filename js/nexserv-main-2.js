@@ -1711,8 +1711,8 @@
           const subs = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
           const esMulti = subs.length > 1;
           const subtitulo = esMulti
-            ? (subs.length + ' servicios · desde ' + a.horaToma)
-            : (a.servicio + ' · ' + a.area + ' · desde ' + a.horaToma);
+            ? (subs.length + ' servicios · desde ' + _hhmm(a.horaToma))
+            : (a.servicio + ' · ' + a.area + ' · desde ' + _hhmm(a.horaToma));
           const subticketsHtml = esMulti
             ? '<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">'
               + subs.map(function(s){
@@ -2531,7 +2531,7 @@
                     return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;' + (si < servicios.length - 1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
                       '<div style="flex:1;">' +
                         '<div style="font-size:13px;font-weight:700;color:var(--ink);">' + clienteDisplay(s.cliente, s.codigo) + '</div>' +
-                        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + s.hora + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
+                        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + s.fecha + ' · ' + _hhmm(s.hora) + ' · ' + (s.metodoPago || 'Efectivo') + '</div>' +
                         '<div style="font-size:11px;color:var(--ink-faint);margin-top:1px;">' + s.servicio + '</div>' +
                       '</div>' +
                       '<div style="font-size:15px;font-weight:800;color:var(--success);margin-left:12px;">$' + Number(s.comision || 0).toFixed(2) + '</div>' +
@@ -3228,7 +3228,7 @@
       } else {
         atendList.className = '';
         atendList.innerHTML = atend.map(function (a) {
-          var horaFin = a.horaFin ? ('<div style="font-size:11px;color:var(--ink-faint);">' + a.horaFin + '</div>') : '';
+          var horaFin = a.horaFin ? ('<div style="font-size:11px;color:var(--ink-faint);">' + _hhmm(a.horaFin) + '</div>') : '';
           var serv = [a.servicio, a.area].filter(Boolean).join(' · ');
           return '<div style="display:flex;align-items:center;gap:12px;padding:11px 12px;margin-bottom:8px;background:var(--card,#fff);border:1px solid var(--line);border-left:3px solid #46b04a;border-radius:12px;">' +
             '<div style="flex-shrink:0;text-align:center;min-width:42px;"><div style="font-size:13px;font-weight:800;">' + (a.hora || '') + '</div>' + horaFin + '</div>' +
@@ -3572,7 +3572,7 @@
                 } else if (est === 'en servicio') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
-                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+ar.hora:''}</div></div>
+                    <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+_hhmm(ar.hora):''}</div></div>
                     <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
                 } else {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${notLast?'border-bottom:1px solid var(--line);':''}">
