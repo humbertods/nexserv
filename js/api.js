@@ -336,6 +336,17 @@
   const AREA_COMM = { cejas: '30%', depilacion: '30%', pestanas: '30%', facial: '40%' };
   const AREA_STAFF = { cejas: 'María / Keyla / Lesly / Rosa', depilacion: 'María / Keyla / Lesly / Rosa', pestanas: 'Yadira / Diana', retiro_lifting: 'María / Keyla / Lesly / Rosa', facial: 'Laura' };
 
+  // ── Helper global de hora ────────────────────────────────────────────────
+  // Sheets serializa una celda que solo tiene hora como Date anclado al día cero:
+  // "Sat Dec 30 1899 15:50:00 GMT-0500". Esto extrae "15:50". Si ya viene limpia
+  // (HH:mm) la devuelve igual; si viene vacía, devuelve ''.
+  window._hhmm = function (v) {
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    var m = s.match(/(\d{1,2}):(\d{2})/);
+    return m ? (('0' + m[1]).slice(-2) + ':' + m[2]) : s;
+  };
+
   function updatePromoTotal() {
     const selected = getSelectedServices();
     const total = selected.reduce((sum, s) => sum + s.price, 0);
