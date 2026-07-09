@@ -363,11 +363,14 @@
       }
     });
 
-    // Preservar valores previos si existen
+    // Preservar valores previos si existen (monto promo Y precio regular por fila)
     const prevValues = {};
+    const prevRegular = {};
     divContainer.querySelectorAll('[data-area]').forEach(row => {
-      const inp = row.querySelector('input');
+      const inp = row.querySelector('[data-field="promo"]') || row.querySelector('input');
       if (inp && inp.value) prevValues[row.dataset.area] = inp.value;
+      const inpR = row.querySelector('[data-field="regular"]');
+      if (inpR && inpR.value) prevRegular[row.dataset.area] = inpR.value;
     });
 
     divContainer.innerHTML = '';
@@ -378,11 +381,18 @@
       const area = isDepiItem ? 'depilacion' : (isCejaItem ? 'cejas' : key);
       const itemName = (isDepiItem || isCejaItem) ? services[0].name : services.map(s => s.name).join(' + ');
       const suggestedPrice = prevValues[key] || '';
-      
+      // Precio REGULAR de esta fila = suma del precio de catálogo de sus servicios.
+      // El sistema ya lo conoce (con eso calcula el regular total del combo), así que
+      // lo prellenamos. Se guarda por servicio en la DIVISION → el cobro con tarjeta
+      // usa el regular real por área y no lo reparte proporcional.
+      const regularRow = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+      const suggestedRegular = prevRegular[key] || (regularRow > 0 ? regularRow : '');
+
       const row = document.createElement('div');
       row.dataset.area = key; // key único por servicio en depi
       row.dataset.realarea = area;
       row.dataset.servicio = itemName;
+      row.dataset.regular = String(regularRow || '');
       row.style.cssText = 'background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; border-left: 3px solid ' + (isDepiItem ? '#c44569' : 'var(--accent)') + ';';
       row.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
@@ -397,6 +407,12 @@
             style="flex: 1; padding: 10px; border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; background: var(--bg-card);"
             oninput="updateDepiSumaCheck()">
         </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+          <span style="font-size: 12px; font-weight: 600; color: var(--ink-soft); white-space: nowrap;">Precio regular:</span>
+          <input type="number" placeholder="$" value="${suggestedRegular}" data-field="regular"
+            style="flex: 1; padding: 10px; border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; background: var(--bg-card);">
+        </div>
+        <div style="font-size: 10px; color: var(--ink-faint); margin-top: 4px;">Sin promo (tarjeta). Se prellena del catálogo — ajustalo si hace falta.</div>
       `;
       divContainer.appendChild(row);
     });
@@ -425,7 +441,8 @@
     rows.forEach(row => {
       if (String(row.dataset.area || '').startsWith('depi__')) {
         tieneDepi = true;
-        const inp = row.querySelector('input');
+        // Ahora hay 2 inputs por fila (promo y regular) → tomar el de promo explícito
+        const inp = row.querySelector('[data-field="promo"]') || row.querySelector('input');
         sumaDepi += Number(inp?.value || 0);
       }
     });
