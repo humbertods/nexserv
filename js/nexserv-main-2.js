@@ -3469,7 +3469,7 @@
               <div class="waitlist-card" style="border:2px solid var(--accent);">
                 <div class="waitlist-top">
                   <div class="waitlist-client">
-                    <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                    <div class="waitlist-code">${w.codigo}${w.horaLlegada ? ' · llegó ' + _hhmm(w.horaLlegada) : ''}</div>
                     <div class="waitlist-name">${w.nombre} <span style="background:var(--accent);color:white;font-size:10px;padding:2px 8px;border-radius:100px;font-weight:700;">🔄 Para redirigir</span></div>
                   </div>
                 </div>
@@ -3488,7 +3488,7 @@
             <div class="waitlist-card priority-${pri === 'con el tiempo' ? 'tiempo' : pri} ${w.esTop ? 'is-top' : ''}" data-tid="${w.idEspera || ''}" data-tname="${String(w.nombre || '').replace(/"/g,'')}"${estaAsignada ? ' style="border-left:4px solid var(--accent);"' : ''}>
               <div class="waitlist-top">
                 <div class="waitlist-client">
-                  <div class="waitlist-code">${w.codigo} · llegó ${w.horaLlegada}</div>
+                  <div class="waitlist-code">${w.codigo}${w.horaLlegada ? ' · llegó ' + _hhmm(w.horaLlegada) : ''}</div>
                   <div class="waitlist-name">${w.nombre}${w.esTop ? ' <span class="top-star">⭐ TOP</span>' : ''}${synaBadge}</div>
                 </div>
                 ${priBadge[pri] || priBadge['normal']}
