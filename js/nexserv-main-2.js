@@ -2015,7 +2015,7 @@
         + '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">Esta clienta no tiene ficha registrada</div>'
         + '<button onclick="openNewPestFicha(\'' + clientKey + '\', ' + slot + ')" style="padding:14px 24px;background:var(--top-purple);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;">+ Crear ficha de pestañas</button>'
         + '</div>'
-        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + _cfn + '\',(window.currentUser&&window.currentUser.name)||\' staff)" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
+        + '<button onclick="abrirEvidenciasPestanas(\'' + _cfc + '\',\'' + String(_cfn || '').replace(/'/g, "\\'") + '\',(window.currentUser&&window.currentUser.name)||\'staff\')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;">'
         + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
         + 'Evidencia del trabajo realizado</button>';
       return;
@@ -2049,10 +2049,10 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${client.name}',(window.currentUser&&window.currentUser.name)||'staff\")" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${clientKey}','${String(client.name || '').replace(/'/g, "\\'")}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
-          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.\")" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
+          <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.')" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
           <button onclick="openNewPestFicha('${clientKey}', ${slot})" style="flex: 1; padding: 14px; background: var(--top-purple); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✨ Nueva ficha</button>
         </div>
         ${otherCount > 0 ? '<button onclick="showPestFichaHistory(\'' + clientKey + '\', ' + slot + ')" style="width: 100%; padding: 10px; background: var(--bg-card); border: 1.5px solid var(--line); border-radius: var(--radius-pill); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft);">📂 Ver ' + otherCount + ' ficha' + (otherCount > 1 ? 's' : '') + ' anterior' + (otherCount > 1 ? 'es' : '') + '</button>' : ''}
@@ -3846,6 +3846,18 @@
     sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
   }
 
+  // Botón 📷 de evidencias para una fila del Historial de servicios.
+  // Mikaela abre el mismo panel de fotos que la staff y puede subir imágenes.
+  // Solo se muestra si la fila tiene código de clienta (los productos no lo tienen).
+  function _histEvidenciaBtn(sv) {
+    if (!sv || !sv.codigoCli) return '';
+    const _nom = String(sv.cliente || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return '<button title="Evidencias / fotos" onclick="abrirEvidenciasHistorial(\'' + sv.codigoCli + '\',\'' + _nom + '\',\'evHistPanel_' + sv.itemIdx + '\')"'
+      + ' style="background:none;border:1.5px solid var(--ink-faint);color:var(--ink-soft);border-radius:8px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
+      + '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
+      + '</button>';
+  }
+
   async function loadServiciosHistory() {
     const selVal = document.getElementById('historyWeekSelect')?.value || 'hoy';
     const esHoy = selVal === 'hoy';
@@ -3928,7 +3940,10 @@
 
         if (!porDia[diaN]) porDia[diaN] = { dia: diaN, sortKey: diaSortKey === 0 ? 7 : diaSortKey, total: 0, count: 0, staff: {} };
         if (!porDia[diaN].staff[staffDisplay]) porDia[diaN].staff[staffDisplay] = { nombre: staffDisplay, total: 0, servicios: [] };
-        porDia[diaN].staff[staffDisplay].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx });
+        // codigo: necesario para abrir/subir las evidencias de la clienta desde el historial.
+        // En productos, h.codigo trae el nombre de la clienta, no un C-xxxx → se filtra al render.
+        const codigoCli = esProducto ? '' : String(h.codigo || h.code || '').trim();
+        porDia[diaN].staff[staffDisplay].servicios.push({ cliente, servicio, valor, hora, metodo, itemIdx, codigoCli });
         porDia[diaN].staff[staffDisplay].total += valor;
         porDia[diaN].total += valor;
         porDia[diaN].count++;
@@ -3974,15 +3989,19 @@
             '</div>' +
             '<div id="staff-hist-0-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
               s.servicios.map(function(sv, svi) {
-                return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
-                  '<div style="flex:1;">' +
-                    '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
-                    '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                return '<div style="' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                  '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">' +
+                    '<div style="flex:1;">' +
+                      '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
+                      '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex;align-items:center;gap:8px;">' +
+                      '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                      _histEvidenciaBtn(sv) +
+                      (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
+                    '</div>' +
                   '</div>' +
-                  '<div style="display:flex;align-items:center;gap:8px;">' +
-                    '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
-                    (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
-                  '</div>' +
+                  '<div id="evHistPanel_' + sv.itemIdx + '"></div>' +
                 '</div>';
               }).join('') +
             '</div>' +
@@ -4028,15 +4047,19 @@
                     '<div id="staff-hist-' + di + '-' + si + '" style="display:none;background:var(--bg-card);border-radius:0 0 12px 12px;padding:4px 14px 10px;">' +
                       s.servicios.map(function(sv, svi) {
                         const canDelete = window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner');
-                        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
-                          '<div style="flex:1;">' +
-                            '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
-                            '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                        return '<div style="' + (svi < s.servicios.length-1 ? 'border-bottom:1px solid var(--line);' : '') + '">' +
+                          '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">' +
+                            '<div style="flex:1;">' +
+                              '<div style="font-size:13px;font-weight:600;">' + sv.cliente + '</div>' +
+                              '<div style="font-size:11px;color:var(--ink-soft);">' + sv.servicio + ' · ' + sv.hora + ' · ' + sv.metodo + '</div>' +
+                            '</div>' +
+                            '<div style="display:flex;align-items:center;gap:8px;">' +
+                              '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
+                              _histEvidenciaBtn(sv) +
+                              (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
+                            '</div>' +
                           '</div>' +
-                          '<div style="display:flex;align-items:center;gap:8px;">' +
-                            '<div style="font-size:14px;font-weight:800;color:var(--success);">$' + sv.valor.toFixed(0) + '</div>' +
-                            (canDelete ? '<button onclick="confirmarEliminarServicio(' + sv.itemIdx + ')" style="background:none;border:1.5px solid var(--danger);color:var(--danger);border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4Z"/></svg></button>' : '') +
-                          '</div>' +
+                          '<div id="evHistPanel_' + sv.itemIdx + '"></div>' +
                         '</div>';
                       }).join('') +
                     '</div>' +
