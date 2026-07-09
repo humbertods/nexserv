@@ -347,6 +347,19 @@
     return m ? (('0' + m[1]).slice(-2) + ':' + m[2]) : s;
   };
 
+  // ── Servicio EXTRA aprobado por autorización ─────────────────────────────
+  // Un extra que pasó por el flujo de autorización SIEMPRE lleva authId.
+  // El backend ya lo registra por su cuenta (ServiciosExtras + su propia línea
+  // en LINEAS vía lineaAgregarExtra). Si además lo sumamos al ticket de la
+  // promo, el mismo servicio se cobra dos o tres veces.
+  //   Caso C-1027 Melany Castro (09/07/2026): promo $69 + adicional $15
+  //   quedó como una sola línea de $99 (69+15+15) MÁS otra línea de $15 → $114.
+  // Regla: un extra con authId nunca se fusiona al nombre ni al total del ticket.
+  window._esExtraAut = function (s) { return !!(s && s.authId); };
+  window._sinExtrasAut = function (arr) {
+    return (arr || []).filter(function (s) { return !window._esExtraAut(s); });
+  };
+
   function updatePromoTotal() {
     const selected = getSelectedServices();
     const total = selected.reduce((sum, s) => sum + s.price, 0);
