@@ -524,7 +524,7 @@
                   <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;${pi<histResult.ventasProductos.length-1?'border-bottom:1px solid var(--line);':''}">
                     <div>
                       <div style="font-size:13px;font-weight:600;">${p.cliente||'Clienta'}</div>
-                      <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${(p.producto||'').replace('🛍 ','')} · ${p.hora}</div>
+                      <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${(p.producto||'').replace('🛍 ','')} · ${_hhmm(p.hora)}</div>
                     </div>
                     <div style="font-size:15px;font-weight:700;color:var(--accent-deep);">$${Math.round(Number(p.precio||0))}</div>
                   </div>
@@ -2691,7 +2691,7 @@
           if (_as1av0) { _as1av0.textContent = initials; _as1av0.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as1Name', a.nombre, a.codigo, a.esTop);
           const _as1cd0 = document.getElementById('as1Code');
-          if (_as1cd0) _as1cd0.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
+          if (_as1cd0) _as1cd0.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + _hhmm(a.horaLlegada) : '');
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText = a.obsGeneral || a.observaciones || '';
           const _obs1d = document.getElementById('obs1Display');
@@ -3035,7 +3035,7 @@
           const _as2avb = document.getElementById('as2Avatar');
           if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
-          const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + a.horaLlegada : '');
+          const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + _hhmm(a.horaLlegada) : '');
           // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
           const obsText2 = a.obsGeneral || a.observaciones || '';
           document.getElementById('obs2Display').textContent = obsText2 || 'Sin observaciones';
