@@ -971,7 +971,7 @@
       const retrasoTag = s.retrasoMin > 0 ? '<span style="background:#ffeaea;color:#e53;font-size:10px;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:6px;">+' + s.retrasoMin + 'min</span>' : '';
       const permisoTag = s.permisoActivo ? '<div style="font-size:11px;color:#b8975c;margin-top:4px;">\uD83D\uDD12 Permiso desde ' + s.permisoActivo.hora + (s.permisoActivo.motivo ? ' · ' + s.permisoActivo.motivo : '') + '</div>' : '';
       const horasTag = s.minutosTrabajados > 0 ? '<span style="font-size:11px;color:var(--ink-faint);"> · ' + Math.floor(s.minutosTrabajados/60) + 'h ' + (s.minutosTrabajados%60) + 'min</span>' : '';
-      const horaEntradaTag = s.horaEntrada ? '<span style="font-size:12px;color:var(--ink-soft);">Entrada ' + s.horaEntrada + (s.horaSalida ? ' · Salida ' + s.horaSalida : '') + '</span>' : '<span style="font-size:12px;color:var(--ink-faint);">Sin registro</span>';
+      const horaEntradaTag = s.horaEntrada ? '<span style="font-size:12px;color:var(--ink-soft);">Entrada ' + _hhmm(s.horaEntrada) + (s.horaSalida ? ' · Salida ' + _hhmm(s.horaSalida) : '') + '</span>' : '<span style="font-size:12px;color:var(--ink-faint);">Sin registro</span>';
       const corBtn = (window.currentUser && (window.currentUser.role === 'admin' || window.currentUser.role === 'owner'))
         ? '<button onclick="_asisPreCorreccion(\'' + s.idJornada + '\')" style="background:none;border:1px solid var(--line);border-radius:20px;font-size:11px;padding:3px 9px;cursor:pointer;color:var(--ink-soft);flex-shrink:0;">\u270F\uFE0F</button>' : '';
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;margin-bottom:6px;background:' + bg + ';border:' + border + ';">'
@@ -4067,4 +4067,3 @@
 
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
-
