@@ -2003,6 +2003,10 @@
     const el = document.getElementById('pestFichaQuick' + slot);
     if (!el) return;
     const client = CLIENT_PROFILES[clientKey];
+    // OJO: clientKey NO es el código. Es el código normalizado ('C-1029' → 'c1029'),
+    // que es como se llavea CLIENT_PROFILES. FichaPestanas guarda el código real en
+    // col A, así que pasarle clientKey a las evidencias daba "No se encontró ficha".
+    const _codReal = (client && client.code) || window['_as' + slot + 'Client'] || clientKey;
     // Si el cliente no está en memoria aún, mostrar el estado sin ficha con el botón de evidencias
     if (!client) {
       el.style.display = 'block';
@@ -2049,7 +2053,7 @@
           ${fichaActiva.obs ? '<div style="font-size: 11px; opacity: 0.9; font-weight: 500; line-height: 1.4; margin-bottom: 10px;">📝 ' + fichaActiva.obs + '</div>' : ''}
         </div>
         ${_ultVisitaBarHTML(client)}
-        <button onclick="abrirEvidenciasPestanas('${clientKey}','${String(client.name || '').replace(/'/g, "\\'")}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
+        <button onclick="abrirEvidenciasPestanas('${_codReal}','${String(client.name || '').replace(/'/g, "\\'")}',(window.currentUser&&window.currentUser.name)||'staff')" style="width:100%;padding:14px;background:#1a1a1a;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"currentColor\"><path d=\"M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z\"/></svg>Evidencia del trabajo realizado</button>
         <div id="evPanelSlot_${slot}"></div>
         <div style="display: flex; gap: 8px; margin-bottom: 6px;">
           <button onclick="alert('✅ Se mantiene la ficha actual para este servicio.')" style="flex: 1; padding: 14px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✅ Mantener ficha</button>
