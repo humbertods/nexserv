@@ -64,11 +64,13 @@
       return apiGet('getTableroLineas')
         .then(function(r) {
           if (!r || !r.success) return apiGet('getListaEspera').then(function(r2){ return r2 && r2.lista ? r2.lista : []; });
-          // getTableroLineas devuelve { esperando:[], enServicio:[], porCobrar:[], completado:[], cobrado:[] }
+          // FIX nombres de campo: getTableroLineas devuelve { cola, en_servicio,
+          // completado, cobrado } — NO { esperando, enServicio, porCobrar }. Antes
+          // se leían los nombres equivocados → la lista volvía SIEMPRE vacía.
           var lista = [].concat(
-            r.esperando   || [],
-            r.enServicio  || [],
-            r.porCobrar   || []
+            r.cola          || r.esperando  || [],
+            r.en_servicio   || r.enServicio || [],
+            r.completado    || r.porCobrar  || []
           );
           return lista;
         })
