@@ -2005,21 +2005,24 @@
       { titulo: 'Después del servicio',     keys: [['despues_izq','Ojo Izquierdo'],['despues_der','Ojo Derecho']] },
       { titulo: 'Separación línea de agua', keys: [['linea_izq','Ojo Izquierdo'],['linea_der','Ojo Derecho']] }
     ];
-    var hayFotos = Object.keys(fotos).some(function(k){ return fotos[k]; });
-    if (!hayFotos) { panel.innerHTML = '<div style="color:var(--ink-faint);font-size:13px;padding:8px 0;">Sin evidencias registradas.</div>'; return; }
+    // Render CON CARGA: cada slot permite subir/cambiar foto (reusa _evFotoSlot,
+    // el mismo del panel de staff → sube a Drive + FichaPestanas y muestra miniatura).
+    // Antes acá era solo-lectura y, sin fotos, quedaba en "Sin evidencias registradas"
+    // sin forma de cargar. Ahora se pueden subir desde el perfil de la clienta.
+    var _evStaff = (window.currentUser && window.currentUser.name) || 'admin';
     var html = '';
     secciones.forEach(function(sec) {
       html += '<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:800;color:var(--ink);margin-bottom:6px;">' + sec.titulo + '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
       sec.keys.forEach(function(pair) {
-        var url = fotos[pair[0]];
-        html += '<div style="text-align:center;"><div style="font-size:10px;font-weight:700;color:#888;margin-bottom:4px;">' + pair[1] + '</div>'
-          + (url ? '<img src="' + url + '" onclick="_evVerFoto(\'' + url + '\')" style="width:100%;height:100px;object-fit:cover;border-radius:10px;cursor:pointer;">'
-                 : '<div style="height:100px;border:1.5px dashed #ddd;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:11px;">Sin foto</div>')
-          + '</div>';
+        // _evFotoSlot(key, label, url, codigo, staff): thumbnail si hay foto, o "+ Agregar foto".
+        html += (typeof _evFotoSlot === 'function')
+          ? _evFotoSlot(pair[0], pair[1], fotos[pair[0]] || '', codigo, _evStaff)
+          : '';
       });
       html += '</div></div>';
     });
-    if (r && r.fecha) html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:4px;">Registrado: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
+    html += '<div style="font-size:10px;color:var(--ink-faint,#aaa);text-align:center;padding-top:4px;">Las fotos se guardan en el perfil de la clienta</div>';
+    if (r && r.fecha) html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:2px;">Última carga: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
     panel.innerHTML = html;
   };
 
