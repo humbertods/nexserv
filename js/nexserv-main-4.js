@@ -544,6 +544,24 @@
       return '<option value="'+n+'">'+n+(ocup?' (Ocupada)':' (Disponible)')+'</option>';
     }).join('');
   }
+  // MODELO "Espera por staff": la staff toca "Confirmar / Empezar" en una clienta
+  // asignada → inicia TODOS sus servicios con esa staff (pasa a 'en_servicio').
+  async function iniciarClientaStaff(codigo, nombre){
+    const user = window.currentUser;
+    if (!user) return;
+    if (!confirm('¿Empezar con ' + (nombre || 'esta clienta') + '?')) return;
+    try {
+      const r = await apiPost('iniciarServicioStaff', { codigo: codigo, chicaNombre: user.name });
+      if (r && r.success) {
+        if (typeof showToast === 'function') showToast('▶ Servicio iniciado con ' + (nombre || 'la clienta'));
+        if (typeof loadStaffHome === 'function') loadStaffHome();
+      } else {
+        alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo iniciar'));
+      }
+    } catch(e){ console.error(e); alert('Error al iniciar el servicio'); }
+  }
+  window.iniciarClientaStaff = iniciarClientaStaff;
+
   async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
