@@ -1698,6 +1698,42 @@
       const list = document.getElementById('staffAtendiendoList');
       // Guard tardío: verificar que el DOM sigue siendo el de staffHome (no fue reemplazado por SIRA)
       if (!section || !list) return;
+
+      // ── POR EMPEZAR (Espera por staff) ─────────────────────────────────────
+      // Clientas asignadas a esta staff que todavía están 'esperando' en LINEAS.
+      // La staff toca "Confirmar / Empezar" → iniciarServicioStaff → 'en_servicio'.
+      try {
+        const _peSection = document.getElementById('staffPorEmpezarSection');
+        const _peList    = document.getElementById('staffPorEmpezarList');
+        if (_peSection && _peList) {
+          const _wait = await LineaService.obtenerListaEspera().catch(function(){ return []; });
+          const _mias = (_wait || []).filter(function (w) {
+            const est = String(w.estado || w.status || '').toLowerCase().replace('_', ' ');
+            if (est !== 'esperando') return false;   // solo las que aún no empezaron
+            const quien = (w.tomadaPor && String(w.tomadaPor).trim())
+                       || (w.asignadaA && String(w.asignadaA).trim()) || '';
+            return quien && quien.split(',').map(function(s){return s.trim();}).indexOf(user.name) !== -1;
+          });
+          if (_mias.length > 0) {
+            _peSection.style.display = 'block';
+            _peList.innerHTML = _mias.map(function (w) {
+              const _cod = String(w.codigo || '').replace(/'/g, "\\'");
+              const _nom = String(w.nombre || '').replace(/'/g, "\\'");
+              const _svc = String(w.servicio || w.promoNombre || 'Servicio');
+              const _tot = Number(w.total || 0);
+              return '<div class="card" style="padding:14px;margin-bottom:8px;border:2px solid var(--top-purple,#8b5cf6);">'
+                + '<div style="font-weight:800;font-size:15px;">' + (w.nombre || w.codigo || 'Clienta') + '</div>'
+                + '<div style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">' + _svc + (_tot ? ' · $' + _tot : '') + '</div>'
+                + '<button onclick="iniciarClientaStaff(\'' + _cod + '\',\'' + _nom + '\')" '
+                + 'style="width:100%;padding:12px;background:var(--top-purple,#8b5cf6);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">▶ Confirmar / Empezar</button>'
+                + '</div>';
+            }).join('');
+          } else {
+            _peSection.style.display = 'none';
+            _peList.innerHTML = '';
+          }
+        }
+      } catch (ePE) { console.warn('[porEmpezar]', ePE); }
       
       if (result.success && result.atenciones && result.atenciones.length > 0) {
         section.style.display = 'block';
