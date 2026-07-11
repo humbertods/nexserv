@@ -302,6 +302,17 @@
       };
       if (promoNombre) { payload.promoNombre = promoNombre; payload.precioPromo = precioPromo; payload.precioRegular = precioRegular; }
       if (areas.length > 1) { payload.secuencia = areas; }
+      // Servicios ESTRUCTURADOS (para que el backend arme las líneas LINEAS por área/staff
+      // = TicketMulti cuando hay 2+ áreas). El backend usa esto en vez del string concatenado.
+      payload.servicios = items.map(function (s) {
+        return {
+          area: s.area, servicio: s.servicio,
+          precio: Number(s.precio) || 0,
+          promoNombre: s.promoNombre || '',
+          precioPromo: Number(s.precioPromo) || 0,
+          precioRegular: Number(s.precioRegular) || 0
+        };
+      });
       try {
         var r = await apiPost('crearTicketSyna', payload);
         if (r && r.success) okCount++;
