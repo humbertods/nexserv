@@ -3359,6 +3359,32 @@
   window.synaNuevaReserva = synaNuevaReserva; window.synaCopiloto = synaCopiloto;
   window.synaAbrirEmbed = synaAbrirEmbed;
 
+  // ── SYNA embebido DENTRO de NexServ (overlay, sin cambiar de "app") ──────────
+  // Los botones "Agendar cita" / "Agenda" de la pantalla del "+" abren la agenda SYNA
+  // en un overlay sobre la pantalla actual, con "← Volver". No duplica pantalla ni
+  // cambia de pestaña: Mikaela siente que sigue dentro de NexServ (mismo criterio que SIRA).
+  function abrirSynaCita(view, titulo) {
+    var ov   = document.getElementById('synaCitaOverlay');
+    var slot = document.getElementById('synaCitaFrameSlot');
+    var ttl  = document.getElementById('synaCitaTitulo');
+    if (!ov || !slot) return;
+    if (ttl) ttl.textContent = titulo || 'SYNA';
+    var url = synaUrl_('embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : ''));
+    slot.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;display:block;background:#f5f5f3;" allow="clipboard-write"></iframe>';
+    ov.style.display = 'flex';
+    // Que el overlay cubra bien aunque la pantalla estuviera scrolleada.
+    try { var _ph = document.querySelector('.phone'); if (_ph) _ph.scrollTop = 0; } catch (e) {}
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+  function cerrarSynaCita() {
+    var ov   = document.getElementById('synaCitaOverlay');
+    var slot = document.getElementById('synaCitaFrameSlot');
+    if (slot) slot.innerHTML = '';   // descarga el iframe al salir (libera recursos)
+    if (ov) ov.style.display = 'none';
+  }
+  window.abrirSynaCita = abrirSynaCita;
+  window.cerrarSynaCita = cerrarSynaCita;
+
   async function loadMikaelaHome() {
     loadCajaChica();
     loadPrelista();
