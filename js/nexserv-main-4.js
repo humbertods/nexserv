@@ -1247,41 +1247,52 @@
     `;
   }
 
-  // === REFRESH (actualizar datos) ===
+  // === REFRESH PROFUNDO (equivale a Cmd+Shift+R desde el teléfono) ===
+  // Antes solo re-renderizaba la pantalla activa desde el estado en memoria. Eso dejaba
+  // referencias viejas (ej. un ticket ya enviado a cobro → "Ticket no encontrado") y la
+  // staff perdía tiempo teniendo que recargar a mano. Ahora hace una recarga REAL:
+  //   1) borra Cache Storage (assets cacheados por el service worker),
+  //   2) fuerza al service worker a actualizarse,
+  //   3) limpia los caches en memoria de la app,
+  //   4) recarga la página completa con un parámetro anti-caché → reconstruye TODO el
+  //      estado y vuelve a pedir datos frescos al servidor.
   async function doRefresh(btn) {
     if (btn.classList.contains('spinning')) return;
     btn.classList.add('spinning');
-    
-    // Mostrar toast
-    const toast = btn.closest('.nav').querySelector('.refresh-toast');
-    if (toast) {
-      toast.textContent = '⏳ Actualizando...';
-      toast.classList.add('show');
+
+    const toast = btn.closest('.nav') ? btn.closest('.nav').querySelector('.refresh-toast') : null;
+    if (toast) { toast.textContent = '⏳ Actualizando a fondo…'; toast.classList.add('show'); }
+
+    try {
+      // 1) Vaciar Cache Storage (lo que el SW haya guardado)
+      if (window.caches && caches.keys) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      }
+      // 2) Pedir al service worker que busque versión nueva
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(function (r) { try { return r.update(); } catch (e) { return null; } }));
+      }
+      // 3) Limpiar caches en memoria de la app
+      try { CLIENT_DIRECTORY_CACHE = []; } catch (e) {}
+      try { COMM_DATA = { value: '****', detail: 'Cargando...', day: '****', items: [] }; commVisible = false; } catch (e) {}
+      try { window._siraProductos = null; } catch (e) {}
+      try { window._mkPorCobrarData = null; } catch (e) {}
+    } catch (e) {
+      // Si algo falla, igual recargamos abajo — la recarga es lo importante.
+      console.warn('[doRefresh] limpieza parcial:', e);
     }
-    
-    // Resetear caches
-    CLIENT_DIRECTORY_CACHE = [];
-    COMM_DATA = { value: '****', detail: 'Cargando...', day: '****', items: [] };
-    commVisible = false;
-    
-    // Re-renderizar datos de la pantalla activa desde API
-    const activeScreen = document.querySelector('.screen.active');
-    if (activeScreen) {
-      const id = activeScreen.id;
-      if (id === 'waitList') await renderWaitList();
-      if (id === 'staffHome') await loadStaffHome();
-      if (id === 'ownerHome') await loadOwnerHome();
-      if (id === 'clientDirectory') await renderClientDirectory();
-      if (id === 'mikaelaHome') await loadMikaelaHome();
-      if (id === 'solucionesPanel') await loadSolucionesTickets();
-      if (id === 'ownerPromos') renderPromos();
-      if (id === 'staffPromos') await renderStaffPromos();
-    }
-    
-    btn.classList.remove('spinning');
-    if (toast) {
-      toast.textContent = '✓ Actualizado';
-      setTimeout(() => toast.classList.remove('show'), 1500);
+
+    // 4) Recarga real de la página con bypass de caché del documento.
+    // Un parámetro _r nuevo obliga al navegador a traer el documento fresco (no de caché),
+    // como un Cmd+Shift+R. El resto de datos se re-piden al arrancar la app de nuevo.
+    try {
+      const u = new URL(location.href);
+      u.searchParams.set('_r', Date.now().toString());
+      location.replace(u.toString());
+    } catch (e) {
+      location.reload();
     }
   }
 
