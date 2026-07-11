@@ -1048,7 +1048,7 @@
 
     <!-- SYNA: agendar cita / ver agenda (embebido en NexServ · solo Mikaela) -->
     <div style="display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px;">
-      <button onclick="abrirSynaCita('reservar','Agendar cita')" style="width:100%;min-height:60px;border:none;border-radius:18px;background:var(--ink,#1a1a1a);color:#fff;font-family:inherit;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,.10);">
+      <button onclick="abrirNuevaCita()" style="width:100%;min-height:60px;border:none;border-radius:18px;background:var(--ink,#1a1a1a);color:#fff;font-family:inherit;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 12px rgba(0,0,0,.10);">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h1V3a1 1 0 0 1 1-1Zm13 7H4v10h16V9Zm-8 2a1 1 0 0 1 1 1v2h2a1 1 0 1 1 0 2h-2v2a1 1 0 1 1-2 0v-2H9a1 1 0 1 1 0-2h2v-2a1 1 0 0 1 1-1Z"/></svg>
         Agendar cita
       </button>
@@ -1150,6 +1150,16 @@
   </div>
 
   <!-- ARRIVAL: CLIENTA EXISTENTE (buscar y seleccionar) -->
+  <!-- Nueva cita (módulo nativo NexServ · agendar/atender) -->
+  <div class="screen" id="nuevaCitaScreen">
+    <button class="back-btn" onclick="show('newArrival')">← Volver</button>
+    <div class="greeting" style="margin-bottom:18px;">
+      <div class="hello">Agendar</div>
+      <div class="name" style="font-size:24px;">Nueva cita</div>
+    </div>
+    <div id="ncBody"></div>
+  </div>
+
   <div class="screen" id="arrivalExisting">
     <button class="back-btn" onclick="show('newArrival')">← Volver</button>
     <div class="greeting" style="margin-bottom: 20px;">
@@ -2851,6 +2861,7 @@
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/nexserv-main-1.js?v=20260711d"></script>
   <script src="js/nexserv-main-2.js?v=20260711g"></script>
+  <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
   <script src="js/nexserv-main-3.js?v=20260710a"></script>
   <script src="js/nexserv-main-4.js?v=20260711b"></script>
 
