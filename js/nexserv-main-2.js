@@ -3886,16 +3886,15 @@
     sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
   }
 
-  // Botón 📷 de evidencias para una fila del Historial de servicios.
-  // Mikaela abre el mismo panel de fotos que la staff y puede subir imágenes.
-  // Solo se muestra si la fila tiene código de clienta (los productos no lo tienen).
+  // Botón 📷 de evidencias — DESACTIVADO en este listado diario "Cobros del día".
+  // Por pedido: las evidencias (ver/agregar foto) SOLO deben estar en dos lugares:
+  //   1) la ficha de pestañas de la staff mientras atiende a la clienta, y
+  //   2) el Historial de servicios POR CLIENTA de Mikaela/Owner (perfil de la clienta),
+  //      que usa _histToggleEvidencias — ese sí conserva ver + subir.
+  // Este listado agregado por staff ya no muestra el botón. Devolver '' lo quita de
+  // los dos sitios que lo llamaban (vista Hoy y vista semanal) sin tocar nada más.
   function _histEvidenciaBtn(sv) {
-    if (!sv || !sv.codigoCli) return '';
-    const _nom = String(sv.cliente || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    return '<button title="Evidencias / fotos" onclick="abrirEvidenciasHistorial(\'' + sv.codigoCli + '\',\'' + _nom + '\',\'evHistPanel_' + sv.itemIdx + '\')"'
-      + ' style="background:none;border:1.5px solid var(--ink-faint);color:var(--ink-soft);border-radius:8px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">'
-      + '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg>'
-      + '</button>';
+    return '';
   }
 
   async function loadServiciosHistory() {
