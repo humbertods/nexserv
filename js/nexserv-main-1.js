@@ -1393,7 +1393,7 @@
           const _as1cd = document.getElementById('as1Code');
           if (_as1cd) _as1cd.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
           const _obs1 = document.getElementById('obs1Display');
-          if (_obs1) _obs1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+          if (_obs1) _obs1.textContent = _obsDeArea(a1) || 'Sin observaciones';
           _setNotaRecepcion(1, a1.observaciones);
 
           // Restaurar servicios de la 1ª clienta desde el ticket
@@ -2650,10 +2650,37 @@
     }
     return humanas.join(' · ').trim();
   }
+  // ── Observación de la clienta POR ÁREA ──────────────────────────────────────
+  // Cada staff ve, al abrir el ticket, la observación de SU área (cejas→obsCejas,
+  // depilación→obsDepilacion, pestañas→obsPestanas, facial→obsFacial), guardada en el
+  // perfil de la clienta. Antes el recuadro mostraba a.observaciones, que en tickets
+  // LINEAS trae marcadores internos como "[paralelo SP]" → por eso no se veía la nota
+  // real. Acá se limpia ese marcador y, si el área no tiene nota, cae a la general.
+  function _limpiarObsInterna(s){
+    var t = String(s == null ? '' : s);
+    t = t.replace(/\[paralelo[^\]]*\]/gi, '');       // marcador de servicio paralelo
+    t = t.replace(/_completedAreas:\s*\[.*?\]/g, ''); // progreso de promo (interno)
+    return t.trim();
+  }
+  function _obsDeArea(a, area){
+    a = a || {};
+    var al = String(area || (window.currentUser && window.currentUser.area) || '').toLowerCase();
+    var val = al.indexOf('ceja')  >= 0 ? a.obsCejas
+            : al.indexOf('depil') >= 0 ? a.obsDepilacion
+            : al.indexOf('pest')  >= 0 ? a.obsPestanas
+            : (al.indexOf('facial') >= 0 || al.indexOf('limpieza') >= 0) ? a.obsFacial
+            : '';
+    val = _limpiarObsInterna(val);
+    if (val) return val;
+    return _limpiarObsInterna(a.obsGeneral);  // fallback: nota general del perfil
+  }
+  window._obsDeArea = _obsDeArea;
+  window._limpiarObsInterna = _limpiarObsInterna;
+
   function _setNotaRecepcion(panel, obsRaw){
     var el = document.getElementById('as' + panel + 'NotaMikaela');
     if (!el) return;
-    var nota = _extraerNotaRecepcion(obsRaw);
+    var nota = _limpiarObsInterna(_extraerNotaRecepcion(obsRaw));
     var txt = document.getElementById('as' + panel + 'NotaMikaelaTxt');
     if (nota){
       if (txt) { txt.textContent = nota; txt.style.display = 'block'; } // arranca visible en cada clienta
@@ -2695,8 +2722,8 @@
           pintarNombre('as1Name', a.nombre, a.codigo, a.esTop);
           const _as1cd0 = document.getElementById('as1Code');
           if (_as1cd0) _as1cd0.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + _hhmm(a.horaLlegada) : '');
-          // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
-          const obsText = a.obsGeneral || a.observaciones || '';
+          // Observación del ÁREA de la staff (limpia de marcadores internos).
+          const obsText = _obsDeArea(a);
           const _obs1d = document.getElementById('obs1Display');
           if (_obs1d) _obs1d.textContent = obsText || 'Sin observaciones';
           _setNotaRecepcion(1, a.observaciones);
@@ -3039,8 +3066,8 @@
           if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
           pintarNombre('as2Name', a.nombre, a.codigo, a.esTop);
           const _as2cdb = document.getElementById('as2Code'); if (_as2cdb) _as2cdb.textContent = a.codigo + (a.horaLlegada ? ' · Llegó ' + _hhmm(a.horaLlegada) : '');
-          // Mostrar obs — puede contener historial de areas previas (✅ cejas completado...)
-          const obsText2 = a.obsGeneral || a.observaciones || '';
+          // Observación del ÁREA de la staff (limpia de marcadores internos).
+          const obsText2 = _obsDeArea(a);
           document.getElementById('obs2Display').textContent = obsText2 || 'Sin observaciones';
           _setNotaRecepcion(2, a.observaciones);
           // Destacar si hay servicios previos en las observaciones
