@@ -4268,6 +4268,48 @@
     } catch(e) { return { success: false, ok: false, error: String(e) }; }
   }
 
+  // Resuelve el ID estable del producto desde el catálogo de SIRA (getProductos),
+  // buscándolo por nombre. Si SIRA no expone un id, devuelve '' y el movimiento se
+  // resuelve por nombre.
+  function _siraIdProducto(nombre) {
+    var prods = window._siraProductos || [];
+    var n = String(nombre || '').trim().toLowerCase();
+    for (var i = 0; i < prods.length; i++) {
+      var p = prods[i];
+      if (String(p.nombre || '').trim().toLowerCase() === n) {
+        return p.id || p.idProducto || p.ID || p.codigo || p.sku || '';
+      }
+    }
+    return '';
+  }
+
+  // Registra un movimiento en SIRA con la acción 'movimiento' — la que VALIDA el
+  // producto, ACTUALIZA el Stock Actual (suma en entrada / resta en salida) y luego
+  // escribe la fila en Movimientos. Antes NexServ usaba 'movimientoNexserv', que solo
+  // hacía append a Movimientos y NO tocaba Stock Actual: por eso una Entrada quedaba
+  // registrada pero el stock no subía. Manda el payload completo (idProducto, fecha,
+  // hora, tipoUnidad, grupo) para que SIRA lo procese igual que desde su propia UI.
+  async function _siraRegistrarMov(o) {
+    var now = new Date(), gy;
+    try { gy = new Date(now.toLocaleString('en-US', { timeZone: 'America/Guayaquil' })); } catch(e) { gy = now; }
+    var fecha = gy.getFullYear() + '-' + String(gy.getMonth()+1).padStart(2,'0') + '-' + String(gy.getDate()).padStart(2,'0');
+    var hora  = String(gy.getHours()).padStart(2,'0') + ':' + String(gy.getMinutes()).padStart(2,'0');
+    var resp  = o.responsable || 'Staff';
+    return _siraPost('movimiento', {
+      tipo:        o.tipo || 'salida',
+      producto:    o.producto || '',
+      idProducto:  (o.idProducto != null && o.idProducto !== '') ? o.idProducto : _siraIdProducto(o.producto),
+      cantidad:    Number(o.cantidad || 0),
+      responsable: resp,
+      area:        o.area || '',
+      fecha:       fecha,
+      hora:        hora,
+      tipoUnidad:  o.tipoUnidad || 'Unidad',
+      grupo:       o.grupo || (String(resp).replace(/ /g, '_') + '_' + Date.now()),
+      nota:        o.nota || ''
+    });
+  }
+
   window.abrirInventarioStaff = function() {
     var user = window.currentUser;
     if (!user) return;
@@ -4564,11 +4606,12 @@
       var btn2 = document.getElementById('siraEnviarBtn');
       if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
       var errores = 0;
+      var grupoKit = (user ? String(user.name).replace(/ /g,'_') : 'Staff') + '_kit_' + Date.now();
       for (var ki = 0; ki < kitItems.length; ki++) {
-        var rk = await _siraPost('movimientoNexserv', {
+        var rk = await _siraRegistrarMov({
           tipo:'salida', producto:kitItems[ki], cantidad:cantidad,
           responsable: user ? user.name : 'Staff',
-          area: user ? user.area : 'Pestañas', nota:'Kit Lashista'
+          area: user ? user.area : 'Pestañas', nota:'Kit Lashista', grupo: grupoKit
         });
         if (!rk || (!rk.ok && !rk.success)) errores++;
       }
@@ -4619,15 +4662,16 @@
       var staffNomB = user ? user.name : 'Staff';
       var itemsProd = COMBOS_MAP[producto] || [producto];
       // FIX: antes se enviaba un BATCH (movimientoBatchNexserv) que SIRA no resolvía
-      // → "Producto no encontrado: Vino rosado". La Salida individual (movimientoNexserv)
-      // SÍ encuentra el producto, así que el combo ahora registra cada ítem por ese
-      // mismo endpoint que funciona, uno por uno. Se reporta el ítem exacto que falle.
+      // → "Producto no encontrado". Ahora cada ítem del combo (bebida + servilleta +
+      // galleta) se registra con la acción 'movimiento' que SÍ descuenta Stock Actual,
+      // compartiendo un mismo 'grupo' para que SIRA lo reconozca como un combo.
+      var grupoBeb = String(staffNomB).replace(/ /g,'_') + '_combo_' + Date.now();
       var _errItems = [];
       for (var _bi = 0; _bi < itemsProd.length; _bi++) {
         var _prodB = itemsProd[_bi];
-        var _rItem = await _siraPost('movimientoNexserv', {
+        var _rItem = await _siraRegistrarMov({
           tipo: 'salida', producto: _prodB, cantidad: 1,
-          responsable: staffNomB, area: 'Coffee', nota: 'Combo bebida: ' + producto
+          responsable: staffNomB, area: 'Coffee', nota: 'Combo bebida: ' + producto, grupo: grupoBeb
         });
         if (!_rItem || (!_rItem.ok && !_rItem.success)) {
           _errItems.push(_prodB + ((_rItem && _rItem.error) ? ' (' + _rItem.error + ')' : ''));
@@ -4658,7 +4702,7 @@
     var btn2 = document.getElementById('siraEnviarBtn');
     if (btn2) { btn2.textContent='Registrando…'; btn2.disabled=true; }
 
-    var r = await _siraPost('movimientoNexserv', { tipo:tipo==='bebida'?'salida':tipo, producto:producto, cantidad:cantidad, responsable:responsable, area:area, nota:tipo==='bebida'?'Bebida servida':'' });
+    var r = await _siraRegistrarMov({ tipo:tipo==='bebida'?'salida':tipo, producto:producto, cantidad:cantidad, responsable:responsable, area:area, nota:tipo==='bebida'?'Bebida servida':'' });
 
     if (r && (r.ok || r.success)) {
       var p2 = document.getElementById('siraPanel_' + tipo);
