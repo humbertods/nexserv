@@ -4617,14 +4617,27 @@
         'Vino rosado':           ['Vino rosado','Servilleta logo','Galleta']
       };
       var staffNomB = user ? user.name : 'Staff';
-      var grupoB = staffNomB.replace(/ /g,'_') + '_combo_' + Date.now();
-      var nowB = new Date();
-      var fechaB = nowB.getFullYear() + '-' + String(nowB.getMonth()+1).padStart(2,'0') + '-' + String(nowB.getDate()).padStart(2,'0');
-      var horaB  = String(nowB.getHours()).padStart(2,'0') + ':' + String(nowB.getMinutes()).padStart(2,'0');
-      var itemsB = (COMBOS_MAP[producto] || [producto]).map(function(prod) {
-        return { tipo:'salida', producto:prod, cantidad:1, responsable:staffNomB, area:'Coffee', fecha:fechaB, hora:horaB, tipoUnidad:'Unidad', grupo:grupoB, esCombo:true, nombreCombo:producto };
-      });
-      var rb = await _siraPost('movimientoBatchNexserv', { movimientos: itemsB });
+      var itemsProd = COMBOS_MAP[producto] || [producto];
+      // FIX: antes se enviaba un BATCH (movimientoBatchNexserv) que SIRA no resolvía
+      // → "Producto no encontrado: Vino rosado". La Salida individual (movimientoNexserv)
+      // SÍ encuentra el producto, así que el combo ahora registra cada ítem por ese
+      // mismo endpoint que funciona, uno por uno. Se reporta el ítem exacto que falle.
+      var _errItems = [];
+      for (var _bi = 0; _bi < itemsProd.length; _bi++) {
+        var _prodB = itemsProd[_bi];
+        var _rItem = await _siraPost('movimientoNexserv', {
+          tipo: 'salida', producto: _prodB, cantidad: 1,
+          responsable: staffNomB, area: 'Coffee', nota: 'Combo bebida: ' + producto
+        });
+        if (!_rItem || (!_rItem.ok && !_rItem.success)) {
+          _errItems.push(_prodB + ((_rItem && _rItem.error) ? ' (' + _rItem.error + ')' : ''));
+        } else if (typeof _siraAgregarMovLocal === 'function') {
+          _siraAgregarMovLocal('salida', _prodB, 1, staffNomB, 'Coffee');
+        }
+      }
+      var rb = _errItems.length === 0
+        ? { ok: true, success: true }
+        : { ok: false, success: false, error: 'No encontrado: ' + _errItems.join(', ') };
       var p2b = document.getElementById('siraPanel_bebida');
       if (rb && (rb.ok || rb.success)) {
         if (p2b) {
