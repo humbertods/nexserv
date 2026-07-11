@@ -3365,9 +3365,14 @@
   // cambia de pestaña: Mikaela siente que sigue dentro de NexServ (mismo criterio que SIRA).
   function abrirSynaCita(view, titulo) {
     var ov   = document.getElementById('synaCitaOverlay');
+    if (!ov) return;
+    // El overlay está declarado dentro de una .screen (activeService) que queda en
+    // display:none cuando Mikaela está en otra pantalla → hay que sacarlo a <body> para
+    // que se vea siempre. Se mueve una sola vez (idempotente).
+    if (ov.parentNode !== document.body) document.body.appendChild(ov);
     var slot = document.getElementById('synaCitaFrameSlot');
     var ttl  = document.getElementById('synaCitaTitulo');
-    if (!ov || !slot) return;
+    if (!slot) return;
     if (ttl) ttl.textContent = titulo || 'SYNA';
     var url = synaUrl_('embed=1&user=mikaela' + (view ? '&view=' + encodeURIComponent(view) : ''));
     slot.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;display:block;background:#f5f5f3;" allow="clipboard-write"></iframe>';
