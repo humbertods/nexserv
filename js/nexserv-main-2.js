@@ -4295,7 +4295,14 @@
     var fecha = gy.getFullYear() + '-' + String(gy.getMonth()+1).padStart(2,'0') + '-' + String(gy.getDate()).padStart(2,'0');
     var hora  = String(gy.getHours()).padStart(2,'0') + ':' + String(gy.getMinutes()).padStart(2,'0');
     var resp  = o.responsable || 'Staff';
-    return _siraPost('movimiento', {
+    // AUTENTICACIÓN: NexServ solo tiene TOKEN (no sesión de usuario SIRA). La acción
+    // 'movimiento' exige sesión logueada → devolvía "Sesión requerida". El único endpoint
+    // de escritura que acepta el token es 'movimientoNexserv'. Le mandamos el payload
+    // COMPLETO (idProducto, fecha, hora, tipoUnidad, grupo) para que —una vez que en SIRA
+    // el handler 'movimientoNexserv' agregue la lógica de Stock Actual— ya tenga todo lo
+    // que necesita. Hoy este endpoint registra en Movimientos; el update de stock es la
+    // pieza que falta DEL LADO DE SIRA.
+    return _siraPost('movimientoNexserv', {
       tipo:        o.tipo || 'salida',
       producto:    o.producto || '',
       idProducto:  (o.idProducto != null && o.idProducto !== '') ? o.idProducto : _siraIdProducto(o.producto),
