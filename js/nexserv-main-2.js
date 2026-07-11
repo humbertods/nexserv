@@ -1794,7 +1794,7 @@
         document.getElementById('as1Avatar').className = 'client-avatar' + (a1.esTop ? ' is-top' : '');
         pintarNombre('as1Name', a1.nombre, a1.codigo, a1.esTop);
         var _ac1=document.getElementById('as1Code'); if(_ac1) _ac1.textContent = a1.codigo + (a1.horaLlegada ? ' · Llegó ' + a1.horaLlegada : '');
-        var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = a1.obsGeneral || a1.observaciones || 'Sin observaciones';
+        var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = (window._obsDeArea ? window._obsDeArea(a1) : (a1.obsGeneral||'')) || 'Sin observaciones';
         _setNotaRecepcion(1, a1.observaciones);
         renderSecuenciaBanner(1, a1.secuencia || []);
 
