@@ -4316,9 +4316,13 @@ async function renderEvidenciasPanel() {
 function _evFotoSlot(key, label, url, codigo, staff) {
   var inputId = 'evInput_' + key;
   var imgId   = 'evImg_'   + key;
+  // Cache-buster por render: fuerza al navegador a bajar la foto de ESTA clienta y
+  // no reusar una cacheada (evita que se vea la foto de otra clienta). Se agrega solo
+  // al src del <img>, no a la URL que se abre en grande.
+  var _srcCb  = url ? (url + (url.indexOf('?') >= 0 ? '&' : '?') + '_cb=' + encodeURIComponent(String(codigo || '')) + '_' + Date.now()) : '';
   var imgHtml = url
     ? '<div style="position:relative;cursor:pointer;" onclick="_evMenuFoto(\'' + key + '\',\'' + url + '\',\'' + inputId + '\')">'
-        + '<img id="' + imgId + '" src="' + url + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
+        + '<img id="' + imgId + '" src="' + _srcCb + '" style="width:100%;height:130px;object-fit:cover;border-radius:10px;display:block;">'
         + '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.55);border-radius:6px;padding:3px 7px;font-size:10px;font-weight:700;color:#fff;">⋯</div>'
       + '</div>'
     : '<label for="' + inputId + '" style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
