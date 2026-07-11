@@ -3695,8 +3695,42 @@ function computeCajaBreakdown_(servicios, gastos) {
     tarjeta:       { total: 0, items: [] },
     gastos:        { total: 0, totalEfectivo: 0, totalTransfer: 0, items: [] }
   };
-  (servicios || []).forEach(s => {
-    const partes = parseMetodoPagoCaja_(s.metodoPago, s.total);
+  const svs = servicios || [];
+
+  // ── PAGO MIXTO: contar UNA sola vez por cobro, con los montos EXACTOS ────────
+  // La etiqueta "Mixto: $X efectivo + $Y transferencia" ya trae el reparto real que
+  // ingresó Mikaela y cubre TODO el cobro (servicios + producto). Antes cada fila
+  // re-parseaba la etiqueta completa y, como su total de fila era menor (el producto
+  // se guarda aparte), se escalaba proporcionalmente → centavos raros ($7.78/$27.22)
+  // y efectivo inflado. Ahora: se indexa el mixto por cobro (cliente+hora), se suma
+  // una vez con sus montos exactos, y se IGNORA la fila del producto de ese mismo
+  // cobro (el backend la fuerza a 'Efectivo', pero su pago ya está dentro del mixto).
+  const mixtoPorCobro = {};   // key "cliente|hora" → { cliente, partes:[{metodo,monto}] }
+  svs.forEach(s => {
+    if (!/^mixto/i.test(String(s.metodoPago || '').trim())) return;
+    const key = (s.clienteNombre || '') + '|' + (s.hora || '');
+    if (mixtoPorCobro[key]) return;   // otra línea del mismo cobro mixto
+    mixtoPorCobro[key] = {
+      cliente: s.clienteNombre || 'Clienta',
+      partes: parseMetodoPagoCaja_(s.metodoPago, null)   // null → montos exactos, sin escalar
+    };
+  });
+  Object.keys(mixtoPorCobro).forEach(key => {
+    const mc = mixtoPorCobro[key];
+    mc.partes.forEach(p => {
+      bd[p.metodo].total += p.monto;
+      bd[p.metodo].items.push({ cliente: mc.cliente, monto: p.monto });
+    });
+  });
+
+  svs.forEach(s => {
+    const metRaw = String(s.metodoPago || '').trim();
+    if (/^mixto/i.test(metRaw)) return;   // los mixtos ya se contaron arriba
+    // Producto (🛍) de un cobro mixto: su pago YA está incluido en el mixto → no re-sumar.
+    const key = (s.clienteNombre || '') + '|' + (s.hora || '');
+    const esProducto = /^\s*🛍/.test(String(s.servicio || ''));
+    if (mixtoPorCobro[key] && esProducto) return;
+    const partes = parseMetodoPagoCaja_(metRaw, s.total);
     partes.forEach(p => {
       bd[p.metodo].total += p.monto;
       bd[p.metodo].items.push({ cliente: s.clienteNombre || 'Clienta', monto: p.monto });
