@@ -3715,10 +3715,15 @@
               const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
               const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
               const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
+              // Ticket madre con varios subtickets → listar cada servicio en su
+              // renglón (antes se concatenaban en una sola línea: "A + B + C + D").
+              const _subticketsHTML = (a.serviciosDetalle && a.serviciosDetalle.length > 1)
+                ? a.serviciosDetalle.map(d => `<div style="font-size:11px;color:var(--ink-soft);">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></div>`).join('')
+                : `<div style="font-size:11px;color:var(--ink-soft);">${servicioLimpio}</div>`;
               timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
                 <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
                 <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:${badgeColor};">${labelActual} · ${a.tomadaPor}</div>
-                <div style="font-size:11px;color:var(--ink-soft);">${servicioLimpio}</div>
+                ${_subticketsHTML}
                 <div style="font-size:10px;color:var(--ink-faint);">Desde ${a.horaToma || '?'}${esPendConf?' · Esperando confirmación':''}</div></div>
                 <div style="font-size:10px;font-weight:700;background:${badgeBg};color:${badgeColor};padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${badgeLabel}</div></div>`;
               if (a.promoNombre) {
