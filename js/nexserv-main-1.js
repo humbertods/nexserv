@@ -3527,9 +3527,10 @@
   
   function removeServiceItem(slot, idx) {
     if (!slotServices[slot]) return;
+    const _removed = slotServices[slot][idx];   // capturar ANTES de quitar
     slotServices[slot].splice(idx, 1);
     renderServicesForSlot(slot);
-    
+
     // Actualizar total
     const total = slotServices[slot].reduce((sum, s) => {
       if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
@@ -3538,7 +3539,29 @@
     document.getElementById('as' + slot + 'Total').textContent = '$' + total;
     document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
 
-    // Sincronizar cambio de servicios con el backend (actualiza col F en ListaEspera)
+    // ANULAR la línea del servicio quitado en LINEAS (queda como evidencia 'anulado').
+    // Antes solo se re-sincronizaba el ticket y la línea del servicio quitado seguía
+    // 'en_servicio' → se seguía cobrando y no figuraba anulada (caso Depilación de
+    // cejas hombres $9). Solo aplica si el servicio ya tenía su propia línea.
+    try {
+      const _user = window.currentUser;
+      const _idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const _clientCode = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+      if (_removed && _removed.name && _removed.status !== 'pendiente') {
+        apiPost('anularLineaTicket', {
+          idEspera: _idEspera,
+          chicaNombre: (_user && _user.name) || '',
+          clienteCodigo: _clientCode || '',
+          servicio: _removed.name,
+          monto: String(_removed.price != null ? _removed.price : '')
+        }).then(function (r) { console.log('🗑 Línea anulada:', r); })
+          .catch(function (e) { console.warn('anularLineaTicket:', e); });
+      }
+    } catch (eAnul) { console.warn('[removeServiceItem] anular:', eAnul); }
+
+    // Sincronizar cambio de servicios con el backend (actualiza col F en ListaEspera).
+    // Los servicios que ya son línea propia (_yaEnLinea/authId) quedan excluidos del
+    // string concatenado por _sinExtrasAut, así que esto no pisa las otras líneas.
     syncServiciosBackend(slot, total);
   }
 
