@@ -1843,14 +1843,37 @@
               setTimeout(() => updateFinishButtons(1), 300);
             }
           } else {
-            // Sin promo: precio normal del servicio
-            const price = a1.total || 0;
-            if (!slotServices[1].find(s => s.name === a1.servicio)) {
-              slotServices[1].unshift({
-                name: a1.servicio,
-                price: price,
-                area: a1.area
+            // Sin promo: restaurar TODOS los servicios del ticket (no solo el primario).
+            // FIX (13/07): cuando la staff agrega extras (combo + nariz + barbilla), el
+            // ticket llega con varios servicios en serviciosDetalle. Antes esta rama solo
+            // re-agregaba a1.servicio (el nombre combinado en un renglón) → los extras no
+            // se listaban por separado y, tras un refresh, "desaparecían". Ahora se
+            // expande serviciosDetalle en renglones separados, sin duplicar lo ya presente.
+            const _detalle1 = Array.isArray(a1.serviciosDetalle) ? a1.serviciosDetalle : [];
+            if (_detalle1.length > 1) {
+              _detalle1.forEach(function (sd) {
+                const _nm = sd.servicio || sd.nombre || sd.name || '';
+                if (!_nm) return;
+                if (slotServices[1].find(s => s.name === _nm)) return;
+                slotServices[1].push({
+                  name: _nm,
+                  price: Number(sd.monto || sd.precio || sd.price || 0),
+                  area: sd.area || a1.area || '',
+                  esPromo: !!sd.esPromo,
+                  status: 'aprobado',
+                  // ya vienen de líneas existentes en LINEAS → no re-sincronizar al ticket
+                  _yaEnLinea: true
+                });
               });
+            } else {
+              const price = a1.total || 0;
+              if (!slotServices[1].find(s => s.name === a1.servicio)) {
+                slotServices[1].unshift({
+                  name: a1.servicio,
+                  price: price,
+                  area: a1.area
+                });
+              }
             }
             // Limpiar promo residual de esta clienta (puede ser un servicio nuevo sin promo)
             if (activePromos[clientKey1]) {
