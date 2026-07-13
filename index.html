@@ -268,7 +268,10 @@
       <button id="appBtn_sira" onclick="switchApp('sira')">Sira</button>
     </div>
 
-    <button onclick="show('tableroLineas')" style="width:calc(100% - 28px);margin:0 14px 4px;padding:11px;background:var(--ink);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">📊 Tablero en vivo</button>
+    <!-- Botón "Tablero en vivo" removido (13/07): era una vista de solo lectura del tablero
+         LINEAS (preview de migración). No tocaba el flujo de citas. La pantalla y su render
+         quedan en el código pero sin acceso desde la UI. -->
+
 
     <!-- ============ TAB: NEXSERV (contenido actual) ============ -->
     <div id="tabNexserv">
