@@ -355,7 +355,12 @@
   //   Caso C-1027 Melany Castro (09/07/2026): promo $69 + adicional $15
   //   quedó como una sola línea de $99 (69+15+15) MÁS otra línea de $15 → $114.
   // Regla: un extra con authId nunca se fusiona al nombre ni al total del ticket.
-  window._esExtraAut = function (s) { return !!(s && s.authId); };
+  // _yaEnLinea: servicio que YA está registrado como su propia línea en LINEAS
+  // (una parte de promo creada por aplicarPromoStaff, o un servicio recargado desde
+  // serviciosDetalle al volver a abrir el ticket). Igual que un extra con authId,
+  // NO debe re-fusionarse al string del ticket en syncServiciosBackend (si no, el
+  // sync concatena nombres y pisa/duplica líneas → "aparece y se quita").
+  window._esExtraAut = function (s) { return !!(s && (s.authId || s._yaEnLinea)); };
   window._sinExtrasAut = function (arr) {
     return (arr || []).filter(function (s) { return !window._esExtraAut(s); });
   };
