@@ -3594,7 +3594,7 @@
               </div>
               ${estadoHTML}
               ${_desgloseMultiHTML}
-              ${_esMultiPromo ? reassignHTML : `${esSyna ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
+              ${_esMultiPromo ? reassignHTML : `${(!estaAsignada && w.servicio && String(w.servicio).trim() && String(w.servicio).trim() !== '—') ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
                 <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
                 <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
               </div>`}
