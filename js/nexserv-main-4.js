@@ -1398,11 +1398,16 @@
     // Obtener el precio que le corresponde a esta área (suma todas las partes que puede hacer)
     const myPrice = getMyPromoPrice(promo, myArea);
     
-    // Agregar servicio de promo a slotServices
+    // Agregar servicio de promo a slotServices.
+    // _yaEnLinea: la promo se registra como sus propias líneas en LINEAS (aplicarPromoStaff),
+    // así que este renglón es SOLO para mostrar — no debe re-sincronizarse al ticket.
     const servicioPromo = {
       name: promo.name,
       area: myArea,
-      price: myPrice
+      price: myPrice,
+      esPromo: true,
+      status: 'aprobado',
+      _yaEnLinea: true
     };
     
     // Aplicar promo = REEMPLAZAR el servicio que tenía la clienta (cambió de opinión),
@@ -1440,34 +1445,54 @@
     closeModal();
     alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
 
-    // Sincronizar el cambio con el backend para que Mikaela vea el nuevo valor EN VIVO
-    // (antes solo se actualizaba el estado local de la staff y Mikaela seguía viendo el viejo).
+    // Registrar el cambio a promo en el backend DEJANDO EVIDENCIA:
+    // la línea original (la que asignó Mikaela) se ANULA y se crean N líneas nuevas
+    // (una por parte de la división de la promo que hace ESTA staff). Así queda
+    // registro de que la staff cambió el servicio inicial, y la promo queda en 2
+    // líneas bien registradas en vez de una sola. Los extras siguen su propio flujo.
     const _idEsperaPromo = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
     if (_idEsperaPromo) {
-      apiPost('updateServiciosAtencion', {
+      // Partes de la promo que hace ESTA staff (según su área/capacidades)
+      const _CAPS = {
+        cejas:    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow'],
+        pestanas: ['pestanas', 'pestañas', 'pestaña', 'lifting', 'volumen', 'retiro_lifting', 'retiro', 'pelo a pelo', 'efecto', 'clasicas', 'clásicas', 'natural', 'hawaiano', 'aura'],
+        facial:   ['facial', 'hidra', 'limpieza']
+      };
+      const _caps = _CAPS[myArea] || [myArea];
+      const _div = Array.isArray(promo.division) ? promo.division : [];
+      let _mias = _div.filter(function (dd) {
+        const a = String(dd.area || '').toLowerCase();
+        return _caps.some(function (c) { return a.includes(c); });
+      });
+      // Sin división utilizable → una sola línea con el nombre de la promo
+      if (_mias.length === 0) {
+        _mias = [{ servicio: promo.name, area: myArea, monto: myPrice }];
+      }
+      // Escalar los montos de las partes para que SUMEN lo que cobra la staff (myPrice).
+      // La división suele estar en precio regular; myPrice es el precio promo del área.
+      const _sumDiv = _mias.reduce(function (s, p) { return s + Number(p.monto || 0); }, 0) || 1;
+      let _acum = 0;
+      const _partes = _mias.map(function (p, idx) {
+        const _reg = Number(p.monto || 0);
+        let _val;
+        if (idx === _mias.length - 1) {
+          _val = Math.round((myPrice - _acum) * 100) / 100;   // última absorbe el redondeo
+        } else {
+          _val = Math.round((_reg / _sumDiv) * myPrice * 100) / 100;
+          _acum += _val;
+        }
+        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg };
+      });
+      apiPost('aplicarPromoStaff', {
         idEspera      : _idEsperaPromo,
         chicaNombre   : user?.name || '',
         clienteNombre : clientName,
         clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
-        servicios     : promo.name,
-        total         : String(myPrice),
         promoNombre   : promo.name,
-        tipo          : 'SP',
-        precioPromo   : String(myPrice),
         precioRegular : String(promo.regular || promo.price || myPrice),
-        // áreas que cubre la promo NUEVA → el backend cancela las otras áreas del combo
-        // viejo que queden huérfanas (ej. Depilación $8.96 del Classic Premium)
-        promoAreas    : (Array.isArray(promo.division) ? promo.division.map(function (d) { return d.area; }) : []).join(','),
-        // división completa del combo nuevo (categoría + precio por área) → el backend
-        // ACTUALIZA las áreas compartidas (ej. cejas) al combo nuevo en vez de dejarlas
-        // con el combo viejo, así la otra staff (María) recibe el combo correcto.
-        promoDivision : JSON.stringify(
-          (Array.isArray(promo.division) ? promo.division : []).map(function (d) {
-            return { cat: _promoCatDe(d.realArea || d.area), servicio: (d.servicio || d.area || ''), monto: Number(d.monto || 0) };
-          })
-        )
-      }).then(function (r) { console.log('✅ Promo sincronizada con Mikaela:', r); })
-        .catch(function (e) { console.warn('⚠ Error sincronizando promo con Mikaela:', e); });
+        partes        : JSON.stringify(_partes)
+      }).then(function (r) { console.log('✅ Promo registrada (anular original + crear', (r && r.creadas) || 0, 'líneas):', r); })
+        .catch(function (e) { console.warn('⚠ Error registrando promo:', e); });
     }
 
     // Si la promo incluye áreas que esta staff NO hace, avisar a Mikaela del cambio
