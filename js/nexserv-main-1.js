@@ -3055,6 +3055,27 @@
               updateFinishButtons(1);
             });
           } else {
+            // FALLBACK (14/07): slot vacío tras normal/promo (SP con promoNombre fuera
+            // del catálogo PROMOS del front, p.ej. clienta piloto LINEAS) → cargar el
+            // servicio directo desde la atención para que el modal no muestre "—".
+            if ((!slotServices[1] || slotServices[1].length === 0) && a.servicio && a.servicio !== '—') {
+              const _det1fb = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
+              if (_det1fb.length > 0) {
+                slotServices[1] = _det1fb.map(sd => ({
+                  name: sd.servicio || sd.nombre || sd.name || '',
+                  price: Number(sd.monto || sd.precio || sd.price || 0),
+                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true
+                }));
+              } else {
+                let _nm1 = String(a.servicio || '');
+                if (_nm1.trim().startsWith('{')) { try { _nm1 = JSON.parse(_nm1).nombre || _nm1; } catch(e){} }
+                slotServices[1] = [{ name: _nm1, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true }];
+              }
+              renderServicesForSlot(1);
+              const _tot1fb = slotServices[1].reduce((s,v) => s + Number(v.price||0), 0);
+              const _as1t = document.getElementById('as1Total'); if (_as1t) _as1t.textContent = '$' + _tot1fb;
+              const _as1c = document.getElementById('as1SvcCount'); if (_as1c) _as1c.textContent = String(slotServices[1].length);
+            }
             // SP / promo compartida / enganche → siempre mostrar modal de confirmación
             window.confirmarServicioObligatorio(1);
           }
@@ -3346,10 +3367,32 @@
               updateFinishButtons(2);
             });
           } else {
+            // FALLBACK (14/07): si tras las ramas normal/promo el slot quedó vacío
+            // —caso típico: SP cuyo promoNombre no existe en el catálogo PROMOS del
+            // front (p.ej. la clienta piloto de LINEAS)— cargar el servicio directo
+            // desde la atención para que el modal "Servicio asignado" no muestre "—".
+            if ((!slotServices[2] || slotServices[2].length === 0) && a.servicio && a.servicio !== '—') {
+              const _det2 = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
+              if (_det2.length > 0) {
+                slotServices[2] = _det2.map(sd => ({
+                  name: sd.servicio || sd.nombre || sd.name || '',
+                  price: Number(sd.monto || sd.precio || sd.price || 0),
+                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true
+                }));
+              } else {
+                let _nm2 = String(a.servicio || '');
+                if (_nm2.trim().startsWith('{')) { try { _nm2 = JSON.parse(_nm2).nombre || _nm2; } catch(e){} }
+                slotServices[2] = [{ name: _nm2, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true }];
+              }
+              renderServicesForSlot(2);
+              const _tot2fb = slotServices[2].reduce((s,v) => s + Number(v.price||0), 0);
+              const _as2t = document.getElementById('as2Total'); if (_as2t) _as2t.textContent = '$' + _tot2fb;
+              const _as2c = document.getElementById('as2SvcCount'); if (_as2c) _as2c.textContent = String(slotServices[2].length);
+            }
             window.confirmarServicioObligatorio(2);
           }
         }
-        
+
         if (user && user.maxClients === 2) {
           if (!activeClients[name]) activeClients[name] = [];
           activeClients[name] = aten.map(at => ({ name: at.nombre, code: at.codigo, service: at.servicio }));
