@@ -670,15 +670,15 @@
         ${totalStr}
         <div style="display:flex;gap:6px;margin-top:10px;">
           <button onclick="agregarServicioExtra('${c.idEspera}','${c.codigo||''}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
-          <button onclick="mandarACobro('${c.idEspera}','${nombreSafe}')" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
+          <button onclick="mandarACobro('${c.idEspera}','${nombreSafe}','${c.codigo||''}')" style="flex:1;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
           <button onclick="eliminarTicketEspera('${c.idEspera}','${nombreSafe}')" title="Borrar ticket" style="padding:11px 13px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:14px;font-weight:800;cursor:pointer;">🗑</button>
         </div>
       </div>`;
   }
-  async function mandarACobro(idEspera, nombre){
+  async function mandarACobro(idEspera, nombre, codigo){
     if (!confirm('¿Mandar a cobro a ' + (nombre || 'esta clienta') + '?')) return;
     try {
-      const r = await apiPost('mandarACobro', { idEspera: idEspera });
+      const r = await apiPost('mandarACobro', { idEspera: idEspera, clienteCodigo: codigo || '' });
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' enviada a cobro');
         loadMikaelaHome();
