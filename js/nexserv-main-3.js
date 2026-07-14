@@ -1825,6 +1825,7 @@
           _payloadGrupal.precioRegular  = _regClienta;
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
+          _payloadGrupal.clienteCodigo  = c.codigo || '';   // para el gate del piloto LINEAS
           await apiPost('confirmarCobro', _payloadGrupal);
           // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
           // (van a la caja, SIN comisión), igual que en el cobro individual.
@@ -1911,6 +1912,7 @@
     });
     _payloadM5.totalServicios = totalServicios;
     _payloadM5.totalProductos = totalProductos;
+    _payloadM5.clienteCodigo = window._cobrarCodigo || '';   // para el gate del piloto LINEAS
     // FIX: forzar que el desglose EDITADO por Mikaela (montos corregidos) sea el que use
     // el backend para repartir comisiones — antes podía quedar el guardado (viejo).
     if (window._cobrarDesglose && window._cobrarDesglose.length) {
