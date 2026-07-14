@@ -1882,8 +1882,26 @@
             }
           }
         }
+        // FALLBACK (14/07): si tras las ramas normal/promo el slot quedó vacío —SP cuyo
+        // promoNombre no existe en el catálogo PROMOS del front (p.ej. clienta piloto
+        // LINEAS)— cargar el servicio directo desde la atención (serviciosDetalle o
+        // servicio/total) para que el panel activo no aparezca vacío tras un refresh.
+        if ((!slotServices[1] || slotServices[1].length === 0) && a1.servicio && a1.servicio !== '—') {
+          const _det1p = Array.isArray(a1.serviciosDetalle) ? a1.serviciosDetalle : [];
+          if (_det1p.length > 0) {
+            slotServices[1] = _det1p.map(function(sd){ return {
+              name: sd.servicio || sd.nombre || sd.name || '',
+              price: Number(sd.monto || sd.precio || sd.price || 0),
+              area: sd.area || a1.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true
+            }; });
+          } else {
+            var _nm1p = String(a1.servicio || '');
+            if (_nm1p.trim().indexOf('{') === 0) { try { _nm1p = JSON.parse(_nm1p).nombre || _nm1p; } catch(e){} }
+            slotServices[1] = [{ name: _nm1p, price: Number(a1.total || 0), area: a1.area || '', _yaEnLinea: true }];
+          }
+        }
         renderServicesForSlot(1);
-        
+
         // Actualizar total: solo servicios no pendientes y no rechazados
         const total1 = slotServices[1].reduce((sum, s) => {
           if (s.status === 'pendiente' || s.status === 'rechazado') return sum;
