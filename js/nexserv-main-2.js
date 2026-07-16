@@ -3960,7 +3960,11 @@
       sel.innerHTML = '<option value="hoy">Hoy</option>'
         + '<option value="0">Semana</option>';
     }
-    sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
+    // Al entrar, mostrar la SEMANA COMPLETA en acordeón (Lunes–Sábado como primera
+    // vista; el día actual sale marcado "(HOY)"). Al tocar un día se despliegan sus
+    // movimientos y los demás días se recogen solos (acordeón). Antes arrancaba en
+    // 'hoy' (solo el día); ahora arranca en la semana para ver todos los días.
+    sel.value = '0';
   }
 
   // Botón 📷 de evidencias — DESACTIVADO en este listado diario "Cobros del día".
