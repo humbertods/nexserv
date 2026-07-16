@@ -1464,7 +1464,12 @@
     // registro de que la staff cambió el servicio inicial, y la promo queda en 2
     // líneas bien registradas en vez de una sola. Los extras siguen su propio flujo.
     const _idEsperaPromo = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-    if (_idEsperaPromo) {
+    const _codPromoReg   = slot === 1 ? (window._as1Client   || '') : (window._as2Client   || '');
+    // Disparar el registro aunque NO haya idEspera. Las clientas de SYNA / LINEAS nacen
+    // con promo_ref vacío → su idEspera queda vacío y ANTES no se llamaba a aplicarPromoStaff,
+    // así que al cambiar de servicio la línea original NO se anulaba (quedaban 2 servicios).
+    // El backend matchea por CÓDIGO, así que alcanza con tener el código de la clienta.
+    if (_idEsperaPromo || _codPromoReg) {
       // Partes de la promo que hace ESTA staff (según su área/capacidades)
       const _CAPS = {
         cejas:    ['cejas', 'depilacion', 'bigote', 'depil', 'ceja', 'pigment', 'brow'],
