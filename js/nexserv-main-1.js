@@ -2805,7 +2805,7 @@
             if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
               slotServices[1] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
-                price: Number(sd.precio || sd.price || 0),
+                price: Number(sd.monto || sd.precio || sd.price || 0),
                 area: a.area, status: undefined
               }));
               const totalCombinado = slotServices[1].reduce((s, v) => s + Number(v.price), 0);
@@ -3137,7 +3137,7 @@
             if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
               slotServices[2] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
-                price: Number(sd.precio || sd.price || 0),
+                price: Number(sd.monto || sd.precio || sd.price || 0),
                 area: a.area, status: undefined
               }));
               const totalCombinado2 = slotServices[2].reduce((s, v) => s + Number(v.price), 0);
