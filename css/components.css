@@ -259,7 +259,7 @@
   }
   .modal-bg.active { display: flex; animation: fadeIn .2s ease; }
   .modal {
-    background: var(--bg); width: 100%;
+    background: var(--bg); width: 100%; max-width: 420px;
     border-radius: 28px 28px 0 0; padding: 24px 20px 30px;
     max-height: 80%; overflow-y: auto;
     animation: slideUp .3s ease;
