@@ -633,6 +633,19 @@
       if (c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
     }
     if (!filas.length && c.servicio) filas.push({ label: c.servicio, staff: c.tomadaPor||'—', monto: Number(c.total||0), done: true });
+    // DEDUP visual: quitar renglones "placeholder" (sin staff real ni monto) cuando el
+    // MISMO servicio ya aparece con datos reales. Pasa cuando el detalle estructurado que
+    // manda SYNA ({servicio, precio}) y el registrado al finalizar ({servicio, staff, monto})
+    // quedan ambos en serviciosDetalle → el servicio salía DOBLE (caso PRUEBA SYNA · SN:
+    // "Depilación de cejas —" + "Depilación de cejas · Rosa · $8"). El total no cambia.
+    var _conDatos = {};
+    filas.forEach(function(r){
+      if ((r.staff && r.staff !== '—') || Number(r.monto || 0) > 0) _conDatos[String(r.label || '').trim().toLowerCase()] = true;
+    });
+    filas = filas.filter(function(r){
+      var esPlaceholder = (!r.staff || r.staff === '—') && !(Number(r.monto || 0) > 0);
+      return !(esPlaceholder && _conDatos[String(r.label || '').trim().toLowerCase()]);
+    });
     return filas;
   }
   function _desgloseTotal(c){
