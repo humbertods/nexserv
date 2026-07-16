@@ -3960,11 +3960,7 @@
       sel.innerHTML = '<option value="hoy">Hoy</option>'
         + '<option value="0">Semana</option>';
     }
-    // Al entrar, mostrar la SEMANA COMPLETA en acordeón (Lunes–Sábado como primera
-    // vista; el día actual sale marcado "(HOY)"). Al tocar un día se despliegan sus
-    // movimientos y los demás días se recogen solos (acordeón). Antes arrancaba en
-    // 'hoy' (solo el día); ahora arranca en la semana para ver todos los días.
-    sel.value = '0';
+    sel.value = 'hoy'; // al entrar, vista EN VIVO de hoy
   }
 
   // Botón 📷 de evidencias — DESACTIVADO en este listado diario "Cobros del día".
@@ -5151,7 +5147,7 @@
       + '<div id="siraAdminFormContainer"></div>'
       + '<div id="siraAdminFeedback"></div>'
       + '<div style="margin-top:24px;">'
-      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial diario</div>'
+      + '<div style="font-size:16px;font-weight:800;color:var(--ink);margin-bottom:12px;">Historial de la semana</div>'
       + '<div id="siraMovHoyAdmin"><div style="text-align:center;padding:20px;color:var(--ink-faint);font-size:13px;">Cargando...</div></div>'
       + '</div>';
   }
@@ -5247,55 +5243,109 @@
     _siraRenderMovAdmin();
   }
 
+  // Tarjeta HTML de un movimiento individual (entrada/salida)
+  function _siraMovCardHtml(m) {
+    var tipo      = String(m.tipo || '').toLowerCase();
+    var esEntrada = tipo === 'entrada';
+    var cant      = Number(m.cantidad || m.cant || 1);
+    var prod      = String(m.producto || '');
+    var resp      = String(m.responsable || m.resp || '');
+    var hora      = (function(){ var s=String(m.hora||'').trim(); var mm=s.match(/(\d{1,2}):(\d{2})/); return mm?(('0'+mm[1]).slice(-2)+':'+mm[2]):''; })();
+    var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
+    var bgIcon    = esEntrada ? '#edf7f1' : '#fff0f0';
+    var iconSvg   = esEntrada
+      ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
+      : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
+    return '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
+      + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
+        + '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.' + (resp ? ' · ' + resp : '') + (hora ? ' · ' + hora : '') + '</div>'
+      + '</div>'
+      + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
+      + '</div>';
+  }
+
+  // Historial en ACORDEÓN por día de la semana (igual estilo que "Cobros del día"):
+  // primera vista = lista de días Lunes–Sábado (el actual marcado "(HOY)"); al tocar
+  // un día se despliegan sus movimientos y los demás días se recogen solos.
   function _siraRenderMovAdmin() {
     var cont = document.getElementById('siraMovHoyAdmin');
     if (!cont) return;
 
-    var hoy = (function() {
-      try {
-        var p = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
-        return p.getFullYear() + '-' + String(p.getMonth()+1).padStart(2,'0') + '-' + String(p.getDate()).padStart(2,'0');
-      } catch(e) { return new Date().toISOString().slice(0,10); }
-    })();
+    // Fecha/hora Ecuador
+    var ec = (function(){ try { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Guayaquil' })); } catch(e){ return new Date(); } })();
+    // Semana actual: lunes 00:00 → domingo 23:59 (mostramos Lunes–Sábado)
+    var dow = (ec.getDay() + 6) % 7; // 0 = lunes
+    var lunes = new Date(ec); lunes.setDate(ec.getDate() - dow); lunes.setHours(0,0,0,0);
+    var finSemana = new Date(lunes); finSemana.setDate(lunes.getDate() + 6); finSemana.setHours(23,59,59,999);
 
-    // Admin ve TODOS los movimientos de hoy, ordenados más reciente primero
-    var movs = (window._siraMovsHoy || []).filter(function(m) {
-      return String(m.fecha || '').slice(0,10) === hoy;
+    var DIAS_SIRA = [
+      { key: 1, label: 'Lunes' }, { key: 2, label: 'Martes' }, { key: 3, label: 'Miercoles' },
+      { key: 4, label: 'Jueves' }, { key: 5, label: 'Viernes' }, { key: 6, label: 'Sabado' }
+    ];
+
+    // Agrupar TODOS los movimientos de la semana por día (getDay: 0=dom..6=sáb)
+    var porDia = {};
+    (window._siraMovsHoy || []).forEach(function(m) {
+      var fstr = String(m.fecha || '').slice(0,10);
+      var parts = fstr.split('-');
+      if (parts.length !== 3) return;
+      var fd = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (fd < lunes || fd > finSemana) return;
+      var diaKey = fd.getDay();               // 0..6
+      if (diaKey === 0) return;               // domingo no se muestra (igual que Cobros)
+      if (!porDia[diaKey]) porDia[diaKey] = [];
+      porDia[diaKey].push(m);
     });
 
-    if (movs.length === 0) {
-      cont.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Sin movimientos hoy</div>';
-      return;
-    }
-
-    var html = '';
-    [...movs].reverse().forEach(function(m) {
-      var tipo     = String(m.tipo || '').toLowerCase();
-      var esEntrada = tipo === 'entrada';
-      var cant     = Number(m.cantidad || m.cant || 1);
-      var prod     = String(m.producto || '');
-      var resp     = String(m.responsable || m.resp || '');
-      var colorTipo = esEntrada ? '#2d6a4f' : '#c0392b';
-      var bgIcon   = esEntrada ? '#edf7f1' : '#fff0f0';
-      var iconSvg  = esEntrada
-        ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M5 11h8.586l-2.293-2.293 1.414-1.414L17.414 12l-4.707 4.707-1.414-1.414L13.586 13H5v-2ZM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>'
-        : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M15 11H6.414l2.293-2.293-1.414-1.414L2.586 12l4.707 4.707 1.414-1.414L6.414 13H15v-2ZM19 3H9a2 2 0 0 0-2 2v4h2V5h10v14H9v-4H7v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></svg>';
-
-      html += '<div style="display:flex;align-items:center;gap:12px;background:var(--bg-card,#fff);border-radius:14px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">'
-        + '<div style="width:36px;height:36px;border-radius:50%;background:' + bgIcon + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;color:' + colorTipo + ';">' + iconSvg + '</div>'
-        + '<div style="flex:1;min-width:0;">'
-          + '<div style="font-size:14px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + prod + '</div>'
-          + '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">' + (esEntrada ? 'Entrada' : 'Salida') + ' · ' + cant + ' unid.' + (resp ? ' · ' + resp : '') + '</div>'
+    var hoyDow = ec.getDay(); // 1..6 = Lun..Sáb
+    var html = DIAS_SIRA.map(function(d, di) {
+      var movs   = (porDia[d.key] || []).slice().reverse(); // más reciente primero
+      var count  = movs.length;
+      var esHoy  = (d.key === hoyDow);
+      var label  = d.label + (esHoy ? ' (HOY)' : '');
+      return '<div style="margin-bottom:6px;">'
+        + '<div onclick="_siraToggleDiaMov(' + di + ')" style="background:var(--bg-card);border-radius:14px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;box-shadow:var(--shadow-card,0 1px 3px rgba(0,0,0,.06));">'
+          + '<div style="font-size:15px;font-weight:700;color:var(--ink);">' + label + '</div>'
+          + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<div style="font-size:13px;font-weight:700;color:' + (count > 0 ? 'var(--ink-soft)' : 'var(--ink-faint)') + ';">' + count + ' mov.</div>'
+            + '<div id="sira-arrow-' + di + '" style="color:var(--ink-faint);font-size:11px;transition:transform .2s;">▼</div>'
+          + '</div>'
         + '</div>'
-        + '<div style="font-size:15px;font-weight:800;color:' + colorTipo + ';flex-shrink:0;">' + (esEntrada ? '+' : '−') + cant + '</div>'
-        + '</div>';
-    });
+        + '<div id="sira-dia-mov-' + di + '" style="display:none;padding:8px 2px 0;">'
+          + (count === 0
+              ? '<div style="padding:10px 12px;font-size:12px;color:var(--ink-faint);">Sin movimientos</div>'
+              : movs.map(_siraMovCardHtml).join(''))
+        + '</div>'
+      + '</div>';
+    }).join('');
 
-    cont.innerHTML = html;
+    cont.innerHTML = html || '<div style="text-align:center;padding:20px 0;color:var(--ink-faint);font-size:13px;">Sin movimientos esta semana</div>';
+  }
+
+  // Acordeón: al abrir un día se cierran los demás (uno abierto a la vez)
+  function _siraToggleDiaMov(di) {
+    var d = document.getElementById('sira-dia-mov-' + di);
+    var a = document.getElementById('sira-arrow-' + di);
+    if (!d) return;
+    var open = d.style.display !== 'none';
+    if (!open) {
+      for (var od = 0; od < 6; od++) {
+        if (od === di) continue;
+        var odd = document.getElementById('sira-dia-mov-' + od);
+        var oarr = document.getElementById('sira-arrow-' + od);
+        if (odd) odd.style.display = 'none';
+        if (oarr) oarr.style.transform = '';
+      }
+    }
+    d.style.display = open ? 'none' : 'block';
+    if (a) a.style.transform = open ? '' : 'rotate(180deg)';
   }
 
   window._siraCargarMovsAdmin = _siraCargarMovsAdmin;
   window._siraRenderMovAdmin  = _siraRenderMovAdmin;
+  window._siraToggleDiaMov    = _siraToggleDiaMov;
 
 (function _installDelegationHub() {
   document.addEventListener('click', function _delegationHandler(e) {
