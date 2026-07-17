@@ -1230,7 +1230,15 @@
         if (typeof PROMOS !== 'undefined' && Array.isArray(PROMOS)) {
           const nombres = [];
           if (d.promoNombre) String(d.promoNombre).split(',').forEach(function(n){ nombres.push(n.trim()); });
-          if (d.servicio)    String(d.servicio).split('+').forEach(function(n){ nombres.push(n.trim()); });
+          if (d.servicio) {
+            // Nombre BASE del combo sin el sufijo "(parte)": "Combo 5 Axilas (Depilación
+            // + maquillaje)" → "Combo 5 Axilas". Sin esto, un TM cuyo desglose trae el
+            // nombre con sufijo NO matcheaba el catálogo PROMOS → no derivaba el regular
+            // y con tarjeta NO recalculaba (caso Combo 5 Axilas de Domenica Mateus).
+            var _baseCombo = String(d.servicio).replace(/\s*\([^()]*\)\s*$/, '').trim();
+            if (_baseCombo) nombres.push(_baseCombo);
+            String(d.servicio).split('+').forEach(function(n){ nombres.push(n.trim()); });
+          }
           nombres.forEach(function(nm){
             const k = String(nm || '').toLowerCase();
             if (!k) return;
