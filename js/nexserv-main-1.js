@@ -4113,6 +4113,23 @@
     pintarNombre('confirmSvcClientName', clientName, (slot === 1 ? window._as1Client : window._as2Client), false);
     window._confirmSvcSlot = slot;
 
+    // ── TM: SIEMPRE traer el grupo completo fresco antes de renderizar el modal.
+    //    Las áreas solo se precargaban en loadClientAfterTake (post-toma), así que
+    //    la 2ª staff recién asignada por Mikaela veía el modal VACÍO. Ahora se
+    //    consulta el ticket completo para que CUALQUIER staff vea la lista total:
+    //    completadas ✅, las suyas (checkables) y las de otra área con candado 🔒.
+    var _tmReadyKey = '_confirmSvcTMReady' + slot;
+    if (esTM && !window[_tmReadyKey]) {
+      window[_tmReadyKey] = true;
+      LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
+        var arr = (tm && tm.areas) ? tm.areas : [];
+        if (slot === 2) window._tmAreasActuales2 = arr; else window._tmAreasActuales = arr;
+        showConfirmServiceModal(slot);
+      }).catch(function() { showConfirmServiceModal(slot); });
+      return;
+    }
+    window[_tmReadyKey] = false;
+
     // Si hay desglose previo (promo compartida), mostrarlo en el modal
     const desgloseHtml = (window._desgloseAcumulado || []).map(function(d) {
       return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--success-bg);border-radius:10px;margin-bottom:6px;">'
