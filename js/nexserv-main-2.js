@@ -489,6 +489,7 @@
   async function finishSlotAndContinue(slot) {
     // Prepara los datos del slot igual que finishSlot1/2 y llama finishAndContinue
     window._finishingSlot = slot;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real antes de armar _finishingData
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey  = normalizeClientKey(clientName);
     const promoData  = activePromos[clientKey];
@@ -763,6 +764,7 @@
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const siguientePromo = data.promasExtraPendientes && data.promasExtraPendientes[0];
 
     if (!siguientePromo) { alert('No hay siguiente promo'); return; }
@@ -830,6 +832,7 @@
     const user = window.currentUser;
     const data = window._finishingData;
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
 
     // Solo los servicios aprobados del slot actual
     const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
@@ -1205,6 +1208,7 @@
   async function prepararYFinalizar(slot) {
     const user = window.currentUser;
     const slotStr = String(slot || 1);
+    await ensureIdEsperaFresco(slot || 1); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey  = normalizeClientKey(clientName);
     const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
