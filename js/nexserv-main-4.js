@@ -3621,6 +3621,7 @@
 
   async function completarYTomarSiguiente() {
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const user = window.currentUser;
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
     try {
