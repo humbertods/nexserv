@@ -1746,7 +1746,9 @@
   }
 
   function removeServiceItem(slot, index) {
+    if (!slotServices[slot]) return;
     if (!confirm('¿Quitar este servicio?')) return;
+    const _removed = slotServices[slot][index];   // capturar ANTES de quitar
     slotServices[slot].splice(index, 1);
     renderServicesForSlot(slot);
     const total = slotServices[slot].reduce((sum, s) => {
@@ -1756,6 +1758,29 @@
     document.getElementById('as' + slot + 'Total').textContent = '$' + total;
     document.getElementById('as' + slot + 'SvcCount').textContent =
       slotServices[slot].filter(s => s.status !== 'rechazado').length;
+
+    // ── ANULAR la línea en LINEAS (queda como evidencia 'anulado') ──────────────
+    // Antes esta versión (que sobrescribe a la de main-1) solo borraba local: el
+    // servicio seguía 'en_servicio' en el sheet y en el panel de Mikaela. Ahora se
+    // anula en el backend → desaparece del ticket madre y figura 'anulado'.
+    try {
+      const _user = window.currentUser;
+      const _idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+      const _clientCode = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+      if (_removed && _removed.name && _removed.status !== 'pendiente') {
+        apiPost('anularLineaTicket', {
+          idEspera: _idEspera,
+          chicaNombre: (_user && _user.name) || '',
+          clienteCodigo: _clientCode || '',
+          servicio: _removed.name,
+          monto: String(_removed.price != null ? _removed.price : '')
+        }).then(function (r) { console.log('🗑 Línea anulada:', r); })
+          .catch(function (e) { console.warn('anularLineaTicket:', e); });
+      }
+    } catch (eAnul) { console.warn('[removeServiceItem] anular:', eAnul); }
+
+    // Sincronizar el string de servicios del ticket (col F en ListaEspera).
+    try { if (typeof syncServiciosBackend === 'function') syncServiciosBackend(slot, total); } catch (eS) {}
   }
 
   function openEditService() {
