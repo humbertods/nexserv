@@ -973,6 +973,7 @@
   async function finishAndSendPartial() {
     closeModal();
     const slot = window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const user = window.currentUser;
     const data = window._finishingData;
     const svcs = slotServices[slot] || [];
@@ -3647,26 +3648,36 @@
   // Solo hace la llamada extra cuando el id FALTA → cero overhead en el caso normal.
   async function ensureIdEsperaFresco(slot) {
     slot = slot || 1;
-    const key = slot === 1 ? '_as1IdEspera' : '_as2IdEspera';
-    if (window[key]) return window[key]; // ya hay id válido en memoria
-    const clientCode = slot === 1 ? window._as1Client : window._as2Client;
+    const key    = slot === 1 ? '_as1IdEspera' : '_as2IdEspera';
+    const cliKey = slot === 1 ? '_as1Client'   : '_as2Client';
     const user = window.currentUser;
-    if (!clientCode || !user) return '';
-    const staffName = String(user.name || '').trim().toLowerCase();
+    if (!user) return window[key] || '';
+    const clientCode = window[cliKey];
+    const staffName  = String(user.name || '').trim();
+    // ── ROBUSTEZ vs. TIEMPO ────────────────────────────────────────────────
+    // Si el ticket queda abierto mucho rato en la app de la staff, el idEspera
+    // en memoria puede quedar VIEJO o vacío (aunque el ticket sigue intacto en
+    // el backend). Antes eso obligaba a refrescar la app manualmente y daba
+    // "Ticket no encontrado" al finalizar / pasar a la siguiente área.
+    // Ahora SIEMPRE re-resolvemos el idEspera real desde getAtenciones — la
+    // MISMA fuente autoritativa que usa el refresh manual — antes de actuar.
+    // Devuelve el id correcto y actual del ticket (TM-/SP-/LE-).
     try {
-      const r = await apiGet('getListaCompleta');
-      if (!r) return '';
-      const enServ = r.enServicio || [];
-      const otros  = [].concat(r.porCobrar || [], r.paraRedirigir || [], r.lista || []);
-      const mismaCli = x => String(x.codigo || '') === clientCode;
-      const miStaff  = x => String(x.tomadaPor || x.asignada || '').trim().toLowerCase() === staffName;
-      let cand = enServ.find(x => mismaCli(x) && miStaff(x));   // 1) en servicio, mía, de esta clienta
-      if (!cand) cand = enServ.find(mismaCli);                  // 2) en servicio de esta clienta
-      if (!cand) cand = otros.find(x => mismaCli(x) && miStaff(x)) || otros.find(mismaCli); // 3) otras colas
-      const id = cand ? String(cand.idEspera || cand.id || '') : '';
-      if (id) { window[key] = id; console.log('[ticket] id vacío → resuelto del backend:', id); }
-      return id;
-    } catch (e) { console.warn('ensureIdEsperaFresco error', e); return ''; }
+      const r = await apiGet('getAtenciones', { chica: staffName });
+      const aten = (r && r.success && r.atenciones) ? r.atenciones : [];
+      let cand = null;
+      if (clientCode) cand = aten.find(a => String(a.codigo || '') === clientCode);
+      if (!cand && aten.length) cand = aten[slot - 1] || aten[0]; // fallback por posición del slot
+      if (cand && cand.idEspera) {
+        if (window[key] !== cand.idEspera) {
+          console.log('[ticket] idEspera re-resuelto del backend:', window[key], '→', cand.idEspera);
+        }
+        window[key] = cand.idEspera;
+        if (!window[cliKey]) window[cliKey] = cand.codigo;
+        return cand.idEspera;
+      }
+    } catch (e) { console.warn('ensureIdEsperaFresco error', e); }
+    return window[key] || ''; // último recurso: lo que haya en memoria
   }
 
   async function syncServiciosBackend(slot, total, promoData) {
@@ -3771,6 +3782,7 @@
 
   async function cobrarPromoCompleta(slot) {
     slot = slot || window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const user = window.currentUser;
     if (!user) return;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
@@ -3802,6 +3814,7 @@
   // puede optar por cobrar el precio normal completo en lugar del precio promo.
   async function cobrarPromoCompletaTM(slot) {
     slot = slot || window._finishingSlot || 1;
+    await ensureIdEsperaFresco(slot); // ROBUSTEZ: re-resolver id real (ticket abierto mucho tiempo)
     const user = window.currentUser;
     if (!user) return;
     const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
