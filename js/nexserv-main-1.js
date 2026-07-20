@@ -4155,6 +4155,43 @@
     var _tmReadyKey = '_confirmSvcTMReady' + slot;
     if (esTM && !window[_tmReadyKey]) {
       window[_tmReadyKey] = true;
+
+      // ── PILOTO: leer el ticket completo desde LINEAS (getTicketLineas) ─────────
+      // Solo para clientas piloto. Clientas reales siguen con obtenerGrupoTicket
+      // (TicketMulti, máx 4) hasta que el modal general migre. Aislamiento estricto.
+      var _codigoCli = String(slot === 2 ? (window._as2Client || '') : (window._as1Client || '')).trim();
+      if (window._esPilotoTicketLineas && window._esPilotoTicketLineas(_codigoCli)) {
+        var _u = window.currentUser || {};
+        apiGet('getTicketLineas', {
+          ticketRef: _ticketBaseId(idEspera),          // quita ':slot' → ticket madre
+          codigo:    _codigoCli,                        // P#5: código real (texto)
+          areaStaff: String(_u.area || '')              // P#5: área real de la staff
+        }).then(function(r) {
+          // P#3: si el backend rechaza por identidad, NO continuar con datos ajenos.
+          if (!r || r.success === false) {
+            console.warn('[PILOTO getTicketLineas] rechazado:', r && r.errorCode, r);
+            // Fallback legacy explícito (P#4): leer TicketMulti y renderizar.
+            return LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
+              var arrL = (tm && tm.areas) ? tm.areas : [];
+              if (slot === 2) window._tmAreasActuales2 = arrL; else window._tmAreasActuales = arrL;
+              showConfirmServiceModal(slot);
+            });
+          }
+          var arr = _lineasLineasAAreasModal(r);         // mapear lineasActivas → shape del modal
+          if (slot === 2) window._tmAreasActuales2 = arr; else window._tmAreasActuales = arr;
+          showConfirmServiceModal(slot);
+        }).catch(function(error) {
+          // P#4: fallback EXPLÍCITO a legacy, sin recursión directa al modal.
+          console.warn('[PILOTO getTicketLineas fallback]', error);
+          return LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
+            var arrL = (tm && tm.areas) ? tm.areas : [];
+            if (slot === 2) window._tmAreasActuales2 = arrL; else window._tmAreasActuales = arrL;
+            showConfirmServiceModal(slot);
+          });
+        });
+        return;
+      }
+
       LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
         var arr = (tm && tm.areas) ? tm.areas : [];
         if (slot === 2) window._tmAreasActuales2 = arr; else window._tmAreasActuales = arr;
@@ -4627,6 +4664,37 @@ function evSubirFotoDesdeInput(input) {
   evSubirFoto(input, key, codigo, staff);
 }
 window.evSubirFotoDesdeInput = evSubirFotoDesdeInput;
+
+// ── PILOTO · LINEAS: helpers del modal (bloque piloto 1, solo lectura de LINEAS) ──
+// Detección de clienta piloto por código. Clientas reales NO entran a este flujo.
+window._esPilotoTicketLineas = function(codigo) {
+  var c = String(codigo || '').trim();
+  return c === 'C-LINEAS-TEST-001';   // allowlist piloto (espejo de LINEAS_PILOTO_CODIGOS)
+};
+// Ticket madre a partir de un idEspera que puede venir con slot (TM-0459:2 → TM-0459).
+function _ticketBaseId(id) { return String(id || '').replace(/:.*$/, ''); }
+window._ticketBaseId = _ticketBaseId;
+// Mapea la respuesta de getTicketLineas (lineasActivas) al shape que el modal ya sabe
+// pintar: cada "área" del modal = una línea. puedeEditar→check, !puedeEditar→candado 🔒.
+function _lineasLineasAAreasModal(r) {
+  var ls = (r && r.lineasActivas) ? r.lineasActivas : [];
+  return ls.map(function(l) {
+    return {
+      area:         l.area || '',
+      tentativo:    l.servicio || '',
+      precio:       Number(l.monto || 0),
+      precioNormal: Number(l.montoRegular || l.monto || 0),
+      estado:       (l.estado === 'en_servicio') ? 'en servicio' : (l.estado || 'esperando'),
+      staff:        l.staff || '',
+      puedeEditar:  !!l.puedeEditar,       // informativo: check vs candado
+      motivoBloqueo: l.motivoBloqueo || '',
+      _lineaId:     l.id || '',
+      _promoRef:    l.promoRef || '',
+      _slot:        l.slot || ''
+    };
+  });
+}
+window._lineasLineasAAreasModal = _lineasLineasAAreasModal;
 
 // Additional aliases for functions called from other modules
 window.cobrarPromoCompleta = cobrarPromoCompleta;
