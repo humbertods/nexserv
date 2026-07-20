@@ -253,7 +253,17 @@
   }
   window.finalizarYPasarOtraArea = finalizarYPasarOtraArea;
 
+  // ── GUARD DE DOBLE SUBMIT (envío real del slot 1) ────────────────────────────
+  // El cuerpo real vive en finishAndSend_(); acá solo se serializa la entrada para
+  // que un doble toque no mande la misma clienta a cobro dos veces.
   async function finishAndSend() {
+    if (window._finAndSendEnCurso) { console.warn('[finishAndSend] ignorado: envío en curso'); return; }
+    window._finAndSendEnCurso = true;
+    try { return await finishAndSend_(); }
+    finally { window._finAndSendEnCurso = false; }
+  }
+
+  async function finishAndSend_() {
     // Mandar directo a cobrar (finaliza completamente)
     closeModal();
     const user = window.currentUser;
@@ -433,9 +443,11 @@
     // (antes el alert de éxito salía SIEMPRE y la clienta desaparecía de la pantalla sin haberse enviado)
     if (!_finResp || !_finResp.success) {
       const _msg = (_finResp && _finResp.message) ? _finResp.message : 'no se pudo conectar con el servidor';
+      console.warn('[finishAndSend]', window._as1Client || '(sin código)', data.clientName, idEsperaActual, 'NO enviada', _finResp);
       alert('⚠️ NO se pudo enviar la clienta a cobro.\n\nMotivo: ' + _msg + '.\n\nLa clienta sigue en tu pantalla — volvé a tocar "Finalizar servicio". Si sigue fallando, avisá a Mikaela.');
       return;
     }
+    console.info('[finishAndSend]', window._as1Client || '(sin código)', data.clientName, idEsperaActual, 'confirmada', _finResp);
 
     // ── LIMPIEZA: el backend confirmó el envío, ahora sí limpiar el slot ──
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
@@ -1276,6 +1288,10 @@
   }
   window._soloTexto = _soloTexto;
 
+  // NOTA: finishSlot1() NO manda nada al backend — solo abre finishOptionsModal.
+  // El envío real del slot 1 ocurre en finishAndSend / finishAndContinue /
+  // finishAndNextPromo / finishAndRetire / finishAndReturn. El guard de doble
+  // submit va ahí, no acá. (El slot 2 sí envía directo: ver finishSlot2.)
   async function finishSlot1() {
     const user = window.currentUser;
     const displayName = document.getElementById('as1Name')?.textContent?.replace(' ⭐', '') || '';
@@ -1576,7 +1592,16 @@
     }, 100);
   }
 
+  // ── GUARD DE DOBLE SUBMIT (slot 2) ───────────────────────────────────────────
+  // El cuerpo real vive en finishSlot2_(); acá solo se serializa la entrada.
   async function finishSlot2() {
+    if (window._finSlot2EnCurso) { console.warn('[finishSlot2] ignorado: finalización en curso'); return; }
+    window._finSlot2EnCurso = true;
+    try { return await finishSlot2_(); }
+    finally { window._finSlot2EnCurso = false; }
+  }
+
+  async function finishSlot2_() {
     const user = window.currentUser;
     // Si la 2ª clienta es un ticket multi-área (TM-), usar el flujo TM correcto
     const _idEsp2 = window._as2IdEspera || '';
@@ -1639,9 +1664,10 @@
       if (!yaExiste) desgloseAcumulado2.push(nuevo);
     });
 
+    let _finResp2 = null;
     try {
       if (esTicketSP2) {
-        await LineaService.finalizarServicio( {
+        _finResp2 = await LineaService.finalizarServicio( {
           idEspera: idEspera2,
           chicaNombre: user?.name || '',
           clienteNombre: clientName,
@@ -1653,7 +1679,7 @@
           serviciosDetalle: desgloseAcumulado2
         });
       } else {
-        await apiPost('finalizarAtencion', {
+        _finResp2 = await apiPost('finalizarAtencion', {
           idEspera: idEspera2,
           chicaNombre: user?.name || '',
           clienteNombre: clientName,
@@ -1665,7 +1691,18 @@
           serviciosDetalle: desgloseAcumulado2
         });
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('❌ Error en apiPost finalizarServicio (slot 2):', err); _finResp2 = null; }
+
+    // ── VALIDACIÓN: si el backend NO confirmó el envío, NO limpiar ni mostrar éxito ──
+    // Mismo blindaje que finishAndSend (envío del slot 1): antes el alert de éxito
+    // salía SIEMPRE y la 2ª clienta desaparecía de la pantalla sin haberse enviado.
+    if (!_finResp2 || !_finResp2.success) {
+      const _msg2 = (_finResp2 && _finResp2.message) ? _finResp2.message : 'no se pudo conectar con el servidor';
+      console.warn('[finishSlot2]', window._as2Client || '(sin código)', clientName, idEspera2, 'NO enviada', _finResp2);
+      alert('⚠️ NO se pudo enviar la clienta a cobro.\n\nMotivo: ' + _msg2 + '.\n\nLa clienta sigue en tu pantalla — volvé a tocar "Finalizar servicio". Si sigue fallando, avisá a Mikaela.');
+      return;
+    }
+    console.info('[finishSlot2]', window._as2Client || '(sin código)', clientName, idEspera2, 'confirmada', _finResp2);
 
     window._desgloseAcumulado = [];
 
