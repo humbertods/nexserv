@@ -4162,27 +4162,46 @@
       var _codigoCli = String(slot === 2 ? (window._as2Client || '') : (window._as1Client || '')).trim();
       if (window._esPilotoTicketLineas && window._esPilotoTicketLineas(_codigoCli)) {
         var _u = window.currentUser || {};
+        // Códigos de IDENTIDAD: bloquean el modal, NUNCA hacen fallback a TicketMulti
+        // (abrir legacy mostraría otro ticket y anularía la protección de identidad).
+        var _ERRORES_IDENTIDAD = ['TICKET_CLIENT_MISMATCH', 'TICKET_MIXED_CLIENTS', 'TICKET_NOT_FOUND'];
         apiGet('getTicketLineas', {
           ticketRef: _ticketBaseId(idEspera),          // quita ':slot' → ticket madre
           codigo:    _codigoCli,                        // P#5: código real (texto)
           areaStaff: String(_u.area || '')              // P#5: área real de la staff
         }).then(function(r) {
-          // P#3: si el backend rechaza por identidad, NO continuar con datos ajenos.
           if (!r || r.success === false) {
-            console.warn('[PILOTO getTicketLineas] rechazado:', r && r.errorCode, r);
-            // Fallback legacy explícito (P#4): leer TicketMulti y renderizar.
-            return LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
-              var arrL = (tm && tm.areas) ? tm.areas : [];
-              if (slot === 2) window._tmAreasActuales2 = arrL; else window._tmAreasActuales = arrL;
-              showConfirmServiceModal(slot);
-            });
+            var _code = r && r.errorCode;
+            // Corrección #1: identidad → bloquear, mostrar error, SIN fallback.
+            if (_ERRORES_IDENTIDAD.indexOf(_code) !== -1) {
+              console.error('[PILOTO getTicketLineas] IDENTIDAD bloqueada:', _code, r);
+              closeModal();
+              alert('⚠️ No se puede abrir este ticket: ' +
+                (_code === 'TICKET_CLIENT_MISMATCH' ? 'no pertenece a esta clienta.' :
+                 _code === 'TICKET_MIXED_CLIENTS'  ? 'tiene clientas mezcladas.' :
+                 'no se encontró.') +
+                '\n\nAvisá a soporte. (' + _code + ')');
+              return;   // NO fallback
+            }
+            // Error técnico/desconocido → lanzar para que el catch haga fallback legacy.
+            throw new Error(_code || 'GET_TICKET_LINEAS_FAILED');
           }
           var arr = _lineasLineasAAreasModal(r);         // mapear lineasActivas → shape del modal
           if (slot === 2) window._tmAreasActuales2 = arr; else window._tmAreasActuales = arr;
           showConfirmServiceModal(slot);
         }).catch(function(error) {
-          // P#4: fallback EXPLÍCITO a legacy, sin recursión directa al modal.
-          console.warn('[PILOTO getTicketLineas fallback]', error);
+          // Solo errores TÉCNICOS llegan acá (conexión, ruta, timeout). Los de identidad
+          // ya retornaron arriba sin lanzar. Fallback legacy EXPLÍCITO (P#4).
+          var _msg = String(error && error.message || error || '');
+          if (_ERRORES_IDENTIDAD.indexOf(_msg) !== -1) {
+            // Defensa extra: si por algún camino un error de identidad llegó como throw,
+            // NO hacer fallback.
+            console.error('[PILOTO getTicketLineas] identidad en catch, sin fallback:', _msg);
+            closeModal();
+            alert('⚠️ No se puede abrir este ticket (' + _msg + ').');
+            return;
+          }
+          console.warn('[PILOTO getTicketLineas fallback técnico]', error);
           return LineaService.obtenerGrupoTicket(idEspera).then(function(tm) {
             var arrL = (tm && tm.areas) ? tm.areas : [];
             if (slot === 2) window._tmAreasActuales2 = arrL; else window._tmAreasActuales = arrL;
@@ -4220,6 +4239,7 @@
       const user = window.currentUser;
 
       let areasHTML = '';
+      let _yaMarqueMio = false;   // regla: solo el 1er servicio de la staff queda pre-marcado
       areas.forEach((ar, i) => {
         const aKey = String(ar.area||'').toLowerCase()
           .replace(/ó/g,'o').replace(/á/g,'a').replace(/é/g,'e').replace(/ñ/g,'n');
@@ -4242,16 +4262,32 @@
             <span style="font-size:10px;font-weight:700;background:var(--success);color:white;padding:2px 8px;border-radius:100px;">✅</span>
           </div>`;
         } else if (esEnServicio && esMio) {
-          // Mi área actual — preseleccionada, no se puede desmarcar
-          areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);cursor:pointer;">
-            <input type="checkbox" data-area-idx="${ar.idx}" checked disabled style="width:18px;height:18px;accent-color:var(--info);">
-            <span style="font-size:16px;">${icon}</span>
-            <div style="flex:1;">
-              <div style="font-size:12px;font-weight:800;color:var(--info);">👇 ${label} — yo</div>
-              <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
-            </div>
-            <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
-          </label>`;
+          if (!_yaMarqueMio) {
+            // PRIMER servicio de la staff → preseleccionado (activo), no se desmarca.
+            _yaMarqueMio = true;
+            areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;border:2px solid var(--info);cursor:pointer;">
+              <input type="checkbox" data-area-idx="${ar.idx}" checked disabled style="width:18px;height:18px;accent-color:var(--info);">
+              <span style="font-size:16px;">${icon}</span>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:800;color:var(--info);">👇 ${label} — yo</div>
+                <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:var(--info);">$${ar.precio||0}</div>
+            </label>`;
+          } else {
+            // Servicios ADICIONALES de la staff → DESMARCADOS, ella los agrega uno a uno.
+            // Regla del owner: "1º marcado, el resto los agrega uno a uno" (Mikaela
+            // asigna al ticket, pero la staff elige cuándo activar cada servicio suyo).
+            areasHTML += `<label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:12px;margin-bottom:8px;border:1.5px solid var(--line);cursor:pointer;">
+              <input type="checkbox" data-area-idx="${ar.idx}" style="width:18px;height:18px;accent-color:var(--accent);">
+              <span style="font-size:16px;">${icon}</span>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:700;color:var(--ink);">${label}</div>
+                <div style="font-size:11px;color:var(--ink-soft);">${ar.tentativo||''}</div>
+              </div>
+              <div style="font-size:13px;font-weight:800;color:var(--ink);">$${ar.precio||0}</div>
+            </label>`;
+          }
         } else if (esEsperando) {
           // ¿Esta área es de la especialidad de la staff? Si no, se muestra bloqueada.
           const _puedeArea = window.esMismaAreaM3
