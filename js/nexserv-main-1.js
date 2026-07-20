@@ -2028,6 +2028,10 @@
     html += '<div style="font-size:10px;color:var(--ink-faint,#aaa);text-align:center;padding-top:4px;">Las fotos se guardan en el perfil de la clienta</div>';
     if (r && r.fecha) html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:2px;">Última carga: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
     panel.innerHTML = html;
+    // iOS + enlace de eventos: _evFotoSlot ya no trae onchange inline (queda inerte
+    // en Safari iOS). Hay que enlazar los inputs por JS también en el panel de Mikaela
+    // (Historial de servicios), o la subida desde acá no dispararía. Cubre biblioteca y cámara.
+    if (typeof _evEnlazarInputs === 'function') _evEnlazarInputs();
   };
 
   function _histGenericFicha(f) {
