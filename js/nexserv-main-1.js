@@ -2028,10 +2028,6 @@
     html += '<div style="font-size:10px;color:var(--ink-faint,#aaa);text-align:center;padding-top:4px;">Las fotos se guardan en el perfil de la clienta</div>';
     if (r && r.fecha) html += '<div style="font-size:10px;color:var(--ink-faint);text-align:right;padding-top:2px;">Última carga: ' + r.fecha + (r.staff ? ' · ' + r.staff : '') + '</div>';
     panel.innerHTML = html;
-    // iOS + enlace de eventos: _evFotoSlot ya no trae onchange inline (queda inerte
-    // en Safari iOS). Hay que enlazar los inputs por JS también en el panel de Mikaela
-    // (Historial de servicios), o la subida desde acá no dispararía. Cubre biblioteca y cámara.
-    if (typeof _evEnlazarInputs === 'function') _evEnlazarInputs();
   };
 
   function _histGenericFicha(f) {
@@ -3066,8 +3062,15 @@
                   setTimeout(function() { updateFinishButtons(1); }, 600);
                 }
               }
-              // TM: mostrar modal de confirmación igual que otros tipos
-              // La staff debe confirmar/cambiar su servicio tentativo
+              // TM: mostrar modal de confirmación igual que otros tipos.
+              // ORDEN: las áreas ya se cargaron arriba en _tmAreasActuales, así que
+              // marcamos _confirmSvcTMReady1=true para que showConfirmServiceModal NO
+              // vuelva a hacer la llamada asíncrona (obtenerGrupoTicket) y abra el modal
+              // DE INMEDIATO (sincrónico). Sin esto, el modal esperaba una 2ª llamada de
+              // red y mientras tanto se mostraba el panel de atención (imagen 1) primero;
+              // el modal de selección (imagen 2) recién aparecía después. Ahora el modal
+              // sale primero y el panel queda detrás.
+              window._confirmSvcTMReady1 = true;
               window.confirmarServicioObligatorio(1);
             }).catch(function() {
               window.confirmarServicioObligatorio(1);
@@ -4392,23 +4395,7 @@ async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
   html += '<div style="text-align:center;padding:8px;color:var(--ink-faint,#aaa);font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
   var loading = document.getElementById('evLoading');
   if (loading) loading.outerHTML = html;
-  // iOS: re-enlazar los inputs por JS (el onchange inline no dispara en Safari iOS
-  // cuando el input se inserta por outerHTML). Sin esto, elegir foto no subía nada.
-  _evEnlazarInputs();
 }
-
-// Enlaza (change) a cada <input data-evinput="1"> con addEventListener. Idempotente:
-// marca el input con dataset.evbound para no duplicar el listener si se re-renderiza.
-function _evEnlazarInputs() {
-  var inputs = document.querySelectorAll('input[data-evinput="1"]');
-  for (var i = 0; i < inputs.length; i++) {
-    var inp = inputs[i];
-    if (inp.dataset.evbound === '1') continue;
-    inp.dataset.evbound = '1';
-    inp.addEventListener('change', function() { evSubirFotoDesdeInput(this); });
-  }
-}
-window._evEnlazarInputs = _evEnlazarInputs;
 
 // Renderiza el panel de evidencias completo (se llama al cargar si ?evidencias=1)
 async function renderEvidenciasPanel() {
@@ -4468,8 +4455,6 @@ async function renderEvidenciasPanel() {
   html += '<div style="text-align:center;padding:8px;color:#aaa;font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
 
   document.getElementById('evLoading').outerHTML = html;
-  // iOS: mismo re-enlace por JS que en el overlay embebido (ver _evEnlazarInputs).
-  _evEnlazarInputs();
 }
 
 function _evFotoSlot(key, label, url, codigo, staff) {
@@ -4491,14 +4476,9 @@ function _evFotoSlot(key, label, url, codigo, staff) {
       + '</label>';
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
-    // NOTA iOS: el onchange INLINE de un <input type="file"> insertado por
-    // innerHTML/outerHTML queda inerte en Safari iOS/iPadOS (el evento nunca dispara).
-    // Por eso NO se pone onchange acá; el listener se enlaza con addEventListener
-    // en _evEnlazarInputs() DESPUÉS de inyectar el HTML. Sin esto, elegir la foto
-    // no disparaba la subida y no se guardaba nada (caso Diana · evidencias embebidas).
     + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
     + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
-    + ' data-evinput="1">'
+    + ' onchange="evSubirFotoDesdeInput(this)">'
     + imgHtml
     + '<div id="evStatus_' + key + '" style="font-size:10px;text-align:center;color:#888;margin-top:3px;min-height:14px;"></div>'
     + '</div>';
