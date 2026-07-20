@@ -1143,19 +1143,22 @@
       const r = await apiGet('getTableroLineas');
       if (!r || !r.success) { cont.innerHTML = '<div style="text-align:center;color:var(--danger);padding:30px;font-size:13px;">No se pudo cargar el tablero.</div>'; return; }
       if (fechaEl) fechaEl.textContent = r.fecha || '';
-      const todas = [].concat(r.en_servicio||[], r.cola||[], r.completado||[], r.cobrado||[]);
+      // por_verificar = la staff finalizó y espera que Mikaela mande a cobro.
+      // Sin incluirlo, esas clientas desaparecían del tablero (servicio hecho, sin cobrar).
+      const todas = [].concat(r.en_servicio||[], r.cola||[], r.por_verificar||[], r.completado||[], r.cobrado||[]);
       if (todas.length === 0) { cont.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:30px;font-size:13px;">No hay servicios hoy todavía.</div>'; return; }
       const colorEstado = function(e){
-        if (e === 'en_servicio') return 'var(--success)';
-        if (e === 'esperando')   return 'var(--warning)';
-        if (e === 'completado')  return '#3b82f6';
-        if (e === 'cobrado')     return 'var(--ink-faint)';
+        if (e === 'en_servicio')   return 'var(--success)';
+        if (e === 'esperando')     return 'var(--warning)';
+        if (e === 'por_verificar') return '#8b5cf6';
+        if (e === 'completado')    return '#3b82f6';
+        if (e === 'cobrado')       return 'var(--ink-faint)';
         return 'var(--line)';
       };
       const etiqueta = function(e){
-        return e === 'en_servicio' ? 'En servicio' : e === 'esperando' ? 'En espera' : e === 'completado' ? 'Terminado' : e === 'cobrado' ? 'Cobrado' : e;
+        return e === 'en_servicio' ? 'En servicio' : e === 'esperando' ? 'En espera' : e === 'por_verificar' ? 'Terminado — mandar a cobro' : e === 'completado' ? 'Terminado' : e === 'cobrado' ? 'Cobrado' : e;
       };
-      const rank = function(e){ return e === 'en_servicio' ? 0 : e === 'esperando' ? 1 : e === 'completado' ? 2 : 3; };
+      const rank = function(e){ return e === 'en_servicio' ? 0 : e === 'esperando' ? 1 : e === 'por_verificar' ? 2 : e === 'completado' ? 3 : 4; };
       // Agrupar por visita (clienta)
       const grupos = {}; const orden = [];
       todas.forEach(function(l){
@@ -2552,7 +2555,18 @@
     window._esSplitDepi = true;
     await confirmTake();
   }
+  // ── GUARD DE DOBLE SUBMIT ────────────────────────────────────────────────────
+  // Sin esto, un doble toque (o un toque mientras la red está lenta) dispara dos
+  // 'tomarClienta'/'tomarAreaTicketMulti' y la clienta queda tomada dos veces.
+  // El cuerpo real vive en confirmTake_(); acá solo se serializa la entrada.
   async function confirmTake() {
+    if (window._confirmTakeEnCurso) { console.warn('[confirmTake] ignorado: ya hay una toma en curso'); return; }
+    window._confirmTakeEnCurso = true;
+    try { return await confirmTake_(); }
+    finally { window._confirmTakeEnCurso = false; }
+  }
+
+  async function confirmTake_() {
     closeModal();
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
