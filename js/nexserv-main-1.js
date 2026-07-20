@@ -4388,7 +4388,23 @@ async function _renderEvidenciasEnOverlay(codigo, nombre, staff) {
   html += '<div style="text-align:center;padding:8px;color:var(--ink-faint,#aaa);font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
   var loading = document.getElementById('evLoading');
   if (loading) loading.outerHTML = html;
+  // iOS: re-enlazar los inputs por JS (el onchange inline no dispara en Safari iOS
+  // cuando el input se inserta por outerHTML). Sin esto, elegir foto no subía nada.
+  _evEnlazarInputs();
 }
+
+// Enlaza (change) a cada <input data-evinput="1"> con addEventListener. Idempotente:
+// marca el input con dataset.evbound para no duplicar el listener si se re-renderiza.
+function _evEnlazarInputs() {
+  var inputs = document.querySelectorAll('input[data-evinput="1"]');
+  for (var i = 0; i < inputs.length; i++) {
+    var inp = inputs[i];
+    if (inp.dataset.evbound === '1') continue;
+    inp.dataset.evbound = '1';
+    inp.addEventListener('change', function() { evSubirFotoDesdeInput(this); });
+  }
+}
+window._evEnlazarInputs = _evEnlazarInputs;
 
 // Renderiza el panel de evidencias completo (se llama al cargar si ?evidencias=1)
 async function renderEvidenciasPanel() {
@@ -4448,6 +4464,8 @@ async function renderEvidenciasPanel() {
   html += '<div style="text-align:center;padding:8px;color:#aaa;font-size:11px;">Las fotos se guardan en el perfil de la clienta</div>';
 
   document.getElementById('evLoading').outerHTML = html;
+  // iOS: mismo re-enlace por JS que en el overlay embebido (ver _evEnlazarInputs).
+  _evEnlazarInputs();
 }
 
 function _evFotoSlot(key, label, url, codigo, staff) {
@@ -4469,9 +4487,14 @@ function _evFotoSlot(key, label, url, codigo, staff) {
       + '</label>';
   return '<div>'
     + '<div style="font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-align:center;">' + label + '</div>'
+    // NOTA iOS: el onchange INLINE de un <input type="file"> insertado por
+    // innerHTML/outerHTML queda inerte en Safari iOS/iPadOS (el evento nunca dispara).
+    // Por eso NO se pone onchange acá; el listener se enlaza con addEventListener
+    // en _evEnlazarInputs() DESPUÉS de inyectar el HTML. Sin esto, elegir la foto
+    // no disparaba la subida y no se guardaba nada (caso Diana · evidencias embebidas).
     + '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;"'
     + ' data-key="' + key + '" data-codigo="' + codigo + '" data-staff="' + staff + '"'
-    + ' onchange="evSubirFotoDesdeInput(this)">'
+    + ' data-evinput="1">'
     + imgHtml
     + '<div id="evStatus_' + key + '" style="font-size:10px;text-align:center;color:#888;margin-top:3px;min-height:14px;"></div>'
     + '</div>';
