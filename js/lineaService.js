@@ -70,6 +70,7 @@
           var lista = [].concat(
             r.cola          || r.esperando  || [],
             r.en_servicio   || r.enServicio || [],
+            r.por_verificar || [],   // staff finalizó, espera que Mikaela mande a cobro
             r.completado    || r.porCobrar  || []
           );
           return lista;
