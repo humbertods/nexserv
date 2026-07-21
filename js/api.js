@@ -29,7 +29,7 @@
   // Subila en cada cambio que despliegues a GitHub Pages. Al abrir, la app
   // le pregunta al servidor su versión; si la del servidor es distinta,
   // muestra un aviso para recargar (cura el problema de caché vieja).
-  const APP_VERSION = '5.2';
+  const APP_VERSION = '5.3';
 
   // Sello visual rojo "DEV" para que nunca se confunda con producción.
   if (ENV === 'dev') {
