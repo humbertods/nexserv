@@ -1489,20 +1489,15 @@
       const _sumDiv = _mias.reduce(function (s, p) { return s + Number(p.monto || 0); }, 0) || 1;
       let _acum = 0;
       const _partes = _mias.map(function (p, idx) {
-        const _reg = Number(p.regular || p.montoRegular || p.precioRegular || p.normal || p.monto || 0);
+        const _reg = Number(p.monto || 0);
         let _val;
         if (idx === _mias.length - 1) {
           _val = Math.round((myPrice - _acum) * 100) / 100;   // última absorbe el redondeo
         } else {
-          // El MONTO promo se reparte por p.monto (misma base que _sumDiv) para que la
-          // suma de partes dé exactamente myPrice. OJO: NO usar _reg aquí — _reg es el
-          // precio REGULAR (tarjeta) y mezclarlo con _sumDiv (suma de montos promo)
-          // descuadra el reparto y puede dar partes negativas (Combo 3 Brow: parte A
-          // $36 y última −$6). El regular real va SOLO en montoRegular, no en el monto.
-          _val = Math.round((Number(p.monto || 0) / _sumDiv) * myPrice * 100) / 100;
+          _val = Math.round((_reg / _sumDiv) * myPrice * 100) / 100;
           _acum += _val;
         }
-        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg, regular: _reg };
+        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg };
       });
       apiPost('aplicarPromoStaff', {
         idEspera      : _idEsperaPromo,
@@ -4891,3 +4886,4 @@ function renderInformeServicios(d, pestanasData, tendData) {
 }
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
+
