@@ -1489,7 +1489,7 @@
       const _sumDiv = _mias.reduce(function (s, p) { return s + Number(p.monto || 0); }, 0) || 1;
       let _acum = 0;
       const _partes = _mias.map(function (p, idx) {
-        const _reg = Number(p.monto || 0);
+        const _reg = Number(p.regular || p.montoRegular || p.precioRegular || p.normal || p.monto || 0);
         let _val;
         if (idx === _mias.length - 1) {
           _val = Math.round((myPrice - _acum) * 100) / 100;   // última absorbe el redondeo
@@ -1497,7 +1497,7 @@
           _val = Math.round((_reg / _sumDiv) * myPrice * 100) / 100;
           _acum += _val;
         }
-        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg };
+        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg, regular: _reg };
       });
       apiPost('aplicarPromoStaff', {
         idEspera      : _idEsperaPromo,
