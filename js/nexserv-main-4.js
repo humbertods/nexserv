@@ -1371,15 +1371,13 @@
         return '<span style="background:var(--bg);font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-pill);color:var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>';
       }).join('');
 
+      // GENERALIZACIÓN: se eliminó el sub-botón "Tomar promo completa" del selector.
+      // Regla única: al tocar una promo se aplica con applyPromo() → anula el servicio
+      // activo y crea las líneas de la promo. Las partes de OTRAS áreas quedan pendientes
+      // por confirmar con las otras staff. Ya no hay opción separada "promo completa" acá
+      // (evita la confusión de dos botones). El caso "yo hago todo" de pestañas es un
+      // flujo aparte (cobrarPromoCompleta), no de este selector.
       var _btnPromoCompleta = '';
-      if (_promoEsMasBarata) {
-        _btnPromoCompleta = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);" onclick="event.stopPropagation()">'
-          + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">&#128161; La clienta solo quiere tu servicio, pero la promo es m&#225;s barata que el precio normal</div>'
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-          + '<button onclick="event.stopPropagation(); applyPromo(' + i + ')" style="flex:1;padding:8px 12px;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);">Solo mi parte &middot; $' + (_myDivPM ? _myDivPM.monto : '?') + '</button>'
-          + '<button onclick="event.stopPropagation(); applyPromoCompleta(' + i + ')" style="flex:1;padding:8px 12px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:white;">&#127919; Tomar promo completa &middot; $' + p.price + '</button>'
-          + '</div></div>';
-      }
 
       return '<div style="' + bgStyle + ' ' + borderStyle + ' border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(' + i + ')">'
         + assignedBadge
