@@ -1494,7 +1494,12 @@
         if (idx === _mias.length - 1) {
           _val = Math.round((myPrice - _acum) * 100) / 100;   // última absorbe el redondeo
         } else {
-          _val = Math.round((_reg / _sumDiv) * myPrice * 100) / 100;
+          // El MONTO promo se reparte por p.monto (misma base que _sumDiv) para que la
+          // suma de partes dé exactamente myPrice. OJO: NO usar _reg aquí — _reg es el
+          // precio REGULAR (tarjeta) y mezclarlo con _sumDiv (suma de montos promo)
+          // descuadra el reparto y puede dar partes negativas (Combo 3 Brow: parte A
+          // $36 y última −$6). El regular real va SOLO en montoRegular, no en el monto.
+          _val = Math.round((Number(p.monto || 0) / _sumDiv) * myPrice * 100) / 100;
           _acum += _val;
         }
         return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg, regular: _reg };
