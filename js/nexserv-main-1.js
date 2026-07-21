@@ -724,8 +724,19 @@
           var e = String(a.estado||'').trim().toLowerCase();
           return e === 'esperando' || e === 'en espera' || e === 'en_espera';
         });
-        var sig = areasEsperando.length > 0 ? areasEsperando[0] : null;
-        var hayMas = areasEsperando.length > 0;
+        // FIX: el "Yo sigo — tomar ahora" solo puede ofrecer servicios que ESTA staff
+        // pueda realizar (su misma familia de área). Antes tomaba areasEsperando[0] sin
+        // filtrar, así que podía ofrecer "Limpieza facial" (de otra staff) saltándose el
+        // servicio de depilación que sí era suyo → ese servicio se perdía del flujo.
+        // Ahora se respeta lo que la staff puede hacer: su próximo servicio pendiente.
+        var _miArea = user && user.area ? user.area : '';
+        var areasEsperandoMias = areasEsperando.filter(function(a) {
+          return window.esMismaAreaM3 ? window.esMismaAreaM3(_miArea, a.area || a.tentativo) : true;
+        });
+        var sig = areasEsperandoMias.length > 0 ? areasEsperandoMias[0] : null;
+        // hayMas = ¿queda algún servicio MÍO por hacer? Si solo quedan de otras áreas,
+        // esta staff ya terminó lo suyo → botón "Terminé mi parte" (no "yo sigo").
+        var hayMas = areasEsperandoMias.length > 0;
 
         var lbl = sig ? (sig.tentativo || sig.area || 'siguiente servicio') : 'siguiente servicio';
 
