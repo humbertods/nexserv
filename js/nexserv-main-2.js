@@ -2749,61 +2749,77 @@
   }
   
   async function confirmAssignService() {
-    const val = document.getElementById('assignSvcService').value;
-    if (!val) { 
-      alert('Seleccioná un servicio'); 
-      return; 
+    // Guard anti-doble-tap: si ya hay un envío en curso, ignorar completamente.
+    if (window._confirmAssignEnCurso) {
+      console.warn('[confirmAssignService] ignorado: envío en curso');
+      return;
     }
-    
-    const svc = JSON.parse(val);
-    const client = window._assigningClient;
-    const chica = (document.getElementById('assignSvcStaff') || {}).value || '';
-    if (!chica) { alert('Elegí qué staff la atiende'); return; }
+    window._confirmAssignEnCurso = true;
 
-    console.log('[ServicioExtra] modo extra:', !!window._extraTicketId, '| ticket:', window._extraTicketId || '(ninguno)');
-    // ── Modo "+ Servicio Extra": agregar al ticket existente y reabrir a la lista ──
-    if (window._extraTicketId) {
-      const idEx = window._extraTicketId;
+    try {
+      const val = document.getElementById('assignSvcService').value;
+      if (!val) {
+        alert('Seleccioná un servicio');
+        return;
+      }
+
+      const svc    = JSON.parse(val);
+      const client = window._assigningClient;
+      const chica  = (document.getElementById('assignSvcStaff') || {}).value || '';
+      if (!chica) { alert('Elegí qué staff la atiende'); return; }
+
+      console.log('[ServicioExtra] modo extra:', !!window._extraTicketId, '| ticket:', window._extraTicketId || '(ninguno)');
+
+      // ── Modo "+ Servicio Extra": agregar al ticket existente ──
+      if (window._extraTicketId) {
+        const idEx = window._extraTicketId;
+        try {
+          const rEx = await apiPost('agregarServicioExtra', {
+            idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
+          });
+          window._extraTicketId = null;
+          if (rEx && rEx.success) {
+            if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
+            closeModal();
+            loadMikaelaHome();
+          } else {
+            alert(((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar el servicio extra'));
+          }
+        } catch (err) {
+          window._extraTicketId = null;
+          console.error(err);
+          alert('Error al agregar servicio extra');
+        }
+        return;
+      }
+
+      // ── Asignación normal ──
       try {
-        const rEx = await apiPost('agregarServicioExtra', {
-          idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
+        const result = await LineaService.asignarServicio({
+          codigo:        client.code,
+          servicio:      svc.name,
+          area:          svc.area,
+          precio:        svc.price,
+          chica:         chica,
+          observaciones: (document.getElementById('assignSvcNota') || {}).value || ''
         });
-        window._extraTicketId = null;
-        if (rEx && rEx.success) {
-          if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
+
+        if (result.success) {
+          if (!result.duplicado) {
+            alert('✓ ' + client.name + ' asignada a ' + chica);
+          }
           closeModal();
           loadMikaelaHome();
         } else {
-          alert(((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar el servicio extra'));
+          alert('Error: ' + (result.message || 'No se pudo asignar'));
         }
       } catch (err) {
-        window._extraTicketId = null;
         console.error(err);
-        alert('Error al agregar servicio extra');
+        alert('Error al asignar servicio');
       }
-      return;
-    }
-
-    try {
-      const result = await LineaService.asignarServicio( {
-        codigo: client.code,
-        servicio: svc.name,
-        area: svc.area,
-        precio: svc.price,
-        chica: chica,
-        observaciones: (document.getElementById('assignSvcNota') || {}).value || ''
-      });
-      
-      if (result.success) {
-        alert('✓ ' + client.name + ' asignada a ' + chica);
-        closeModal();
-        loadMikaelaHome();
-      } else {
-        alert('Error: ' + (result.message || 'No se pudo asignar'));
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error al asignar servicio');
+    } finally {
+      // Liberar el flag siempre, incluyendo retornos tempranos por validación
+      window._confirmAssignEnCurso = false;
     }
   }
   
