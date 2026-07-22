@@ -1506,6 +1506,21 @@
     }
     if (_ss2 === 'staffAsistencia') { _ss2 = 'staffHome'; }
     show(_ss2);
+
+    // ── Forzar recarga con datos del usuario recién logueado ────────────────
+    // Si la sesión anterior (de otro usuario) ya había cargado staffHome o
+    // mikaelaHome, los datos en pantalla son del usuario anterior. Recargar
+    // explícitamente para que la comisión, servicios y lista correspondan al
+    // usuario que acaba de autenticarse — no a quien tenía la sesión guardada.
+    try {
+      if (_ss2 === 'staffHome' && typeof loadStaffHome === 'function') {
+        setTimeout(function() { loadStaffHome(); }, 100);
+      } else if (_ss2 === 'mikaelaHome' && typeof loadMikaelaHome === 'function') {
+        setTimeout(function() { loadMikaelaHome(); }, 100);
+      } else if (_ss2 === 'ownerHome' && typeof loadOwnerHome === 'function') {
+        setTimeout(function() { loadOwnerHome(); }, 100);
+      }
+    } catch (_eReload) { console.warn('[doLogin] recarga post-login:', _eReload); }
   }
 
   // Modo de descanso: bloquea staff si está en descanso individual O si el descanso GLOBAL está activo.
