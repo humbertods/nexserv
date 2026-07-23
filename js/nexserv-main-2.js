@@ -188,8 +188,37 @@
     if (!user) return;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey  = normalizeClientKey(clientName);
-    const idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    let idEspera   = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
     const clienteCodigo = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
+
+    // FIX INC-TM-02: si ensureIdEsperaFresco resolvió un TM- como idEspera activo
+    // pero hay otro ticket SP-/SN- también activo para esta clienta y esta staff
+    // (caso: Jeannette C-1171 con TM-0480 completado + SP-0320 en_servicio),
+    // getAtenciones agrupa ambos bajo C-1171 y toma la primera línea (TM-0480)
+    // como base → idEspera queda TM-0480 y finishAndSend_ intenta finalizarlo de
+    // nuevo (el backend responde todasCompletadas:true sin hacer nada) mientras el
+    // SP-0320 real nunca se manda a cobro.
+    // Solución: cuando idEspera es TM-, consultar getAtenciones para esta staff y
+    // clienta; si existe un SP-/SN- activo de la misma staff, usarlo como idEspera.
+    if (idEspera.startsWith('TM-') && clienteCodigo) {
+      try {
+        const _rFresco = await apiGet('getAtenciones', { chica: user.name });
+        const _atenFresco = (_rFresco && _rFresco.success && _rFresco.atenciones) ? _rFresco.atenciones : [];
+        const _atenCli = _atenFresco.filter(a => String(a.codigo || '') === clienteCodigo);
+        // Buscar cualquier SP- o SN- activo de esta clienta con esta staff
+        const _spActivo = _atenCli.find(a => {
+          const id = String(a.idEspera || '');
+          return (id.startsWith('SP-') || id.startsWith('SN-')) &&
+                 String(a.tomadaPor || '').split(',').map(s => s.trim()).includes(user.name);
+        });
+        if (_spActivo) {
+          console.log('[INC-TM-02] TM ya completado, usando ticket activo real:', idEspera, '→', _spActivo.idEspera);
+          idEspera = _spActivo.idEspera;
+          const _winKey = slot === 1 ? '_as1IdEspera' : '_as2IdEspera';
+          window[_winKey] = idEspera;
+        }
+      } catch (_eTM02) { console.warn('[INC-TM-02] error buscando SP activo:', _eTM02); }
+    }
 
     // Obtener datos del servicio desde slotServices o desde activePromos
     const svcs = (slotServices[slot] || []).filter(s => s.status !== 'rechazado' && s.status !== 'pendiente' && s.status !== 'enganche-enviado');
