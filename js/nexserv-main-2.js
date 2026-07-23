@@ -452,8 +452,15 @@
     // ── LIMPIEZA: el backend confirmó el envío, ahora sí limpiar el slot ──
     if (activePromos[data.clientName]) delete activePromos[data.clientName];
     if (data.clientKey && activePromos[data.clientKey]) delete activePromos[data.clientKey];
-    window._as1IdEspera = '';
-    window._as1Client = '';
+    // FIX INC-TM-01: limpiar el slot correcto (antes siempre limpiaba slot 1
+    // aunque Keyla/staff estuviera en slot 2 → TM quedaba "en servicio" en pantalla)
+    if (slot === 2) {
+      window._as2IdEspera = '';
+      window._as2Client = '';
+    } else {
+      window._as1IdEspera = '';
+      window._as1Client = '';
+    }
     window._finishingData = null;
     window._desgloseAcumulado = [];
     slotServices[slot] = [];
