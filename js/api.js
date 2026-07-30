@@ -21,7 +21,7 @@
   })();
   const API_URLS = {
     prod: 'https://script.google.com/macros/s/AKfycbyS9YonMU50Oq811-kPyOBUQoksDFVwT5AQ2P4U0BN9IJaJJCAV2HeZ5L1A0bMWMjcL/exec',
-    dev:  '__PEGA_DEV_EXEC_URL__'   // ← URL /exec del deployment de pruebas
+    dev:  'https://script.google.com/macros/s/AKfycbwbCYRXduTSyVSmX7yDSkgLD_5sqW3wWrWP4AkNC0blCGHn2RYASyT2rucTsAJWWtKuQQ/exec'   // ← URL /exec del deployment de pruebas
   };
   const API_URL = API_URLS[ENV];
 
