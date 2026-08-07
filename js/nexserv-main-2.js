@@ -5313,7 +5313,8 @@
       descripcion: desc,
       monto:       monto,
       responsable: resp,
-      notas:       notas
+      notas:       notas,
+      userId:      _siraIdDesdeNombre(window.currentUser && window.currentUser.name)
     });
 
     if (btn) { btn.disabled = false; btn.textContent = 'Confirmar gasto'; }
