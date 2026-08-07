@@ -3,15 +3,11 @@
 <head>
   <!-- Service Worker registration → js/app.js -->
   <script>
-    // Limpiar cache del Service Worker para forzar archivos frescos.
-    // ESTRICTO: solo caches propias de DEV (prefijo "nexserv-dev-"). Nunca
-    // tocar "nexserv-prod-*", ningún otro "nexserv-*", ni ninguna cache
-    // desconocida — caches.keys()/delete() operan a nivel de origen
-    // completo (humbertods.github.io), no de ruta.
+    // Limpiar cache del Service Worker para forzar archivos frescos
     if ('serviceWorker' in navigator && 'caches' in window) {
       caches.keys().then(function(names) {
         names.forEach(function(name) {
-          if (name.startsWith('nexserv-dev-')) {
+          if (name.indexOf('firebase') === -1) { // mantener FCM
             caches.delete(name);
           }
         });
@@ -41,8 +37,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- NEXSERV Styles — Fase 1 partición -->
-  <link rel="stylesheet" href="./base.css">
-  <link rel="stylesheet" href="./components.css?v=20260716a">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css?v=20260716a">
 
 <!-- ── MANDAMIENTOS DEL SISTEMA ── cargado antes del body para que sus funciones estén disponibles globalmente -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
@@ -2861,16 +2857,16 @@
 
 
   <!-- NEXSERV Core JS — Fase 2 partición -->
-  <script src="./state.js?v=20260706a"></script>
-  <script src="./api.js?v=20260713c"></script>
-  <script src="./lineaService.js?v=20260710a"></script>
-  <script src="./router.js?v=20260706a"></script>
-  <script src="./app.js?v=20260706a"></script>
-  <script src="./nexserv-main-1.js?v=20260721a"></script>
-  <script src="./nexserv-main-2.js?v=20260715c"></script>
-  <script src="./nexserv-nuevacita.js?v=20260711a"></script>
-  <script src="./nexserv-main-3.js?v=20260717a"></script>
-  <script src="./nexserv-main-4.js?v=20260721a"></script>
+  <script src="js/state.js?v=20260706a"></script>
+  <script src="js/api.js?v=20260713c"></script>
+  <script src="js/lineaService.js?v=20260710a"></script>
+  <script src="js/router.js?v=20260706a"></script>
+  <script src="js/app.js?v=20260706a"></script>
+  <script src="js/nexserv-main-1.js?v=20260721a"></script>
+  <script src="js/nexserv-main-2.js?v=20260715c"></script>
+  <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
+  <script src="js/nexserv-main-3.js?v=20260717a"></script>
+  <script src="js/nexserv-main-4.js?v=20260721a"></script>
 
 
 <!-- ============================================ -->
@@ -3072,7 +3068,7 @@ async function suscribirPushActual() {
     // Si el archivo aún no está subido, cae al SW principal y sigue andando en primer plano.
     let fcmReg = reg;
     try {
-      fcmReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './firebase-cloud-messaging-push-scope' });
+      fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
       // Esperar a que el SW de Firebase esté ACTIVO antes de suscribir
       // (recién registrado puede estar instalándose → "no active Service Worker")
       if (!fcmReg.active) {
@@ -3085,7 +3081,7 @@ async function suscribirPushActual() {
             });
           });
         }
-        fcmReg = (await navigator.serviceWorker.getRegistration('./firebase-cloud-messaging-push-scope')) || fcmReg;
+        fcmReg = (await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope')) || fcmReg;
       }
       // Si todavía no quedó activo, usar el SW principal (que sí lo está)
       if (!fcmReg.active) { console.log('[Push] FCM SW aún no activo, uso SW principal'); fcmReg = reg; }
@@ -3103,7 +3099,7 @@ async function suscribirPushActual() {
         try {
           (fcmReg || reg).showNotification(n.title, {
             body: n.body || '',
-            icon: location.origin + (window.NEXSERV_BASE_PATH || '/') + 'icon-192x192.png',
+            icon: 'https://humbertods.github.io/nexserv/icon-192x192.png',
             tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
           });
         } catch (e) {}
