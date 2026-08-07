@@ -4452,7 +4452,7 @@
     for (var i = 0; i < prods.length; i++) {
       var p = prods[i];
       if (String(p.nombre || '').trim().toLowerCase() === n) {
-        return p.id || p.idProducto || p.ID || p.codigo || p.sku || '';
+        return p.idEstable || '';
       }
     }
     return '';
