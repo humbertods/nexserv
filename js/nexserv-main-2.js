@@ -4458,26 +4458,39 @@
     return '';
   }
 
+  // Resuelve el userId que exige el bridge de SIRA (autorizarAccion: token + userId)
+  // a partir del nombre autenticado en NexServ. SIRA_USUARIOS_JSON usa el primer
+  // nombre en minúsculas sin tildes como id (confirmado por auditoría: humberto,
+  // mikaela, diana, yadira, keyla, lesly, maria, laura). Transformación pura y
+  // determinística — NO hardcodea usuarios individuales.
+  // Riesgo conocido, sin resolver: si `nombre` alguna vez trae apellido u otro
+  // texto además del primer nombre, el id resultante no calzará con SIRA.
+  function _siraIdDesdeNombre(nombre) {
+    return String(nombre || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '');
+  }
+
   // Registra un movimiento en SIRA con la acción 'movimiento' — la que VALIDA el
-  // producto, ACTUALIZA el Stock Actual (suma en entrada / resta en salida) y luego
-  // escribe la fila en Movimientos. Antes NexServ usaba 'movimientoNexserv', que solo
-  // hacía append a Movimientos y NO tocaba Stock Actual: por eso una Entrada quedaba
-  // registrada pero el stock no subía. Manda el payload completo (idProducto, fecha,
-  // hora, tipoUnidad, grupo) para que SIRA lo procese igual que desde su propia UI.
+  // producto, ACTUALIZA el Stock Actual (suma en entrada / resta en salida) y
+  // escribe la fila en Movimientos.
+  // AUTENTICACIÓN (confirmado por auditoría contra COPIAR_EN_APPS_SCRIPT.gs):
+  // autorizarAccion() exige sessionToken válido O (token bridge + userId). NexServ
+  // no tiene sesión SIRA, así que manda token bridge + userId. 'movimientoNexserv'
+  // NUNCA existió en el router de SIRA (solo 'movimiento' / 'movimientoBatch') —
+  // por eso siempre caía a "Sesión requerida" sin importar el token.
+  // El userId se resuelve del usuario AUTENTICADO en NexServ (window.currentUser),
+  // no del campo editable "Responsable" del formulario — la staff acreditada en
+  // SIRA debe ser quien realmente inició sesión en NexServ.
   async function _siraRegistrarMov(o) {
     var now = new Date(), gy;
     try { gy = new Date(now.toLocaleString('en-US', { timeZone: 'America/Guayaquil' })); } catch(e) { gy = now; }
     var fecha = gy.getFullYear() + '-' + String(gy.getMonth()+1).padStart(2,'0') + '-' + String(gy.getDate()).padStart(2,'0');
     var hora  = String(gy.getHours()).padStart(2,'0') + ':' + String(gy.getMinutes()).padStart(2,'0');
     var resp  = o.responsable || 'Staff';
-    // AUTENTICACIÓN: NexServ solo tiene TOKEN (no sesión de usuario SIRA). La acción
-    // 'movimiento' exige sesión logueada → devolvía "Sesión requerida". El único endpoint
-    // de escritura que acepta el token es 'movimientoNexserv'. Le mandamos el payload
-    // COMPLETO (idProducto, fecha, hora, tipoUnidad, grupo) para que —una vez que en SIRA
-    // el handler 'movimientoNexserv' agregue la lógica de Stock Actual— ya tenga todo lo
-    // que necesita. Hoy este endpoint registra en Movimientos; el update de stock es la
-    // pieza que falta DEL LADO DE SIRA.
-    return _siraPost('movimientoNexserv', {
+    return _siraPost('movimiento', {
       tipo:        o.tipo || 'salida',
       producto:    o.producto || '',
       idProducto:  (o.idProducto != null && o.idProducto !== '') ? o.idProducto : _siraIdProducto(o.producto),
@@ -4488,7 +4501,8 @@
       hora:        hora,
       tipoUnidad:  o.tipoUnidad || 'Unidad',
       grupo:       o.grupo || (String(resp).replace(/ /g, '_') + '_' + Date.now()),
-      nota:        o.nota || ''
+      nota:        o.nota || '',
+      userId:      _siraIdDesdeNombre(window.currentUser && window.currentUser.name)
     });
   }
 
