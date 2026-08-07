@@ -966,7 +966,12 @@
     const badge = document.getElementById('capacityBadge');
     const slot1 = document.getElementById('slot1');
     const slot2 = document.getElementById('slot2');
-    
+    // Guard: el DOM de staffHome puede haber sido reemplazado (SIRA/Comisiones activos).
+    // Sin esto, escribir sobre badge/slot1/slot2 nulos revienta con TypeError — visto en
+    // consola como "Error cargando staff home" (vía loadStaffHome) y también alcanzable
+    // directo desde completarAreaMultiFinal(), que llama a updateCapacityUI() sin guard propio.
+    if (!badge || !slot1 || !slot2) return;
+
     badge.textContent = count + '/2 ocupada' + (count !== 1 ? 's' : '');
     badge.style.background = count === 2 ? 'var(--danger-bg)' : count === 1 ? 'var(--warning-bg)' : 'var(--success-bg)';
     badge.style.color = count === 2 ? 'var(--danger)' : count === 1 ? 'var(--warning)' : 'var(--success)';
