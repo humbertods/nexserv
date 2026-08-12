@@ -3,11 +3,15 @@
 <head>
   <!-- Service Worker registration → js/app.js -->
   <script>
-    // Limpiar cache del Service Worker para forzar archivos frescos
+    // Limpiar cache del Service Worker para forzar archivos frescos.
+    // ESTRICTO: solo caches propias de DEV (prefijo "nexserv-dev-"). Nunca
+    // tocar "nexserv-prod-*", ningún otro "nexserv-*", ni ninguna cache
+    // desconocida — caches.keys()/delete() operan a nivel de origen
+    // completo (humbertods.github.io), no de ruta.
     if ('serviceWorker' in navigator && 'caches' in window) {
       caches.keys().then(function(names) {
         names.forEach(function(name) {
-          if (name.indexOf('firebase') === -1) { // mantener FCM
+          if (name.startsWith('nexserv-dev-')) {
             caches.delete(name);
           }
         });
@@ -2990,6 +2994,7 @@ const STAFF_PUSH_MAP = {
   'Keyla':    'push_keyla',
   'Lesly':    'push_lesly',
   'Rosa':     'push_rosa',
+  'Melany':   'push_melany',
   'Yadira':   'push_yadira',
   'Diana':    'push_diana',
   'Laura':    'push_laura',
@@ -3068,7 +3073,7 @@ async function suscribirPushActual() {
     // Si el archivo aún no está subido, cae al SW principal y sigue andando en primer plano.
     let fcmReg = reg;
     try {
-      fcmReg = await navigator.serviceWorker.register('/nexserv/firebase-messaging-sw.js', { scope: '/nexserv/firebase-cloud-messaging-push-scope' });
+      fcmReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js', { scope: './firebase-cloud-messaging-push-scope' });
       // Esperar a que el SW de Firebase esté ACTIVO antes de suscribir
       // (recién registrado puede estar instalándose → "no active Service Worker")
       if (!fcmReg.active) {
@@ -3081,7 +3086,7 @@ async function suscribirPushActual() {
             });
           });
         }
-        fcmReg = (await navigator.serviceWorker.getRegistration('/nexserv/firebase-cloud-messaging-push-scope')) || fcmReg;
+        fcmReg = (await navigator.serviceWorker.getRegistration('./firebase-cloud-messaging-push-scope')) || fcmReg;
       }
       // Si todavía no quedó activo, usar el SW principal (que sí lo está)
       if (!fcmReg.active) { console.log('[Push] FCM SW aún no activo, uso SW principal'); fcmReg = reg; }
@@ -3099,7 +3104,7 @@ async function suscribirPushActual() {
         try {
           (fcmReg || reg).showNotification(n.title, {
             body: n.body || '',
-            icon: 'https://humbertods.github.io/nexserv/icon-192x192.png',
+            icon: location.origin + (window.NEXSERV_BASE_PATH || '/') + 'icon-192x192.png',
             tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
           });
         } catch (e) {}
@@ -3166,7 +3171,7 @@ async function enviarPushStaff(nombres, titulo, cuerpo) {
 async function probarNotificaciones() {
   const staffMap = {
     'push_maria':'María', 'push_keyla':'Keyla', 'push_lesly':'Lesly', 'push_rosa':'Rosa',
-    'push_yadira':'Yadira', 'push_diana':'Diana', 'push_laura':'Laura'
+    'push_melany':'Melany', 'push_yadira':'Yadira', 'push_diana':'Diana', 'push_laura':'Laura'
   };
   const keys = Object.keys(staffMap);
 
