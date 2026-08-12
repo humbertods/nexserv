@@ -2283,6 +2283,12 @@
     const user = window.currentUser;
     if (!user || user.role !== 'staff') return;
     
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    const _LAT = (typeof window._nexLat === 'function') ? window._nexLat : function(){};
+    const _latT = function(){ return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); };
+    _LAT('T3 WAITLIST_START', {});
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+
     const content = document.getElementById('waitListContent');
     content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando lista...</div>';
     
@@ -2291,10 +2297,37 @@
     try {
       // Mapa de clientas frecuentes por área (para las estrellas de color)
       try {
+        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+        const _tFrec = _latT(); _LAT('T3A FRECUENTES_REQUEST', {});
+        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
         const fr = await apiGet('getClientasFrecuentes');
+        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+        _LAT('T3B FRECUENTES_RESPONSE', { duracionMs: Math.round(_latT() - _tFrec) });
+        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
         if (fr && fr.success) window._frecMapa = fr.mapa || {};
       } catch(eFr) {}
+      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      const _tLE = _latT(); _LAT('T4 WAITLIST_REQUEST', {});
+      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
       const result = await apiGet('getListaEspera');
+      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — solo conteos, jamás nombres
+      try {
+        const _cruda = (result && result.lista) ? result.lista : [];
+        const _quienDe = function (w) {
+          return (w.asignadaA && String(w.asignadaA).trim())
+              || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
+        };
+        _LAT('T5 WAITLIST_RESPONSE', {
+          duracionMs: Math.round(_latT() - _tLE),
+          ok: !!(result && result.success),
+          totalItems: _cruda.length,
+          assignedToCurrentUserCount: _cruda.filter(function (w) {
+            const q = _quienDe(w); return q !== '' && q === user.name;
+          }).length,
+          conAsignadaA: _cruda.filter(function (w) { return _quienDe(w) !== ''; }).length
+        });
+      } catch (eL5) {}
+      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
       if (result.success && result.lista) {
         lista = result.lista.map(w => {
           const areaRaw = String(w.area || '').toLowerCase();
@@ -2341,6 +2374,27 @@
                  || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
       return quien !== '' && quien === user.name;
     });
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — solo conteos, jamás nombres
+    try {
+      const _norm = function (s) {
+        return String(s || '').trim().toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      };
+      const _quienDe2 = function (w) {
+        return (w.asignadaA && String(w.asignadaA).trim())
+            || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
+      };
+      const _yo = user.name;
+      _LAT('T6 FILTER_DONE', {
+        total: lista.length,
+        mias: myList.length,
+        exactMatchCount: lista.filter(function (w) { return _quienDe2(w) === _yo; }).length,
+        trimmedCaseInsensitiveMatchCount: lista.filter(function (w) {
+          return _quienDe2(w) !== '' && _norm(_quienDe2(w)) === _norm(_yo);
+        }).length
+      });
+    } catch (eL6) {}
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
     
     document.getElementById('waitCountMy').textContent = myList.length;
     document.getElementById('waitCountAll').textContent = lista.length;
@@ -2397,6 +2451,14 @@
       </div>
     `;
     }).join('');
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    try {
+      _LAT('T7 DOM_DONE', {
+        tarjetasRenderizadas: myList.length,
+        nodos: content.querySelectorAll ? content.querySelectorAll('.waitlist-card').length : -1
+      });
+    } catch (eL7) {}
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
   }
 
   function openTake(idx) {
