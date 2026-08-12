@@ -3108,6 +3108,9 @@ async function suscribirPushActual() {
             tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
           });
         } catch (e) {}
+        // Señal de refresco dirigido. Best-effort: si falla, la notificación
+        // ya se mostró y el fallback focus/visibility sigue cubriendo.
+        try { nexRefrescarUI('fcm'); } catch (e) {}
       });
     } catch (e) {}
 
@@ -3283,6 +3286,78 @@ window.eliminarTicketEspera = eliminarTicketEspera;
   document.addEventListener('mouseup', cancel);
   document.addEventListener('mouseleave', cancel);
 })();
+
+// ══════════════════════════════════════════════════════════════════
+// NexServ · Refresco dirigido de UI (INC-LATENCIA-ASIGNACION-STAFF)
+// El push es SEÑAL, nunca fuente de verdad: solo dispara una LECTURA
+// de la pantalla activa. No lee payload.data, no escribe estado, no
+// ejecuta ninguna acción comercial.
+// ══════════════════════════════════════════════════════════════════
+window._nexRefresh = { ultimo: 0, timer: null, enVuelo: false, pendiente: null };
+
+function _nexPantallaActiva() {
+  const el = document.querySelector('.screen.active');
+  return el ? el.id : '';
+}
+
+async function _nexRefrescarAhora(origen) {
+  const st = window._nexRefresh;
+  const u = window.currentUser;
+  if (!u) return;
+  const pantalla = _nexPantallaActiva();
+  st.enVuelo = true;
+  try {
+    if (u.role === 'staff') {
+      if (pantalla === 'waitList' && typeof renderWaitList === 'function') {
+        await renderWaitList();
+      } else if (pantalla === 'staffHome' && typeof loadStaffHome === 'function') {
+        await loadStaffHome();
+      }
+    } else if (u.role === 'admin' || u.area === 'admin') {
+      if (pantalla === 'mikaelaHome' && typeof loadMikaelaHome === 'function') {
+        await loadMikaelaHome();
+      }
+    }
+    console.log('[nexRefresh]', origen, u.role, pantalla);
+  } catch (e) {
+    console.warn('[nexRefresh] error:', e && e.message);
+  } finally {
+    st.enVuelo = false;
+    // Trailing: un evento que llegó DURANTE la lectura no se pierde — la
+    // lectura recién terminada pudo haber salido antes del cambio.
+    if (st.pendiente) {
+      const _o = st.pendiente;
+      st.pendiente = null;
+      st.ultimo = Date.now();
+      if (st.timer) clearTimeout(st.timer);
+      st.timer = setTimeout(function () {
+        st.timer = null;
+        _nexRefrescarAhora(_o + '+pendiente');
+      }, 0);
+    }
+  }
+}
+
+// Coalescencia 400 ms. Push + focus + visibilitychange casi simultáneos
+// producen UN solo refresh. Eventos separados por más de 400 ms no se
+// pierden. Un evento llegado con una lectura en vuelo queda pendiente y
+// se ejecuta al terminar (nunca dos requests concurrentes).
+function nexRefrescarUI(origen) {
+  const st = window._nexRefresh;
+  if (st.enVuelo) { st.pendiente = origen; return; }
+  const ahora = Date.now();
+  if (ahora - st.ultimo < 400) return;
+  st.ultimo = ahora;
+  _nexRefrescarAhora(origen);
+}
+window.nexRefrescarUI = nexRefrescarUI;
+
+// Red de seguridad: cubre FCM no registrado, token vencido, notificaciones
+// bloqueadas y app suspendida. La lógica comercial nunca depende del push.
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') nexRefrescarUI('visibility');
+});
+window.addEventListener('focus', function () { nexRefrescarUI('focus'); });
 
 const _origDoLogin = window.doLogin;
 window.doLogin = async function(...args) {
