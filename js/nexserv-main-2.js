@@ -1788,7 +1788,15 @@
         const _peSection = document.getElementById('staffPorEmpezarSection');
         const _peList    = document.getElementById('staffPorEmpezarList');
         if (_peSection && _peList) {
-          const _wait = await LineaService.obtenerListaEspera().catch(function(){ return []; });
+          // INC-LATENCIA-TICKET-STAFF — fuente única: cola compartida de Staff
+          // (apiGet('getListaEspera'), contrato legacy PROD). Antes se usaba
+          // LineaService.obtenerListaEspera() → getTableroLineas, cuyo shape
+          // (staff/cliente/monto) no coincide con los campos que este filtro
+          // lee (tomadaPor/asignadaA/nombre/total), así que _mias salía SIEMPRE
+          // vacío. Se consume la lista CRUDA porque este filtro necesita
+          // `estado`, que el mapeo de waitList no conserva.
+          if (typeof refreshStaffQueue === 'function') await refreshStaffQueue('staffHome');
+          const _wait = (window._staffQueueState && window._staffQueueState.raw) || [];
           const _mias = (_wait || []).filter(function (w) {
             const est = String(w.estado || w.status || '').toLowerCase().replace('_', ' ');
             if (est !== 'esperando') return false;   // solo las que aún no empezaron
@@ -2009,7 +2017,9 @@
       }
       
       // Actualizar contadores
-      const waitResult = await LineaService.obtenerListaEspera().then(function(l){ return {success:true, lista:l}; }).catch(function(){ return apiGet('getListaEspera'); });
+      // INC-LATENCIA-TICKET-STAFF — sin segunda lectura: reutiliza la cola ya
+      // refrescada arriba por refreshStaffQueue() (cero requests extra).
+      const waitResult = { success: true, lista: (window._staffQueueState && window._staffQueueState.raw) || [] };
       if (waitResult.success) {
         const allowed = AREA_FILTER[user.area] || [];
         const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
