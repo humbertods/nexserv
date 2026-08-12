@@ -3108,6 +3108,15 @@ async function suscribirPushActual() {
             tag: 'nexserv-cita', renotify: true, vibrate: [200, 100, 200]
           });
         } catch (e) {}
+        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — sin title/body/datos de clienta
+        try {
+          _nexLatAbrir('fcm');
+          _nexLat('T0 FCM', {
+            role: (window.currentUser && window.currentUser.role) || 'sin-sesion',
+            activeScreenId: _nexPantallaActiva()
+          });
+        } catch (e) {}
+        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
         // Señal de refresco dirigido. Best-effort: si falla, la notificación
         // ya se mostró y el fallback focus/visibility sigue cubriendo.
         try { nexRefrescarUI('fcm'); } catch (e) {}
@@ -3287,6 +3296,30 @@ window.eliminarTicketEspera = eliminarTicketEspera;
   document.addEventListener('mouseleave', cancel);
 })();
 
+// TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — instrumentación, remover tras medir
+// Solo console.log. Cero requests, cero cambios de comportamiento.
+// NUNCA registra nombres de clientas, títulos ni cuerpos de notificación.
+window._nexLatTrace = { id: 0, t0: 0, abierta: false };
+function _nexLatReloj() {
+  return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+}
+function _nexLatAbrir(origen) {
+  const tr = window._nexLatTrace;
+  tr.id++; tr.t0 = _nexLatReloj(); tr.abierta = true;
+  return tr;
+}
+function _nexLat(etapa, extra) {
+  try {
+    const tr = window._nexLatTrace;
+    const d = tr.t0 ? Math.round(_nexLatReloj() - tr.t0) : 0;
+    console.log('[NEX-LAT]', etapa, 'trace#' + tr.id, '+' + d + 'ms', 'ts=' + Date.now(),
+                extra ? JSON.stringify(extra) : '');
+  } catch (e) {}
+}
+window._nexLat = _nexLat;
+window._nexLatAbrir = _nexLatAbrir;
+// /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+
 // ══════════════════════════════════════════════════════════════════
 // NexServ · Refresco dirigido de UI (INC-LATENCIA-ASIGNACION-STAFF)
 // El push es SEÑAL, nunca fuente de verdad: solo dispara una LECTURA
@@ -3306,6 +3339,16 @@ async function _nexRefrescarAhora(origen) {
   if (!u) return;
   const pantalla = _nexPantallaActiva();
   st.enVuelo = true;
+  // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+  var _latRoute = 'NONE';
+  if (u.role === 'staff') {
+    if (pantalla === 'waitList') _latRoute = 'renderWaitList';
+    else if (pantalla === 'staffHome') _latRoute = 'loadStaffHome';
+  } else if (u.role === 'admin' || u.area === 'admin') {
+    if (pantalla === 'mikaelaHome') _latRoute = 'loadMikaelaHome';
+  }
+  try { _nexLat('T2 REFRESH_EXEC', { origen: origen, role: u.role, activeScreenId: pantalla, ROUTE: _latRoute }); } catch (e) {}
+  // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
   try {
     if (u.role === 'staff') {
       if (pantalla === 'waitList' && typeof renderWaitList === 'function') {
@@ -3323,6 +3366,12 @@ async function _nexRefrescarAhora(origen) {
     console.warn('[nexRefresh] error:', e && e.message);
   } finally {
     st.enVuelo = false;
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    try {
+      _nexLat('T8 REFRESH_END', { ROUTE: _latRoute, pendiente: st.pendiente ? 'SI' : 'NO' });
+      if (!st.pendiente) window._nexLatTrace.abierta = false;
+    } catch (e) {}
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
     // Trailing: un evento que llegó DURANTE la lectura no se pierde — la
     // lectura recién terminada pudo haber salido antes del cambio.
     if (st.pendiente) {
@@ -3344,6 +3393,19 @@ async function _nexRefrescarAhora(origen) {
 // se ejecuta al terminar (nunca dos requests concurrentes).
 function nexRefrescarUI(origen) {
   const st = window._nexRefresh;
+  // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+  try {
+    if (!window._nexLatTrace.abierta) _nexLatAbrir(origen);
+    _nexLat('T1 REFRESH_REQUEST', {
+      origen: origen,
+      activeScreenId: _nexPantallaActiva(),
+      enVuelo: st.enVuelo,
+      pendiente: st.pendiente ? 'SI' : 'NO',
+      resultado: st.enVuelo ? 'ENCOLADO'
+               : ((Date.now() - st.ultimo < 400) ? 'COALESCIDO' : 'EJECUTA')
+    });
+  } catch (e) {}
+  // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
   if (st.enVuelo) { st.pendiente = origen; return; }
   const ahora = Date.now();
   if (ahora - st.ultimo < 400) return;
