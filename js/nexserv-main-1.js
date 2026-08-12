@@ -2279,57 +2279,19 @@
   }
   window.histSeleccionarClienta = histSeleccionarClienta;
 
-  async function renderWaitList() {
-    const user = window.currentUser;
-    if (!user || user.role !== 'staff') return;
-    
-    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-    const _LAT = (typeof window._nexLat === 'function') ? window._nexLat : function(){};
-    const _latT = function(){ return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); };
-    _LAT('T3 WAITLIST_START', {});
-    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+  // ══════════════════════════════════════════════════════════════════
+  // COLA STAFF COMPARTIDA — INC-LATENCIA-TICKET-STAFF
+  // Fuente canónica: apiGet('getListaEspera') (ruta operativa PROD legacy).
+  // NO usa getTableroLineas ni LineaService.obtenerListaEspera (contrato
+  // LINEAS→legacy roto, incidente separado). Solo lectura: no escribe,
+  // no cambia estados, no ejecuta acciones comerciales.
+  // ══════════════════════════════════════════════════════════════════
+  window._staffQueueState = window._staffQueueState || { data: [], raw: [], ts: 0, inFlight: null };
+  const STAFF_QUEUE_FRESCA_MS = 1000;   // solo para colapsar la MISMA ráfaga
+  const FREC_FRESCA_MS = 60000;         // estrellas: cambian muy poco
 
-    const content = document.getElementById('waitListContent');
-    content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando lista...</div>';
-    
-    // Intentar cargar desde API
-    let lista = [];
-    try {
-      // Mapa de clientas frecuentes por área (para las estrellas de color)
-      try {
-        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-        const _tFrec = _latT(); _LAT('T3A FRECUENTES_REQUEST', {});
-        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-        const fr = await apiGet('getClientasFrecuentes');
-        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-        _LAT('T3B FRECUENTES_RESPONSE', { duracionMs: Math.round(_latT() - _tFrec) });
-        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-        if (fr && fr.success) window._frecMapa = fr.mapa || {};
-      } catch(eFr) {}
-      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-      const _tLE = _latT(); _LAT('T4 WAITLIST_REQUEST', {});
-      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-      const result = await apiGet('getListaEspera');
-      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — solo conteos, jamás nombres
-      try {
-        const _cruda = (result && result.lista) ? result.lista : [];
-        const _quienDe = function (w) {
-          return (w.asignadaA && String(w.asignadaA).trim())
-              || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
-        };
-        _LAT('T5 WAITLIST_RESPONSE', {
-          duracionMs: Math.round(_latT() - _tLE),
-          ok: !!(result && result.success),
-          totalItems: _cruda.length,
-          assignedToCurrentUserCount: _cruda.filter(function (w) {
-            const q = _quienDe(w); return q !== '' && q === user.name;
-          }).length,
-          conAsignadaA: _cruda.filter(function (w) { return _quienDe(w) !== ''; }).length
-        });
-      } catch (eL5) {}
-      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-      if (result.success && result.lista) {
-        lista = result.lista.map(w => {
+  function _staffQueueMapear(cruda) {
+    return (cruda || []).map(w => {
           const areaRaw = String(w.area || '').toLowerCase();
           const areaMap = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting', 'retiro_lifting': 'retiro_lifting' };
           return {
@@ -2351,71 +2313,124 @@
             promasExtra: w.promasExtra || []
           };
         });
-      }
-    } catch (err) {
-      console.error('Error cargando lista:', err);
-    }
+  }
 
-    // Lista siempre viene del API o está vacía
-
-    const allowed = AREA_FILTER[user.area] || [];
-    
-    // Filtrar por área Y por asignación directa
-    window._listaEsperaCache = lista;
-
-    const myList = lista.filter(w => {
+  // Criterio de pertenencia — SEMÁNTICA PROD SIN CAMBIOS.
+  function _staffQueueMias(lista, user) {
+    return (lista || []).filter(w => {
       const estado = String(w.estado || w.status || '').toLowerCase();
       if (estado === 'en servicio' || estado === 'completada') return false;
       // MODELO CENTRALIZADO: la staff ve SOLO sus clientas asignadas.
-      // Robusto: la columna J (tomadaPor) siempre guarda la staff asignada,
-      // aunque el estado quede en 'Esperando'. Así no depende de que el backend
-      // ya esté redeployado escribiendo 'Asignada'.
       const quien = (w.asignadaA && String(w.asignadaA).trim())
                  || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
       return quien !== '' && quien === user.name;
     });
-    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — solo conteos, jamás nombres
-    try {
-      const _norm = function (s) {
-        return String(s || '').trim().toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-      };
-      const _quienDe2 = function (w) {
-        return (w.asignadaA && String(w.asignadaA).trim())
-            || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
-      };
-      const _yo = user.name;
-      _LAT('T6 FILTER_DONE', {
-        total: lista.length,
-        mias: myList.length,
-        exactMatchCount: lista.filter(function (w) { return _quienDe2(w) === _yo; }).length,
-        trimmedCaseInsensitiveMatchCount: lista.filter(function (w) {
-          return _quienDe2(w) !== '' && _norm(_quienDe2(w)) === _norm(_yo);
-        }).length
-      });
-    } catch (eL6) {}
-    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-    
-    document.getElementById('waitCountMy').textContent = myList.length;
-    document.getElementById('waitCountAll').textContent = lista.length;
-    document.getElementById('navBadge').textContent = myList.length;
-    document.getElementById('navBadge2').textContent = myList.length;
-    document.getElementById('pendingStat').querySelector('.value').textContent = myList.length;
-    
-    if (myList.length === 0) {
-      content.innerHTML = '<div class="card" style="text-align: center; padding: 40px 20px; color: var(--ink-faint);"><div style="font-size: 40px; margin-bottom: 8px;">✨</div><div>No hay clientas esperando para tu área</div></div>';
-      return;
+  }
+
+  function _staffQueueBadges(mias, total) {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('waitCountMy', mias);
+    set('waitCountAll', total);
+    set('navBadge', mias);
+    set('navBadge2', mias);
+    const ps = document.getElementById('pendingStat');
+    const psv = ps && ps.querySelector ? ps.querySelector('.value') : null;
+    if (psv) psv.textContent = mias;
+  }
+
+  // Refresco de cola INDEPENDIENTE DE LA PANTALLA ACTIVA.
+  // Deduplicación: promesa en vuelo compartida + ventana de frescura corta.
+  async function refreshStaffQueue(origen, opts) {
+    opts = opts || {};
+    const user = window.currentUser;
+    if (!user || user.role !== 'staff') return [];
+    const st = window._staffQueueState;
+    const ahora = Date.now();
+
+    if (!opts.forzar && st.ts && (ahora - st.ts) < STAFF_QUEUE_FRESCA_MS) {
+      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      try { if (typeof window._nexLat === 'function') window._nexLat('QUEUE_CACHE_HIT', { origen: origen, edadMs: ahora - st.ts, items: st.data.length }); } catch (e) {}
+      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      return st.data;
     }
-    
-    const priOrder = { 'tiempo': 0, 'normal': 1, 'especial': 2 };
-    myList.sort((a, b) => (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1));
-    
+    if (st.inFlight) return st.inFlight;   // una sola lectura real por ráfaga
+
+    st.inFlight = (async () => {
+      const _t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      try {
+        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+        try { if (typeof window._nexLat === 'function') window._nexLat('QUEUE_REQUEST', { origen: origen }); } catch (e) {}
+        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+        const result = await apiGet('getListaEspera');
+        const cruda = (result && result.success && result.lista) ? result.lista : [];
+        st.raw = cruda;
+        st.data = _staffQueueMapear(cruda);
+        st.ts = Date.now();
+        window._listaEsperaCache = st.data;
+        const _mias = _staffQueueMias(st.data, user).length;
+        _staffQueueBadges(_mias, st.data.length);
+        // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME — solo conteos, jamás nombres
+        try {
+          if (typeof window._nexLat === 'function') {
+            const _t = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+            const _q = w => (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
+            const _n = x => String(x || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            window._nexLat('QUEUE_RESPONSE', {
+              origen: origen,
+              duracionMs: Math.round(_t - _t0),
+              ok: !!(result && result.success),
+              totalItems: cruda.length,
+              assignedToCurrentUserCount: cruda.filter(w => { const q = _q(w); return q !== '' && q === user.name; }).length,
+              mias: _mias,
+              trimmedCaseInsensitiveMatchCount: cruda.filter(w => _q(w) !== '' && _n(_q(w)) === _n(user.name)).length
+            });
+          }
+        } catch (e) {}
+        // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+        return st.data;
+      } catch (err) {
+        console.warn('[refreshStaffQueue]', err && err.message);
+        return st.data;               // conserva lo último bueno
+      } finally {
+        st.inFlight = null;
+      }
+    })();
+    return st.inFlight;
+  }
+  window.refreshStaffQueue = refreshStaffQueue;
+  window._staffQueueMias = _staffQueueMias;
+
+  // Estrellas de clienta frecuente: BEST-EFFORT, fuera del camino crítico.
+  // Nunca bloquea la aparición del ticket; si falla, la cola se ve igual.
+  function _cargarFrecuentesBestEffort(alLlegar) {
+    const ahora = Date.now();
+    if (window._frecMapaTs && (ahora - window._frecMapaTs) < FREC_FRESCA_MS) return;
+    if (window._frecInFlight) return;
+    window._frecInFlight = true;
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    const _tF = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    try { if (typeof window._nexLat === 'function') window._nexLat('T3A FRECUENTES_REQUEST', {}); } catch (e) {}
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    apiGet('getClientasFrecuentes').then(fr => {
+      if (fr && fr.success) { window._frecMapa = fr.mapa || {}; window._frecMapaTs = Date.now(); }
+      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      try {
+        if (typeof window._nexLat === 'function') {
+          const _t = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          window._nexLat('T3B FRECUENTES_RESPONSE', { duracionMs: Math.round(_t - _tF), ok: !!(fr && fr.success) });
+        }
+      } catch (e) {}
+      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      try { if (typeof alLlegar === 'function') alLlegar(); } catch (e) {}
+    }).catch(() => {}).then(() => { window._frecInFlight = false; });
+  }
+
+  function _renderWaitListDOM(content, myList) {
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
       'tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
-    
     content.innerHTML = myList.map((w, idx) => {
       // Guardar en objeto global
       if (!window._waitListData) window._waitListData = {};
@@ -2451,14 +2466,59 @@
       </div>
     `;
     }).join('');
+  }
+
+  async function renderWaitList() {
+    const user = window.currentUser;
+    if (!user || user.role !== 'staff') return;
     // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-    try {
-      _LAT('T7 DOM_DONE', {
-        tarjetasRenderizadas: myList.length,
-        nodos: content.querySelectorAll ? content.querySelectorAll('.waitlist-card').length : -1
-      });
-    } catch (eL7) {}
+    const _LAT = (typeof window._nexLat === 'function') ? window._nexLat : function(){};
+    _LAT('T3 WAITLIST_START', {});
     // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+
+    const content = document.getElementById('waitListContent');
+    if (!content) return;
+    const st = window._staffQueueState;
+    const hayColaFresca = st.ts && (Date.now() - st.ts) < STAFF_QUEUE_FRESCA_MS;
+    if (!hayColaFresca && !st.data.length) {
+      content.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando lista...</div>';
+    }
+
+    // Camino crítico: SOLO la cola. Reutiliza la ya refrescada por FCM/focus.
+    const lista = await refreshStaffQueue('waitList');
+    const myList = _staffQueueMias(lista, user);
+    _staffQueueBadges(myList.length, lista.length);
+
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    _LAT('T6 FILTER_DONE', { total: lista.length, mias: myList.length });
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+
+    if (myList.length === 0) {
+      content.innerHTML = '<div class="card" style="text-align: center; padding: 40px 20px; color: var(--ink-faint);"><div style="font-size: 40px; margin-bottom: 8px;">✨</div><div>No hay clientas esperando para tu área</div></div>';
+      _cargarFrecuentesBestEffort(null);
+      // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      _LAT('QUEUE_RENDER', { tarjetas: 0 });
+      // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+      return;
+    }
+
+    const priOrder = { 'tiempo': 0, 'normal': 1, 'especial': 2 };
+    myList.sort((a, b) => (priOrder[a.priority] || 1) - (priOrder[b.priority] || 1));
+
+    _renderWaitListDOM(content, myList);
+    // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+    _LAT('T7 DOM_DONE', {
+      tarjetasRenderizadas: myList.length,
+      nodos: content.querySelectorAll ? content.querySelectorAll('.waitlist-card').length : -1
+    });
+    _LAT('QUEUE_RENDER', { tarjetas: myList.length });
+    // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+
+    // Estrellas después: si llegan, se repinta solo el DOM (cero lecturas de cola).
+    _cargarFrecuentesBestEffort(function () {
+      const sigueActiva = document.getElementById('waitList');
+      if (sigueActiva && sigueActiva.classList.contains('active')) _renderWaitListDOM(content, myList);
+    });
   }
 
   function openTake(idx) {
