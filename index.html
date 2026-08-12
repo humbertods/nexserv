@@ -2866,8 +2866,8 @@
   <script src="js/lineaService.js?v=20260710a"></script>
   <script src="js/router.js?v=20260706a"></script>
   <script src="js/app.js?v=20260706a"></script>
-  <script src="js/nexserv-main-1.js?v=20260721a"></script>
-  <script src="js/nexserv-main-2.js?v=20260715c"></script>
+  <script src="js/nexserv-main-1.js?v=20260812a"></script>
+  <script src="js/nexserv-main-2.js?v=20260812a"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
   <script src="js/nexserv-main-3.js?v=20260717a"></script>
   <script src="js/nexserv-main-4.js?v=20260721a"></script>
@@ -3333,6 +3333,13 @@ function _nexPantallaActiva() {
   return el ? el.id : '';
 }
 
+// Un evento FCM representa un CAMBIO NUEVO en el backend: debe poder forzar
+// una lectura real, sin quedar absorbido por la ventana de frescura de la
+// cola. focus/visibility sí pueden reutilizar la cola fresca.
+function _nexEsFCM(origen) {
+  return String(origen || '').indexOf('fcm') !== -1;
+}
+
 async function _nexRefrescarAhora(origen) {
   const st = window._nexRefresh;
   const u = window.currentUser;
@@ -3342,8 +3349,9 @@ async function _nexRefrescarAhora(origen) {
   // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
   var _latRoute = 'NONE';
   if (u.role === 'staff') {
-    if (pantalla === 'waitList') _latRoute = 'renderWaitList';
-    else if (pantalla === 'staffHome') _latRoute = 'loadStaffHome';
+    if (pantalla === 'waitList') _latRoute = 'queue+renderWaitList';
+    else if (pantalla === 'staffHome') _latRoute = 'queue+loadStaffHome';
+    else _latRoute = 'queue-only';
   } else if (u.role === 'admin' || u.area === 'admin') {
     if (pantalla === 'mikaelaHome') _latRoute = 'loadMikaelaHome';
   }
@@ -3351,6 +3359,13 @@ async function _nexRefrescarAhora(origen) {
   // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
   try {
     if (u.role === 'staff') {
+      // INC-LATENCIA-TICKET-STAFF — la cola se refresca SIEMPRE, sin importar
+      // la pantalla: así el ticket ya está disponible cuando la staff entra a
+      // waitList, y badges/"Por empezar" quedan al día donde esté.
+      // No navega, no abre pantallas, no ejecuta acciones comerciales.
+      if (typeof refreshStaffQueue === 'function') {
+        await refreshStaffQueue('fcm:' + origen, { forzar: _nexEsFCM(origen) });
+      }
       if (pantalla === 'waitList' && typeof renderWaitList === 'function') {
         await renderWaitList();
       } else if (pantalla === 'staffHome' && typeof loadStaffHome === 'function') {
@@ -3402,13 +3417,38 @@ function nexRefrescarUI(origen) {
       enVuelo: st.enVuelo,
       pendiente: st.pendiente ? 'SI' : 'NO',
       resultado: st.enVuelo ? 'ENCOLADO'
-               : ((Date.now() - st.ultimo < 400) ? 'COALESCIDO' : 'EJECUTA')
+               : ((Date.now() - st.ultimo < 400)
+                    ? (_nexEsFCM(origen) ? 'COALESCIDO_FCM_TRAILING' : 'COALESCIDO')
+                    : 'EJECUTA'),
+      forzaraLectura: _nexEsFCM(origen) ? 'SI' : 'NO'
     });
   } catch (e) {}
   // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-  if (st.enVuelo) { st.pendiente = origen; return; }
+  if (st.enVuelo) {
+    // Un FCM pendiente tiene prioridad sobre un focus/visibility pendiente:
+    // representa un cambio nuevo y debe forzar lectura real al reanudar.
+    st.pendiente = _nexEsFCM(st.pendiente) ? st.pendiente : origen;
+    return;
+  }
   const ahora = Date.now();
-  if (ahora - st.ultimo < 400) return;
+  if (ahora - st.ultimo < 400) {
+    // focus/visibility dentro de la ventana → se descartan (misma ráfaga).
+    // Un FCM NO se descarta: puede ser una asignación nueva. Queda pendiente
+    // y se ejecuta al cerrar la ventana, nunca en paralelo.
+    if (_nexEsFCM(origen)) {
+      st.pendiente = origen;
+      if (!st.timer) {
+        const _espera = Math.max(0, 400 - (ahora - st.ultimo));
+        st.timer = setTimeout(function () {
+          st.timer = null;
+          const _o = st.pendiente;
+          st.pendiente = null;
+          if (_o) { st.ultimo = Date.now(); _nexRefrescarAhora(_o + '+trailing'); }
+        }, _espera);
+      }
+    }
+    return;
+  }
   st.ultimo = ahora;
   _nexRefrescarAhora(origen);
 }
