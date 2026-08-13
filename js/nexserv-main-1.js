@@ -1371,12 +1371,13 @@
                         user.area === 'facial' ? 'Facial' : '';
       document.getElementById('waitListRole').textContent = areaLabel;
       const allowed = AREA_FILTER[user.area] || [];
-      // MODELO CENTRALIZADO: contar solo las asignadas a esta staff (igual que la lista)
-      const myCount = WAITLIST.filter(w => {
-        const est = String(w.estado || w.status || '').toLowerCase();
-        if (est === 'en servicio' || est === 'completada') return false;
-        const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
-      }).length;
+      // INC-COLA-STAFF-02 · el cálculo manual de pertenencia se eliminó de acá:
+      // era una CUARTA interpretación (asignadaA || tomadaPor) independiente del
+      // clasificador único, y además leía WAITLIST, que en este archivo es
+      // `const WAITLIST = []` — nunca fue la cola real. El login solo inicializa
+      // los contadores; loadStaffHome()/refreshStaffQueue() los reemplazan con
+      // datos reales usando exclusivamente _staffQueueMias(). Sin requests acá.
+      const myCount = 0;
       document.getElementById('navBadge').textContent = myCount;
       document.getElementById('navBadge2').textContent = myCount;
       document.getElementById('pendingStat').querySelector('.value').textContent = myCount;
@@ -2305,6 +2306,16 @@
             obs: w.observaciones || '',
             isTop: String(w.esTop || '').toLowerCase().includes('sí'),
             asignadaA: w.asignadaA || '',
+            // INC-COLA-STAFF-02 · campos preservados: los filtros deben trabajar
+            // con el item real, no con un objeto mutilado.
+            tomadaPor: w.tomadaPor || '',
+            estado: w.estado || '',
+            status: w.status || '',
+            fuente: w.fuente || '',
+            idEspera: w.idEspera || w.id || '',
+            ticketRef: w.ticketRef || '',
+            areaIdx: (w.areaIdx === undefined || w.areaIdx === null) ? '' : w.areaIdx,
+            tipo: w.tipo || '',
             promoNombre: w.promoNombre || '',
             precioPromo: w.precioPromo || '',
             precioRegular: w.precioRegular || '',
@@ -2315,15 +2326,51 @@
         });
   }
 
-  // Criterio de pertenencia — SEMÁNTICA PROD SIN CAMBIOS.
+  // ══════════════════════════════════════════════════════════════════
+  // INC-COLA-STAFF-02 · CLASIFICADOR ÚNICO DE PERTENENCIA Y ESTADO
+  // Una sola interpretación para waitList, "Por empezar" y badges.
+  // No hay lógica especial de TM: getListaEspera ya expone únicamente el
+  // item de la próxima área/slot con su staff, y la regla se aplica sobre
+  // ESE item, no sobre el ticket madre.
+  // ══════════════════════════════════════════════════════════════════
+  function _nsNorm(v) {
+    return String(v == null ? '' : v).trim().toLowerCase().replace(/_/g, ' ').replace(/\s+/g, ' ');
+  }
+
+  // Estados en los que un item YA NO es tomable por la staff.
+  const STAFF_ESTADOS_NO_TOMABLES = [
+    'en servicio', 'por verificar', 'por cobrar', 'completada', 'completado',
+    'cobrada', 'cobrado', 'cancelado', 'cancelada', 'anulado', 'anulada', 'finalizada', 'finalizado'
+  ];
+
+  function _staffQueueEsTomable(w) {
+    const est = _nsNorm(w && (w.estado || w.status));
+    // Estado vacío: se preserva el comportamiento actual — si getListaEspera
+    // lo entregó, es elegible. No se inventan estados nuevos.
+    if (est === '') return true;
+    return STAFF_ESTADOS_NO_TOMABLES.indexOf(est) === -1;
+  }
+
+  // A. asignadaA con valor  → SOLO esa staff.
+  // B. tomadaPor NUNCA amplía ni sobreescribe una asignación explícita.
+  // C. asignadaA vacío      → tomadaPor como fallback legacy.
+  // D. ambos vacíos         → de nadie (modelo centralizado).
+  function _staffQueueEsMia(w, user) {
+    if (!w || !user) return false;
+    const yo = _nsNorm(user.name);
+    if (yo === '') return false;
+    const asignada = String((w.asignadaA == null ? '' : w.asignadaA)).trim();
+    const dueno = asignada !== '' ? asignada
+                : String((w.tomadaPor == null ? '' : w.tomadaPor)).trim();
+    if (dueno === '') return false;
+    return dueno.split(',').some(function (n) { return _nsNorm(n) === yo; });
+  }
+  window._staffQueueEsMia = _staffQueueEsMia;
+  window._staffQueueEsTomable = _staffQueueEsTomable;
+
   function _staffQueueMias(lista, user) {
-    return (lista || []).filter(w => {
-      const estado = String(w.estado || w.status || '').toLowerCase();
-      if (estado === 'en servicio' || estado === 'completada') return false;
-      // MODELO CENTRALIZADO: la staff ve SOLO sus clientas asignadas.
-      const quien = (w.asignadaA && String(w.asignadaA).trim())
-                 || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
-      return quien !== '' && quien === user.name;
+    return (lista || []).filter(function (w) {
+      return _staffQueueEsTomable(w) && _staffQueueEsMia(w, user);
     });
   }
 
@@ -2426,14 +2473,17 @@
   }
 
   function _renderWaitListDOM(content, myList) {
+    // INC-COLA-STAFF-02 · el índice se reconstruye DESDE CERO en cada render.
+    // Antes solo se sobreescribían las posiciones nuevas, dejando residuos de
+    // renders anteriores (clienta ya cobrada seguía seleccionable por índice).
+    window._waitListData = {};
     const priBadge = {
       'especial': '<span class="priority-badge especial">🔴 Especial</span>',
       'tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
       'normal': '<span class="priority-badge normal">🟢 Normal</span>',
     };
     content.innerHTML = myList.map((w, idx) => {
-      // Guardar en objeto global
-      if (!window._waitListData) window._waitListData = {};
+      // Guardar en objeto global (índice ya reiniciado arriba)
       window._waitListData[idx] = w;
       
       return `
@@ -2489,12 +2539,18 @@
     const myList = _staffQueueMias(lista, user);
     _staffQueueBadges(myList.length, lista.length);
 
+    // INC-COLA-STAFF-02 · token de render: un callback tardío de frecuentes
+    // no puede repintar una lista vieja encima de una nueva.
+    window._waitListRenderGen = (window._waitListRenderGen || 0) + 1;
+    const _miGen = window._waitListRenderGen;
+
     // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
     _LAT('T6 FILTER_DONE', { total: lista.length, mias: myList.length });
     // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
 
     if (myList.length === 0) {
       content.innerHTML = '<div class="card" style="text-align: center; padding: 40px 20px; color: var(--ink-faint);"><div style="font-size: 40px; margin-bottom: 8px;">✨</div><div>No hay clientas esperando para tu área</div></div>';
+      window._waitListData = {};   // INC-COLA-STAFF-02 · sin residuos del render anterior
       _cargarFrecuentesBestEffort(null);
       // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
       _LAT('QUEUE_RENDER', { tarjetas: 0 });
@@ -2516,13 +2572,31 @@
 
     // Estrellas después: si llegan, se repinta solo el DOM (cero lecturas de cola).
     _cargarFrecuentesBestEffort(function () {
+      // INC-COLA-STAFF-02 · solo repinta si NADIE renderizó después (no se
+      // cancela la petición; solo se descarta el repaint stale).
+      if (_miGen !== window._waitListRenderGen) return;
       const sigueActiva = document.getElementById('waitList');
       if (sigueActiva && sigueActiva.classList.contains('active')) _renderWaitListDOM(content, myList);
     });
   }
 
+  // INC-COLA-STAFF-02 · limpia TODO el estado de toma anterior. Sin esto,
+  // una clienta ya terminada seguía viva en las globales y podía filtrarse
+  // a la siguiente toma.
+  function _resetTakingState() {
+    window._takingData = null;
+    window._takingId = '';
+    window._takingClient = '';
+    window._takingClientCode = '';
+    window._takingService = '';
+  }
+  window._resetTakingState = _resetTakingState;
+
   function openTake(idx) {
-    const w = window._waitListData[idx];
+    // INC-COLA-STAFF-02 · nunca arrastrar la selección anterior.
+    _resetTakingState();
+
+    const w = window._waitListData ? window._waitListData[idx] : null;
     if (!w) { alert('Error: no se encontró la clienta'); return; }
 
     // Bloquear si está asignada a otra staff
@@ -2531,7 +2605,18 @@
       alert('⚠️ Esta clienta está asignada directamente a ' + w.asignadaA + '. Solo ella puede tomarla.');
       return;
     }
-    
+    // INC-COLA-STAFF-02 · defensa frontend con el MISMO clasificador de la
+    // lista. Sin request adicional: no es fuente de verdad, solo evita actuar
+    // sobre una tarjeta stale.
+    if (!_staffQueueEsMia(w, user)) {
+      alert('⚠️ Esta clienta ya no está asignada a vos. Actualizá la lista.');
+      return;
+    }
+    if (!_staffQueueEsTomable(w)) {
+      alert('⚠️ Esta clienta ya no está disponible para tomar. Actualizá la lista.');
+      return;
+    }
+
     window._takingData = w;
     window._takingId = w.id;
     window._takingClient = w.name;
@@ -2794,6 +2879,9 @@
 
     // Cargar clienta normalmente
     await loadClientAfterTake();
+    // INC-COLA-STAFF-02 · toma consumida: se libera el estado para que la
+    // clienta anterior no siga viva en las globales.
+    _resetTakingState();
   }
   
   // ── Nota directa de Mikaela/recepción para la staff (cartel amarillo) ──
