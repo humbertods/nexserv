@@ -1797,13 +1797,14 @@
           // `estado`, que el mapeo de waitList no conserva.
           if (typeof refreshStaffQueue === 'function') await refreshStaffQueue('staffHome');
           const _wait = (window._staffQueueState && window._staffQueueState.raw) || [];
-          const _mias = (_wait || []).filter(function (w) {
-            const est = String(w.estado || w.status || '').toLowerCase().replace('_', ' ');
-            if (est !== 'esperando') return false;   // solo las que aún no empezaron
-            const quien = (w.tomadaPor && String(w.tomadaPor).trim())
-                       || (w.asignadaA && String(w.asignadaA).trim()) || '';
-            return quien && quien.split(',').map(function(s){return s.trim();}).indexOf(user.name) !== -1;
-          });
+          // INC-COLA-STAFF-02 · clasificador ÚNICO (nexserv-main-1.js). Antes
+          // esta pantalla tenía su propia regla `tomadaPor || asignadaA`, que
+          // dejaba a `tomadaPor` sobreescribir una asignación explícita: un
+          // ticket asignado a Diana pero con tomadaPor=María aparecía en el
+          // "Por empezar" de María. Ya no existe una segunda interpretación.
+          const _mias = (typeof _staffQueueMias === 'function')
+            ? _staffQueueMias(_wait, user)
+            : [];
           if (_mias.length > 0) {
             _peSection.style.display = 'block';
             _peList.innerHTML = _mias.map(function (w) {
@@ -2023,12 +2024,11 @@
       if (waitResult.success) {
         const allowed = AREA_FILTER[user.area] || [];
         const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
-        // MODELO CENTRALIZADO: contar solo las asignadas a esta staff (igual que la lista)
-        const myCount = waitResult.lista.filter(w => {
-          const est = String(w.estado || w.status || '').toLowerCase();
-          if (est === 'en servicio' || est === 'completada') return false;
-          const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
-        }).length;
+        // INC-COLA-STAFF-02 · mismo clasificador que waitList y "Por empezar":
+        // los tres números salen ahora de la misma regla lógica.
+        const myCount = (typeof _staffQueueMias === 'function')
+          ? _staffQueueMias(waitResult.lista, user).length
+          : 0;
         var _nb=document.getElementById('navBadge'); if(_nb) _nb.textContent = myCount;
         var _nb2=document.getElementById('navBadge2'); if(_nb2) _nb2.textContent = myCount;
         var _ps = document.getElementById('pendingStat'); if (_ps) { var _psv = _ps.querySelector('.value'); if (_psv) _psv.textContent = myCount; }
