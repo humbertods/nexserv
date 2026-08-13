@@ -3857,6 +3857,20 @@
   }
   
   function renderServicesForSlot(slot) {
+    // INC-PROMO-FICHA-CEJAS-REENTRADA · resuelve la promo REAL de la clienta
+    // igual que el render visible de más abajo (activePromos[clientKey].promo).
+    // En reentrada/reload `_assignedPromo` no está reconstruido, así que el
+    // helper caía a slotServices, donde el nombre es el genérico del combo
+    // ("Combo 4 EP") y esSrvPigmento() nunca daba true. Fallback preservado.
+    function _promoActivaDeSlot(s) {
+      try {
+        const _cnP = (document.getElementById('as' + s + 'Name')?.textContent || '').replace(' ⭐', '').trim();
+        const _ckP = (typeof normalizeClientKey === 'function') ? normalizeClientKey(_cnP) : _cnP.toLowerCase();
+        const _apP = window.activePromos && (activePromos[_ckP] || activePromos[_cnP]);
+        if (_apP && _apP.promo) return _apP.promo;
+      } catch (eP) {}
+      return (window._assignedPromo ? window._assignedPromo[s] : null) || null;
+    }
     // Después de renderizar, verificar si hay servicio pigmento y mostrar ficha quick
     setTimeout(function() {
       try {
@@ -3866,15 +3880,15 @@
             // INC-PROMO-FICHA-CEJAS-PERMANENTES · mismo decisor único en reentrada.
             const hasPig = _ticketTienePigmentoParaStaffActual({
               user: user2,
-              promoFull: window._assignedPromo ? window._assignedPromo[1] : null,
-              slotServices: slotServices[1]
+              promoFull: _promoActivaDeSlot(slot),
+              slotServices: slotServices[slot]
             });
-            const el = document.getElementById('cejasQuick1');
+            const el = document.getElementById('cejasQuick' + slot);
             if (hasPig && el && el.style.display === 'none' && el.innerHTML.trim() === '') {
               const cod = window._as1Client || '';
-              const nom = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
+              const nom = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
               const cKey = cod.toLowerCase().replace(/-/g,'');
-              if (cod) loadCejasQuick(cKey, 1, cod, nom);
+              if (cod) loadCejasQuick(cKey, slot, cod, nom);
             }
           }
         }
