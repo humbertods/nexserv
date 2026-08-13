@@ -105,8 +105,18 @@
     // ── Si es cejas pigmento: mostrar ficha rápida de efecto polvo ──
     const slot_cs = window._confirmSvcSlot || 1;
     const svcs_cs = slotServices[slot_cs] || [];
-    const tienePigmento = svcs_cs.some(function(s) { return esSrvPigmento(s.name); });
-    if (tienePigmento && user && String(user.area||'').toLowerCase().includes('ceja')) {
+    // INC-PROMO-FICHA-CEJAS-PERMANENTES · decisor único (nexserv-main-1.js).
+    // Antes se evaluaba slotServices[].name, que en la rama promo trae el nombre
+    // genérico del combo ("Combo 4 EP") y nunca daba true. El helper resuelve los
+    // componentes reales y ya incluye el gate de user.area = cejas.
+    const tienePigmento = (typeof _ticketTienePigmentoParaStaffActual === 'function')
+      ? _ticketTienePigmentoParaStaffActual({
+          user: user,
+          promoFull: window._assignedPromo ? window._assignedPromo[slot_cs] : null,
+          slotServices: svcs_cs
+        })
+      : false;
+    if (tienePigmento) {
       const clientCodigo_cs = slot_cs === 1 ? (window._as1Client || '') : (window._as2Client || '');
       const clientNombre_cs = document.getElementById('as' + slot_cs + 'Name')?.textContent?.replace(' ⭐','') || '';
       const clientKey_cs = clientCodigo_cs.toLowerCase().replace(/-/g,'');
