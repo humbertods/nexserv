@@ -2281,6 +2281,124 @@
   window.histSeleccionarClienta = histSeleccionarClienta;
 
   // ══════════════════════════════════════════════════════════════════
+  // INC-PROMO-FICHA-CEJAS-PERMANENTES · DECISOR ÚNICO DE FICHA DE CEJAS
+  // El problema: la rama promo empuja a slotServices el nombre GENÉRICO de la
+  // promo ("Combo 4 EP"), no el del componente real ("Cejas efecto polvo
+  // permanentes"), así que esSrvPigmento() nunca daba true para promos.
+  // Este helper NO clasifica nombres — solo le entrega a esSrvPigmento() los
+  // nombres REALES de los componentes que corresponden a la staff actual.
+  // esSrvPigmento (nexserv-main-4.js) sigue siendo el único clasificador.
+  // ══════════════════════════════════════════════════════════════════
+
+  // Área de cejas a efectos de ESTA ficha. Deliberadamente acotado: no es un
+  // mapeador general de áreas, solo responde "¿este componente es de cejas?".
+  const _FICHA_CEJAS_TOKENS = ['ceja', 'cejas', 'depilacion', 'pigment', 'brow'];
+  function _fcNorm(v) {
+    return String(v == null ? '' : v).toLowerCase()
+      .replace(/[áà]/g, 'a').replace(/[éè]/g, 'e').replace(/[íì]/g, 'i')
+      .replace(/[óò]/g, 'o').replace(/[úù]/g, 'u').replace(/ñ/g, 'n')
+      .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function _fcEsAreaCejas(txt) {
+    const n = _fcNorm(txt);
+    if (n === '') return false;
+    return _FICHA_CEJAS_TOKENS.some(function (t) { return n.indexOf(t) !== -1; });
+  }
+
+  // Construye la lista de componentes candidatos SIN modificar el ticket.
+  // Prioridad factual: lo que el ticket ya resolvió gana sobre el catálogo.
+  //   A. serviciosDetalle[]           (componentes reales del ticket)
+  //   B. slotServices[] con nombre real (≠ nombre de la promo) — respeta TM
+  //   C. promoFull.division[]         (catálogo estructurado: servicio + area)
+  //   D. promoFull.services           (catálogo en texto plano, sin área)
+  //   E. slotServices[] tal cual      (fallback)
+  // Devuelve [{ nombre, area, staff, conArea }]. Función pura.
+  function _fichaCejasComponentes(opts) {
+    opts = opts || {};
+    const promoFull = opts.promoFull || null;
+    const promoName = _fcNorm(promoFull && promoFull.name);
+    const slotSvcs = opts.slotServices || [];
+    const detalle = opts.serviciosDetalle || [];
+
+    // A ── componentes reales del ticket
+    const desdeDetalle = detalle.map(function (sd) {
+      return {
+        nombre: String(sd.servicio || sd.nombre || sd.name || ''),
+        area: String(sd.area || ''),
+        staff: String(sd.staff || ''),
+        conArea: !!sd.area
+      };
+    }).filter(function (c) { return c.nombre !== ''; });
+    if (desdeDetalle.length) return desdeDetalle;
+
+    // B ── el slot ya trae nombres reales (p. ej. reconstruido desde TM):
+    // se respetan tal cual, sin volver a traer componentes del catálogo.
+    const slotReales = slotSvcs.map(function (sv) {
+      return {
+        nombre: String(sv.name || ''),
+        area: String(sv.area || ''),
+        staff: '',
+        conArea: !!sv.area
+      };
+    }).filter(function (c) {
+      return c.nombre !== '' && (!promoName || _fcNorm(c.nombre) !== promoName);
+    });
+    if (slotReales.length) return slotReales;
+
+    // C ── catálogo estructurado: division[] = { area, servicio, monto, realArea }
+    if (promoFull && Array.isArray(promoFull.division) && promoFull.division.length) {
+      const desdeDivision = promoFull.division.map(function (d) {
+        return {
+          nombre: String(d.servicio || d.service || d.nombre || ''),
+          area: String(d.realArea || d.area || ''),
+          staff: String(d.staff || ''),
+          conArea: !!(d.realArea || d.area)
+        };
+      }).filter(function (c) { return c.nombre !== ''; });
+      if (desdeDivision.length) return desdeDivision;
+    }
+
+    // D ── catálogo en texto plano. `services` es un STRING (backend: servicios),
+    // no un array: acá el parsing es inevitable. Sin área por componente, así
+    // que la decisión queda gobernada solo por el gate de user.area.
+    if (promoFull && typeof promoFull.services === 'string' && promoFull.services.trim() !== '') {
+      const desdeTexto = promoFull.services.split(/[+,;·|\n]/)
+        .map(function (t) { return String(t).trim(); })
+        .filter(function (t) { return t !== ''; })
+        .map(function (t) { return { nombre: t, area: '', staff: '', conArea: false }; });
+      if (desdeTexto.length) return desdeTexto;
+    }
+
+    // E ── fallback
+    return slotSvcs.map(function (sv) {
+      return { nombre: String(sv.name || ''), area: String(sv.area || ''), staff: '', conArea: !!sv.area };
+    }).filter(function (c) { return c.nombre !== ''; });
+  }
+
+  // Decisor único. Solo devuelve boolean: NO abre ningún modal ni ficha.
+  function _ticketTienePigmentoParaStaffActual(opts) {
+    opts = opts || {};
+    const user = opts.user || window.currentUser;
+    // Gate mínimo existente, sin cambios: solo staff de cejas.
+    if (!user || !String(user.area || '').toLowerCase().includes('ceja')) return false;
+    if (typeof esSrvPigmento !== 'function') return false;
+
+    const yo = _fcNorm(user.name);
+    const candidatos = _fichaCejasComponentes(opts).filter(function (c) {
+      // Si el componente trae staff, manda la staff (no se deduce por texto).
+      if (c.staff && _fcNorm(c.staff) !== '') return _fcNorm(c.staff) === yo;
+      // Si trae área, debe ser un componente de cejas.
+      if (c.conArea) return _fcEsAreaCejas(c.area);
+      // Sin metadata de área: no se inventa; decide el gate de user.area.
+      return true;
+    });
+
+    return candidatos.some(function (c) { return esSrvPigmento(c.nombre); });
+  }
+  window._fichaCejasComponentes = _fichaCejasComponentes;
+  window._ticketTienePigmentoParaStaffActual = _ticketTienePigmentoParaStaffActual;
+
+  // ══════════════════════════════════════════════════════════════════
   // COLA STAFF COMPARTIDA — INC-LATENCIA-TICKET-STAFF
   // Fuente canónica: apiGet('getListaEspera') (ruta operativa PROD legacy).
   // NO usa getTableroLineas ni LineaService.obtenerListaEspera (contrato
@@ -3241,8 +3359,16 @@
 
           // Precargar ficha cejas pigmento si el servicio es de efecto polvo/permanente
           // Solo para chicas de CEJAS (pestañas/facial no deben ver la ficha de cejas/pigmento)
-          if (user && String(user.area||'').toLowerCase().includes('ceja')) {
-            const svcNameForPig = slotServices[1].find(function(s){ return esSrvPigmento(s.name); });
+          {
+            // INC-PROMO-FICHA-CEJAS-PERMANENTES · decisor único (incluye el gate
+            // de user.area). Reconoce componentes reales de promos, no solo el
+            // nombre genérico del combo.
+            const svcNameForPig = _ticketTienePigmentoParaStaffActual({
+              user: user,
+              serviciosDetalle: a.serviciosDetalle,
+              promoFull: window._assignedPromo ? window._assignedPromo[1] : null,
+              slotServices: slotServices[1]
+            });
             if (svcNameForPig) {
               const cKey1 = (a.codigo || '').toLowerCase().replace(/-/g, '');
               setTimeout(function() {
@@ -3559,8 +3685,14 @@
           }
           var _cqClear2 = document.getElementById('cejasQuick2');
           if (_cqClear2) { _cqClear2.innerHTML = ''; _cqClear2.style.display = 'none'; }
-          if (user && String(user.area||'').toLowerCase().includes('ceja')) {
-            const _svcPig2 = slotServices[2] && slotServices[2].find(function(s){ return esSrvPigmento(s.name); });
+          {
+            // INC-PROMO-FICHA-CEJAS-PERMANENTES · mismo decisor único.
+            const _svcPig2 = _ticketTienePigmentoParaStaffActual({
+              user: user,
+              serviciosDetalle: a.serviciosDetalle,
+              promoFull: window._assignedPromo ? window._assignedPromo[2] : null,
+              slotServices: slotServices[2]
+            });
             if (_svcPig2) {
               const _cKey2 = (a.codigo || '').toLowerCase().replace(/-/g, '');
               setTimeout(function() { loadCejasQuick(_cKey2, 2, a.codigo, a.nombre); }, 500);
@@ -3730,8 +3862,13 @@
       try {
         if (slot === 1) {
           const user2 = window.currentUser;
-          if (user2 && String(user2.area||'').toLowerCase().includes('ceja')) {
-            const hasPig = (slotServices[1] || []).some(function(s) { return esSrvPigmento(s.name); });
+          {
+            // INC-PROMO-FICHA-CEJAS-PERMANENTES · mismo decisor único en reentrada.
+            const hasPig = _ticketTienePigmentoParaStaffActual({
+              user: user2,
+              promoFull: window._assignedPromo ? window._assignedPromo[1] : null,
+              slotServices: slotServices[1]
+            });
             const el = document.getElementById('cejasQuick1');
             if (hasPig && el && el.style.display === 'none' && el.innerHTML.trim() === '') {
               const cod = window._as1Client || '';
