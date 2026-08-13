@@ -1791,49 +1791,26 @@
       // Guard tardío: verificar que el DOM sigue siendo el de staffHome (no fue reemplazado por SIRA)
       if (!section || !list) return;
 
-      // ── POR EMPEZAR (Espera por staff) ─────────────────────────────────────
-      // Clientas asignadas a esta staff que todavía están 'esperando' en LINEAS.
-      // La staff toca "Confirmar / Empezar" → iniciarServicioStaff → 'en_servicio'.
+      // ── INC-STAFFHOME-QUITAR-POR-EMPEZAR ───────────────────────────────────
+      // Regla de negocio: una clienta asignada por Mikaela NO se muestra como
+      // tarjeta accionable en staffHome. Se toma únicamente desde LISTA DE
+      // ESPERA. Por eso se retiró el render de "Por empezar" y su botón
+      // "Confirmar / Empezar" (el caller de iniciarClientaStaff desde esta
+      // pantalla). La función global sigue existiendo en nexserv-main-4.js;
+      // acá solo se retira su invocación.
+      //
+      // La LECTURA de cola se conserva: alimenta badges, contadores y estado
+      // interno más abajo (window._staffQueueState). No es UI accionable.
+      if (typeof refreshStaffQueue === 'function') {
+        try { await refreshStaffQueue('staffHome'); } catch (eRQ) { console.warn('[staffHome cola]', eRQ); }
+      }
+      // El contenedor es HTML global de index.html: no se elimina, se deja
+      // explícitamente vacío y oculto para que el espacio desaparezca del todo.
       try {
         const _peSection = document.getElementById('staffPorEmpezarSection');
         const _peList    = document.getElementById('staffPorEmpezarList');
-        if (_peSection && _peList) {
-          // INC-LATENCIA-TICKET-STAFF — fuente única: cola compartida de Staff
-          // (apiGet('getListaEspera'), contrato legacy PROD). Antes se usaba
-          // LineaService.obtenerListaEspera() → getTableroLineas, cuyo shape
-          // (staff/cliente/monto) no coincide con los campos que este filtro
-          // lee (tomadaPor/asignadaA/nombre/total), así que _mias salía SIEMPRE
-          // vacío. Se consume la lista CRUDA porque este filtro necesita
-          // `estado`, que el mapeo de waitList no conserva.
-          if (typeof refreshStaffQueue === 'function') await refreshStaffQueue('staffHome');
-          const _wait = (window._staffQueueState && window._staffQueueState.raw) || [];
-          // INC-COLA-STAFF-02 · clasificador ÚNICO (nexserv-main-1.js). Antes
-          // esta pantalla tenía su propia regla `tomadaPor || asignadaA`, que
-          // dejaba a `tomadaPor` sobreescribir una asignación explícita: un
-          // ticket asignado a Diana pero con tomadaPor=María aparecía en el
-          // "Por empezar" de María. Ya no existe una segunda interpretación.
-          const _mias = (typeof _staffQueueMias === 'function')
-            ? _staffQueueMias(_wait, user)
-            : [];
-          if (_mias.length > 0) {
-            _peSection.style.display = 'block';
-            _peList.innerHTML = _mias.map(function (w) {
-              const _cod = String(w.codigo || '').replace(/'/g, "\\'");
-              const _nom = String(w.nombre || '').replace(/'/g, "\\'");
-              const _svc = String(w.servicio || w.promoNombre || 'Servicio');
-              const _tot = Number(w.total || 0);
-              return '<div class="card" style="padding:14px;margin-bottom:8px;border:2px solid var(--top-purple,#8b5cf6);">'
-                + '<div style="font-weight:800;font-size:15px;">' + (w.nombre || w.codigo || 'Clienta') + '</div>'
-                + '<div style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">' + _svc + (_tot ? ' · $' + _tot : '') + '</div>'
-                + '<button onclick="iniciarClientaStaff(\'' + _cod + '\',\'' + _nom + '\')" '
-                + 'style="width:100%;padding:12px;background:var(--top-purple,#8b5cf6);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">▶ Confirmar / Empezar</button>'
-                + '</div>';
-            }).join('');
-          } else {
-            _peSection.style.display = 'none';
-            _peList.innerHTML = '';
-          }
-        }
+        if (_peList) _peList.innerHTML = '';
+        if (_peSection) _peSection.style.display = 'none';
       } catch (ePE) { console.warn('[porEmpezar]', ePE); }
       
       if (result.success && result.atenciones && result.atenciones.length > 0) {
