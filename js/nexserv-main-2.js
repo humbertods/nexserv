@@ -2269,6 +2269,35 @@
     alert('✅ Ficha activada: ' + fichas[fichaIdx].modelo + ' · ' + fichas[fichaIdx].diseno);
   }
 
+  // INC-FICHA-PESTANAS-MODELO-CATALOGO · deriva el modelo desde el nombre del
+  // servicio registrado en la atención. NO duplica la lista: lee las <option>
+  // reales de #npfModelo, así cualquier modelo que se agregue al select queda
+  // cubierto automáticamente. Gana la coincidencia MÁS LARGA para que
+  // "Mega volumen ruso Kylie" no caiga en "Volumen ruso", ni
+  // "Volumen ligero wispy" en "Volumen ligero".
+  function _modeloPestanasDesdeServicio(nombreServicio) {
+    const norm = function (v) {
+      return String(v == null ? '' : v).toLowerCase()
+        .replace(/[áà]/g, 'a').replace(/[éè]/g, 'e').replace(/[íì]/g, 'i')
+        .replace(/[óò]/g, 'o').replace(/[úù]/g, 'u').replace(/ñ/g, 'n')
+        .replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+    const svc = norm(nombreServicio);
+    if (svc === '') return '';
+    const sel = document.getElementById('npfModelo');
+    if (!sel || !sel.options) return '';
+    let mejor = '', mejorLargo = 0;
+    for (let i = 0; i < sel.options.length; i++) {
+      const txt = String(sel.options[i].value || sel.options[i].text || '').trim();
+      if (txt === '') continue;                 // "Seleccionar..." / "— Sin ficha —"
+      const t = norm(txt);
+      if (t !== '' && svc.indexOf(t) !== -1 && t.length > mejorLargo) {
+        mejor = txt; mejorLargo = t.length;
+      }
+    }
+    return mejor;
+  }
+
   function openNewPestFicha(clientKey, slot) {
     window._newPestClient = clientKey;
     window._newPestSlot = slot;
@@ -2276,6 +2305,16 @@
     document.getElementById('npfDiseno').selectedIndex = 0;
     document.getElementById('npfTallas').value = '';
     document.getElementById('npfObs').value = '';
+    // INC-FICHA-PESTANAS-MODELO-CATALOGO · preseleccionar el modelo según el
+    // servicio ya registrado en la atención (ej. "Pestañas volumen Griego" →
+    // "Volumen griego"). Si no hay coincidencia, queda en "Seleccionar...".
+    try {
+      const _svcs = (typeof slotServices !== 'undefined' && slotServices[slot]) || [];
+      for (let i = 0; i < _svcs.length; i++) {
+        const _m = _modeloPestanasDesdeServicio(_svcs[i] && _svcs[i].name);
+        if (_m) { document.getElementById('npfModelo').value = _m; break; }
+      }
+    } catch (eMod) { console.warn('[npfModelo preselect]', eMod && eMod.message); }
     document.getElementById('newPestFichaModal').classList.add('active');
   }
 
