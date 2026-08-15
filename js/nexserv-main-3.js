@@ -3737,7 +3737,24 @@
   async function renderPayments() {
     const list = document.getElementById('payStaffList');
     list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando comisiones...</div>';
-    
+
+    // ── Resumen superior: SEMANA CALENDARIO REAL (lunes–sábado, America/Guayaquil) ──
+    // Alimenta SOLO #payWeekLabel / #payTotal / #payComm / #payNet. El listado de
+    // staff de más abajo sigue con getComisiones y su acumulado, sin cambios.
+    try {
+      const fin = await apiGet('getOwnerFinancialSummary');
+      if (fin && fin.success && fin.week) {
+        const w = fin.week;
+        const _set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+        const _m = n => '$' + (Number(n) || 0).toFixed(0);
+        _set('payWeekLabel', w.label || '—');
+        _set('payTotal', _m(w.facturado));
+        _set('payComm',  _m(w.comisiones));
+        _set('payNet',   _m(w.neto));
+        window._ownerFinSummary = fin;
+      }
+    } catch (err) { console.error('Error resumen semana OWNER:', err); }
+
     // Cargar comisiones reales del Sheet
     let staffData = PAY_STAFF;
     try {
