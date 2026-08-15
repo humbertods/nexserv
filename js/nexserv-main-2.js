@@ -2000,6 +2000,18 @@
             loadPestFichaQuick(_pk4, 1);
           }).catch(() => loadPestFichaQuick(_pk4, 1));
         }
+
+        // ── INC-EXTRA-SP-0446 · FASE A — contexto Facial en REENTRADA ────────
+        // Simétrico al bloque de pestañas de arriba. Sin esto, al volver por
+        // card-click/refresh el contexto _currentFacial* quedaba indefinido y
+        // loadFacialFichaQuick no podía montar evFacialAcc1 (EvidenciasCore lee
+        // codigo/nombre/servicio/ticket_ref EXCLUSIVAMENTE de esas variables).
+        // SLOT 2: no hay call site equivalente porque loadStaffHome NO
+        // reconstruye a2 en este punto (solo precarga el slot 1). No se
+        // inventa una reconstrucción artificial acá.
+        if (user.area === 'facial') {
+          await restaurarContextoFacialActivo(1, a1);
+        }
       } else {
         if (section) section.style.display = 'none';
       }
@@ -2083,6 +2095,56 @@
       console.error('Error cargando staff home:', err);
     }
   }
+
+  // ══════════════════════════════════════════════════════════════════
+  // INC-EXTRA-SP-0446 · FASE A — RECONSTRUCCIÓN DE CONTEXTO FACIAL
+  // Los setters post-toma (nexserv-main-1.js) y post-confirmación
+  // (confirmServiceAndClose, más abajo) NO se tocan: siguen siendo los
+  // caminos vigentes. Este helper cubre la ruta que faltaba —la reentrada—
+  // reutilizando LAS MISMAS fórmulas para servicio y precio.
+  // Toma los datos de la atención ya reconstruida, nunca del DOM, y no
+  // condiciona por prefijo de ticket: sirve para SN / SP / TM / LE.
+  // ══════════════════════════════════════════════════════════════════
+  async function restaurarContextoFacialActivo(slot, atencion) {
+    try {
+      const user = window.currentUser;
+      if (!user || String(user.area || '').toLowerCase() !== 'facial') return;
+      const a = atencion || null;
+      if (!a || !a.codigo) return;
+
+      const clientKey = String(a.codigo).toLowerCase().replace(/-/g, '');
+      window._currentFacialClientKey    = clientKey;
+      window._currentFacialClientNombre = a.nombre || '';
+      window._currentFacialClientCodigo = a.codigo;
+
+      // Misma fórmula que los caminos existentes (post-toma / post-confirmación).
+      const svcs = slotServices[slot] || [];
+      window._currentFacialSvcName  = svcs.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
+      window._currentFacialSvcPrice = svcs.filter(s => s.status !== 'rechazado').reduce((s, v) => s + Number(v.price || 0), 0);
+      window._facialFichaSlot = slot;
+      // _as1IdEspera / _as2IdEspera ya los fija el flujo de loadStaffHome; acá
+      // NO se sobreescriben — EvidenciasCore los lee para el ticket_ref.
+
+      // La ficha se trae del backend ANTES del quick: si no, CLIENT_PROFILES
+      // está vacío tras un refresh y el panel diría "Sin ficha" existiendo una.
+      // Mismo patrón que confirmServiceAndClose. Nunca se inventa ficha local.
+      try {
+        const facRes = await apiGet('getFichaFacial', { codigo: a.codigo });
+        if (facRes && facRes.success && facRes.ficha) {
+          if (!CLIENT_PROFILES[clientKey]) CLIENT_PROFILES[clientKey] = { name: a.nombre || '', code: a.codigo, facial: {} };
+          if (!CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial = {};
+          CLIENT_PROFILES[clientKey].facial.ficha = facRes.ficha;
+        }
+      } catch (eFic) { console.warn('[restaurarContextoFacialActivo] getFichaFacial:', eFic && eFic.message); }
+
+      // Se llama siempre: sin ficha el quick muestra "Sin ficha" y EvidenciasCore
+      // se monta igual (el acordeón va en ambas ramas de loadFacialFichaQuick).
+      if (typeof loadFacialFichaQuick === 'function') loadFacialFichaQuick(clientKey, slot);
+    } catch (eCtx) {
+      console.warn('[restaurarContextoFacialActivo]', eCtx && eCtx.message);
+    }
+  }
+  window.restaurarContextoFacialActivo = restaurarContextoFacialActivo;
 
   function loadActiveService(idx) {
     // Ya precargado en loadStaffHome
