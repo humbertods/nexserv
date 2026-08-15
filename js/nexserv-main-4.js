@@ -3817,7 +3817,10 @@
           linea_id:   '',
           staff:      (window.currentUser && window.currentUser.name) || '',
           readonly:   false,
-          allowCreate: true    // en atención SÍ hay servicio y ticket_ref reales
+          // La ATENCIÓN asegura la visita: la staff no la crea a mano ni
+          // escribe servicio/fecha. Por eso autoEnsure sí y allowCreate no.
+          autoEnsure:  true,
+          allowCreate: false
         });
       }
     } catch (eEv) { console.warn('[EvidenciasCore] facial staff:', eEv); }
