@@ -411,29 +411,30 @@
     if (histContainer) histContainer.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:13px;">⏳ Cargando...</div>';
 
     try {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
+      document.getElementById('ownerWeekNum').textContent = weekNum;
+
       // Cargar todo en paralelo
-      // Las tres tarjetas financieras del Owner ya NO salen de getComisiones
-      // (acumulado desde COMISIONES_CORTE): usan getOwnerFinancialSummary, que
-      // devuelve el DÍA calendario en America/Guayaquil calculado en el backend.
-      const [finResult, listaResult, histResult] = await Promise.all([
-        apiGet('getOwnerFinancialSummary').catch(() => ({ success: false })),
+      const [commResult, listaResult, histResult] = await Promise.all([
+        apiGet('getComisiones').catch(() => ({ success: false })),
         apiGet('getListaCompleta').catch(() => ({ success: false })),
         apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
       ]);
 
-      // Facturación / Comisiones / Neto — SIEMPRE del día de hoy
-      const hoyFin = (finResult && finResult.success && finResult.today) ? finResult.today : null;
-      const _m = n => '$' + (Number(n) || 0).toFixed(0);
-      document.getElementById('ownerTotalFact').textContent = hoyFin ? _m(hoyFin.facturado)  : '$0';
-      document.getElementById('ownerComm').textContent      = hoyFin ? _m(hoyFin.comisiones) : '$0';
-      document.getElementById('ownerNeto').textContent      = hoyFin ? _m(hoyFin.neto)       : '$0';
-      const _fechaLbl = document.getElementById('ownerWeekNum');
-      if (_fechaLbl) _fechaLbl.textContent = (hoyFin && hoyFin.label) ? '· ' + hoyFin.label : '';
-      document.getElementById('ownerTrend').textContent =
-        (hoyFin && Number(hoyFin.facturado) > 0) ? '↑ En curso' : '—';
-
-      // Compartido con renderPayments() para no repetir la llamada en la misma sesión.
-      window._ownerFinSummary = (finResult && finResult.success) ? finResult : null;
+      // Comisiones
+      let totalFact = 0, totalComm = 0;
+      if (commResult.success && commResult.comisiones) {
+        commResult.comisiones.forEach(c => {
+          totalFact += Number(c.facturado) || 0;
+          totalComm += Number(c.comision) || 0;
+        });
+      }
+      document.getElementById('ownerTotalFact').textContent = '$' + totalFact.toFixed(0);
+      document.getElementById('ownerComm').textContent = '$' + totalComm.toFixed(0);
+      document.getElementById('ownerNeto').textContent = '$' + (totalFact - totalComm).toFixed(0);
+      document.getElementById('ownerTrend').textContent = totalFact > 0 ? '↑ En curso' : '—';
 
       // TOP — clientas que vienen más de 2 veces en el mes (frecuentes)
       apiGet('getClientasFrecuentes').then(r => {
@@ -2133,6 +2134,35 @@
 
     html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:6px 4px;">Fichas</div>';
     html += _histAcordeon('Ficha facial', facial ? _histGenericFicha(facial) : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha facial.</div>', '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.9,17.8c-1.3,1.3-3.4.5-5.1.6-.1,1.3-.8,2.5-1.7,3.4s-.5.1-.6,0-.1-.4,0-.6c.5-.5.9-1.1,1.2-1.7.8-1.8-.3-3.4-1-5.1s-.6-2.9,0-4.3c1.1-2.6,4.7-3.8,5.2-7.6s.3-.4.5-.4.4.3.3.5l-.2.8c1.1,1.2,1.5,2.8,1.2,4.4s-.2.7-.1,1.1c.2,1,1.1,1.7,1.5,2.8s0,1.2-.5,1.5c0,.5,0,.9-.2,1.3.2.5.1,1-.2,1.4v.6c.1.5,0,.9-.3,1.2ZM13.5,15.6c.1-.2.2-.3.2-.5-.4,0-.7.1-1,.1s-.5-.2-.5-.5.2-.4.5-.4.7-.1,1.1-.3c.1-.6-.2-1.2.4-1.4s.4-.3.3-.6c-.4-1.1-1.4-1.9-1.6-3s.9-2.7-.5-4.7c-.4,1-1.1,1.8-1.9,2.6h1.6c.3,0,.4.3.3.5s-.3.3-.6.3c-1,0-2.1,0-2.9.7s-1,1-1.3,1.7c-.5,1.2-.5,2.5,0,3.7s1,2.2,1.3,3.5h1.7c1,.2,2.2.4,2.9-.4s-.2-1.1.2-1.6Z"/><path d="M4.6,15.5c-.1,1.3-.8,2.2-1.7,3s-.5.2-.6,0-.1-.5,0-.7c1.1-1,1.5-1.9,1.5-3.3s0-1.7,0-2.5c0-1.6.6-3,1.6-4.3s.9-1.1,1.5-1.5l1.6-1.3c.2-.1.5,0,.6,0s.1.4,0,.6l-1.4,1.2c-.5.4-1,.9-1.4,1.4-.9,1.1-1.4,2.3-1.5,3.7s0,2.5-.1,3.7Z"/><path d="M18.6,8.8c-.1.3-.4.5-.7.5s-.6-.1-.7-.4l-.4-1-.9-.3c-.3-.1-.5-.4-.5-.7s.2-.6.5-.7l.9-.3.3-.9c.1-.3.4-.5.7-.5s.6.1.7.4l.4.9.8.3c.3.1.5.4.5.7s-.2.6-.6.7l-.8.3-.3.9ZM17.6,7.4l.3.8c.1-.3.2-.7.4-.9l.9-.4c-1.2-.5-.8,0-1.3-1.3l-.3.7c0,.1-.2.2-.3.3l-.7.3.7.3c.1,0,.3.2.3.3Z"/><path d="M18.4,16.5c-.1.3-.4.5-.7.5s-.6-.2-.7-.5l-.2-.5-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.4-.7l.6-.3.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM17.7,15.9c.3-.8.2-.6.8-.9-.8-.3-.5-.1-.8-.8-.3.7-.1.5-.8.8.8.4.5.1.8.9Z"/><path d="M21.6,13.3c-.1.3-.4.4-.7.5s-.6-.1-.7-.4l-.3-.6-.6-.2c-.3-.1-.5-.4-.5-.7s.1-.6.5-.7l.6-.2.2-.6c.1-.3.4-.5.7-.5s.6.2.7.5l.2.6.6.2c.3.1.5.4.5.7s-.2.6-.5.7l-.5.2-.2.6ZM20.9,12.7l.3-.5c.1-.1.4-.2.6-.3l-.6-.3-.3-.6c-.3.8-.2.5-.9.8.7.3.5.1.9.8Z"/><path d="M9.7,10.7c-.3,0-.4-.3-.4-.5s.3-.4.5-.4c.7.2,1.4,0,2-.3s.5,0,.5.1c.2.2,0,.5-.1.6-.7.5-1.6.6-2.5.4Z"/></svg>');
+    // ── EVIDENCIAS-CORE · "Evidencias de visita" (facial) ────────────────
+    // Va entre Ficha facial y Ficha pestañas. Carga en diferido al desplegar.
+    // El Owner (y sus alias dueño/dueno) entra en modo readonly: solo ver y
+    // ampliar. La autoridad real es el backend (evGuardEscritura_); esto solo
+    // evita mostrarle controles que igual serían rechazados.
+    var _evFacAccId = 'histEvFacial_' + (c.codigo||'').replace(/[^\w]/g,'');
+    var _evFacRol = String((window.currentUser && (window.currentUser.role || window.currentUser.rol)) || '').toLowerCase();
+    var _evFacReadonly = (_evFacRol === 'owner' || _evFacRol === 'dueño' || _evFacRol === 'dueno');
+    html += '<div id="' + _evFacAccId + '"></div>';
+    setTimeout(function () {
+      try {
+        if (window.EvidenciasCore && document.getElementById(_evFacAccId)) {
+          EvidenciasCore.montarAcordeonFacial(_evFacAccId, {
+            codigo:   c.codigo || '',
+            nombre:   c.nombre || '',
+            servicio: '',
+            ticket_ref: '',
+            linea_id: '',
+            staff:    (window.currentUser && window.currentUser.name) || '',
+            readonly: _evFacReadonly,
+            // Desde Historial NO se crean visitas: acá no hay servicio ni
+            // ticket_ref activos y nacerían vacíos. Mikaela/CEO sí pueden
+            // corregir fotos de visitas ya existentes.
+            allowCreate: false
+          });
+        }
+      } catch (eEvF) { console.warn('[EvidenciasCore] historial facial:', eEvF); }
+    }, 0);
+
     html += _histAcordeon('Ficha pestañas', pest.length ? pest.map(_histFichaPestHTML).join('') : '<div style="color:var(--ink-faint);font-size:13px;padding:8px;">Sin ficha de pestañas.</div>', '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.6,8.6l-6.5,2.4c-.9.3-2-.1-2.3-1.1l-.8-2.4c-.1-.3,0-.7.4-.8l8.7-2.1c1.7-.4,3.6-.3,5.3.2s2.3.9,3.2,1.6,1.8,1.8,2.4,2.9.1.6-.1.8-.5.2-.8,0c-2.7-2-6.3-2.6-9.5-1.5ZM4.7,9.9l6.4-2.3c2.7-1,5.6-.9,8.3.2-2-2-5.5-2.7-8.1-2l-8,2,.6,1.8c.1.3.4.5.8.4Z"/><path d="M9.6,17l-.4,1.7c0,.3-.4.5-.7.4s-.5-.4-.5-.7l.4-1.8c-.7-.2-1.2-.5-1.8-.8l-1,1.6c-.2.3-.6.3-.8.1s-.3-.6-.1-.8l.9-1.4-.9-.5c-.3-.1-.4-.5-.2-.8s.5-.4.8-.3c1.1.5,1.9,1,3,1.5,3,1.3,6.4,1,9.1-.7s1.2-.8,1.7-1.3.6-.5.9-.7.6,0,.8.1.1.6-.1.8l-2.2,1.6,1,1.5c.2.3,0,.6-.1.8s-.6.1-.8-.1l-1-1.5c-.6.3-1.2.6-1.9.8l.4,1.7c0,.3-.1.6-.4.7s-.6,0-.7-.4l-.4-1.7c-.6.1-1.2.2-1.8.2v1.8c0,.3-.3.6-.6.6s-.6-.3-.6-.6v-1.7c-.6,0-1.2-.1-1.8-.3Z"/></svg>');
     var _evAccId = 'histAcc_ev_' + (c.codigo||'').replace(/[^\w]/g,'');
     html += '<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden;">'
