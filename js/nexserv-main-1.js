@@ -411,30 +411,29 @@
     if (histContainer) histContainer.innerHTML = '<div style="text-align:center;padding:30px;color:var(--ink-faint);font-size:13px;">⏳ Cargando...</div>';
 
     try {
-      const now = new Date();
-      const startOfYear = new Date(now.getFullYear(), 0, 1);
-      const weekNum = Math.ceil((((now - startOfYear) / 86400000) + startOfYear.getDay() + 1) / 7);
-      document.getElementById('ownerWeekNum').textContent = weekNum;
-
       // Cargar todo en paralelo
-      const [commResult, listaResult, histResult] = await Promise.all([
-        apiGet('getComisiones').catch(() => ({ success: false })),
+      // Las tres tarjetas financieras del Owner ya NO salen de getComisiones
+      // (acumulado desde COMISIONES_CORTE): usan getOwnerFinancialSummary, que
+      // devuelve el DÍA calendario en America/Guayaquil calculado en el backend.
+      const [finResult, listaResult, histResult] = await Promise.all([
+        apiGet('getOwnerFinancialSummary').catch(() => ({ success: false })),
         apiGet('getListaCompleta').catch(() => ({ success: false })),
         apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
       ]);
 
-      // Comisiones
-      let totalFact = 0, totalComm = 0;
-      if (commResult.success && commResult.comisiones) {
-        commResult.comisiones.forEach(c => {
-          totalFact += Number(c.facturado) || 0;
-          totalComm += Number(c.comision) || 0;
-        });
-      }
-      document.getElementById('ownerTotalFact').textContent = '$' + totalFact.toFixed(0);
-      document.getElementById('ownerComm').textContent = '$' + totalComm.toFixed(0);
-      document.getElementById('ownerNeto').textContent = '$' + (totalFact - totalComm).toFixed(0);
-      document.getElementById('ownerTrend').textContent = totalFact > 0 ? '↑ En curso' : '—';
+      // Facturación / Comisiones / Neto — SIEMPRE del día de hoy
+      const hoyFin = (finResult && finResult.success && finResult.today) ? finResult.today : null;
+      const _m = n => '$' + (Number(n) || 0).toFixed(0);
+      document.getElementById('ownerTotalFact').textContent = hoyFin ? _m(hoyFin.facturado)  : '$0';
+      document.getElementById('ownerComm').textContent      = hoyFin ? _m(hoyFin.comisiones) : '$0';
+      document.getElementById('ownerNeto').textContent      = hoyFin ? _m(hoyFin.neto)       : '$0';
+      const _fechaLbl = document.getElementById('ownerWeekNum');
+      if (_fechaLbl) _fechaLbl.textContent = (hoyFin && hoyFin.label) ? '· ' + hoyFin.label : '';
+      document.getElementById('ownerTrend').textContent =
+        (hoyFin && Number(hoyFin.facturado) > 0) ? '↑ En curso' : '—';
+
+      // Compartido con renderPayments() para no repetir la llamada en la misma sesión.
+      window._ownerFinSummary = (finResult && finResult.success) ? finResult : null;
 
       // TOP — clientas que vienen más de 2 veces en el mes (frecuentes)
       apiGet('getClientasFrecuentes').then(r => {
