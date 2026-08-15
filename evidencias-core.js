@@ -24,9 +24,21 @@
     facial: {
       area: 'facial',
       modo: 'visita',
-      slots: ['lateral', 'frente', 'observacion'],
-      labels: { lateral: 'Lateral', frente: 'Frente', observacion: 'Observación' },
-      uiMax: 3,                                  // SOLO presentación
+      // Una visita = un visita_id = hasta 6 fotos en dos momentos del MISMO
+      // servicio. Antes/Después NO son visitas distintas.
+      slots: ['lateral_antes', 'frente_antes', 'observacion_antes',
+              'lateral_despues', 'frente_despues', 'observacion_despues'],
+      grupos: [
+        { key: 'antes',   titulo: 'ANTES',
+          slots: ['lateral_antes', 'frente_antes', 'observacion_antes'] },
+        { key: 'despues', titulo: 'DESPUÉS',
+          slots: ['lateral_despues', 'frente_despues', 'observacion_despues'] }
+      ],
+      labels: {
+        lateral_antes: 'Lateral', frente_antes: 'Frente', observacion_antes: 'Observación',
+        lateral_despues: 'Lateral', frente_despues: 'Frente', observacion_despues: 'Observación'
+      },
+      uiMax: 3,                                  // SOLO presentación: últimas 3 VISITAS
       titulo: 'Evidencias de visita',
       accionLeer:  'getEvidenciasFacial',
       accionCrear: 'crearVisitaEvidenciaFacial',
@@ -50,6 +62,13 @@
 
   function cfgArea(area) {
     return Object.prototype.hasOwnProperty.call(EV_AREAS, area) ? EV_AREAS[area] : null;
+  }
+
+  // Un área sin `grupos` se dibuja como una sola sección sin título: así el
+  // renderer sirve tanto a Facial (Antes/Después) como a áreas futuras planas.
+  function gruposDe(cfg) {
+    if (cfg.grupos && cfg.grupos.length) return cfg.grupos;
+    return [{ key: '_', titulo: '', slots: cfg.slots }];
   }
 
   function esc(s) {
@@ -308,9 +327,17 @@
             esc(v.servicio || '—') + '</span>' +
           '<span style="font-size:11px;font-weight:600;color:var(--ink-faint,#999);">' + esc(v.fecha || '') + '</span>' +
         '</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
-          cfg.slots.map(function (s) { return evFotoSlot(mid, v, s, cfg.labels, st.puedeEditarFotos); }).join('') +
-        '</div>' +
+        gruposDe(cfg).map(function (g) {
+          return '<div style="margin-bottom:10px;">' +
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.08em;' +
+              'color:var(--ink-faint,#999);margin-bottom:6px;">' + esc(g.titulo) + '</div>' +
+            '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">' +
+              g.slots.map(function (s) {
+                return evFotoSlot(mid, v, s, cfg.labels, st.puedeEditarFotos);
+              }).join('') +
+            '</div>' +
+          '</div>';
+        }).join('') +
       '</div>';
     });
 
@@ -352,7 +379,12 @@
         st.puedeEditarFotos = !!r.puedeEscribir && !st.ctx.readonly;
         // La creación exige ADEMÁS que el montaje la habilite (contexto).
         st.puedeCrearVisita = st.puedeEditarFotos && st.allowCreate;
-        if (r.uiMax != null) st.cfg = Object.assign({}, st.cfg, { uiMax: r.uiMax });
+        var _over = {};
+        if (r.uiMax != null) _over.uiMax = r.uiMax;
+        if (r.slots && r.slots.length) _over.slots = r.slots;
+        if (r.grupos && r.grupos.length) _over.grupos = r.grupos;
+        if (r.labels) _over.labels = Object.assign({}, st.cfg.labels, r.labels);
+        st.cfg = Object.assign({}, st.cfg, _over);
       } else {
         st.visitas = [];
         st.puedeEditarFotos = false;
