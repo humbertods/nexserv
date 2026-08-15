@@ -40,9 +40,10 @@
       },
       uiMax: 3,                                  // SOLO presentación: últimas 3 VISITAS
       titulo: 'Evidencias de visita',
-      accionLeer:  'getEvidenciasFacial',
-      accionCrear: 'crearVisitaEvidenciaFacial',
-      accionSubir: 'subirEvidenciaFacial'
+      accionLeer:   'getEvidenciasFacial',
+      accionCrear:  'crearVisitaEvidenciaFacial',
+      accionEnsure: 'ensureVisitaEvidenciaFacial',
+      accionSubir:  'subirEvidenciaFacial'
     }
   };
 
@@ -62,6 +63,20 @@
 
   function cfgArea(area) {
     return Object.prototype.hasOwnProperty.call(EV_AREAS, area) ? EV_AREAS[area] : null;
+  }
+
+  // Iconos del sistema nx-icon de PROD: SVG plano, monocromático, currentColor.
+  // Sin emoji, sin apariencia 3D, sin librería nueva.
+  var ICO = {
+    camara:  'M20 6h-2.586l-1.707-1.707A1 1 0 0 0 15 4H9a1 1 0 0 0-.707.293L6.586 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2Zm-8 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-6a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
+    lupa:    'M10 2a8 8 0 1 0 4.9 14.32l4.39 4.39a1 1 0 0 0 1.42-1.42l-4.39-4.39A8 8 0 0 0 10 2Zm0 2a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z',
+    galeria: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 14h16v-3l-4.5-4.5-4 4L8 12l-4 4v2Zm4.5-9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z'
+  };
+  function ico(nombre, px) {
+    return '<svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" ' +
+      'width="' + (px || 16) + '" height="' + (px || 16) + '" fill="currentColor" ' +
+      'aria-hidden="true" style="vertical-align:-3px;margin-right:6px;">' +
+      '<path d="' + ICO[nombre] + '"/></svg>';
   }
 
   // Un área sin `grupos` se dibuja como una sola sección sin título: así el
@@ -158,11 +173,11 @@
 
     var html = titulo;
     if (url) {
-      html += '<button data-ev="ver" style="' + btn + '">🔍 Ver foto ampliada</button>';
+      html += '<button data-ev="ver" style="' + btn + '">' + ico('lupa', 15) + 'Ver foto ampliada</button>';
     }
     if (st.puedeEditarFotos) {
-      html += '<button data-ev="cam" style="' + btn + '">📷 ' + (url ? 'Cambiar' : 'Agregar') + ' — Cámara</button>' +
-              '<button data-ev="lib" style="' + btn + '">🖼 ' + (url ? 'Cambiar' : 'Agregar') + ' — Biblioteca</button>';
+      html += '<button data-ev="cam" style="' + btn + '">' + ico('camara', 15) + (url ? 'Cambiar' : 'Agregar') + ' — Cámara</button>' +
+              '<button data-ev="lib" style="' + btn + '">' + ico('galeria', 15) + (url ? 'Cambiar' : 'Agregar') + ' — Biblioteca</button>';
     }
     html += '<button data-ev="cerrar" style="' + btn + 'border:none;background:var(--ink,#111);color:#fff;">Cancelar</button>';
     hoja.innerHTML = html;
@@ -315,8 +330,11 @@
 
     var html = '';
     if (!todas.length) {
+      var _msg = (st.autoEnsure && !st.ctx.ticket_ref)
+        ? 'No se detectó la referencia del ticket de esta atención. Abrí la clienta desde su ticket para registrar evidencias.'
+        : 'Sin visitas registradas todavía.';
       html += '<div style="text-align:center;padding:18px 8px;color:var(--ink-faint,#999);font-size:12px;">' +
-        'Sin visitas registradas todavía.</div>';
+        esc(_msg) + '</div>';
     }
 
     visibles.forEach(function (v, i) {
@@ -326,6 +344,11 @@
           '<span style="font-size:11px;font-weight:600;color:var(--ink-soft,#666);flex:1;min-width:80px;">' +
             esc(v.servicio || '—') + '</span>' +
           '<span style="font-size:11px;font-weight:600;color:var(--ink-faint,#999);">' + esc(v.fecha || '') + '</span>' +
+          // Avance parcial: 0/6 … 6/6. Informativo, nunca bloquea el flujo.
+          '<span style="font-size:10px;font-weight:700;color:var(--ink-faint,#aaa);' +
+            'border:1px solid var(--line,#e5e5e5);border-radius:999px;padding:1px 7px;">' +
+            cfg.slots.filter(function (s) { return !!(v.fotos && v.fotos[s]); }).length +
+            '/' + cfg.slots.length + '</span>' +
         '</div>' +
         gruposDe(cfg).map(function (g) {
           return '<div style="margin-bottom:10px;">' +
@@ -371,6 +394,30 @@
     if (cuerpo) cuerpo.innerHTML = '<div style="text-align:center;padding:18px;color:var(--ink-faint,#999);' +
       'font-size:12px;">⏳ Cargando evidencias…</div>';
     try {
+      // ── Visita automática de la atención en curso ──
+      // Idempotente en el BACKEND (clave codigo + ticket_ref): recargar la
+      // página, plegar/desplegar o volver a StaffHome no duplica filas.
+      var _visitaEnsure = null;
+      if (st.autoEnsure && st.cfg.accionEnsure && st.ctx.ticket_ref) {
+        try {
+          var re = await apiPost(st.cfg.accionEnsure, {
+            codigo:     st.ctx.codigo,
+            nombre:     st.ctx.nombre || '',
+            servicio:   st.ctx.servicio || '',    // dato del sistema, no input
+            ticket_ref: st.ctx.ticket_ref,
+            linea_id:   st.ctx.linea_id || ''
+          });
+          if (re && re.success && re.visita) {
+            // El ensure YA devuelve la visita persistida CON sus fotos. Se guarda
+            // como respaldo de pintado: si la lectura posterior fallara, se pinta
+            // esto y NUNCA una visita vacía inventada en el cliente.
+            _visitaEnsure = re.visita;
+          } else {
+            console.warn('[EvidenciasCore] ensure no completado:', re && (re.error || re.message));
+          }
+        } catch (eEns) { console.warn('[EvidenciasCore] ensure falló:', eEns); }
+      }
+
       var r = await apiGet(st.cfg.accionLeer, { codigo: st.ctx.codigo });
       if (r && r.success) {
         st.visitas = r.visitas || [];
@@ -385,6 +432,13 @@
         if (r.grupos && r.grupos.length) _over.grupos = r.grupos;
         if (r.labels) _over.labels = Object.assign({}, st.cfg.labels, r.labels);
         st.cfg = Object.assign({}, st.cfg, _over);
+      } else if (_visitaEnsure) {
+        // Lectura fallida pero el ensure trajo la visita persistida: se pinta esa,
+        // con sus URLs reales. Jamás se sustituye por un contenedor vacío local.
+        st.visitas = [_visitaEnsure];
+        st.total = 1;
+        st.puedeEditarFotos = !st.ctx.readonly;
+        st.puedeCrearVisita = st.puedeEditarFotos && st.allowCreate;
       } else {
         st.visitas = [];
         st.puedeEditarFotos = false;
@@ -431,6 +485,9 @@
       total: 0,
       cargado: false,
       allowCreate: ctx.allowCreate !== false,     // por defecto permitido
+      // autoEnsure: en una ATENCIÓN real, la visita se asegura sola. En
+      // Historial es SIEMPRE false: mirar no crea registros.
+      autoEnsure: ctx.autoEnsure === true && !ctx.readonly,
       // Estimación optimista para el primer pintado; el backend la confirma.
       puedeEditarFotos: _editable,
       puedeCrearVisita: _editable && (ctx.allowCreate !== false)
@@ -439,7 +496,10 @@
     cont.innerHTML =
       '<div class="card" style="margin-bottom:8px;padding:0;overflow:hidden;">' +
         '<div data-ev-head style="padding:13px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;">' +
-          '<span style="font-size:15px;">📸</span>' +
+          // Icono del sistema nx-icon de PROD: SVG plano, monocromático,
+          // fill=currentColor. Misma familia que Ficha facial / Ficha pestañas /
+          // Evidencia del trabajo realizado. Sin emoji ni librería nueva.
+          ico('camara', 16) +
           '<span style="font-weight:700;font-size:14px;flex:1;">' + esc(cfg.titulo) + '</span>' +
           '<span data-ev-caret style="color:var(--ink-faint,#999);">▾</span>' +
         '</div>' +
@@ -455,7 +515,10 @@
       var abierto = body.style.display !== 'none';
       body.style.display = abierto ? 'none' : 'block';
       caret.textContent = abierto ? '▾' : '▴';
-      if (!abierto && !_montajes[mid].cargado) cargar(mid);
+      // Al ABRIR siempre se relee del backend. Cerrar y reabrir, salir del
+      // ticket, volver a StaffHome o refrescar no dependen de ningún estado en
+      // memoria: las URLs de las fotos vienen siempre de EvidenciasFacial.
+      if (!abierto) cargar(mid);
     });
   }
 
