@@ -3797,6 +3797,30 @@
         + '</div>'
         + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">Saltar ficha — solo registrar visita</button>';
     }
+
+    // ── EVIDENCIAS-CORE · acceso a "Evidencias de visita" (área facial) ──────
+    // Se agrega DESPUÉS de la Ficha facial, en ambas ramas (con y sin ficha),
+    // y no altera nada del bloque anterior. El contexto sale de variables de
+    // estado que ya fija el flujo de atención, nunca del DOM:
+    //   codigo/nombre  → window._currentFacialClient*   (de la atención)
+    //   servicio       → window._currentFacialSvcName   (de slotServices)
+    //   ticket_ref     → window._as1IdEspera/_as2IdEspera (LE-/SP-/TM-/SN-)
+    //   linea_id       → '' : no existe ninguna referencia LINEAS en frontend.
+    el.innerHTML += '<div id="evFacialAcc' + slot + '"></div>';
+    try {
+      if (window.EvidenciasCore && typeof EvidenciasCore.montarAcordeonFacial === 'function') {
+        EvidenciasCore.montarAcordeonFacial('evFacialAcc' + slot, {
+          codigo:     window._currentFacialClientCodigo || (client && client.code) || '',
+          nombre:     window._currentFacialClientNombre || (client && client.name) || '',
+          servicio:   window._currentFacialSvcName || '',
+          ticket_ref: (slot === 2 ? (window._as2IdEspera || '') : (window._as1IdEspera || '')),
+          linea_id:   '',
+          staff:      (window.currentUser && window.currentUser.name) || '',
+          readonly:   false,
+          allowCreate: true    // en atención SÍ hay servicio y ticket_ref reales
+        });
+      }
+    } catch (eEv) { console.warn('[EvidenciasCore] facial staff:', eEv); }
   }
 
   function openNuevaFichaFacialFromPanel(clientKey, slot) {
