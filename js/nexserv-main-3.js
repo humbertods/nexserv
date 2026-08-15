@@ -3874,22 +3874,51 @@
     alert('✓ ' + p.name + ' marcada como pagada.');
   }
 
+  // ── OWNER · SEMANA CANÓNICA (frontend) ──────────────────────────────────
+  // Fuente primaria: el week que el backend ya dejó en window._ownerFinSummary
+  // vía renderPayments(). El fallback replica la MISMA regla (lunes–sábado +
+  // ISO-8601 por el jueves) y es el único cálculo local que existe: se
+  // eliminaron las fórmulas aproximadas Math.ceil(getDate()/7)+14 y
+  // mes + (getDate()-6) + '-' + getDate().
+  function _ownerWeekActual() {
+    const w = window._ownerFinSummary && window._ownerFinSummary.week;
+    if (w && w.number) return w;
+
+    const hoy = new Date();
+    const civil = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const lunes = new Date(civil.getFullYear(), civil.getMonth(), civil.getDate() - ((civil.getDay() + 6) % 7));
+    const sabado = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 5);
+    const jueves = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 3);
+    const ene4 = new Date(jueves.getFullYear(), 0, 4);
+    const lunesSem1 = new Date(jueves.getFullYear(), 0, 4 - ((ene4.getDay() + 6) % 7));
+    const number = Math.round((jueves - lunesSem1) / 604800000) + 1;
+    const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const dmy = d => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+    const rango = (lunes.getMonth() === sabado.getMonth())
+      ? (MESES[lunes.getMonth()] + ' ' + lunes.getDate() + '–' + sabado.getDate())
+      : (MESES[lunes.getMonth()] + ' ' + lunes.getDate() + '–' + MESES[sabado.getMonth()] + ' ' + sabado.getDate());
+    return {
+      number: number,
+      label: 'Semana ' + number + ' · ' + rango,
+      periodo: 'Lunes ' + dmy(lunes) + ' — Sábado ' + dmy(sabado)
+    };
+  }
+
   function openCloseWeek() {
     const staffData = window._payStaffData || PAY_STAFF;
     const unpaid = staffData.filter(p => !p.paid);
     const total = unpaid.reduce((s, p) => s + p.acumulado, 0);
-    const weekNum = new Date().getWeekNumber ? new Date().getWeekNumber() : Math.ceil((new Date().getDate()) / 7) + 14;
-    document.getElementById('closeWeekName').textContent = 'Semana ' + weekNum;
+    const w = _ownerWeekActual();
+    document.getElementById('closeWeekName').textContent = w.label || ('Semana ' + w.number);
     document.getElementById('closeWeekTotal').textContent = '$' + total.toFixed(2);
     document.getElementById('closeWeekModal').classList.add('active');
   }
 
   async function confirmCloseWeek() {
-    const now = new Date();
-    const weekNum = Math.ceil(now.getDate() / 7) + 14;
-    const semana = 'Semana ' + weekNum;
-    const mes = now.toLocaleDateString('es-EC', { month: 'short' });
-    const periodo = mes + ' ' + (now.getDate() - 6) + '-' + now.getDate();
+    // MISMA semana que muestra renderPayments: cero cálculo independiente.
+    const w = _ownerWeekActual();
+    const semana = 'Semana ' + w.number;
+    const periodo = w.periodo;
 
     try {
       await apiPost('cierreSemanal', {
