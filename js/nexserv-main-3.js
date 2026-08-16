@@ -1521,6 +1521,87 @@
   }
   window._cobroRegistrarAbono = _cobroRegistrarAbono;
 
+  // ══════════════════════════════════════════════════════════════════
+  // PRE-CONFIRMACIÓN DE TRANSFERENCIAS (Mikaela)
+  // Banco + código de confirmación son obligatorios para TODO componente
+  // cuyo método sea Transferencia. Esto es PRE-confirmación: no verifica
+  // nada, solo deja registrado con qué banco y qué código entró el dinero.
+  // La confirmación final la hace el Owner en Verificación de Pagos.
+  // ══════════════════════════════════════════════════════════════════
+  function _val(id) {
+    const e = document.getElementById(id);
+    return e ? String(e.value || '').trim() : '';
+  }
+  function _limpiarTransferSimple() {
+    ['transferBanco', 'transferCodigo'].forEach(id => {
+      const e = document.getElementById(id); if (e) e.value = '';
+    });
+  }
+  function _limpiarTransferMixto(soloFila) {
+    [1, 2, 3].forEach(i => {
+      if (soloFila && soloFila !== i) return;
+      ['mixtoBanco' + i, 'mixtoCodigo' + i].forEach(id => {
+        const e = document.getElementById(id); if (e) e.value = '';
+      });
+      const p = document.getElementById('mixtoTransfer' + i);
+      if (p) p.style.display = 'none';
+    });
+  }
+
+  // Cada fila del mixto muestra su propio Banco/Código solo si su método es
+  // Transferencia. Al cambiar a Efectivo/Tarjeta se limpia esa fila.
+  function onMixtoMetodoChange() {
+    [1, 2, 3].forEach(i => {
+      const met = document.getElementById('mixtoMetodo' + i);
+      const pan = document.getElementById('mixtoTransfer' + i);
+      if (!met || !pan) return;
+      if (String(met.value) === 'Transferencia') {
+        pan.style.display = 'block';
+      } else {
+        pan.style.display = 'none';
+        _limpiarTransferMixto(i);
+      }
+    });
+  }
+  window.onMixtoMetodoChange = onMixtoMetodoChange;
+
+  // Construye transferencias[] y valida. Devuelve { ok, error, transferencias }.
+  // componente_index es el ORDINAL del componente financiero dentro del pago:
+  // 0 para pago simple; para mixto, la posición de la fila entre las filas con
+  // monto > 0 — el mismo orden con el que se arma el string 'Mixto: ...'.
+  function _recolectarTransferencias() {
+    const metodo = window._cobrarPago || window._cobroPago || 'Efectivo';
+
+    if (metodo === 'Transferencia') {
+      const banco = _val('transferBanco'), codigo = _val('transferCodigo');
+      if (!banco)  return { ok: false, error: 'Falta el BANCO de la transferencia.' };
+      if (!codigo) return { ok: false, error: 'Falta el CÓDIGO DE CONFIRMACIÓN de la transferencia.' };
+      return { ok: true, transferencias: [{ componente_index: 0, monto: 0, banco: banco, codigo_confirmacion: codigo }] };
+    }
+
+    if (metodo === 'Pago mixto') {
+      const out = [];
+      let idx = 0;
+      for (let i = 1; i <= 3; i++) {
+        const met = document.getElementById('mixtoMetodo' + i);
+        const monto = parseFloat(_val('mixtoMonto' + i)) || 0;
+        if (monto <= 0) continue;                    // fila inactiva: no es componente
+        const m = met ? String(met.value) : 'Efectivo';
+        if (m === 'Transferencia') {
+          const banco = _val('mixtoBanco' + i), codigo = _val('mixtoCodigo' + i);
+          if (!banco)  return { ok: false, error: 'Falta el BANCO de la transferencia de $' + monto.toFixed(2) + '.' };
+          if (!codigo) return { ok: false, error: 'Falta el CÓDIGO DE CONFIRMACIÓN de la transferencia de $' + monto.toFixed(2) + '.' };
+          out.push({ componente_index: idx, monto: monto, banco: banco, codigo_confirmacion: codigo });
+        }
+        idx++;
+      }
+      return { ok: true, transferencias: out };
+    }
+
+    return { ok: true, transferencias: [] };          // Efectivo / Tarjeta: no exige
+  }
+  window._recolectarTransferencias = _recolectarTransferencias;
+
   function selectPago(metodo, btn) {
     // Unificar ambas variables de pago (cobro individual y grupal usan la misma)
     window._cobrarPago = metodo;
@@ -1531,6 +1612,17 @@
       b.classList.remove('selected');
     });
     if (btn) { btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)'; btn.classList.add('selected'); }
+
+    // ── PRE-CONFIRMACIÓN DE TRANSFERENCIA ────────────────────────────────
+    // Nunca se conserva metadata bancaria de un método que ya no está activo:
+    // al salir de Transferencia se limpian Banco/Código, no solo se ocultan.
+    const tPanel = document.getElementById('transferPanel');
+    if (tPanel) {
+      const esTransfer = (metodo === 'Transferencia');
+      tPanel.style.display = esTransfer ? 'block' : 'none';
+      if (!esTransfer) _limpiarTransferSimple();
+    }
+    if (metodo !== 'Pago mixto') _limpiarTransferMixto();   // incluye simple/efectivo/tarjeta
 
     // Mostrar/ocultar panel mixto
     const mixtoPanel = document.getElementById('mixtoPanel');
@@ -1803,6 +1895,19 @@
       window._cobrarPago = _metodoPagoFinal;
       window._cobroPago  = _metodoPagoFinal;
     }
+
+    // ── PRE-CONFIRMACIÓN OBLIGATORIA DE TRANSFERENCIAS ───────────────────
+    // Se recolecta ANTES de deshabilitar el botón y ANTES de cualquier
+    // apiPost: si falta banco o código, no hay cobro. El backend vuelve a
+    // validar (DevTools no puede saltarse la regla).
+    // OJO: se lee el método ORIGINAL, no el string 'Mixto: ...' ya armado.
+    const _metodoUI = (_metodoPagoFinal.indexOf('Mixto:') === 0) ? 'Pago mixto' : _metodoPagoFinal;
+    const _pagoPrev = window._cobrarPago;
+    window._cobrarPago = _metodoUI;
+    const _tr = _recolectarTransferencias();
+    window._cobrarPago = _pagoPrev;
+    if (!_tr.ok) { alert('⚠ ' + _tr.error); return; }
+    window._transferenciasCobro = _tr.transferencias || [];
 
     btn.textContent = '⏳ Procesando...';
     btn.disabled = true;
