@@ -1834,7 +1834,11 @@
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           _payloadGrupal.clienteCodigo  = c.codigo || '';   // para el gate del piloto LINEAS
-          await apiPost('confirmarCobro', _payloadGrupal);
+          // pago_uid: identidad nativa del cobro. Cada clienta del grupal tiene el
+          // suyo (el frontend hace un confirmarCobro por clienta), así que sus
+          // productos se atan a SU pago y no al de otra.
+          const _respGrupal = await apiPost('confirmarCobro', _payloadGrupal);
+          const _pagoUidC = (_respGrupal && _respGrupal.pago_uid) || '';
           // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
           // (van a la caja, SIN comisión), igual que en el cobro individual.
           const _prodsC = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
@@ -1846,7 +1850,8 @@
                 clienteNombre: c.nombre || '',
                 productos: _prodsC,
                 total: _totProdC,
-                metodoPago: metodoPago
+                metodoPago: metodoPago,
+                pago_uid: _pagoUidC        // mismo pago que el servicio de esta clienta
               });
             } catch(eProd) { console.error(eProd); }
             delete window._apProductosEnTicket[c.idEspera];
@@ -1932,9 +1937,13 @@
       _payloadM5.notaAjuste = window._cobrarAjustes.join(' · ');
     }
 
+    // pago_uid: se captura del cobro para que los productos del mismo ticket
+    // queden atados al MISMO pago (no se deduce por idEspera).
+    let _pagoUidTicket = '';
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
-      await apiPost('confirmarCobro', _payloadM5);
+      const _respCobro = await apiPost('confirmarCobro', _payloadM5);
+      _pagoUidTicket = (_respCobro && _respCobro.pago_uid) || '';
     } catch (err) {
       console.error('confirmarCobro error:', err);
       btn.disabled = false;
@@ -1959,7 +1968,8 @@
           clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
           productos: productosTicket,
           total: totalProductos,
-          metodoPago: window._cobrarPago
+          metodoPago: window._cobrarPago,
+          pago_uid: _pagoUidTicket        // mismo pago que el servicio
         });
       } catch(e) { console.error(e); }
       delete window._apProductosEnTicket[window._cobrarId];
