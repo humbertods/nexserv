@@ -42,8 +42,11 @@ window.getAreaPrioritaria = function(tipo) {
   if (tipo === 'promo') {
     const pr = window._arrPromo || (window._arrPromos && window._arrPromos.find(p => p));
     if (pr && pr.division && pr.division.length > 0) {
-      const dv = [...pr.division].sort((a, b) => Number(b.monto||0) - Number(a.monto||0));
-      const d  = String(dv[0].area || '').toLowerCase();
+      // Área inicial = PRIMERA parte de la división, tal como fue creada la promo.
+      // ANTES ordenaba por monto desc y elegía la MÁS CARA → en cejas+pestañas forzaba
+      // siempre pestañas sin importar la staff. El orden lo manda Mikaela vía _secuencia
+      // (Regla 1, arriba); esto es solo el fallback cuando no hay secuencia.
+      const d  = String(pr.division[0].area || '').toLowerCase();
       const k  = d.includes('pest') || d.includes('lifting') || d.includes('retiro') ? 'pestanas'
                : d.includes('facial') || d.includes('hidra') ? 'facial'
                : d.includes('depil') || d.includes('bikini') ? 'depilacion'
@@ -187,6 +190,16 @@ window.construirPayloadDistribucionM5 = function(contexto) {
     metodoPago:    contexto.metodoPago,
     totalCobrado:  contexto.totalCobrado
   };
+
+  // PRE-CONFIRMACIÓN DE TRANSFERENCIAS (aditivo, no altera ningún contrato).
+  // Se toma de contexto.transferencias si viene; si no, del estado que dejó
+  // confirmarCobro(). Solo se agrega la clave cuando hay al menos una, para
+  // que los cobros sin transferencia sigan enviando exactamente el payload
+  // de siempre.
+  const _tr = (contexto.transferencias && contexto.transferencias.length)
+    ? contexto.transferencias
+    : (typeof window !== 'undefined' && window._transferenciasCobro) || [];
+  if (_tr && _tr.length > 0) base.transferencias = _tr;
 
   // Si hay desglose multi-staff, mandarlo siempre para que el backend
   // pueda distribuir comisiones y escribir HistorialOwner por parte.
