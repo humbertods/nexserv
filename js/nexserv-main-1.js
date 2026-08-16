@@ -1618,6 +1618,10 @@
     document.getElementById('userMenuName').textContent = user ? user.name : '';
     const segBtn = document.getElementById('menuSeguridadBtn');
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    // Verificación de pagos: solo Owner. El backend es OWNER_ONLY igual, así que
+    // ocultar el botón es UX, no la protección.
+    const pagosVerifBtn = document.getElementById('menuPagosVerificacionBtn');
+    if (pagosVerifBtn) pagosVerifBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cajaBtn = document.getElementById('menuCajaBtn');
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cierreMesBtn = document.getElementById('menuCierreMesBtn');
