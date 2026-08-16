@@ -47,7 +47,7 @@
 <!-- ── MANDAMIENTOS DEL SISTEMA ── cargado antes del body para que sus funciones estén disponibles globalmente -->
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-messaging-compat.js"></script>
-<script src="nexserv-mandamientos.js?v=20260706a"></script>
+<script src="nexserv-mandamientos.js?v=20260815a"></script>
 
 </head>
 <body>
@@ -535,12 +535,17 @@
           <button onclick="selectPago('Pago mixto', this)" class="pago-btn" style="padding: 14px; border-radius: var(--radius-pill); border: 2px solid var(--line); background: var(--bg-card); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M16 3h5v5l-1.5-1.5-4.5 4.5-3-3-6 6-1.5-1.5 7.5-7.5 3 3 3-3L16 3zM4.5 16.5 3 18v3h3l8.5-8.5-3-3-7 7z"/></svg>Pago mixto</button>
         </div>
 
+        <!-- Pre-confirmación de TRANSFERENCIA simple. Banco y código son
+             obligatorios ANTES de confirmar el cobro. type="text" a propósito:
+             el código puede traer ceros a la izquierda o guiones (001245, ABC-9821). -->
+        <div id="transferPanel" style="display:none;background:var(--bg);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin-bottom:16px;"><div style="font-size:10px;font-weight:800;color:var(--accent-deep);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Pre-confirmación de transferencia</div><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Banco *</div><input type="text" id="transferBanco" placeholder="Ej: Pichincha" autocomplete="off" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Código de confirmación *</div><input type="text" id="transferCodigo" placeholder="Ej: 548921 · ABC-9821" autocomplete="off" inputmode="text" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;"></div>
+
         <!-- Panel desglose pago mixto -->
         <div id="mixtoPanel" style="display:none;background:var(--bg);border:1.5px solid var(--line);border-radius:16px;padding:14px;margin-bottom:16px;">
           <div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">Desglosar pago mixto</div>
           <!-- Fila 1 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
-            <select id="mixtoMetodo1" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+            <select id="mixtoMetodo1" onchange="onMixtoMetodoChange()" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
               <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
               <option value="Transferencia">Transferencia</option>
               <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
@@ -549,9 +554,10 @@
               oninput="onMixtoInput()"
               style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
           </div>
+          <div id="mixtoTransfer1" style="display:none;background:var(--bg);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:10px;font-weight:800;color:var(--accent-deep);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Pre-confirmación de transferencia</div><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Banco *</div><input type="text" id="mixtoBanco1" placeholder="Ej: Pichincha" autocomplete="off" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Código de confirmación *</div><input type="text" id="mixtoCodigo1" placeholder="Ej: 548921 · ABC-9821" autocomplete="off" inputmode="text" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;"></div>
           <!-- Fila 2 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
-            <select id="mixtoMetodo2" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+            <select id="mixtoMetodo2" onchange="onMixtoMetodoChange()" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
               <option value="Transferencia">Transferencia</option>
               <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
               <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
@@ -560,9 +566,10 @@
               oninput="onMixtoInput()"
               style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
           </div>
+          <div id="mixtoTransfer2" style="display:none;background:var(--bg);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:10px;font-weight:800;color:var(--accent-deep);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Pre-confirmación de transferencia</div><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Banco *</div><input type="text" id="mixtoBanco2" placeholder="Ej: Pichincha" autocomplete="off" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Código de confirmación *</div><input type="text" id="mixtoCodigo2" placeholder="Ej: 548921 · ABC-9821" autocomplete="off" inputmode="text" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;"></div>
           <!-- Fila 3 -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;align-items:center;">
-            <select id="mixtoMetodo3" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
+            <select id="mixtoMetodo3" onchange="onMixtoMetodoChange()" style="padding:11px 10px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:13px;font-weight:700;background:var(--bg-card);color:var(--ink);appearance:none;-webkit-appearance:none;cursor:pointer;">
               <option value="Tarjeta"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 14H4V10h16v8Zm0-10H4V6h16v2ZM6 14h4v2H6Z"/></svg>Tarjeta</option>
               <option value="Efectivo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="currentColor" style="vertical-align:-2px;margin-right:5px;"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Efectivo</option>
               <option value="Transferencia">Transferencia</option>
@@ -571,6 +578,7 @@
               oninput="onMixtoInput()"
               style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:15px;font-weight:700;background:var(--bg-card);box-sizing:border-box;width:100%;">
           </div>
+          <div id="mixtoTransfer3" style="display:none;background:var(--bg);border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;margin-bottom:8px;"><div style="font-size:10px;font-weight:800;color:var(--accent-deep);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;">Pre-confirmación de transferencia</div><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Banco *</div><input type="text" id="mixtoBanco3" placeholder="Ej: Pichincha" autocomplete="off" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">Código de confirmación *</div><input type="text" id="mixtoCodigo3" placeholder="Ej: 548921 · ABC-9821" autocomplete="off" inputmode="text" style="padding:11px 12px;border-radius:12px;border:1.5px solid var(--line);font-family:inherit;font-size:14px;font-weight:700;background:var(--bg-card);color:var(--ink);box-sizing:border-box;width:100%;"></div>
           <div id="mixtoSuma" style="font-size:12px;font-weight:700;text-align:center;color:var(--ink-soft);"></div>
         </div>
 
@@ -2898,7 +2906,7 @@
   <script src="js/nexserv-main-1.js?v=20260815c"></script>
   <script src="js/nexserv-main-2.js?v=20260815d"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
-  <script src="js/nexserv-main-3.js?v=20260815g"></script>
+  <script src="js/nexserv-main-3.js?v=20260815h"></script>
   <script src="js/nexserv-main-4.js?v=20260815c"></script>
   <script src="js/pagos-verificacion.js?v=20260815b"></script>
 
