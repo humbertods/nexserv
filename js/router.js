@@ -75,6 +75,10 @@
       clearInterval(window._ownerCajaRefresh);
       window._ownerCajaRefresh = null;
     }
+    // OWNER · Verificación de pagos. Solo carga al entrar (sin polling).
+    if (id === 'ownerPagosVerificacion' && typeof loadPagosVerificacion === 'function') {
+      loadPagosVerificacion();
+    }
     if (id === 'ownerCierreMes') { initCierreMesSelectors(); loadCierreMes(); }
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') {
