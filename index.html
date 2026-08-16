@@ -58,6 +58,9 @@
   <div class="user-menu-overlay" id="userMenuOverlay" onclick="closeUserMenu()"></div>
   <div class="user-menu" id="userMenu">
     <div id="userMenuName" style="padding: 10px 14px 6px; font-size: 11px; font-weight: 700; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em;"></div>
+    <button class="user-menu-item" id="menuPagosVerificacionBtn" style="display:none;" onclick="closeUserMenu(); show('ownerPagosVerificacion');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z"/></svg> Verificación de pagos
+    </button>
     <button class="user-menu-item" id="menuCajaBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCaja');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M2 7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v1H2V7Zm0 3h20v8a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-8Zm13 3a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 0 0-3h-3Z"/></svg> Caja chica
     </button>
@@ -2488,6 +2491,29 @@
   </div>
 
   <!-- OWNER: CAJA CHICA (vista solo lectura) -->
+  <!-- OWNER · VERIFICACIÓN DE PAGOS (conciliación; no modifica el cobro) -->
+  <div class="screen" id="ownerPagosVerificacion">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Verificación de pagos</span>
+      <span id="pvRefreshBtn" style="margin-left:auto;font-size:10px;color:var(--ink-faint);letter-spacing:0;text-transform:none;cursor:pointer;" onclick="loadPagosVerificacion()">↻ Actualizar</span>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;font-weight:500;line-height:1.5;">
+      ✅ Marcá un pago cuando confirmes que el dinero existe: efectivo en caja, transferencia en el banco, tarjeta en el POS. Esto <strong>no</strong> modifica el cobro.
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <button id="pvBtn_dia"    onclick="pvSetFiltro('hoy')"    style="flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-weight:800;font-size:12px;cursor:pointer;">DÍA</button>
+      <button id="pvBtn_semana" onclick="pvSetFiltro('semana')" style="flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--bg-card);color:var(--ink);font-weight:800;font-size:12px;cursor:pointer;">SEMANA</button>
+      <button id="pvBtn_mes"    onclick="pvSetFiltro('mes')"    style="flex:1;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--bg-card);color:var(--ink);font-weight:800;font-size:12px;cursor:pointer;">MES</button>
+    </div>
+    <div id="pvRangoLabel" style="font-size:11px;color:var(--ink-faint);margin-bottom:12px;text-align:center;"></div>
+
+    <div id="pvContenido"></div>
+  </div>
+
   <div class="screen" id="ownerCaja">
     <div class="header">
       <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
@@ -2866,14 +2892,15 @@
   <script src="js/state.js?v=20260706a"></script>
   <script src="js/api.js?v=20260713c"></script>
   <script src="js/lineaService.js?v=20260710a"></script>
-  <script src="js/router.js?v=20260706a"></script>
+  <script src="js/router.js?v=20260815b"></script>
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/evidencias-core.js?v=20260815e"></script>
-  <script src="js/nexserv-main-1.js?v=20260815b"></script>
+  <script src="js/nexserv-main-1.js?v=20260815c"></script>
   <script src="js/nexserv-main-2.js?v=20260815d"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
-  <script src="js/nexserv-main-3.js?v=20260815f"></script>
+  <script src="js/nexserv-main-3.js?v=20260815g"></script>
   <script src="js/nexserv-main-4.js?v=20260815c"></script>
+  <script src="js/pagos-verificacion.js?v=20260815b"></script>
 
 
 <!-- ============================================ -->
