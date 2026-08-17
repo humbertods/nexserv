@@ -215,9 +215,26 @@
       +      '<span style="font-size:24px;line-height:1;color:' + col + ';min-width:26px;text-align:center;">' + box + '</span>'
       +      '<div style="flex:1;min-width:0;">'
       +        '<div style="font-weight:700;font-size:13px;">' + money(c.monto) + ' · ' + esc(c.metodo || 'sin método') + '</div>'
+      +        metaTransferencia(c)
       +        '<div style="font-size:11px;color:' + col + ';font-weight:700;margin-top:1px;">'
       +          (v ? 'Pago verificado' : 'Pendiente de verificar') + '</div>'
       +      '</div>'
+      +    '</div>';
+  }
+
+  // Pre-confirmación que registró Mikaela al cobrar (CierresPagos col L).
+  // Es INFORMACIÓN DE APOYO: no verifica nada, no cambia el estado y no
+  // sustituye el check del Owner. Solo se muestra en transferencias; los
+  // pagos históricos (sin col L) siguen siendo verificables igual.
+  function metaTransferencia(c) {
+    if (c.metodo !== 'transferencia') return '';
+    var banco  = String(c.banco || '').trim();
+    var codigo = String(c.codigo_confirmacion || '').trim();
+    var sin = 'No registrado';
+    var estilo = 'font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.5;';
+    return '<div style="' + estilo + '">'
+      +      '<div>🏦 Banco: ' + (banco ? esc(banco) : sin) + '</div>'
+      +      '<div>🔐 Código: ' + (codigo ? esc(codigo) : sin) + '</div>'
       +    '</div>';
   }
 
