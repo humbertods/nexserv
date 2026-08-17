@@ -18,10 +18,28 @@
     enVuelo: {}                        // componente_ref → true (anti doble tap)
   };
 
+  // Iconos planos: outline, un solo color, sin rellenos ni sombras. Usan
+  // currentColor para adaptarse solos a modo claro/oscuro. Sin librerías.
+  function ico(inner, px) {
+    var t = px || 18;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="' + t + '" height="' + t + '"'
+      +    ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"'
+      +    ' stroke-linejoin="round" style="vertical-align:-3px;flex:none;">' + inner + '</svg>';
+  }
+  var ICO = {
+    efectivo:      '<circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M9.5 9.5h5"/><path d="M9.5 14.5h5"/>',
+    transferencia: '<path d="M3 10 12 4l9 6"/><path d="M5 10v10M12 10v10M19 10v10"/><path d="M3 20h18"/>',
+    tarjeta:       '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
+    banco:         '<path d="M3 10 12 4l9 6"/><path d="M5 10v10M12 10v10M19 10v10"/><path d="M3 20h18"/>',
+    codigo:        '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    verificado:    '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5 11 15l4.5-5"/>',
+    pendiente:     '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>'
+  };
+
   var METODOS = [
-    { key: 'efectivo',      label: 'Efectivo',      icono: '💵' },
-    { key: 'transferencia', label: 'Transferencia', icono: '🏦' },
-    { key: 'tarjeta',       label: 'Tarjeta',       icono: '💳' }
+    { key: 'efectivo',      label: 'Efectivo',      icono: ICO.efectivo },
+    { key: 'transferencia', label: 'Transferencia', icono: ICO.transferencia },
+    { key: 'tarjeta',       label: 'Tarjeta',       icono: ICO.tarjeta }
   ];
 
   // ── Seguridad: TODO valor que venga de Sheets pasa por acá ───────────────
@@ -101,9 +119,9 @@
       +   '<div style="display:flex;justify-content:space-between;padding:3px 0;font-weight:800;">'
       +     '<span>Total registrado</span><span>' + money(totPend + totVerif) + '</span></div>'
       +   '<div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--success);">'
-      +     '<span>🟢 Verificado</span><span>' + money(totVerif) + '</span></div>'
+      +     '<span>' + ico(ICO.verificado, 15) + ' Verificado</span><span>' + money(totVerif) + '</span></div>'
       +   '<div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--danger);">'
-      +     '<span>🔴 Pendiente</span><span>' + money(totPend) + '</span></div>'
+      +     '<span>' + ico(ICO.pendiente, 15) + ' Pendiente</span><span>' + money(totPend) + '</span></div>'
       + '</div>';
 
     // Abanicos por método
@@ -121,7 +139,7 @@
 
       h += '<div class="card" style="padding:0;margin-bottom:12px;overflow:hidden;">';
       h +=   '<div onclick="pvToggleAbanico(\'' + m.key + '\')" style="cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;">'
-        +      '<span style="font-size:18px;">' + m.icono + '</span>'
+        +      '<span style="display:inline-flex;color:var(--ink);">' + ico(m.icono, 20) + '</span>'
         +      '<div style="flex:1;">'
         +        '<div style="font-weight:800;font-size:14px;letter-spacing:-0.01em;">' + m.label + '</div>'
         +        '<div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">'
@@ -233,8 +251,8 @@
     var sin = 'No registrado';
     var estilo = 'font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.5;';
     return '<div style="' + estilo + '">'
-      +      '<div>🏦 Banco: ' + (banco ? esc(banco) : sin) + '</div>'
-      +      '<div>🔐 Código: ' + (codigo ? esc(codigo) : sin) + '</div>'
+      +      '<div>' + ico(ICO.banco, 13) + ' Banco: ' + (banco ? esc(banco) : sin) + '</div>'
+      +      '<div>' + ico(ICO.codigo, 13) + ' Código: ' + (codigo ? esc(codigo) : sin) + '</div>'
       +    '</div>';
   }
 
