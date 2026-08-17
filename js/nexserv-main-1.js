@@ -1306,6 +1306,10 @@
         console.log('[doLogin] API ok — rol:', rolNorm, '| nombre:', r.nombre);
         user = {
           name: r.nombre,
+          // userId de login (col B de Usuarios). Se usa SOLO para decidir qué
+          // botones mostrar; la autorización real la hace el backend contra el
+          // token firmado. El nombre puede cambiar, el userId no.
+          userId: r.userId || '',
           role: rolNorm,
           area: areaMap[r.area] || r.area || '',
           maxClients: r.maxClients || 1,
@@ -1613,15 +1617,47 @@
     show('login');
   }
 
+  // ── ACCESO A VERIFICACIÓN DE PAGOS ────────────────────────────────────
+  // Owner, o Rosa por su userId estable. NUNCA por nombre ni por área: el
+  // nombre visible puede cambiar y hay otras staff.
+  const PV_STAFF_VERIFICADORES = ['U009'];   // Rosa · staff
+  function puedeVerificarPagos(user) {
+    if (!user) return false;
+    const rol = String(user.role || '').trim().toLowerCase();
+    if (rol === 'owner' || rol === 'dueño' || rol === 'dueno') return true;
+    const uid = String(user.userId || '').trim();
+    return rol === 'staff' && PV_STAFF_VERIFICADORES.indexOf(uid) !== -1;
+  }
+  window.puedeVerificarPagos = puedeVerificarPagos;
+
+  // Retorno contextual desde Verificación de pagos: el Owner vuelve a su
+  // resumen; cualquier otro autorizado (Rosa, staff) vuelve a staffHome.
+  // Rosa nunca debe caer en ownerHome.
+  function volverDesdeVerificacion() {
+    const u = window.currentUser;
+    const rol = String((u && u.role) || '').trim().toLowerCase();
+    const destino = (rol === 'owner' || rol === 'dueño' || rol === 'dueno') ? 'ownerHome' : 'staffHome';
+    show(destino);
+  }
+  window.volverDesdeVerificacion = volverDesdeVerificacion;
+
   function openUserMenu(avatarEl) {
     const user = window.currentUser;
     document.getElementById('userMenuName').textContent = user ? user.name : '';
     const segBtn = document.getElementById('menuSeguridadBtn');
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
-    // Verificación de pagos: solo Owner. El backend es OWNER_ONLY igual, así que
-    // ocultar el botón es UX, no la protección.
+    // Verificación de pagos: Owner + Rosa (U009). Ocultar el botón es UX; la
+    // protección real es pvVerificadorGuard_ en el backend, que valida el
+    // userId FIRMADO. Ninguna otra staff lo ve ni obtiene datos si fuerza la
+    // pantalla. Esto NO le da a Rosa ningún otro privilegio de Owner.
     const pagosVerifBtn = document.getElementById('menuPagosVerificacionBtn');
-    if (pagosVerifBtn) pagosVerifBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    if (pagosVerifBtn) pagosVerifBtn.style.display =
+      (puedeVerificarPagos(user) && user && user.role === 'owner') ? 'flex' : 'none';
+    // Mismo módulo, entrada desde el menú de staff (Rosa). Se muestra solo a
+    // staff autorizada, así el Owner no ve el botón duplicado.
+    const pagosVerifStaffBtn = document.getElementById('menuPagosVerifStaffBtn');
+    if (pagosVerifStaffBtn) pagosVerifStaffBtn.style.display =
+      (puedeVerificarPagos(user) && user && user.role !== 'owner') ? 'flex' : 'none';
     const cajaBtn = document.getElementById('menuCajaBtn');
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cierreMesBtn = document.getElementById('menuCierreMesBtn');
