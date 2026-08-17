@@ -1620,7 +1620,9 @@
   // ── ACCESO A VERIFICACIÓN DE PAGOS ────────────────────────────────────
   // Owner, o Rosa por su userId estable. NUNCA por nombre ni por área: el
   // nombre visible puede cambiar y hay otras staff.
-  const PV_STAFF_VERIFICADORES = ['U009'];   // Rosa · staff
+  // userId de LOGIN (hoja Usuarios col B), igual que el `u` del token firmado.
+  // NO es el id de la col A (U009): handleLogin usa row[1].
+  const PV_STAFF_VERIFICADORES = ['ro2026'];   // Rosa · staff
   function puedeVerificarPagos(user) {
     if (!user) return false;
     const rol = String(user.role || '').trim().toLowerCase();
@@ -1646,7 +1648,7 @@
     document.getElementById('userMenuName').textContent = user ? user.name : '';
     const segBtn = document.getElementById('menuSeguridadBtn');
     if (segBtn) segBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
-    // Verificación de pagos: Owner + Rosa (U009). Ocultar el botón es UX; la
+    // Verificación de pagos: Owner + Rosa (ro2026). Ocultar el botón es UX; la
     // protección real es pvVerificadorGuard_ en el backend, que valida el
     // userId FIRMADO. Ninguna otra staff lo ve ni obtiene datos si fuerza la
     // pantalla. Esto NO le da a Rosa ningún otro privilegio de Owner.
