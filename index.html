@@ -331,6 +331,18 @@
     </div>
     <!-- ===== /CAJA CHICA ===== -->
 
+    <!-- ===== ENTRADA A RECORDATORIOS (seguimientos) ===== -->
+    <div onclick="show('recordatoriosCentral')"
+         style="display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:14px;padding:13px 15px;margin-bottom:18px;cursor:pointer;">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none;"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:800;font-size:14px;letter-spacing:-0.01em;">Recordatorios</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">Clientas a las que toca dar seguimiento</div>
+      </div>
+      <span style="font-size:14px;color:var(--ink-faint);">›</span>
+    </div>
+    <!-- ===== /RECORDATORIOS ===== -->
+
     <!-- AUTORIZACIONES PENDIENTES -->
     <div id="authorizationsSection" style="display: none;">
       <div class="section-title" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 10px 16px; border-radius: 12px; margin-bottom: 12px;">
@@ -2504,6 +2516,30 @@
     <div id="histPerfil" style="display:none;padding:0 4px;margin-top:10px;"></div>
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- CENTRAL/OWNER · RECORDATORIOS (seguimientos)                       -->
+  <!-- Genera la oportunidad de contacto; NO envía mensajes.              -->
+  <!-- Abrir WhatsApp != contactada: el contacto se registra sólo con la  -->
+  <!-- acción explícita "Marcar contactada".                              -->
+  <!-- LENGUAJE: "Recordatorio / Seguimiento / Contactar". NUNCA          -->
+  <!-- "Próximo retoque recomendado" — ese concepto pertenece a la ficha  -->
+  <!-- de pigmentación (proxRetoque +37 d), que no se toca ni se mezcla.  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div class="screen" id="recordatoriosCentral">
+    <div class="header">
+      <button class="back-btn" onclick="show('mikaelaHome')">← Volver</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Recordatorios</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--ink-faint);letter-spacing:0;text-transform:none;cursor:pointer;" onclick="loadRecordatorios()">↻ Actualizar</span>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;font-weight:500;line-height:1.5;">
+      Clientas a las que corresponde dar seguimiento según su último servicio. Abrir WhatsApp <strong>no</strong> registra el contacto: usá &ldquo;Marcar contactada&rdquo; cuando hayas enviado el mensaje.
+    </div>
+
+    <div id="recContenido"></div>
+  </div>
+
   <!-- OWNER: CAJA CHICA (vista solo lectura) -->
   <!-- OWNER · VERIFICACIÓN DE PAGOS (conciliación; no modifica el cobro) -->
   <div class="screen" id="ownerPagosVerificacion">
@@ -2917,6 +2953,8 @@
   <script src="js/nexserv-main-3.js?v=20260815h"></script>
   <script src="js/nexserv-main-4.js?v=20260815c"></script>
   <script src="js/pagos-verificacion.js?v=20260817a"></script>
+  <!-- Módulo Recordatorios: independiente, no toca main-1..4. -->
+  <script src="js/nexserv-recordatorios.js?v=20260818a"></script>
 
 
 <!-- ============================================ -->
