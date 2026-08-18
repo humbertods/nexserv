@@ -1670,6 +1670,12 @@
     if (pushBtn) pushBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const histBtn = document.getElementById('menuHistorialBtn');
     if (histBtn) histBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
+    // Recordatorios: Mikaela (admin) + Owner. Mismo patrón que Historial.
+    // Ocultar el botón es UX; la autoridad real es recGuardCentral_ en el
+    // backend, que exige sesión FIRMADA y rechaza a cualquier staff aunque
+    // fuerce la pantalla.
+    const recordatoriosBtn = document.getElementById('menuRecordatoriosBtn');
+    if (recordatoriosBtn) recordatoriosBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const solBtn = document.getElementById('menuSolucionesBtn');
     if (solBtn) solBtn.style.display = (user && (user.role === 'owner' || user.role === 'admin')) ? 'flex' : 'none';
     const asisBtn = document.getElementById('menuAsistenciaBtn');
