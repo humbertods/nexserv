@@ -1643,6 +1643,21 @@
   }
   window.volverDesdeVerificacion = volverDesdeVerificacion;
 
+  // Retorno contextual desde Recordatorios: cada rol vuelve a SU panel.
+  // El Owner no debe caer en el panel de Mikaela. Staff no llega a esta
+  // pantalla (el guard de router.js la desvía y recGuardCentral_ la rechaza
+  // en backend), pero el fallback a staffHome cubre cualquier navegación
+  // cruzada o sesión vieja.
+  // Sólo LEE window.currentUser.role: no modifica sesión, token ni usuario.
+  function volverDesdeRecordatorios() {
+    const u = window.currentUser;
+    const rol = String((u && u.role) || '').trim().toLowerCase();
+    if (rol === 'owner' || rol === 'dueño' || rol === 'dueno') { show('ownerHome'); return; }
+    if (rol === 'admin') { show('mikaelaHome'); return; }
+    show('staffHome');
+  }
+  window.volverDesdeRecordatorios = volverDesdeRecordatorios;
+
   function openUserMenu(avatarEl) {
     const user = window.currentUser;
     document.getElementById('userMenuName').textContent = user ? user.name : '';
