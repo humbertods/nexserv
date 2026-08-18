@@ -79,6 +79,17 @@
     if (id === 'ownerPagosVerificacion' && typeof loadPagosVerificacion === 'function') {
       loadPagosVerificacion();
     }
+    // CENTRAL/OWNER — Bandeja de Recordatorios. Solo carga al entrar (sin polling).
+    // Guard de rol idéntico al de mikaelaHome: la bandeja expone teléfonos e
+    // historial de clientas, así que una staff que llegue por navegación cruzada
+    // o sesión vieja se va a su panel y NO se carga nada. El guard real está en
+    // el backend (recGuardCentral_); este es solo la capa de UI.
+    if (id === 'recordatoriosCentral') {
+      const _uREC = window.currentUser;
+      const _permitidoREC = _uREC && (_uREC.role === 'admin' || _uREC.role === 'owner');
+      if (_uREC && !_permitidoREC) { show('staffHome'); return; }
+      if (typeof loadRecordatorios === 'function') loadRecordatorios();
+    }
     if (id === 'ownerCierreMes') { initCierreMesSelectors(); loadCierreMes(); }
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') {
