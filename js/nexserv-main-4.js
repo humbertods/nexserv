@@ -3125,7 +3125,53 @@
       document.getElementById('vdNombreExistente').value = '';
       document.getElementById('vdClienteSuggestions').style.display = 'none';
       document.getElementById('vdFormaPago').value = '';
+      _vdLimpiarTransfer();
     }
+  }
+
+  // ── PRE-CONFIRMACIÓN DE TRANSFERENCIA (venta directa) ────────────────────
+  // Mismo contrato que el cobro de servicios. Al salir de Transferencia se
+  // LIMPIAN los tres campos, no solo se ocultan: nunca se envía metadata
+  // bancaria de un método que ya no está seleccionado.
+  function _vdLimpiarTransfer() {
+    ['vdTransferResponsable', 'vdTransferBanco', 'vdTransferCodigo'].forEach(function (id) {
+      const e = document.getElementById(id); if (e) e.value = '';
+    });
+    const p = document.getElementById('vdTransferPanel');
+    if (p) p.style.display = 'none';
+  }
+
+  function vdOnFormaPagoChange() {
+    const metodo = (document.getElementById('vdFormaPago') || {}).value || '';
+    const panel = document.getElementById('vdTransferPanel');
+    if (!panel) return;
+    if (metodo === 'Transferencia') {
+      panel.style.display = 'block';
+      setTimeout(function () {
+        const r = document.getElementById('vdTransferResponsable'); if (r) r.focus();
+      }, 60);
+    } else {
+      _vdLimpiarTransfer();
+    }
+  }
+  window.vdOnFormaPagoChange = vdOnFormaPagoChange;
+
+  // Devuelve { ok, error, transferencias } con los TRES datos obligatorios.
+  // componente_index 0: la venta directa es siempre un pago simple.
+  function _vdRecolectarTransferencias(formaPago) {
+    if (formaPago !== 'Transferencia') return { ok: true, transferencias: [] };
+    const v = function (id) {
+      const e = document.getElementById(id);
+      return e ? String(e.value || '').trim() : '';
+    };
+    const responsable = v('vdTransferResponsable');
+    const banco = v('vdTransferBanco');
+    const codigo = v('vdTransferCodigo');
+    if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia.' };
+    if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia.' };
+    if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia.' };
+    return { ok: true, transferencias: [{ componente_index: 0, monto: 0,
+             responsable: responsable, banco: banco, codigo_confirmacion: codigo }] };
   }
 
   function vdOnTipoClienteChange() {
@@ -3235,9 +3281,29 @@
     if (!formaPago) { showToast('⚠ Seleccioná la forma de pago'); return; }
     const total = lineasValidas.reduce((s, l) => s + (l.precio * (l.cantidad || 1)), 0);
     const productos = lineasValidas.map(l => ({ nombre: l.producto, precio: l.precio, cantidad: l.cantidad || 1, subtotal: l.precio * (l.cantidad || 1) }));
-    descontarStockVenta(productos);
+
+    // Pre-confirmación de transferencia ANTES de tocar nada. El backend
+    // (_validarTransferenciasCobro_) exige los tres datos y rechaza la venta
+    // sin ellos; validar acá evita el viaje y da un mensaje claro.
+    const _vtr = _vdRecolectarTransferencias(formaPago);
+    if (!_vtr.ok) { showToast('⚠ ' + _vtr.error); return; }
+
+    // FIX: antes se descontaba el stock ANTES del POST y no se comprobaba
+    // r.success. Si el backend rechazaba (p. ej. transferencia sin banco), el
+    // inventario ya había bajado y se mostraba "✓ Venta registrada" igual.
+    // Ahora: primero se confirma la escritura, y solo después se descuenta.
     try {
-      await apiPost('registrarVentaProductos', { idEspera: '', clienteNombre: nombreCliente, productos, total, esVentaDirecta: true, metodoPago: formaPago });
+      const r = await apiPost('registrarVentaProductos', {
+        idEspera: '', clienteNombre: nombreCliente, productos, total,
+        esVentaDirecta: true, metodoPago: formaPago,
+        transferencias: _vtr.transferencias
+      });
+      if (!r || r.success === false) {
+        const msg = (r && (r.error || r.message)) || 'No se pudo registrar la venta.';
+        showToast('⚠ ' + msg);
+        return;                       // sin descuento de stock, sin falso éxito
+      }
+      descontarStockVenta(productos);
       showToast('✓ Venta registrada — $' + total.toFixed(2) + ' · ' + formaPago);
       toggleVentaDirecta();
       window._vdLineas = [{ producto: '', precio: 0, cantidad: 1 }];
