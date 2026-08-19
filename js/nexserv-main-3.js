@@ -1533,14 +1533,14 @@
     return e ? String(e.value || '').trim() : '';
   }
   function _limpiarTransferSimple() {
-    ['transferBanco', 'transferCodigo'].forEach(id => {
+    ['transferResponsable', 'transferBanco', 'transferCodigo'].forEach(id => {
       const e = document.getElementById(id); if (e) e.value = '';
     });
   }
   function _limpiarTransferMixto(soloFila) {
     [1, 2, 3].forEach(i => {
       if (soloFila && soloFila !== i) return;
-      ['mixtoBanco' + i, 'mixtoCodigo' + i].forEach(id => {
+      ['mixtoResponsable' + i, 'mixtoBanco' + i, 'mixtoCodigo' + i].forEach(id => {
         const e = document.getElementById(id); if (e) e.value = '';
       });
       const p = document.getElementById('mixtoTransfer' + i);
@@ -1573,10 +1573,13 @@
     const metodo = window._cobrarPago || window._cobroPago || 'Efectivo';
 
     if (metodo === 'Transferencia') {
+      const responsable = _val('transferResponsable');
       const banco = _val('transferBanco'), codigo = _val('transferCodigo');
-      if (!banco)  return { ok: false, error: 'Falta el BANCO de la transferencia.' };
-      if (!codigo) return { ok: false, error: 'Falta el CÓDIGO DE CONFIRMACIÓN de la transferencia.' };
-      return { ok: true, transferencias: [{ componente_index: 0, monto: 0, banco: banco, codigo_confirmacion: codigo }] };
+      if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia.' };
+      if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia.' };
+      if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia.' };
+      return { ok: true, transferencias: [{ componente_index: 0, monto: 0,
+               responsable: responsable, banco: banco, codigo_confirmacion: codigo }] };
     }
 
     if (metodo === 'Pago mixto') {
@@ -1588,10 +1591,14 @@
         if (monto <= 0) continue;                    // fila inactiva: no es componente
         const m = met ? String(met.value) : 'Efectivo';
         if (m === 'Transferencia') {
+          // Cada componente de transferencia del mixto exige sus TRES datos.
+          const responsable = _val('mixtoResponsable' + i);
           const banco = _val('mixtoBanco' + i), codigo = _val('mixtoCodigo' + i);
-          if (!banco)  return { ok: false, error: 'Falta el BANCO de la transferencia de $' + monto.toFixed(2) + '.' };
-          if (!codigo) return { ok: false, error: 'Falta el CÓDIGO DE CONFIRMACIÓN de la transferencia de $' + monto.toFixed(2) + '.' };
-          out.push({ componente_index: idx, monto: monto, banco: banco, codigo_confirmacion: codigo });
+          if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia de $' + monto.toFixed(2) + '.' };
+          if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia de $' + monto.toFixed(2) + '.' };
+          if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia de $' + monto.toFixed(2) + '.' };
+          out.push({ componente_index: idx, monto: monto,
+                     responsable: responsable, banco: banco, codigo_confirmacion: codigo });
         }
         idx++;
       }
@@ -1943,23 +1950,53 @@
           // suyo (el frontend hace un confirmarCobro por clienta), así que sus
           // productos se atan a SU pago y no al de otra.
           const _respGrupal = await apiPost('confirmarCobro', _payloadGrupal);
+          // Mismo gate estricto que el individual: solo success === true cuenta
+          // como cobrada. Un { error:'Failed to fetch' } de apiPost (red caída
+          // tras los reintentos) no trae `success` y antes se colaba como éxito.
+          // Se lanza para que el catch del grupal deje el botón utilizable y NO
+          // se limpie el staging de productos.
+          if (!_respGrupal || _respGrupal.success !== true) {
+            throw new Error(
+              (c.nombre ? c.nombre + ': ' : '') +
+              ((_respGrupal && (_respGrupal.error || _respGrupal.message)) ||
+               'No se pudo confirmar el cobro')
+            );
+          }
           const _pagoUidC = (_respGrupal && _respGrupal.pago_uid) || '';
           // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
           // (van a la caja, SIN comisión), igual que en el cobro individual.
           const _prodsC = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
           if (_prodsC.length > 0) {
             const _totProdC = _prodsC.reduce(function(s,p){ return s + (Number(p.precio) * Number(p.cantidad || 1)); }, 0);
+            let _prodOkC = false;
             try {
-              await apiPost('registrarVentaProductos', {
+              const _rpC = await apiPost('registrarVentaProductos', {
                 idEspera: c.idEspera,
                 clienteNombre: c.nombre || '',
                 productos: _prodsC,
                 total: _totProdC,
                 metodoPago: metodoPago,
-                pago_uid: _pagoUidC        // mismo pago que el servicio de esta clienta
+                pago_uid: _pagoUidC,        // mismo pago que el servicio de esta clienta
+                // Misma pre-confirmación del cobro de esta clienta: servicio y
+                // producto del mismo pago_uid son UN solo evento de pago. No se
+                // le pide a Mikaela que reescriba Responsable/Banco/No. de
+                // confirmación, ni se crea una segunda pre-confirmación.
+                transferencias: window._transferenciasCobro || []
               });
-            } catch(eProd) { console.error(eProd); }
-            delete window._apProductosEnTicket[c.idEspera];
+              // Confirmación positiva obligatoria (mismo motivo que el individual).
+              _prodOkC = !!(_rpC && _rpC.success === true);
+              if (!_prodOkC) {
+                console.error('registrarVentaProductos (grupal) rechazado:', _rpC);
+                showToast('⚠ ' + (c.nombre || 'Clienta') + ': productos NO registrados — ' +
+                  ((_rpC && (_rpC.error || _rpC.message)) || 'error del servidor'));
+              }
+            } catch(eProd) {
+              console.error(eProd);
+              showToast('⚠ ' + (c.nombre || 'Clienta') + ': error de red al registrar productos');
+            }
+            // Solo se limpia el staging si el backend CONFIRMÓ el registro. Un
+            // success:false ya no borra los productos en silencio.
+            if (_prodOkC) delete window._apProductosEnTicket[c.idEspera];
           }
         }
         // ── FACTURACIÓN grupal (OPCIONAL): factura a nombre de la pagadora (principal),
@@ -1985,9 +2022,16 @@
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
         window._cobroGrupal = null;
-        // Vaciar TODO el mapa de productos staged tras cobro OK: ningún producto
-        // sobrevive a un cobro para reaparecerle a la siguiente clienta (reúso de id).
-        window._apProductosEnTicket = {};
+        // Vaciar el staging de las clientas de ESTE grupo: ningún producto
+        // sobrevive a un cobro para reaparecerle a la siguiente clienta (reúso
+        // de id). Los tickets cuyo registro de productos falló ya conservaron su
+        // entrada arriba y NO se borran acá: quedan visibles para reintentar.
+        clientas.forEach(function (c) {
+          if (c && c.idEspera && window._apProductosEnTicket &&
+              !window._apProductosEnTicket[c.idEspera]) {
+            delete window._apProductosEnTicket[c.idEspera];
+          }
+        });
         mkRenderEsperandoCobro();
         closeModal();
         showToast('✓ Cobro grupal confirmado — ' + metodoPago);
@@ -2048,6 +2092,21 @@
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
       const _respCobro = await apiPost('confirmarCobro', _payloadM5);
+      // Éxito = CONFIRMACIÓN POSITIVA del backend (success === true), no
+      // "no vi un false". Hay tres formas de no-éxito y ninguna lanza:
+      //   1) { success:false, ... }  → rechazo del backend (TRANSFERENCIA_INCOMPLETO…)
+      //   2) { error:'Failed to fetch' } → apiPost agotó los reintentos y
+      //      devuelve ESO, sin clave `success` y sin excepción;
+      //   3) null / undefined.
+      // Con `success === false` el caso 2 pasaba de largo y el cobro se daba
+      // por bueno. Todas las rutas de confirmarCobro (LINEAS, SN, SP, TM y
+      // legacy) devuelven success:true cuando cobran — incluido yaCobrado.
+      if (!_respCobro || _respCobro.success !== true) {
+        throw new Error(
+          (_respCobro && (_respCobro.error || _respCobro.message)) ||
+          'No se pudo confirmar el cobro'
+        );
+      }
       _pagoUidTicket = (_respCobro && _respCobro.pago_uid) || '';
     } catch (err) {
       console.error('confirmarCobro error:', err);
@@ -2065,21 +2124,53 @@
     } catch (eAb) { console.error(eAb); }
 
     // Si hay productos, registrarlos en el historial
-    const productosTicket = (window._cobrarId && window._apProductosEnTicket && window._apProductosEnTicket[window._cobrarId]) ? window._apProductosEnTicket[window._cobrarId] : [];
+    // `_ticketCobrado` y `_prodOk` se declaran ACÁ (no dentro del if) porque la
+    // limpieza final del staging, mucho más abajo, necesita saber qué ticket se
+    // cobró y si sus productos quedaron realmente registrados.
+    const _ticketCobrado = window._cobrarId || '';
+    // Sin productos staged no hay nada pendiente → la limpieza puede proceder.
+    let _prodOk = true;
+    const productosTicket = (_ticketCobrado && window._apProductosEnTicket && window._apProductosEnTicket[_ticketCobrado]) ? window._apProductosEnTicket[_ticketCobrado] : [];
     if (productosTicket.length > 0) {
+      _prodOk = false;
       try {
-        await apiPost('registrarVentaProductos', {
-          idEspera: window._cobrarId,
+        const _rp = await apiPost('registrarVentaProductos', {
+          idEspera: _ticketCobrado,
           clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
           productos: productosTicket,
           total: totalProductos,
           metodoPago: window._cobrarPago,
-          pago_uid: _pagoUidTicket        // mismo pago que el servicio
+          pago_uid: _pagoUidTicket,       // mismo pago que el servicio
+          // Misma pre-confirmación que ya validó este cobro. Servicio y
+          // producto del mismo pago_uid son UN solo evento de pago: no se pide
+          // dos veces Responsable/Banco/No. de confirmación ni se crea una
+          // segunda pre-confirmación. El agrupador de Verificación toma la
+          // metadata de la primera fila que la traiga, así que repetir el mismo
+          // JSON no duplica componentes ni dinero.
+          transferencias: window._transferenciasCobro || []
         });
-      } catch(e) { console.error(e); }
-      delete window._apProductosEnTicket[window._cobrarId];
-      const ticketDiv = document.getElementById('productos-ticket-' + window._cobrarId);
-      if (ticketDiv) ticketDiv.innerHTML = '';
+        // Confirmación positiva obligatoria. `success !== false` daba true para
+        // { error:'Failed to fetch' } (apiPost tras agotar reintentos), y el
+        // staging se borraba sin que el producto se hubiera registrado.
+        // handleRegistrarVentaProductos devuelve success:true al escribir.
+        _prodOk = !!(_rp && _rp.success === true);
+        if (!_prodOk) {
+          console.error('registrarVentaProductos rechazado:', _rp);
+          showToast('⚠ Cobro registrado, pero los productos NO: ' +
+            ((_rp && (_rp.error || _rp.message)) || 'error del servidor'));
+        }
+      } catch(e) {
+        console.error(e);
+        showToast('⚠ Cobro registrado, pero hubo un error de red con los productos');
+      }
+      // El staging solo se limpia si el backend CONFIRMÓ el registro. Antes se
+      // borraba siempre, así que un rechazo hacía desaparecer los productos sin
+      // que quedaran guardados en ninguna parte.
+      if (_prodOk) {
+        delete window._apProductosEnTicket[_ticketCobrado];
+        const ticketDiv = document.getElementById('productos-ticket-' + _ticketCobrado);
+        if (ticketDiv) ticketDiv.innerHTML = '';
+      }
     }
 
     // ── FACTURACIÓN: guardar el documento (endpoint aparte, NUNCA bloquea el cobro) ──
@@ -2132,8 +2223,17 @@
       }
     } catch(e) {}
     await loadPorCobrar();
-    // Vaciar TODO el mapa de productos staged tras cobro OK (mismo motivo que en grupal).
-    window._apProductosEnTicket = {};
+    // Limpieza del staging: SOLO el ticket que se acaba de cobrar, y SOLO si sus
+    // productos quedaron efectivamente registrados (_prodOk).
+    // Antes acá se vaciaba el mapa entero (`window._apProductosEnTicket = {}`),
+    // lo que tenía dos efectos malos: (1) borraba el staging que el bloque de
+    // arriba había preservado a propósito cuando registrarVentaProductos
+    // devolvió success:false o hubo error de red, dejando los productos sin
+    // registrar Y sin rastro; y (2) se llevaba por delante los productos staged
+    // de OTROS tickets que no tienen nada que ver con este cobro.
+    if (_prodOk && _ticketCobrado && window._apProductosEnTicket) {
+      delete window._apProductosEnTicket[_ticketCobrado];
+    }
 
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
