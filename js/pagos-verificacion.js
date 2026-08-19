@@ -32,6 +32,7 @@
     tarjeta:       '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/>',
     banco:         '<path d="M3 10 12 4l9 6"/><path d="M5 10v10M12 10v10M19 10v10"/><path d="M3 20h18"/>',
     codigo:        '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    responsable:   '<circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
     verificado:    '<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5 11 15l4.5-5"/>',
     pendiente:     '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16.5v.01"/>'
   };
@@ -246,13 +247,18 @@
   // pagos históricos (sin col L) siguen siendo verificables igual.
   function metaTransferencia(c) {
     if (c.metodo !== 'transferencia') return '';
+    var responsable = String(c.responsable || '').trim();
     var banco  = String(c.banco || '').trim();
     var codigo = String(c.codigo_confirmacion || '').trim();
+    // Los cobros anteriores a la captura de `responsable` no lo traen: se
+    // muestra "No registrado", exactamente igual que un banco faltante. Ninguna
+    // fila histórica deja de ser verificable por eso.
     var sin = 'No registrado';
     var estilo = 'font-size:11px;color:var(--ink-soft);margin-top:3px;line-height:1.5;';
     return '<div style="' + estilo + '">'
+      +      '<div>' + ico(ICO.responsable, 13) + ' Responsable: ' + (responsable ? esc(responsable) : sin) + '</div>'
       +      '<div>' + ico(ICO.banco, 13) + ' Banco: ' + (banco ? esc(banco) : sin) + '</div>'
-      +      '<div>' + ico(ICO.codigo, 13) + ' Código: ' + (codigo ? esc(codigo) : sin) + '</div>'
+      +      '<div>' + ico(ICO.codigo, 13) + ' No. de confirmación: ' + (codigo ? esc(codigo) : sin) + '</div>'
       +    '</div>';
   }
 
