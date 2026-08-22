@@ -1355,6 +1355,31 @@
         b.style.background = 'var(--bg-card)'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line)';
       }
     });
+
+    // ── FIX B — RESET FAIL-CLOSED DEL ESTADO DE PAGO ─────────────────────
+    // El reset de arriba es SOLO visual (resalta el botón Efectivo). Sin esto,
+    // un cobro anterior hecho con "Pago mixto" o "Transferencia" dejaba el
+    // estado interno y el DOM contaminados para la siguiente clienta: botón
+    // Efectivo resaltado, pero `_cobroPago === 'Pago mixto'` y los paneles
+    // abiertos con banco/código/montos de OTRA persona. Se fuerza el estado
+    // real a Efectivo y se limpia toda metadata bancaria heredada.
+    window._cobrarPago = 'Efectivo';
+    window._cobroPago  = 'Efectivo';
+    const _tPanelReset = document.getElementById('transferPanel');
+    if (_tPanelReset) _tPanelReset.style.display = 'none';
+    if (typeof _limpiarTransferSimple === 'function') _limpiarTransferSimple();
+    const _mPanelReset = document.getElementById('mixtoPanel');
+    if (_mPanelReset) _mPanelReset.style.display = 'none';
+    if (typeof _limpiarTransferMixto === 'function') _limpiarTransferMixto();
+    [1, 2, 3].forEach(i => {
+      const _mm = document.getElementById('mixtoMonto' + i);
+      if (_mm) _mm.value = '';
+    });
+    const _sumaReset = document.getElementById('mixtoSuma');
+    if (_sumaReset) { _sumaReset.textContent = ''; _sumaReset.style.color = 'var(--ink-soft)'; }
+    window._transferenciasCobro = [];
+    // ─────────────────────────────────────────────────────────────────────
+
     document.getElementById('cobrarModal').classList.add('active');
     _cobroCargarAbono();
   }
@@ -1644,6 +1669,12 @@
         if (m3) m3.value = '';
         const sumaEl = document.getElementById('mixtoSuma');
         if (sumaEl) { sumaEl.textContent = 'Ingresá los montos'; sumaEl.style.color = 'var(--ink-soft)'; }
+        // Sincroniza la visibilidad de los sub-paneles de transferencia con el
+        // valor ACTUAL de cada select al abrir el desglose. Sin esto, una fila
+        // cuyo <option> por defecto ya es "Transferencia" (fila 2) nunca dispara
+        // el evento 'change' y sus campos Responsable / Banco / No. de
+        // confirmación jamás se despliegan, aunque la validación sí los exija.
+        onMixtoMetodoChange();
         setTimeout(() => m1?.focus(), 100);
       }
     }
