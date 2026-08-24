@@ -2610,7 +2610,17 @@
       // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
       return st.data;
     }
-    if (st.inFlight) return st.inFlight;   // una sola lectura real por ráfaga
+    if (st.inFlight) {
+      if (!opts.forzar) return st.inFlight;
+      if (st.refrescoPendiente) return st.refrescoPendiente;
+      st.refrescoPendiente = st.inFlight
+        .catch(function () { return st.data; })
+        .then(function () {
+          st.refrescoPendiente = null;
+          return refreshStaffQueue(origen + '+post', { forzar: true });
+        });
+      return st.refrescoPendiente;
+    }
 
     st.inFlight = (async () => {
       const _t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
