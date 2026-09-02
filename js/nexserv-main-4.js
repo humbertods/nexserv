@@ -2529,6 +2529,18 @@
     window._goToListRunning = true;
     setTimeout(() => { window._goToListRunning = false; }, 3000);
 
+    // C1 — identidad de ESTA intención de "enviar a lista". Nace UNA sola vez,
+    // acá, antes de bifurcar en normal/promo/TM, con el MISMO generador que ya
+    // usa goAssign (_nuevoTicketRequestId_ — no se crea un segundo generador).
+    // Viaja tal cual en el payload: si apiPost reenviara el mismo payload, el
+    // valor se conserva y el backend reconoce el reintento en vez de crear otro
+    // ticket. NO se regenera en LineaService ni en el backend.
+    //
+    // ALCANCE C1: aunque nace antes de la bifurcación, solo se CONECTA a la rama
+    // SN normal de 1 área. Las ramas promo y TM quedan exactamente como estaban
+    // — conectarlas es otro microtramo y no se amplía acá.
+    const _requestIdGTL = _nuevoTicketRequestId_();
+
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
     const codigo = (document.getElementById('arrSelCode')?.textContent || '').split(' ')[0] || '';
@@ -2653,7 +2665,9 @@
           result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: a.tentativo,
             area: a.area, prioridad: prioridad, observaciones: obs,
-            esTop: isTop ? 'Sí' : 'No', total: a.precio
+            esTop: isTop ? 'Sí' : 'No', total: a.precio,
+            // C1 — requestId de ESTA intención, generado arriba una sola vez.
+            requestId: _requestIdGTL
           });
         }
         if (result && result.success) {
@@ -2941,7 +2955,14 @@
           result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
             area: aGA.area, prioridad: 'Normal', observaciones: obs,
-            esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
+            esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica,
+            // C1 — requestId: el MISMO _requestIdGA generado arriba (una sola
+            // vez, antes de las tres ramas). Era la única de las tres que no lo
+            // enviaba: promo y TM ya lo hacían. Enruta por LineaService →
+            // addServicioNormal → crearTicketServicioNormalNativo_, que ahora lo
+            // exige y lo usa como identidad de intención para la idempotencia.
+            // NO se genera otro acá, ni en LineaService, ni en el backend.
+            requestId: _requestIdGA
           });
         }
         if (result && result.success) {
