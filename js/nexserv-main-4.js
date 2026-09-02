@@ -5370,3 +5370,141 @@ function renderInformeServicios(d, pestanasData, tendData) {
 }
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
+
+// ============================================================================
+// G2 · DECISIÓN POST-PARTE — SP NATIVO (LINEAS)
+// ----------------------------------------------------------------------------
+// Handlers de los 4 botones que arma updateFinishButtons (nexserv-main-1.js).
+// Contrato aprobado (SP-0305):
+//   1 Yo sigo                -> el siguiente pendiente pasa a mí. Conservo el ticket.
+//   2 Terminé mi parte       -> congelo las mías, los pendientes quedan VIVOS en central.
+//   3 Terminé todo           -> la clienta se retira: congelo las mías y se ANULAN los pendientes.
+//   4 Devolver a central     -> devolverALista existente.
+// "Central" = lista de espera. Ningún botón manda a cobro: eso lo decide la admin.
+// ============================================================================
+(function () {
+  function _g2Cerrar(slot, msg) {
+    try {
+      slotServices[slot] = [];
+      window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
+      window[slot === 1 ? '_as1Aten'     : '_as2Aten']     = null;
+      const u = window.currentUser;
+      if (u && activeClients[u.name]) {
+        activeClients[u.name].splice(slot - 1, 1);
+        updateCapacityUI(u.name);
+      }
+    } catch (e) {}
+    showToast(msg);
+    show('staffHome');
+    setTimeout(function () { try { loadStaffHome(); } catch (e) {} }, 300);
+  }
+
+  // 1 · Yo sigo — sin endpoint nuevo: es tomarClienta con el linea_id del siguiente.
+  //     No cierra el slot: la staff sigue con la misma clienta.
+  async function nativoYoSigo(ticketRef, lineaId) {
+    const u = window.currentUser;
+    if (!ticketRef || !lineaId) { alert('No se pudo identificar el siguiente servicio.'); return; }
+    try {
+      const r = await apiPost('tomarClienta', {
+        idListaEspera: ticketRef,
+        chicaNombre: u?.name || '',
+        componentesSeleccionados: [String(lineaId)]
+      });
+      if (r && r.success) {
+        showToast('✅ Servicio tomado — seguís vos');
+        show('staffHome');
+        setTimeout(function () { try { loadStaffHome(); } catch (e) {} }, 300);
+      } else {
+        alert(r?.message || 'No se pudo tomar el siguiente servicio');
+      }
+    } catch (e) { alert('Error de conexión'); }
+  }
+
+  // 2 · Terminé mi parte — pendientes VIVOS, ticket a central para reasignación.
+  async function nativoPasarOtraStaff(ticketRef, lineaIds) {
+    const u = window.currentUser;
+    const slot = window._finishingSlot || 1;
+    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
+    // lista (la atención puede venir de una lectura previa, o slotServices
+    // haberse repoblado por un camino que no conserva lineaId). El backend la
+    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
+    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
+    // única fuente que no depende del estado del navegador.
+    if (!Array.isArray(lineaIds)) lineaIds = [];
+    try {
+      const r = await apiPost('cederPendientesACentral', {
+        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds
+      });
+      if (r && r.success) {
+        if (r.advertencias && r.advertencias.length) {
+          alert('Se finalizó tu parte, pero revisá con Mikaela: ' + r.advertencias.join(', '));
+        }
+        _g2Cerrar(slot, '✅ Tu parte quedó lista · Los pendientes están en central');
+      } else {
+        alert(r?.message || 'No se pudo enviar a central');
+      }
+    } catch (e) { alert('Error de conexión'); }
+  }
+
+  // 3 · Terminé todo — la clienta se retira. ANULA los pendientes.
+  //     Acción destructiva: se nombra el servicio que se cancela en el toast para
+  //     que quede constancia de qué perdió la clienta.
+  async function nativoTerminarYCancelar(ticketRef, lineaIds, lblPendiente) {
+    const u = window.currentUser;
+    const slot = window._finishingSlot || 1;
+    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
+    // lista (la atención puede venir de una lectura previa, o slotServices
+    // haberse repoblado por un camino que no conserva lineaId). El backend la
+    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
+    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
+    // única fuente que no depende del estado del navegador.
+    if (!Array.isArray(lineaIds)) lineaIds = [];
+    try {
+      const r = await apiPost('terminarYCancelarPendientes', {
+        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds,
+        motivo: 'clienta se retira'
+      });
+      if (r && r.success) {
+        if (r.advertencias && r.advertencias.length) {
+          alert('Se finalizó tu parte, pero revisá con Mikaela: ' + r.advertencias.join(', '));
+        }
+        const _n = (r.anuladas || []).length;
+        _g2Cerrar(slot, '✅ Terminado · ' + (_n ? _n + ' servicio(s) cancelado(s)' : 'sin pendientes') + ' · En central');
+      } else {
+        alert(r?.message || 'No se pudo cerrar el ticket');
+      }
+    } catch (e) { alert('Error de conexión'); }
+  }
+
+  // Sin pendientes — cierro mi parte y el ticket queda en central.
+  async function nativoTerminarMandarCentral(ticketRef, lineaIds) {
+    const u = window.currentUser;
+    const slot = window._finishingSlot || 1;
+    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
+    // lista (la atención puede venir de una lectura previa, o slotServices
+    // haberse repoblado por un camino que no conserva lineaId). El backend la
+    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
+    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
+    // única fuente que no depende del estado del navegador.
+    if (!Array.isArray(lineaIds)) lineaIds = [];
+    try {
+      const r = await apiPost('finalizarComponentesStaff', {
+        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds
+      });
+      if (r && r.success) _g2Cerrar(slot, '✅ Servicios finalizados · En central');
+      else alert(r?.message || 'No se pudo finalizar');
+    } catch (e) { alert('Error de conexión'); }
+  }
+
+  // 4 · Devolver a central — reutiliza el flujo existente, sin lógica nueva.
+  async function nativoDevolverACentral(slot) {
+    if (typeof devolverALista === 'function') { devolverALista(slot); return; }
+    alert('No se pudo devolver a central.');
+  }
+
+  window.nativoYoSigo                = nativoYoSigo;
+  window.nativoPasarOtraStaff        = nativoPasarOtraStaff;
+  window.nativoTerminarYCancelar     = nativoTerminarYCancelar;
+  window.nativoTerminarMandarCentral = nativoTerminarMandarCentral;
+  window.nativoDevolverACentral      = nativoDevolverACentral;
+})();s
