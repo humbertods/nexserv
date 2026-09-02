@@ -3212,10 +3212,30 @@
     } else {
     // ── FLUJO NORMAL / SN / SP / LE ──────────────────────────
     try {
-      const result = await apiPost('tomarClienta', {
-        idListaEspera: window._takingId,
-        chicaNombre: name
-      });
+      // ── PLAN A · A6 — selección autoritativa por componente ───────────────
+      // Para tickets nativos LINEAS, la selección de la staff viaja como lista
+      // de linea_id. FAIL CLOSED: si la identidad falta, está incompleta o
+      // duplicada, se BLOQUEA la confirmación — nunca se omite el campo, porque
+      // componentesSeleccionados === undefined significa TOMAR TODAS en el
+      // backend y convertiría "seleccioné 1" en "tomé 3".
+      // Legacy (sin fuente LineasNativo) mantiene el payload de siempre.
+      const _tkData   = window._takingData || null;
+      const _esNativo = !!(_tkData && String(_tkData.fuente || '') === 'LineasNativo');
+      let _payloadTomar = { idListaEspera: window._takingId, chicaNombre: name };
+      if (_esNativo) {
+        const _selNat = (window._depiItems || []).filter(it => it.checked && !it.readonly && !it.completado && !it.bloqueado);
+        const _idsNat = _selNat.map(it => String(it.id || '').trim()).filter(Boolean);
+        if (!_selNat.length) {
+          alert('Elegí al menos un servicio para tomar.');
+          return;
+        }
+        if (_idsNat.length !== _selNat.length || new Set(_idsNat).size !== _idsNat.length) {
+          alert('No se pudo identificar la selección. Cerrá y volvé a abrir el ticket.');
+          return;   // cero POST, cero escrituras
+        }
+        _payloadTomar.componentesSeleccionados = _idsNat;
+      }
+      const result = await apiPost('tomarClienta', _payloadTomar);
       if (result.success) {
         simulateNotif('mikaela', name + ' tomó a ' + (window._takingClientCode || 'una clienta'), 'Lista de espera · ahora', false);
       } else if (result.message) {
@@ -3288,6 +3308,18 @@
     var t = String(s == null ? '' : s);
     t = t.replace(/\[paralelo[^\]]*\]/gi, '');       // marcador de servicio paralelo
     t = t.replace(/_completedAreas:\s*\[.*?\]/g, ''); // progreso de promo (interno)
+    // ── MARCADORES NATIVE — identidad interna, NUNCA para la staff ──────────
+    // obs guarda los marcadores del contrato de líneas
+    // ([NATIVE_REQUEST_ID:…], [NATIVE_LINE_REQUEST_FP:…], [PROMO_NOMBRE:…]).
+    // Se estaban pintando crudos en "Nota Especial": ilegibles, se desbordaban
+    // del recuadro y exponían identidad interna del sistema. El desborde era el
+    // síntoma; el problema es que estuvieran ahí. Se filtran en el mismo lugar
+    // donde ya se filtran los otros marcadores internos, así que cualquier
+    // consumidor de esta función queda cubierto de una sola vez.
+    t = t.replace(/\[NATIVE_[A-Z_]*:[^\]]*\]/g, '');
+    t = t.replace(/\[PROMO_NOMBRE:[^\]]*\]/g, '');
+    t = t.replace(/\[(cerrado al completar|promo [^\]]*)\]/gi, '');
+    t = t.replace(/\s{2,}/g, ' ');                  // colapsar huecos que dejó el filtrado
     return t.trim();
   }
   function _obsDeArea(a, area){
@@ -3348,7 +3380,13 @@
           // que persistir la atención, o el bloque nativo queda undefined
           // justo después de tomar y se cae al flujo legacy.
           window._as1Aten = a || window._takingData || null;
-          window._as1EsNativo = (window._as1EsNativo === true) || _fuenteEsNativa(window._as1Aten);
+          // 2A · comprobación DEV literal: fuenteReal (getAtenciones) O
+          // fuente='LineasNativo' (tarjeta, que viaja en _takingData). Mirar solo
+          // _as1Aten hacía que esta rama nunca corriera cuando getAtenciones
+          // devuelve el objeto sin fuenteReal.
+          window._as1EsNativo = (window._as1EsNativo === true)
+            || _fuenteEsNativa(window._as1Aten)
+            || _fuenteEsNativa(window._takingData);
           const initials = (a.nombre || '').split(' ').map(n=>n[0]).join('').slice(0,2);
           const _as1av0 = document.getElementById('as1Avatar');
           if (_as1av0) { _as1av0.textContent = initials; _as1av0.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
@@ -3734,7 +3772,13 @@
           // que persistir la atención, o el bloque nativo queda undefined
           // justo después de tomar y se cae al flujo legacy.
           window._as2Aten = a || window._takingData || null;
-          window._as2EsNativo = (window._as2EsNativo === true) || _fuenteEsNativa(window._as2Aten);
+          // 2A · comprobación DEV literal: fuenteReal (getAtenciones) O
+          // fuente='LineasNativo' (tarjeta, que viaja en _takingData). Mirar solo
+          // _as2Aten hacía que esta rama nunca corriera cuando getAtenciones
+          // devuelve el objeto sin fuenteReal.
+          window._as2EsNativo = (window._as2EsNativo === true)
+            || _fuenteEsNativa(window._as2Aten)
+            || _fuenteEsNativa(window._takingData);
           const initials2b = a.nombre.split(' ').map(n=>n[0]).join('').slice(0,2);
           const _as2avb = document.getElementById('as2Avatar');
           if (_as2avb) { _as2avb.textContent = initials2b; _as2avb.className = 'client-avatar' + (a.esTop ? ' is-top' : ''); }
