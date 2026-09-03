@@ -831,7 +831,7 @@
     }
 
     // SP- con promo → si hay servicios de OTRA área en el slot, ofrecer pasarlos a otra staff
-    if (_idEsperaSlot.startsWith('SP-')) {
+    if (_idEsperaSlot.startsWith('SP-') && !_esSlotNativoLineas(slot1 ? 1 : 2)) {
       const _slotSP = slot1 ? 1 : 2;
       const _myAreaSP = user?.area || 'cejas';
       const _svcsSP = (slotServices[_slotSP] || []).filter(s =>
@@ -1395,6 +1395,9 @@
                    lineaId: String(sd.id || sd.lineaId || ''),
                    estado: String(sd.estado || '') };
         });
+        window['_as' + slot + 'Aten'] = a;
+        window['_as' + slot + 'EsNativo'] = true;
+        window['_as' + slot + 'IdEspera'] = String(a.idEspera || idEspera || '');
         renderServicesForSlot(slot);
         var _totRest = slotServices[slot].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
         var _tR = document.getElementById('as' + slot + 'Total');    if (_tR) _tR.textContent = '$' + _totRest;
@@ -1589,6 +1592,8 @@
           // Restaurar servicios de la 1ª clienta desde el ticket
           var _nativo1 = _fuenteEsNativa(a1) && Array.isArray(a1.serviciosDetalle) && a1.serviciosDetalle.length > 0;
           if (_nativo1) {
+            window._as1Aten = a1;
+            window._as1EsNativo = true;
             var _yo1 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
             var _mias1 = a1.serviciosDetalle.filter(function (sd) {
               return String(sd.staff || '').trim().toLowerCase() === _yo1
@@ -1656,6 +1661,8 @@
               // Cargar servicios de la 2ª clienta si vienen del ticket
               var _nativo2 = _fuenteEsNativa(a2) && Array.isArray(a2.serviciosDetalle) && a2.serviciosDetalle.length > 0;
               if (_nativo2) {
+                window._as2Aten = a2;
+                window._as2EsNativo = true;
                 var _yo2 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
                 var _mias2 = a2.serviciosDetalle.filter(function (sd) {
                   return String(sd.staff || '').trim().toLowerCase() === _yo2
