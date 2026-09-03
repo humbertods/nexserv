@@ -1,9 +1,11 @@
 // NEXSERV nexserv-main-3.js — Cobros, facturación, asistencia
 // Depende de: nexserv-main-2.js
 
-  async function approveAuthorization(reqId) {
+  async function approveAuthorization(reqId, ticketRef) {
     try {
-      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
+      // APROBACIÓN 100% LINEAS. reqId es el linea_id de la propuesta;
+      // ticketRef viene de la misma tarjeta que la lista.
+      const result = await LineaService.aprobarExtra(ticketRef, reqId);
       
       if (result.success) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
@@ -18,9 +20,15 @@
     }
   }
   
-  async function rejectAuthorization(reqId) {
+  async function rejectAuthorization(reqId, ticketRef) {
+    // FIX-AUTH-01 — el backend exige motivo no vacío. Lo escribe Central.
+    // Cancelar o dejarlo en blanco NO envía nada: no se fabrica un motivo
+    // por defecto ni se manda una cadena vacía.
+    const motivo = window.prompt('Motivo del rechazo:');
+    const motivoLimpio = String(motivo || '').trim();
+    if (!motivoLimpio) return;
     try {
-      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
+      const result = await LineaService.rechazarExtra(ticketRef, reqId, motivoLimpio);
       
       if (result.success) {
         alert('✕ Servicio rechazado. El staff será notificado.');
@@ -2733,7 +2741,9 @@
           tentativo: d.nombre,
           precio: _m,
           precioNormal: _reg,
-          tipo: 'promo'
+          tipo: 'promo',
+          promoNombre: d.nombre,
+          servicioComponente: String(dv.servicio || dv.area || '')
         };
       });
 
@@ -2850,7 +2860,9 @@
       const montoMio = Number(divs[divMatchIdx].monto || 0) || Number(divs[0].monto || 0);
       if (montoMio > 0 && svc) {
         svc.precio = montoMio;
-        svc.precioNormal = montoMio;
+      const regularMio = Number(divs[divMatchIdx].regular || 0) ||
+                         Number(divs[0].regular || 0);
+        svc.precioNormal = (regularMio > 0) ? regularMio : montoMio;
       }
 
       // Mostrar info: área de esta staff y su precio
@@ -4341,17 +4353,24 @@
   // Función para cargar perfiles de clientas desde el servidor
   async function loadClientProfiles() {
     try {
-      const result = await apiGet('getAllClients');
-      if (result.success && result.clients) {
+      // FIX-CLIENTS-01 — 'getAllClients' nunca existió en el backend (ni en DEV
+      // ni en PROD): la llamada caía en el default del router y CLIENT_PROFILES
+      // quedaba vacío, dejando el directorio sin perfiles. Se usa 'getClientas',
+      // que ya existe, está ruteada y lee la MISMA hoja Clientas. Solo cambian
+      // los nombres de campo: clients→clientas, code→codigo, visitas→totalVisitas.
+      // No se inventa ningún dato: los campos que el backend no trae se dejan
+      // exactamente como estaban.
+      const result = await apiGet('getClientas');
+      if (result.success && result.clientas) {
         CLIENT_PROFILES = {};
-        result.clients.forEach(client => {
-          const key = client.code.toLowerCase().replace('c-', 'c');
+        result.clientas.forEach(client => {
+          const key = String(client.codigo || '').toLowerCase().replace('c-', 'c');
           CLIENT_PROFILES[key] = {
             name: client.nombre || '',
-            code: client.code || '',
+            code: client.codigo || '',
             initials: client.nombre ? client.nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??',
             isTop: false,
-            visits: parseInt(client.visitas) || 0,
+            visits: parseInt(client.totalVisitas) || 0,
             spent: 0,
             last: client.ultimaVisita || '',
             obs: client.observaciones || '',
