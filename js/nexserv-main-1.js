@@ -926,8 +926,8 @@
     }
     // ── FIN TICKET MULTI ─────────────────────────────────────
 
-    if (!promoData || !promoData.promo) {
-      // Sin promo — botón directo sin abrir modal de opciones
+    if ((!promoData || !promoData.promo) && !_esSlotNativoLineas(slot1 ? 1 : 2)) {
+      // Sin promo — botón directo sin abrir modal de opciones — LEGACY ONLY (nativo ya atendido arriba)
       const _slotNP = slot1 ? 1 : 2;
       btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
@@ -937,8 +937,8 @@
       return;
     }
 
-    // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData
-    if (_idEsperaSlot.startsWith('SN-')) {
+    // Si el ticket es SN- (normal), botón directo — no pasar por finishSlot1 que requiere promoData — LEGACY ONLY
+    if (_idEsperaSlot.startsWith('SN-') && !_esSlotNativoLineas(slot1 ? 1 : 2)) {
       const _slotSN = slot1 ? 1 : 2;
       btnContainer.innerHTML = `
         <button class="btn-primary" style="margin-bottom:10px;background:var(--ink);color:white;font-size:14px;padding:16px;"
@@ -5739,3 +5739,4 @@ window._lineasLineasAAreasModal = _lineasLineasAAreasModal;
 window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
+
