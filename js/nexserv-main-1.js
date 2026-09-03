@@ -2675,7 +2675,19 @@
             precioRegular: w.precioRegular || '',
             total: w.total || 0,
             secuencia: w.secuencia || [],
-            promasExtra: w.promasExtra || []
+            promasExtra: w.promasExtra || [],
+            // INC-SP-PRESEL · el mapeo anterior descartaba serviciosDetalle y
+            // componentes, así que window._takingData llegaba al modal SIN la
+            // identidad de las líneas (linea_id). Con fuente='LineasNativo' eso
+            // disparaba el fail-closed de A6 ("No se pudieron identificar los
+            // servicios de este ticket") y la staff no podía tomar el ticket.
+            // El backend YA los envía en el mismo _cardItem que trae asignadaA,
+            // fuente y promasExtra (NexServ_AppsScript.js:545 y :555); solo
+            // había que dejar de mutilarlos aquí.
+            serviciosDetalle: w.serviciosDetalle || null,
+            componentes: w.componentes || [],
+            componentesEsperando: w.componentesEsperando,
+            tieneComponentesSinAsignar: w.tieneComponentesSinAsignar
           };
         });
   }
