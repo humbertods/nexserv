@@ -680,6 +680,31 @@
     const btnContainer = document.getElementById('as' + (slot1?1:2) + 'FinishBtns');
     if (!btnContainer) return;
 
+    // ── G2-RACE · higiene del flag monótono ─────────────────────────────────
+    // _asNEsNativo no se degrada nunca (ver notas en loadStaffHome), así que el
+    // ÚNICO reset válido es el cambio de ticket. Sin esto, una staff que toma
+    // un nativo y después uno legacy arrastraría el flag y vería la rama nativa
+    // sobre un ticket que no lo es.
+    var _slotIdx  = slot1 ? 1 : 2;
+    var _refAhora = String(window['_as' + _slotIdx + 'IdEspera'] || '').trim();
+    var _refPrev  = String(window['_as' + _slotIdx + 'RefFlag'] || '').trim();
+    // CONSERVADOR a propósito: solo se resetea cuando hay DOS refs concretas y
+    // distintas, o sea cuando la staff pasó de una clienta a otra de verdad.
+    // Con ref vacía NO se toca nada: al recargar la página, o en las primeras
+    // llamadas antes de que _asNIdEspera se puebla, la ref es '' y un reset ahí
+    // borraba el flag y tiraba el modal nativo a una rama legacy
+    // ("Finalizar servicio"). El flag es monótono: solo lo baja un cambio de
+    // ticket demostrable.
+    if (_refAhora && _refPrev && _refPrev !== _refAhora) {
+      window['_as' + _slotIdx + 'EsNativo'] = _fuenteEsNativa(window['_as' + _slotIdx + 'Aten']);
+      window['_as' + _slotIdx + 'PintaTok'] = 0;
+    }
+    if (_refAhora) window['_as' + _slotIdx + 'RefFlag'] = _refAhora;
+    // Token de invocación: cada llamada se numera y solo la ÚLTIMA puede pintar
+    // desde una promesa. Sin esto, dos apiPost en vuelo compiten y gana el que
+    // resuelve último, que no es necesariamente el que se lanzó último.
+    var _pintaTok = (window['_as' + _slotIdx + 'PintaTok'] = (window['_as' + _slotIdx + 'PintaTok'] || 0) + 1);
+
     const clientName = document.getElementById('as' + (slot1?1:2) + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
     const promoData = activePromos[clientKey];
@@ -3056,6 +3081,78 @@
       return;
     }
 
+
+    // ── PLAN A · A6 — TICKET NATIVO LINEAS: componentes reales ──────────────
+    // Para fuente 'LineasNativo' los ítems del modal son las LÍNEAS reales del
+    // ticket, con su linea_id estable. Antes se caía siempre al splitter de
+    // abajo, que parte el texto del servicio por '+' y ',' y adivina el precio
+    // por coincidencia difusa en CATALOGO.depilacion: eso producía ítems SIN
+    // identidad, y por eso la selección de la staff nunca podía viajar al
+    // backend (confirmTake_ mandaba solo idListaEspera + chicaNombre y el motor
+    // autoseleccionaba TODAS las candidatas). Causa de R3B.
+    // Legacy conserva el splitter intacto, más abajo.
+    const _esNativoLN = String(w.fuente || '') === 'LineasNativo';
+    if (_esNativoLN) {
+      const _sdNat = Array.isArray(w.serviciosDetalle) ? w.serviciosDetalle : [];
+      const _elegiblesLN = _sdNat.filter(c => String(c.estado || '') === 'esperando');
+      const _idsLN = _elegiblesLN.map(c => String(c.id || '').trim());
+      // FAIL CLOSED: sin serviciosDetalle, sin id, o con ids duplicados NO se
+      // ofrece selección. Nunca degradar a "sin identidad", porque un POST sin
+      // componentesSeleccionados significa TOMAR TODAS.
+      if (!_elegiblesLN.length || _idsLN.some(x => !x) || new Set(_idsLN).size !== _idsLN.length) {
+        alert('No se pudieron identificar los servicios de este ticket. Actualizá la lista e intentá de nuevo.');
+        return;
+      }
+      // ── COMPATIBILIDAD DE ÁREA ───────────────────────────────────────────
+      // Una promo puede cruzar áreas (ej. cejas + pestañas). La staff solo puede
+      // aceptar los componentes de SU familia: ofrecerle uno de otra área la
+      // llevaría a tomar trabajo que no puede hacer, y el backend lo rechazaría
+      // después con STAFF_INCOMPATIBLE_CON_AREA.
+      // Autoridad: la misma que usa el selector de reasignación de Central
+      // (_normAreaKey + STAFF_POR_AREA, nexserv-main-4.js) — no se inventa
+      // clasificación nueva. Si no se puede resolver, NO se bloquea: fail-open
+      // acá es correcto porque el backend valida igual antes de escribir.
+      const _yoModal = String((window.currentUser && window.currentUser.name) || '').trim();
+      const _puedoArea = function (areaComp) {
+        try {
+          if (typeof _normAreaKey !== 'function' || typeof STAFF_POR_AREA === 'undefined') return true;
+          const k = _normAreaKey(String(areaComp || ''));
+          const lista = (STAFF_POR_AREA && STAFF_POR_AREA[k]) || null;
+          if (!lista || !lista.length) return true;   // área no resuelta → no bloquear
+          return lista.some(n => String(n).trim().toLowerCase() === _yoModal.toLowerCase());
+        } catch (e) { return true; }
+      };
+      window._depiItems = _elegiblesLN.map(c => {
+        const _areaC = String(c.area || '');
+        const _bloq  = !_puedoArea(_areaC);
+        return {
+          id: String(c.id).trim(),
+          nombre: String(c.servicio || ''),
+          area: _areaC,
+          precio: Number(c.monto || 0),
+          estado: String(c.estado || ''),
+          staff: String(c.staff || ''),
+          bloqueado: _bloq,          // otra área: no seleccionable
+          checked: !_bloq,           // los bloqueados arrancan desmarcados
+          esNativo: true
+        };
+      });
+      // Si NINGUNO es de su área, no hay nada que ofrecerle.
+      if (window._depiItems.every(it => it.bloqueado)) {
+        alert('Los servicios de este ticket no son de tu área. Avisá a Mikaela para que lo asigne.');
+        return;
+      }
+      if (window._depiItems.length > 1) {
+        splitEl.style.display = 'block';
+        normalEl.style.display = 'none';
+        renderDepiItems();
+      } else {
+        splitEl.style.display = 'none';
+        normalEl.style.display = 'block';
+      }
+      document.getElementById('takeModal').classList.add('active');
+      return;
+    }
     // ── DEPILACIÓN CORPORAL: múltiples ítems ──
     const esDepi = w.area === 'depilacion' || servicioStr0.toLowerCase().includes('depi') || servicioStr0.toLowerCase().includes('bikini') || servicioStr0.toLowerCase().includes('pierna') || servicioStr0.toLowerCase().includes('axila');
 
@@ -3103,9 +3200,22 @@
           </div>
         </div>`;
       }
+      if (item.bloqueado) {
+        // Componente de OTRA área — visible pero no seleccionable, para que la
+        // staff entienda qué más lleva el ticket sin poder tomarlo.
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:12px;margin-bottom:8px;opacity:0.65;border:1.5px dashed var(--line);">
+          <span style="font-size:16px;flex-shrink:0;">🔒</span>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">${item.nombre}</div>
+            <div style="font-size:11px;color:var(--ink-faint);font-weight:600;">Otra área (${item.area || '—'}) · lo toma otra staff</div>
+          </div>
+          ${item.precio > 0 ? `<div style="font-size:12px;font-weight:700;color:var(--ink-faint);">$${item.precio}</div>` : ''}
+        </div>`;
+      }
       // Área pendiente — seleccionable
       return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--info-bg);border-radius:12px;margin-bottom:8px;cursor:pointer;border:2px solid var(--info);">
         <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleDepiItem(${i}, this.checked)"
+          data-linea-id="${item.id ? String(item.id).replace(/"/g,'&quot;') : ''}"
           style="width:18px;height:18px;accent-color:var(--info);flex-shrink:0;">
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:800;color:var(--info);">👇 Tu servicio: ${item.nombre}</div>
@@ -3127,7 +3237,7 @@
   function updateDepiTotal() {
     const items = window._depiItems || [];
     // Only sum non-readonly (pending) items
-    const total = items.filter(i => i.checked && !i.readonly && !i.completado).reduce((sum, i) => sum + Number(i.precio || 0), 0);
+    const total = items.filter(i => i.checked && !i.readonly && !i.completado && !i.bloqueado).reduce((sum, i) => sum + Number(i.precio || 0), 0);
     const el = document.getElementById('takeDepiTotal');
     if (el) el.textContent = '$' + total;
   }
@@ -3496,8 +3606,51 @@
             if (activePromos[clientKeyClean]) delete activePromos[clientKeyClean];
           }
           
+          // ── SP NATIVO · slotServices = SOLO MIS COMPONENTES ──────────────
+          // Este es el camino de TOMAR (loadStaffHome ya estaba cubierto). Sin
+          // esto, el bloque de promo de abajo hace push de la promo ENTERA
+          // ("Combo 18 combo full · $40") encima del componente que la staff sí
+          // aceptó, y "Total actual" queda en $40 en vez de $25.
+          // También se sella acá el contexto del slot: updateFinishButtons y
+          // showConfirmServiceModal leen _as1Aten/_as1EsNativo, y en este camino
+          // quedaban sin poblar — por eso la rama nativa no se activaba y no
+          // salían los 4 botones.
+          var _atenNat1 = a || window._takingData || null;
+          // fuenteReal (getAtenciones) O fuente='LineasNativo' (tarjeta). El objeto
+          // 'a' viene de getAtenciones y NO trae 'LineasNativo': mirar solo eso
+          // hacía que esta rama nunca corriera y volviera el push de la promo.
+          var _esNat1   = _fuenteEsNativa(_atenNat1) || _fuenteEsNativa(window._takingData);
+          if (_esNat1) {
+            window._as1Aten     = _atenNat1;
+            window._as1EsNativo = true;
+            var _yoNat1 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
+            var _sdNat1 = Array.isArray(_atenNat1.serviciosDetalle) ? _atenNat1.serviciosDetalle : [];
+            var _miasNat1 = _sdNat1.filter(function (sd) {
+              return String(sd.staff || '').trim().toLowerCase() === _yoNat1
+                  && String(sd.estado || '') !== 'anulado';
+            });
+            // Respaldo: si la atención todavía no refleja mi toma, uso lo que
+            // marqué en el modal (los mismos linea_id que acabo de enviar).
+            if (!_miasNat1.length && Array.isArray(window._depiItems)) {
+              _miasNat1 = window._depiItems.filter(function (it) { return it.checked && it.id && !it.bloqueado; })
+                .map(function (it) { return { id: it.id, servicio: it.nombre, monto: it.precio, area: it.area }; });
+            }
+            if (_miasNat1.length) {
+              slotServices[1] = _miasNat1.map(function (sd) {
+                return { name: sd.servicio || sd.nombre || sd.name,
+                         price: Number(sd.monto || sd.precio || sd.price || 0),
+                         area: sd.area || a.area || '', lineaId: String(sd.id || ''),
+                         estado: String(sd.estado || '') };
+              });
+              var _totNat1 = slotServices[1].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
+              try { renderServicesForSlot(1); } catch (eR1) {}
+              var _e1t = document.getElementById('as1Total');    if (_e1t) _e1t.textContent = '$' + _totNat1;
+              var _e1c = document.getElementById('as1SvcCount'); if (_e1c) _e1c.textContent = String(slotServices[1].length);
+            }
+            try { updateFinishButtons(); } catch (eF1) {}
+          }
           // Si viene con promo asignada, guardarla pero permitir cambiarla
-          if (window._availablePromo) {
+          if (window._availablePromo && !_esNat1) {
             const promoBasic = window._availablePromo;
             
             // Buscar la promo completa en PROMOS
@@ -3854,8 +4007,42 @@
             if (activePromos[clientKeyClean2]) delete activePromos[clientKeyClean2];
           }
           
-          // Si viene con promo asignada, guardarla pero permitir cambiarla
-          if (window._availablePromo) {
+          // ── SP NATIVO · slotServices = SOLO MIS COMPONENTES (SLOT 2) ─────
+          // Espejo exacto del bloque del slot 1. El área de cejas atiende dos
+          // clientas a la vez, así que el segundo puesto necesita el mismo
+          // tratamiento: sin esto, la promo ENTERA se empujaba encima del
+          // componente aceptado y el total quedaba mal, igual que pasaba en el
+          // slot 1 antes de corregirlo.
+          var _atenNat2 = a || window._takingData || null;
+          var _esNat2   = _fuenteEsNativa(_atenNat2) || _fuenteEsNativa(window._takingData);
+          if (_esNat2) {
+            window._as2Aten     = _atenNat2;
+            window._as2EsNativo = true;
+            var _yoNat2 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
+            var _sdNat2 = Array.isArray(_atenNat2.serviciosDetalle) ? _atenNat2.serviciosDetalle : [];
+            var _miasNat2 = _sdNat2.filter(function (sd) {
+              return String(sd.staff || '').trim().toLowerCase() === _yoNat2
+                  && String(sd.estado || '') !== 'anulado';
+            });
+            if (!_miasNat2.length && Array.isArray(window._depiItems)) {
+              _miasNat2 = window._depiItems.filter(function (it) { return it.checked && it.id && !it.bloqueado; })
+                .map(function (it) { return { id: it.id, servicio: it.nombre, monto: it.precio, area: it.area }; });
+            }
+            if (_miasNat2.length) {
+              slotServices[2] = _miasNat2.map(function (sd) {
+                return { name: sd.servicio || sd.nombre || sd.name,
+                         price: Number(sd.monto || sd.precio || sd.price || 0),
+                         area: sd.area || a.area || '', lineaId: String(sd.id || ''),
+                         estado: String(sd.estado || '') };
+              });
+              var _totNat2 = slotServices[2].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
+              try { renderServicesForSlot(2); } catch (eR2) {}
+              var _e2t = document.getElementById('as2Total');    if (_e2t) _e2t.textContent = '$' + _totNat2;
+              var _e2c = document.getElementById('as2SvcCount'); if (_e2c) _e2c.textContent = String(slotServices[2].length);
+            }
+            try { updateFinishButtons(2); } catch (eF2) {}
+          }
+          if (window._availablePromo && !_esNat2) {
             const promoBasic = window._availablePromo;
             
             // Buscar la promo completa en PROMOS
@@ -4449,6 +4636,13 @@
         payload.precioRegular  = promoData.precioRegular;
       }
       if (idEspera) payload.idEspera = idEspera;
+      // FIX-SYNC-LINEAS-GUARD — la normalización local (dedup, _sinExtrasAut,
+      // total, render) ya ocurrió arriba y se conserva para todos los slots.
+      // Lo que NO debe ocurrir en un slot nativo es la escritura legacy en
+      // ListaEspera: LINEAS es la fuente operativa y volver a leer ese espejo
+      // pisaría estado/monto/servicio reales. Detector: el mismo que ya usa
+      // todo el frontend nativo, nunca uno nuevo.
+      if (typeof _esSlotNativoLineas === 'function' && _esSlotNativoLineas(slot)) return;
       await apiPost('updateServiciosAtencion', payload);
     } catch(e) { console.error('Error sync servicios:', e); }
   }
@@ -4836,6 +5030,19 @@
   }
 
   function showConfirmServiceModal(slot) {
+    // ── SP NATIVO · SIN SEGUNDA CONFIRMACIÓN ─────────────────────────────────
+    // En un ticket LineasNativo la staff YA eligió qué componentes hace, en el
+    // modal "¿Tomar esta clienta?" (que es la confirmación buena y la única que
+    // debe existir). Este modal es el legacy de promo: vuelve a preguntar
+    // "Confirmar / Cambiar / Cancelar servicio" sobre la promo COMPLETA, y por
+    // eso reaparecían los 3 componentes cuando la staff solo aceptó 2 — la
+    // segunda confirmación contradice la selección que ella acaba de hacer.
+    // El ticket ya está tomado y las líneas escritas: no hay nada que confirmar.
+    if (_esSlotNativoLineas(slot)) {
+      const _m = document.getElementById('confirmServiceModal');
+      if (_m) _m.classList.remove('active');
+      return;
+    }
     const slotStr = String(slot);
     const clientName = document.getElementById('as' + slotStr + 'Name')?.textContent?.replace(' ⭐','') || '';
     const svcs = slotServices[slot] || [];
