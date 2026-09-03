@@ -795,9 +795,12 @@
               + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
             return;
           }
-          if (!_sigId && _pendientes > 0) {
-            btnContainer.innerHTML =
-              '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+          if (_pendientes > 0) {
+            var _yoSigoBtn = _sigId
+              ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">Yo sigo: ' + _sigLbl + '</button>'
+              : '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">Yo sigo: ' + _sigLbl + '</button>';
+            btnContainer.innerHTML = _yoSigoBtn
+              + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
               + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
               + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>'
               + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
