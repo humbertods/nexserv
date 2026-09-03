@@ -1073,134 +1073,53 @@
       }, 8000);
     }
 
+    // ── AUTH STAFF 100% LINEAS ───────────────────────────────────────────
+    // FIX-POLL-02 — la staff NUNCA consulta getAutorizaciones ni
+    // getAutorizacionesNativas (esta última exige rol admin/owner y devolvía
+    // 401 en bucle). La única consulta remota permitida acá es
+    // estadoPropuestasDeTicket → getTicketLineas, que resuelve sobre el
+    // PROPIO ticket de la staff.
+    //
+    // FIX-POLL-01 — un extra aprobado YA ES una línea del ticket madre: el
+    // poll solo refleja su estado. No crea tickets, líneas ni SN.
+    const _pendientesLocales = (slotServices[slotNum] || [])
+      .filter(function (sv) { return sv.status === 'pendiente' && sv.lineaId && sv.ticketRef; });
+
+    // Sin pendientes locales identificables: no se consulta nada.
+    if (!_pendientesLocales.length) return;
+
     try {
-      const authResult = await apiGet('getAutorizaciones');
-      if (!authResult.success || !authResult.autorizaciones) return;
+      const _ref = _pendientesLocales[0].ticketRef;
+      const _est = await LineaService.estadoPropuestasDeTicket(_ref);
+      // Fail-safe: si getTicketLineas falla o no trae la línea, la propuesta
+      // local queda 'pendiente' y el próximo intervalo reintenta.
+      if (!_est.success) return;
 
-      const staffName = user.name || '';
-      const myAuths = authResult.autorizaciones.filter(a =>
-        a.clienteCodigo === clientCode &&
-        a.staffNombre === staffName &&
-        (a.estado === 'pendiente' || a.estado === 'aprobado')
-      );
+      let _cambio = false;
+      _pendientesLocales.forEach(function (sv) {
+        const _e = _est.porLinea[String(sv.lineaId)];
+        if (_e === 'aprobado')       { sv.status = 'aprobado';  _cambio = true; }
+        else if (_e === 'rechazado') { sv.status = 'rechazado'; _cambio = true; }
+      });
+      if (!_cambio) return;
 
-      if (!slotServices[slotNum]) slotServices[slotNum] = [];
+      console.log('[autorizaciones] resuelto desde getTicketLineas — sin consultar a Central');
+      renderServicesForSlot(slotNum);
+      try { updateFinishButtons(slotNum); } catch (eUFB) {}
+      try {
+        var _totSlot = (slotServices[slotNum] || [])
+          .filter(function (v) { return v.status !== 'rechazado'; })
+          .reduce(function (a, v) { return a + Number(v.price || 0); }, 0);
+        var _elTot = document.getElementById('as' + slotNum + 'Total');
+        if (_elTot) _elTot.textContent = '$' + _totSlot;
+        var _elCnt = document.getElementById('as' + slotNum + 'SvcCount');
+        if (_elCnt) _elCnt.textContent = String((slotServices[slotNum] || []).length);
+      } catch (eRT) { console.warn('[autorizaciones] recálculo de total falló:', eRT); }
 
-      let changed = false;
-      // ── MANDAMIENTO #3: detección de familia de área centralizada en esMismaAreaM3() ──
-      const staffArea = user.area || 'cejas';
-
-      for (const auth of myAuths) {
-        const svcRef = auth.servicioArea || auth.servicioNombre || '';
-        const esDeOtraArea = !window.esMismaAreaM3(staffArea, svcRef);
-
-        if (auth.estado === 'aprobado' && esDeOtraArea) {
-          // ── Servicio aprobado de otra área → crear ticket SN para esa área ──
-          // Solo si no fue procesado ya (no existe en slotServices como 'enganche-enviado')
-          const yaEnviado = slotServices[slotNum].find(s => s.authId === auth.id && s.status === 'enganche-enviado');
-          if (!yaEnviado) {
-            // Marcar como enviado para no procesar dos veces
-            const existingEng = slotServices[slotNum].find(s => s.authId === auth.id);
-            if (existingEng) {
-              existingEng.status = 'enganche-enviado';
-            } else {
-              slotServices[slotNum].push({
-                name: auth.servicioNombre, price: Number(auth.servicioPrecio||0),
-                area: auth.servicioArea||'', status: 'enganche-enviado', authId: auth.id
-              });
-            }
-            // Crear ticket SN para la otra área
-            const clientCodeEng = slotNum === 1 ? window._as1Client : window._as2Client;
-            const clientNameEng = slotNum === 1
-              ? document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || ''
-              : document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
-            LineaService.crearServicio( {
-              codigo: clientCodeEng || auth.clienteCodigo,
-              nombre: clientNameEng || auth.clienteNombre,
-              servicio: auth.servicioNombre,
-              area: auth.servicioArea || 'cejas',
-              precio: Number(auth.servicioPrecio || 0),
-              prioridad: 'Normal',
-              observaciones: 'Servicio adicional solicitado por ' + staffName + ' durante atención'
-            }).then(function(r) {
-              if (r && (r.ok || r.success)) {
-                showToast('✅ ' + auth.servicioNombre + ' enviado a lista de espera');
-              }
-            }).catch(function(){});
-            changed = true;
-          }
-          continue; // No agregar a slotServices de esta staff
-        }
-
-        // ── Servicio de la misma área → agregar/actualizar en slotServices ──
-        let existing = slotServices[slotNum].find(s => s.authId === auth.id);
-        if (!existing) {
-          existing = slotServices[slotNum].find(s => s.name === auth.servicioNombre && !s.authId);
-        }
-
-        if (existing) {
-          if (!existing.authId) { existing.authId = auth.id; changed = true; }
-          if (existing.status !== auth.estado) { existing.status = auth.estado; changed = true; }
-        } else if (!slotServices[slotNum].find(s => s.name === auth.servicioNombre)) {
-          slotServices[slotNum].push({
-            name: auth.servicioNombre,
-            price: Number(auth.servicioPrecio || 0),
-            area: auth.servicioArea || '',
-            status: auth.estado,
-            authId: auth.id,
-            note: auth.nota || '',
-            requestedBy: auth.staffNombre || staffName
-          });
-          changed = true;
-        }
-      }
-
-      if (changed) {
-        const totalRecalc = slotServices[slotNum].reduce((sum, s) => {
-          if (s.status === 'pendiente' || s.status === 'rechazado' || s.status === 'enganche-enviado') return sum;
-          return sum + Number(s.price || 0);
-        }, 0);
-        renderServicesForSlot(slotNum);
-        document.getElementById('as' + slotNum + 'Total').textContent = '$' + totalRecalc;
-        document.getElementById('as' + slotNum + 'SvcCount').textContent =
-          slotServices[slotNum].filter(s => s.status !== 'rechazado').length;
-        // CRÍTICO: Sincronizar al Sheet cuando cambia el estado de una autorización
-        // Esto asegura que el Sheet tenga el total correcto antes de finalizar
-        syncServiciosBackend(slotNum, totalRecalc);
-        // Re-evaluar los botones de finalizar (la aprobación pudo cambiar el flujo)
-        try { updateFinishButtons(slotNum); } catch(eUFB) {}
-      }
-
-      // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
-      const hayPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
-      const pollKey = '_authPoll' + slotNum;
-
-      if (hayPendientes && !window[pollKey]) {
-        window[pollKey] = setInterval(async () => {
-          // Detener si el staff ya no esta en la pantalla activa
-          const screenId = slotNum === 1 ? 'activeService' : 'activeService2';
-          const screenVisible = document.getElementById(screenId)?.classList.contains('active');
-          if (!screenVisible) {
-            clearInterval(window[pollKey]);
-            window[pollKey] = null;
-            return;
-          }
-          await recargarAutorizacionesStaff(slotNum);
-          // Detener si ya no quedan pendientes
-          const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
-          if (!aunPendientes) {
-            clearInterval(window[pollKey]);
-            window[pollKey] = null;
-          }
-        }, 8000);
-      }
-
-      // Si ya no hay pendientes, asegurar que el poll este detenido
-      if (!hayPendientes && window[pollKey]) {
-        clearInterval(window[pollKey]);
-        window[pollKey] = null;
-      }
-
+      // Si ya no quedan pendientes, detener el poll.
+      const _pollKey = '_authPoll' + slotNum;
+      const _aunPend = (slotServices[slotNum] || []).some(function (s) { return s.status === 'pendiente'; });
+      if (!_aunPend && window[_pollKey]) { clearInterval(window[_pollKey]); window[_pollKey] = null; }
     } catch (err) {
       console.error('Error recargando autorizaciones del staff:', err);
     }
@@ -1218,37 +1137,24 @@
     
     if (pendingServices.length === 0) return;
 
+    // FIX-POLL-02 — misma regla que recargarAutorizacionesStaff: solo
+    // getTicketLineas. Sin fallback legacy ni endpoint admin.
+    // §13 — la correlación es por linea_id (svc.lineaId || svc.authId).
+    // Nunca por cliente+staff+servicio: dos propuestas del mismo servicio
+    // serían indistinguibles.
+    const _refSync = (pendingServices.find(function (s) { return s.ticketRef; }) || {}).ticketRef || '';
+    if (!_refSync) return;
+
     try {
-      const result = await apiGet('getAutorizaciones');
-
-      if (result.success && result.autorizaciones) {
-        const user = window.currentUser;
-        const staffName = user ? user.name : '';
-        const clientCode = slot === 1 ? window._as1Client : window._as2Client;
-
+      const _estSync = await LineaService.estadoPropuestasDeTicket(_refSync);
+      // Fail-safe: sin respuesta útil no se toca ningún status.
+      if (_estSync.success) {
         for (const svc of pendingServices) {
-          // Buscar por authId primero, luego por nombre+staff+cliente
-          let authInBackend = svc.authId
-            ? result.autorizaciones.find(a => a.id === svc.authId)
-            : null;
-
-          if (!authInBackend) {
-            authInBackend = result.autorizaciones.find(a =>
-              a.servicioNombre === svc.name &&
-              a.staffNombre === staffName &&
-              a.clienteCodigo === clientCode &&
-              (a.estado === 'aprobado' || a.estado === 'rechazado')
-            );
-          }
-
-          if (authInBackend) {
-            if (!svc.authId) svc.authId = authInBackend.id;
-            if (authInBackend.estado === 'aprobado') {
-              svc.status = 'aprobado';
-            } else if (authInBackend.estado === 'rechazado') {
-              svc.status = 'rechazado';
-            }
-          }
+          const _lid = String(svc.lineaId || svc.authId || '');
+          if (!_lid) continue;
+          const _e = _estSync.porLinea[_lid];
+          if (_e === 'aprobado')       svc.status = 'aprobado';
+          else if (_e === 'rechazado') svc.status = 'rechazado';
         }
 
         // Recalcular total y re-renderizar
@@ -2833,16 +2739,90 @@
 
   // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
   
+  // operación — apiPost reintenta por dentro y debe mandar SIEMPRE el mismo id,
+  // porque la idempotencia del backend se apoya en él. Un id nuevo por retry
+  // crearía extras duplicados. Formato exigido por _lnValidarLineRequestId_:
+  // [A-Za-z0-9_-], ≤128 chars.
+  function _nuevoExtraLineRequestId_() {
+    var raw = '';
+    try {
+      if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
+        raw = crypto.randomUUID().replace(/-/g, '');
+      }
+    } catch (e) { raw = ''; }
+    if (!raw) {
+      raw = Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+          + Math.random().toString(36).slice(2, 10);
+    }
+    return ('EXR_' + raw).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40);
+  }
+
+  // Descarta la intención completa: ticket + identidad + padre + candidatas.
+  // Una nueva apertura del modal genera una identidad nueva.
+  function _limpiarCtxServicioExtra_() {
+    window._extraTicketId      = null;
+    window._extraLineRequestId = null;
+    window._extraLineaPadre    = null;
+    window._extraCandidatos    = null;
+    window._extraEsTM          = false;
+  }
+  window._limpiarCtxServicioExtra_ = _limpiarCtxServicioExtra_;
+
+  // Inserta (una sola vez) el selector de línea madre dentro del modal de
+  // asignar servicio. Se inyecta por DOM para no tocar index.html.
+  function _renderSelectorLineaPadre_(candidatos, esTM) {
+    var host = document.getElementById('assignSvcPriceDisplay');
+    if (!host || !host.parentNode) return;
+    var wrap = document.getElementById('assignSvcPadreWrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'assignSvcPadreWrap';
+      wrap.style.margin = '10px 0';
+      wrap.innerHTML =
+        '<label style="display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:4px;">'
+        + '¿A qué servicio se suma este extra?</label>'
+        + '<select id="assignSvcPadre" style="width:100%;padding:10px;border-radius:10px;'
+        + 'border:1.5px solid var(--line);font-family:inherit;font-size:14px;"></select>';
+      host.parentNode.insertBefore(wrap, host);
+    }
+    var sel = document.getElementById('assignSvcPadre');
+    if (!sel) return;
+    var lista = Array.isArray(candidatos) ? candidatos : [];
+    // TM exige lineaPadre siempre → sin opción vacía. SN/SP puede omitirla y
+    // dejar que el backend resuelva la única candidata inequívoca.
+    var opts = esTM ? '' : '<option value="">(el sistema lo resuelve)</option>';
+    opts += lista.map(function (c) {
+      var et = String(c.label || 'Servicio') + (c.staff && c.staff !== '—' ? ' · ' + c.staff : '');
+      return '<option value="' + String(c.lineaId) + '">' + et + '</option>';
+    }).join('');
+    sel.innerHTML = opts;
+    // Con una sola candidata en TM, queda preseleccionada: sigue siendo el id
+    // real de esa línea, no una inferencia por posición.
+    sel.value = (esTM && lista.length === 1) ? String(lista[0].lineaId) : (esTM ? '' : '');
+    // Solo se muestra si hay algo real que elegir.
+    wrap.style.display = lista.length ? 'block' : 'none';
+  }
+
   function openAssignServiceModal(clientCode, clientName, extraTicketId) {
     window._extraTicketId = extraTicketId || null;
+    // Identidad de la intención: se fija UNA vez, al abrir.
+    window._extraLineRequestId = extraTicketId ? _nuevoExtraLineRequestId_() : null;
+    window._extraLineaPadre = null;
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignSvcClientName').textContent = clientName;
     document.getElementById('assignSvcArea').value = '';
     document.getElementById('assignSvcService').innerHTML = '<option value="">Primero seleccioná el área</option>';
     var _svcNota = document.getElementById('assignSvcNota'); if (_svcNota) _svcNota.value = '';
     document.getElementById('assignSvcPriceDisplay').style.display = 'none';
+    if (extraTicketId) {
+      _renderSelectorLineaPadre_(window._extraCandidatos, !!window._extraEsTM);
+    } else {
+      var _wrapOff = document.getElementById('assignSvcPadreWrap');
+      if (_wrapOff) _wrapOff.style.display = 'none';
+    }
     document.getElementById('assignServiceModal').classList.add('active');
   }
+
   
   function openAssignServiceFromArrival() {
     // Usar datos de newArrivalData
@@ -2911,21 +2891,52 @@
 
       // ── Modo "+ Servicio Extra": agregar al ticket existente ──
       if (window._extraTicketId) {
-        const idEx = window._extraTicketId;
+        const idEx  = window._extraTicketId;
+        const lrid  = window._extraLineRequestId || _nuevoExtraLineRequestId_();
+        window._extraLineRequestId = lrid;   // se conserva para los reintentos
+        const selP  = document.getElementById('assignSvcPadre');
+        const padre = String((selP && selP.value) || window._extraLineaPadre || '').trim();
+        window._extraLineaPadre = padre || null;
+
+        // TM exige lineaPadre siempre. Se corta acá antes de gastar un POST.
+        if (String(idEx).indexOf('TM-') === 0 && !padre) {
+          alert('Elegí a qué servicio del ticket se suma este extra.');
+          return;
+        }
+
+        const payloadExtra = {
+          ticketRef:     idEx,
+          area:          svc.area,
+          servicioExtra: svc.name,
+          precio:        svc.price,
+          staff:         chica,
+          modoExtra:     'POR_EJECUTAR',
+          lineRequestId: lrid
+        };
+        // lineaPadre solo viaja si hay un LINEAS.id real. Si se omite, el
+        // backend resuelve la única candidata o rechaza por ambigüedad — nunca
+        // se adivina por índice, nombre, área ni posición visual.
+        if (padre) payloadExtra.lineaPadre = padre;
+
         try {
-          const rEx = await apiPost('agregarServicioExtra', {
-            idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
-          });
-          window._extraTicketId = null;
-          if (rEx && rEx.success) {
+          const rEx = await apiPost('agregarExtraMikaelaNativo', payloadExtra);
+          const okEx = !!(rEx && (rEx.ok || rEx.success));
+          if (okEx) {
+            _limpiarCtxServicioExtra_();
             if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
             closeModal();
             loadMikaelaHome();
           } else {
-            alert(((rEx && (rEx.message || rEx.error)) || 'No se pudo agregar el servicio extra'));
+            // Se conserva el contexto: el mismo lineRequestId permite reintentar
+            // sin duplicar. Los errores del contrato nativo se muestran tal cual.
+            const errEx = String((rEx && (rEx.error || rEx.message)) || 'No se pudo agregar el servicio extra');
+            if (errEx === 'LINEA_PADRE_REQUERIDA_AMBIGUA' || errEx === 'LINEA_PADRE_REQUERIDA_TM') {
+              alert('Elegí a qué servicio del ticket se suma este extra.');
+            } else {
+              alert(errEx);
+            }
           }
         } catch (err) {
-          window._extraTicketId = null;
           console.error(err);
           alert('Error al agregar servicio extra');
         }
@@ -3033,19 +3044,46 @@
       const idEx = window._extraPromoTicketId;
       const firstDiv = (promo.division && promo.division[0]) ? promo.division[0] : null;
       try {
-        const rEx = await apiPost('agregarPromoExtra', {
-          idEspera: idEx,
-          promoNombre: promo.name,
-          precioPromo: promo.price,
-          precioRegular: promo.regular,
-          area: firstDiv ? firstDiv.area : '',
-          precioMiArea: firstDiv ? firstDiv.monto : promo.price,
-          chica: chica,
-          observaciones: (document.getElementById('assignPromoNota') || {}).value || ''
+        // Camino NATIVO. El anterior (agregarPromoExtra) resolvia la clienta
+        // por prefijo contra la hoja ServicioNormal, donde los tickets nativos
+        // no existen -> "No se encontro la clienta del ticket".
+        //
+        // El frontend NO manda precios, areas ni servicios: el backend resuelve
+        // la division desde Paquetes. Solo manda la identidad de staff por
+        // componente, posicional contra esa division.
+        //
+        // Contrato de asignacion: la staff que Central asigna arranca el PRIMER
+        // componente; los demas quedan con staff vacia -> estado 'esperando',
+        // pendientes de asignar en una vuelta posterior.
+        //
+        // modoExtra='POR_EJECUTAR' devuelve el ticket a 'en_atencion', que es lo
+        // que permite repetir la operacion N veces.
+        const _divEx = Array.isArray(promo.division) ? promo.division : [];
+        if (_divEx.length === 0) {
+          window._extraPromoTicketId = null;
+          alert('\u26a0\ufe0f Esta promo no tiene division configurada. Avisa a soporte.');
+          return;
+        }
+        const _componentesEx = _divEx.map(function (d, i) {
+          return { staff: (i === 0) ? chica : '', lineaPadre: '' };
+        });
+        // requestId: solo A-Za-z0-9_- (contrato _lnValidarLineRequestId_).
+        const _rqEx = 'PROMOEX-' + String(idEx).replace(/[^A-Za-z0-9_-]/g, '')
+                    + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+
+        const rEx = await apiPost('agregarPromoExtraMikaelaNativa', {
+          ticketRef      : idEx,
+          promoCatalogoId: promo.name,
+          modoExtra      : 'POR_EJECUTAR',
+          requestId      : _rqEx,
+          componentes    : _componentesEx,
+          obs            : (document.getElementById('assignPromoNota') || {}).value || ''
         });
         window._extraPromoTicketId = null;
-        if (rEx && rEx.success) {
-          const msg = '✓ Promo extra "' + promo.name + '" agregada como ticket aparte → ' + chica;
+        // El handler nativo responde { ok:true, ... }; el legacy respondia
+        // { success:true }. Se aceptan ambos para no depender de cual conteste.
+        if (rEx && (rEx.ok || rEx.success)) {
+          const msg = '✓ Promo "' + promo.name + '" agregada al ticket → ' + chica;
           if (typeof showToast === 'function') showToast(msg); else alert(msg);
           closeModal();
           loadMikaelaHome();
@@ -3771,6 +3809,48 @@
                 + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>'
                 + '</div>';
             })();
+            // (TicketsFuente.destinataria viva), los componentes pendientes NO
+            // se ofrecen a nadie más: esa staff conserva el control operativo y
+            // puede elegir "Yo sigo". Mostrar tres "Elegí staff…" en ese momento
+            // invita a una acción incorrecta.
+            // Proxy sin cambio de backend: w.asignadaA ya resuelve
+            // _repr.staff || TicketsFuente.destinataria (PLAN A · A5). Vacío =
+            // nadie tiene el ticket = el pendiente fue realmente cedido a
+            // Central, y ahí sí corresponde el selector (PLAN B / R4).
+            const _ofertaViva = String(w.asignadaA || '').trim() !== ''
+                             || String(w.tomadaPor || '').trim() !== '';
+            const _compsPend = (_fuente === 'LineasNativo' && !_ofertaViva && Array.isArray(w.serviciosDetalle))
+              ? w.serviciosDetalle.filter(function (c) {
+                  return String(c.estado || '') === 'esperando'
+                      && !String(c.staff || '').trim()
+                      && String(c.id || '').trim();
+                })
+              : [];
+            const reassignPorComponenteHTML = _compsPend.length ? _compsPend.map(function (c, ci) {
+              const selIdC = 'reSelC_' + _uid + '_' + ci;
+              const btnIdC = 'reBtnC_' + _uid + '_' + ci;
+              const _staffC = String(c.staff || '').trim();
+              return '<div style="margin-top:8px;padding:8px;border:1px dashed var(--line);border-radius:10px;">'
+                + '<div style="font-size:11px;color:var(--ink-soft);font-weight:700;margin-bottom:5px;">⏳ '
+                + String(c.servicio || '').replace(/</g,'&lt;') + ' · $' + Number(c.monto || 0)
+                + (_staffC ? ' · asignado a ' + _staffC.replace(/</g,'&lt;') : ' · sin asignar') + '</div>'
+                + '<select id="' + selIdC + '" data-btnid="' + btnIdC + '" data-action="toggleReasignar" style="width:100%;padding:9px 10px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:12px;background:var(--bg-card);color:var(--ink);">'
+                + _staffOpcionesReasignar(_normAreaKey(String(c.area || '')), busyStaff)
+                + '</select>'
+                + '<button id="' + btnIdC + '"'
+                + ' data-action="reasignar"'
+                + ' data-id-espera="' + (w.idEspera||'') + '"'
+                + ' data-area-idx=""'
+                + ' data-linea-id="' + String(c.id||'').replace(/"/g,'&quot;') + '"'
+                + ' data-sel-id="' + selIdC + '"'
+                + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
+                + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
+                + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar este servicio</button>'
+                + '</div>';
+            }).join('') : '';
+            // ── Ticket agendado por SYNA: el servicio/área ya vienen definidos,
+            // así que se asigna staff directo con el mismo dropdown que usa multi-área
+            // (no hace falta re-elegir el servicio). Si igual quiere cambiarlo, abajo
             // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
             const _desgloseMultiHTML = _esMultiPromo
               ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
@@ -3788,7 +3868,7 @@
                 </div>
                 ${estadoHTML}
                 ${hechasHTML}
-                ${reassignHTML}
+                ${reassignPorComponenteHTML || reassignHTML}
                 <div style="display:flex;gap:6px;margin-top:10px;">
                   <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--accent);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir servicio</button>
                   <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex:1;padding:8px 12px;background:var(--success);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;">➡️ Redirigir promo</button>
@@ -3808,7 +3888,7 @@
               </div>
               ${estadoHTML}
               ${_desgloseMultiHTML}
-              ${_esMultiPromo ? reassignHTML : `${(!estaAsignada && w.servicio && String(w.servicio).trim() && String(w.servicio).trim() !== '—') ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
+              ${_esMultiPromo ? (reassignPorComponenteHTML || reassignHTML) : `${(!estaAsignada && w.servicio && String(w.servicio).trim() && String(w.servicio).trim() !== '—') ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
                 <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
                 <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
               </div>`}
@@ -3835,7 +3915,8 @@
                 const selId    = btn.getAttribute('data-sel-id')    || '';
                 const nombre   = btn.getAttribute('data-nombre')    || '';
                 const codigo   = btn.getAttribute('data-codigo')    || '';
-                reasignarStaff(idEspera, areaIdx, selId, nombre, codigo);
+                const lineaId = btn.getAttribute('data-linea-id') || '';
+          reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId);
               } else if (action === 'retirar') {
                 const idEspera = btn.getAttribute('data-id-espera') || '';
                 const nombre   = btn.getAttribute('data-nombre')    || '';
@@ -3931,8 +4012,29 @@
               const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
               // Ticket madre con varios subtickets → listar cada servicio en su
               // renglón (antes se concatenaban en una sola línea: "A + B + C + D").
+              const _badgeComp = function (d) {
+                const _e = String(d.estado || '');
+                const _s = String(d.staff || '').trim();
+                if (_e === 'en_servicio')                return { txt: 'EN CURSO',  bg: 'var(--info-bg)',    fg: 'var(--info)' };
+                if (_e === 'completado' || _e === 'por_verificar')
+                                                         return { txt: 'LISTO',     bg: 'var(--success-bg)', fg: 'var(--success)' };
+                if (_e === 'cobrado')                    return { txt: 'COBRADO',   bg: 'var(--success-bg)', fg: 'var(--success)' };
+                if (_e === 'anulado')                    return { txt: 'ANULADO',   bg: 'var(--bg)',         fg: 'var(--ink-faint)' };
+                if (_e === 'esperando' && !_s)           return { txt: 'PENDIENTE', bg: '#fff8e1',           fg: 'var(--warning, #f59e0b)' };
+                return { txt: 'ESPERA', bg: 'var(--bg)', fg: 'var(--ink-faint)' };
+              };
+              const _esNativoTL = String(a.fuente || '') === 'LineasNativo';
               const _subticketsHTML = (a.serviciosDetalle && a.serviciosDetalle.length > 1)
-                ? a.serviciosDetalle.map(d => `<div style="font-size:11px;color:var(--ink-soft);">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></div>`).join('')
+                ? a.serviciosDetalle.map(d => {
+                    if (!_esNativoTL) {
+                      return `<div style="font-size:11px;color:var(--ink-soft);">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></div>`;
+                    }
+                    const _b = _badgeComp(d);
+                    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">`
+                      + `<div style="font-size:11px;color:var(--ink-soft);flex:1;">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></div>`
+                      + `<div style="font-size:9px;font-weight:700;background:${_b.bg};color:${_b.fg};padding:2px 7px;border-radius:100px;flex-shrink:0;">${_b.txt}</div>`
+                      + `</div>`;
+                  }).join('')
                 : `<div style="font-size:11px;color:var(--ink-soft);">${servicioLimpio}</div>`;
               timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
                 <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
@@ -4448,8 +4550,8 @@
     console.log('🔍 renderAuthorizations called');
     try {
       // Cargar autorizaciones desde el backend
-      console.log('📡 Calling apiGet(getAutorizaciones)...');
-      const result = await apiGet('getAutorizaciones');
+      console.log('📡 Calling LineaService.listarPropuestasExtra()...');
+      const result = await LineaService.listarPropuestasExtra();
       
       console.log('📥 Backend response:', result);
       
@@ -4500,8 +4602,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button data-action="approve-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button data-action="reject-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button data-action="approve-auth" data-id="${req.id}" data-ticket="${req.ticketRef || req.idEspera || ''}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" data-ticket="${req.ticketRef || req.idEspera || ''}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -5578,6 +5680,7 @@
     var tomada   = target.dataset.tomada   || '';
     var regular  = target.dataset.regular  || total;
     var promo    = target.dataset.promo    || '';
+    var ticketAt = target.dataset.ticket   || '';
     var desglose = target.dataset.desglose || '';
     var key      = target.dataset.key      || id;
     var staff    = target.dataset.staff;
@@ -5612,11 +5715,11 @@
         break;
       case 'approve-auth':
         e.stopPropagation();
-        if (typeof approveAuthorization === 'function') approveAuthorization(id);
+        if (typeof approveAuthorization === 'function') approveAuthorization(id, ticketAt);
         break;
       case 'reject-auth':
         e.stopPropagation();
-        if (typeof rejectAuthorization === 'function') rejectAuthorization(id);
+        if (typeof rejectAuthorization === 'function') rejectAuthorization(id, ticketAt);
         break;
       case 'ac-select':
         e.stopPropagation();
