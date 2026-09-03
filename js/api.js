@@ -149,7 +149,69 @@
     if (typeof show === 'function') show('login');
   }
 
-  async function apiGet(action, params) {
+  // Si ya hay una llamada IDÉNTICA (misma acción y mismos parámetros) en
+  // vuelo, se devuelve ESA promesa en vez de lanzar otra. Todos los callers
+  // reciben el mismo resultado y nadie cambia su código.
+  //
+  // Solo GET: son de lectura y sin efectos. Los POST nunca se deduplican.
+  // La entrada se borra al resolver o fallar, así que un refresco posterior
+  // siempre pide de nuevo — esto NO es un caché, no guarda respuestas.
+  const _getEnVuelo = new Map();
+
+  // ── SEGURIDAD DE FRESCURA ────────────────────────────────────────────────
+  // Reusar una llamada en vuelo es correcto SOLO si nada cambió desde que
+  // arrancó. Varias funciones (ensureIdEsperaFresco) piden getAtenciones
+  // justo para releer el estado DESPUÉS de una escritura; si se les devuelve
+  // una respuesta que salió antes de esa escritura, reciben datos viejos.
+  // Con getAtenciones tardando 5-9 s, esa ventana es enorme: fue lo que dejó
+  // `idEspera` vacío y mandó finalizarAtencion al camino legacy.
+  //
+  // Solución: cada POST que termina incrementa un contador. Una llamada en
+  // vuelo solo se reusa si el contador NO cambió desde que empezó. Así se
+  // sigue deduplicando el caso real —varias vistas montando a la vez— pero
+  // nunca se sirve una lectura anterior a una escritura.
+  //
+  // Además, un tope de antigüedad: pasado _DEDUPE_MAX_MS no se reusa aunque
+  // no haya habido escrituras, por si algún cambio llegó por otra vía.
+  let _mutaciones = 0;
+  const _DEDUPE_MAX_MS = 2000;
+
+  function _marcarMutacion_() { _mutaciones++; }
+
+  function _claveGet_(action, params) {
+    let k = String(action || '');
+    if (params) {
+      const ks = Object.keys(params).sort();
+      for (let i = 0; i < ks.length; i++) k += '|' + ks[i] + '=' + String(params[ks[i]]);
+    }
+    return k;
+  }
+
+  // MIG-020 — wrapper de dedupe. La implementación PROD pasa a _apiGetReal
+  // SIN cambios: ENV, API_URL, sesión, 401/403, retries y timeouts intactos.
+  function apiGet(action, params, opts) {
+    const clave = _claveGet_(action, params);
+    const reg = _getEnVuelo.get(clave);
+    if (reg
+        && reg.mutAlIniciar === _mutaciones
+        && (Date.now() - reg.iniciada) < _DEDUPE_MAX_MS) {
+      if (ENV === 'dev') console.info('[NX-API-DEDUPE]', action, '— reusa la llamada en vuelo');
+      return reg.promesa;
+    }
+    // No se reusa: o no había ninguna, o hubo una escritura, o es vieja.
+    // Se lanza una nueva y se registra en su lugar.
+    const iniciada = Date.now();
+    const mutAlIniciar = _mutaciones;
+    const promesa = _apiGetReal(action, params, opts)
+      .finally(function () {
+        const actual = _getEnVuelo.get(clave);
+        if (actual && actual.iniciada === iniciada) _getEnVuelo.delete(clave);
+      });
+    _getEnVuelo.set(clave, { promesa: promesa, iniciada: iniciada, mutAlIniciar: mutAlIniciar });
+    return promesa;
+  }
+
+  async function _apiGetReal(action, params) {
     const url = new URL(API_URL);
     url.searchParams.set('action', action);
     // Cache-busting: agregar timestamp para evitar respuestas cacheadas
@@ -173,7 +235,19 @@
     }
   }
 
-  async function apiPost(action, data, { retries = 2, timeoutMs = 18000 } = {}) {
+  // MIG-020 — toda escritura invalida las lecturas en vuelo. Se marca al
+  // ENTRAR y al SALIR. El contrato POST de PROD (retries, timeoutMs) queda
+  // intacto: este wrapper solo delega.
+  async function apiPost(action, data, opts) {
+    _marcarMutacion_();
+    try {
+      return await _apiPostReal(action, data, opts);
+    } finally {
+      _marcarMutacion_();
+    }
+  }
+
+  async function _apiPostReal(action, data, { retries = 2, timeoutMs = 18000 } = {}) {
     if (!data) data = {};
     data.action = action;
     data._t = Date.now();
@@ -229,8 +303,20 @@
   let CATALOGO = { cejas: [], depilacion: [], pestanas: [], retiro_lifting: [], facial: [] };
   let CATALOGO_LOADED = false;
 
-  async function ensureCatalogoLoaded() {
-    if (CATALOGO_LOADED) return;
+  // MIG-021 — una sola promesa en vuelo: dos callers concurrentes comparten
+  // la misma carga. En error se limpia para permitir reintento posterior.
+  let _catalogoPromesa = null;
+  function ensureCatalogoLoaded() {
+    if (CATALOGO_LOADED) return Promise.resolve();
+    if (_catalogoPromesa) return _catalogoPromesa;
+    _catalogoPromesa = _cargarCatalogoReal().catch(function (e) {
+      _catalogoPromesa = null;
+      throw e;
+    });
+    return _catalogoPromesa;
+  }
+
+  async function _cargarCatalogoReal() {
     if (!window._session) return; // sin sesión no pedimos catálogo (evita 'sin credenciales' pre-login)
     try {
       const result = await apiGet('getCatalogo');
