@@ -4091,6 +4091,26 @@
                 }
               }
             }
+            // ── B · TOTAL ACUMULADO EN PROMO PARCIAL (LineasNativo) ──────────
+            // El cálculo de arriba nació para promos legacy y da mal en el caso
+            // parcial: con a.total=40 (suma de los 3 componentes) y detalle=40,
+            // la rama sin promo fija hacía 40+40=80. Y aun acertando la rama de
+            // precio fijo daría 40 — tampoco es lo correcto, porque la staff
+            // solo aceptó 2 de los 3 componentes.
+            // Contrato: el acumulado es la suma de los componentes que ALGUIEN
+            // está atendiendo o ya atendió (staff asignada). Los pendientes sin
+            // staff todavía no son plata de nadie y no se acumulan. En el caso
+            // real SP-0305: axilas $5 + media pierna $10 = $15 (bikini $25 queda
+            // fuera hasta que Central lo asigne).
+            // Solo display: totalAcumDisplay no viaja a ningún POST; el cobro
+            // sale de getLineasParaCobro en backend.
+            if (String(a.fuente || '') === 'LineasNativo'
+                && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length) {
+              const _compTomados = a.serviciosDetalle.filter(function (d) {
+                return String(d.staff || '').trim() && String(d.estado || '') !== 'anulado';
+              });
+              totalAcumDisplay = _compTomados.reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
+            }
             const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
             const tmBadge = esTM ? ' <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>' : '';
             const promoStr = a.promoNombre ? `<div style="background:linear-gradient(135deg,var(--accent),var(--accent-deep));color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:100px;display:inline-block;margin-bottom:8px;">🏷 ${a.promoNombre}</div>` : '';
