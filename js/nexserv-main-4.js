@@ -563,12 +563,12 @@
   }
   window.iniciarClientaStaff = iniciarClientaStaff;
 
-  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo){
+  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
     if (!chica) { alert('Elegí una staff'); return; }
     try {
-      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica });
+      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica, lineaId: String(lineaId || '') });
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         // Notificar SOLO a la staff asignada (no a toda el área)
@@ -613,17 +613,21 @@
               return AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || '') === akArea;
             })
           : [];
+        // F3-A — lineaId real de esta área (LINEAS.id), transportado desde
+        // handleGetListaCompleta. Si la promo se despliega en sub-partes, todas
+        // pertenecen a la MISMA fila LINEAS, así que comparten el mismo id.
+        var _lineaIdArea = String(a.lineaId || '');
         if (subPartes.length > 1) {
           subPartes.forEach(function(d){
-            filas.push({ label: (d.servicio || d.area || lbl), staff: a.staff||'—', monto: Number(d.monto||0), done: done });
+            filas.push({ label: (d.servicio || d.area || lbl), staff: a.staff||'—', monto: Number(d.monto||0), done: done, lineaId: _lineaIdArea });
           });
         } else {
-          filas.push({ label: lbl, staff: a.staff||'—', monto: Number(a.precio||0), done: done });
+          filas.push({ label: lbl, staff: a.staff||'—', monto: Number(a.precio||0), done: done, lineaId: _lineaIdArea });
         }
       });
     } else if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length) {
       c.serviciosDetalle.forEach(function(d){
-        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true });
+        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true, lineaId: String(d.lineaId || d.id || '') });
       });
     } else {
       const obs = String(c.observaciones||'');
@@ -666,6 +670,26 @@
   }
   function buildCompletadaCard(c){
     const nombreSafe = String(c.nombre||'').replace(/'/g, "\\'");
+    // F3-A — registro de candidatas a lineaPadre para este ticket.
+    // Se guarda en un mapa por ticket en vez de serializarlo en el onclick:
+    // el id viaja como dato, no incrustado en HTML (sin riesgo de escape) y
+    // llega intacto hasta el payload nativo. Solo se registran filas con un
+    // LINEAS.id real; nunca se fabrica uno a partir de idx/nombre/área.
+    try {
+      const _refTk = String(c.idEspera || '');
+      if (_refTk) {
+        window._extraCandidatosPorTicket = window._extraCandidatosPorTicket || {};
+        const _cands = [];
+        const _vistos = {};
+        _desgloseFilas(c).forEach(function(r){
+          const _lid = String(r.lineaId || '').trim();
+          if (!_lid || _vistos[_lid]) return;
+          _vistos[_lid] = true;
+          _cands.push({ lineaId: _lid, label: String(r.label || 'Servicio'), staff: String(r.staff || '') });
+        });
+        window._extraCandidatosPorTicket[_refTk] = _cands;
+      }
+    } catch (e) { /* el registro es auxiliar: nunca debe romper el render */ }
     // Total visible = suma de los servicios mostrados (agendados + extras)
     const total = _desgloseTotal(c) || Number(c.total||0);
     const totalStr = total > 0
@@ -1413,8 +1437,29 @@
     // Agregar servicio de promo a slotServices.
     // _yaEnLinea: la promo se registra como sus propias líneas en LINEAS (aplicarPromoStaff),
     // así que este renglón es SOLO para mostrar — no debe re-sincronizarse al ticket.
+    // Nombre con desglose del componente, igual que el backend: el area de la
+    // staff identifica que parte del combo le toca. Antes se mostraba solo
+    // `promo.name` ("Combo 6") y el panel no distinguia los componentes,
+    // aunque el sheet y Central si los mostraran completos.
+    // Solo afecta lo que se dibuja en esta sesion: al recargar, el nombre sale
+    // de la linea ya guardada.
+    const _compPromo = (function () {
+      try {
+        const _divs = Array.isArray(promo.division) ? promo.division : [];
+        const _norm = s => String(s || '').toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const _mia = _divs.find(d => _norm(d.area).indexOf(_norm(myArea)) >= 0
+                                  || _norm(myArea).indexOf(_norm(d.area)) >= 0);
+        return String((_mia && (_mia.servicio || _mia.area)) || '').trim();
+      } catch (e) { return ''; }
+    })();
+    const _yaEnvProm = _compPromo.indexOf(promo.name + ' (') === 0
+                    && _compPromo.charAt(_compPromo.length - 1) === ')';
+    const _nombrePromo = !_compPromo ? promo.name
+                       : (_yaEnvProm ? _compPromo
+                                     : promo.name + ' (' + _compPromo + ')');
     const servicioPromo = {
-      name: promo.name,
+      name: _nombrePromo,
       area: myArea,
       price: myPrice,
       esPromo: true,
@@ -1913,7 +1958,16 @@
     // La fuente viene de a.fuenteReal (backend/TicketsFuente); jamás se
     // infiere por prefijo del idEspera.
     // ══════════════════════════════════════════════════════════════════════
-    const fuenteCanonica = window['_as' + slot + 'FuenteCanonica'];
+    let fuenteCanonica = window['_as' + slot + 'FuenteCanonica'];
+    if (!fuenteCanonica) {
+      try {
+        if (typeof window._esSlotNativoLineas === 'function' &&
+            window._esSlotNativoLineas(slot)) {
+          fuenteCanonica = 'LINEAS';
+          window['_as' + slot + 'FuenteCanonica'] = 'LINEAS';
+        }
+      } catch (e) { /* fail closed: queda sin valor y el guard bloquea */ }
+    }
 
     if (fuenteCanonica !== 'LINEAS' && fuenteCanonica !== 'LEGACY') {
       // FAIL CLOSED: cero escritores. No se toca slotServices, activePromos,
@@ -2373,9 +2427,69 @@
         idEspera: _idEsperaSlot
       };
       
-      console.log('📤 Sending to backend:', payload);
+      // El backend exige que la línea padre esté EN SERVICIO
+      // (LN4_PADRE_ESTADOS_VALIDOS = ['en_servicio']) y que su staff sea la
+      // solicitante.
+      //
+      // ANTES se buscaba en slotServices, pero varios de los mapeos que lo
+      // construyen (nexserv-main-1.js) NO incluyen lineaId — según por dónde
+      // se haya cargado la atención, el campo simplemente no existe. Eso
+      // bloqueaba la solicitud con "sin lineaPadre" en tickets perfectamente
+      // válidos.
+      //
+      // Ahora se pregunta a getTicketLineas, que devuelve las líneas activas
+      // del ticket con su id, estado y staff. Es la fuente de verdad y no
+      // depende de cómo se pobló la pantalla. slotServices queda solo como
+      // respaldo por si la consulta falla.
+      let _lineaPadre = '';
+      const _miNombre = String((user && user.name) || '').trim().toLowerCase();
+      try {
+        const _rTL = await apiGet('getTicketLineas', { ticketRef: _idEsperaSlot });
+        const _activas = (_rTL && _rTL.success && Array.isArray(_rTL.lineasActivas))
+          ? _rTL.lineasActivas : [];
+        // Mi línea en curso en este ticket. Si hubiera varias (extras
+        // encadenados), la última es la que estoy atendiendo ahora.
+        const _mias = _activas.filter(function (l) {
+          return String(l.estado || '') === 'en_servicio'
+              && String(l.staff || '').trim().toLowerCase() === _miNombre;
+        });
+        if (_mias.length) _lineaPadre = String(_mias[_mias.length - 1].id || '').trim();
+        console.log('[sendAuthorizationRequest] lineaPadre desde backend:', _lineaPadre,
+                    '· activas:', _activas.length, '· mías en servicio:', _mias.length);
+      } catch (eTL) {
+        console.warn('[sendAuthorizationRequest] getTicketLineas falló:', eTL);
+      }
+
+      // Respaldo: slotServices, para los casos en que sí trae lineaId.
+      if (!_lineaPadre) {
+        const _cand = (slotServices[slot] || []).filter(function (sv) {
+          return sv !== service
+              && String(sv.lineaId || '').trim()
+              && sv.status !== 'pendiente' && sv.status !== 'rechazado';
+        });
+        const _enSrv = _cand.filter(function (sv) { return String(sv.estado || '') === 'en_servicio'; });
+        const _el = _enSrv.length ? _enSrv[_enSrv.length - 1]
+                                  : (_cand.length ? _cand[_cand.length - 1] : null);
+        if (_el) _lineaPadre = String(_el.lineaId).trim();
+      }
+
+      if (!_lineaPadre) {
+        console.error('[sendAuthorizationRequest] sin lineaPadre — no se envía la solicitud (slot ' + slot + ')');
+        alert('No se pudo identificar tu servicio en curso en este ticket. No se envió la solicitud — avisá a Mikaela.');
+        return { success: false, message: 'No se pudo identificar la línea en curso.' };
+      }
+
+      console.log('📤 Sending to backend (LINEAS):', { ticketRef: _idEsperaSlot, lineaPadre: _lineaPadre, payload: payload });
+
+      const result = await LineaService.solicitarExtra({
+        ticketRef:     _idEsperaSlot,
+        lineaPadre:    _lineaPadre,
+        area:          service.area,
+        servicioExtra: service.name,
+        precio:        service.price,
+        nota:          service.note
+      });
       
-      const result = await apiPost('solicitarAutorizacion', payload);
       
       console.log('📥 Backend response:', result);
       
