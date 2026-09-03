@@ -3750,6 +3750,15 @@
                 : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
             } else if (estaAsignada) {
               estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + w.tomadaPor;
+            } else if (String(w.asignadaA || '').trim()) {
+              // C3 — asignación directa de Central: el ticket fue OFRECIDO a esta
+              // staff (TicketsFuente.destinataria) pero ella todavía no confirmó
+              // qué componentes acepta, así que ninguna línea tiene staff y
+              // tomadaPor viene vacío. Antes caía en "Por asignar", que es falso:
+              // ya está asignada, falta que ella tome.
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a '
+                + String(w.asignadaA).trim()
+                + ' <span style="color:var(--ink-soft);">· asignación directa</span>';
             } else {
               estadoLabel = '<strong style="color:var(--ink-soft);">Por asignar</strong>';
             }
