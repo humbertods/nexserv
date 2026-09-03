@@ -1369,6 +1369,28 @@
         if (code) a = res.atenciones.find(x => x.codigo === code);
       }
       if (!a) a = res.atenciones[slot === 1 ? 0 : 1];
+      var _fcRest = String(a.fuenteReal || '').toUpperCase();
+      if (_fcRest === 'LINEAS' && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length) {
+        var _yoRest = String(user.name || '').trim().toLowerCase();
+        var _miasRest = a.serviciosDetalle.filter(function (sd) {
+          return String(sd.staff || '').trim().toLowerCase() === _yoRest
+              && String(sd.estado || '') !== 'anulado';
+        });
+        if (!_miasRest.length) return;
+        slotServices[slot] = _miasRest.map(function (sd) {
+          return { name: sd.servicio || sd.nombre || sd.name || '',
+                   price: Number(sd.monto || sd.precio || sd.price || 0),
+                   area: sd.area || a.area || '',
+                   lineaId: String(sd.id || sd.lineaId || ''),
+                   estado: String(sd.estado || '') };
+        });
+        renderServicesForSlot(slot);
+        var _totRest = slotServices[slot].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
+        var _tR = document.getElementById('as' + slot + 'Total');    if (_tR) _tR.textContent = '$' + _totRest;
+        var _cR = document.getElementById('as' + slot + 'SvcCount'); if (_cR) _cR.textContent = String(slotServices[slot].length);
+        updateFinishButtons(slot);
+        return;
+      }
       if (!a || a.promoNombre) return; // promo → otra ruta
       if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
         slotServices[slot] = a.serviciosDetalle.map(sd => ({
@@ -1554,7 +1576,26 @@
           _setNotaRecepcion(1, a1.observaciones);
 
           // Restaurar servicios de la 1ª clienta desde el ticket
-          if (!String(a1.idEspera||'').startsWith('TM-')) {
+          var _nativo1 = _fuenteEsNativa(a1) && Array.isArray(a1.serviciosDetalle) && a1.serviciosDetalle.length > 0;
+          if (_nativo1) {
+            var _yo1 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
+            var _mias1 = a1.serviciosDetalle.filter(function (sd) {
+              return String(sd.staff || '').trim().toLowerCase() === _yo1
+                  && String(sd.estado || '') !== 'anulado';
+            });
+            if (_mias1.length) {
+              slotServices[1] = _mias1.map(function (sd) {
+                return { name: sd.servicio || sd.name,
+                         price: Number(sd.monto || sd.price || 0),
+                         area: sd.area || a1.area || '', lineaId: String(sd.id || ''),
+                         estado: String(sd.estado || '') };
+              });
+            }
+            try { renderServicesForSlot(1); } catch (e1n) {}
+            var _t1n = (slotServices[1] || []).reduce(function (s2, v) { return s2 + Number(v.price || 0); }, 0);
+            var _as1tn = document.getElementById('as1Total'); if (_as1tn) _as1tn.textContent = '$' + _t1n;
+            var _as1scn = document.getElementById('as1SvcCount'); if (_as1scn) _as1scn.textContent = String((slotServices[1] || []).length);
+          } else if (!String(a1.idEspera||'').startsWith('TM-')) {
             if (a1.promoNombre && a1.promoNombre.trim() !== '') {
               // Es una promo → cargar el nombre de la promo en slotServices para que el modal lo muestre
               // Buscar precio: total del ticket → precioRegular → PROMOS cargados
@@ -1602,7 +1643,22 @@
               pintarNombre('as2Name', a2.nombre, a2.codigo, a2.esTop);
               const _as2cd = document.getElementById('as2Code'); if (_as2cd) _as2cd.textContent = a2.codigo + (a2.horaLlegada ? ' · Llegó ' + a2.horaLlegada : '');
               // Cargar servicios de la 2ª clienta si vienen del ticket
-              if (a2.promoNombre && a2.promoNombre.trim() !== '') {
+              var _nativo2 = _fuenteEsNativa(a2) && Array.isArray(a2.serviciosDetalle) && a2.serviciosDetalle.length > 0;
+              if (_nativo2) {
+                var _yo2 = String((window.currentUser && window.currentUser.name) || '').toLowerCase();
+                var _mias2 = a2.serviciosDetalle.filter(function (sd) {
+                  return String(sd.staff || '').trim().toLowerCase() === _yo2
+                      && String(sd.estado || '') !== 'anulado';
+                });
+                if (_mias2.length) {
+                  slotServices[2] = _mias2.map(function (sd) {
+                    return { name: sd.servicio || sd.name,
+                             price: Number(sd.monto || sd.price || 0),
+                             area: sd.area || a2.area || '', lineaId: String(sd.id || ''),
+                             estado: String(sd.estado || '') };
+                  });
+                }
+              } else if (a2.promoNombre && a2.promoNombre.trim() !== '') {
                 slotServices[2] = [{ name: a2.promoNombre, price: Number(a2.total || 0), area: a2.area || '', status: 'aprobado', isPromo: true }];
               } else if (a2.serviciosDetalle && a2.serviciosDetalle.length > 0) {
                 slotServices[2] = a2.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.name, price: Number(sd.monto || sd.price || 0), area: sd.area || '' }; });
@@ -5655,3 +5711,4 @@ window._lineasLineasAAreasModal = _lineasLineasAAreasModal;
 window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
+
