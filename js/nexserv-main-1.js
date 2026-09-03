@@ -1364,7 +1364,17 @@
     try {
       const user = window.currentUser;
       if (!user) return;
-      if ((slotServices[slot] || []).length > 0) return; // ya hay servicios → no tocar
+      if ((slotServices[slot] || []).length > 0) {
+        // Los servicios ya están: no hay que reconstruirlos. PERO los botones sí
+        // hay que evaluarlos. En el camino de RECARGA nadie más llama a
+        // updateFinishButtons, así que el contenedor se quedaba con su contenido
+        // estático de index.html ("Finalizar servicio") y el modal nativo no
+        // aparecía nunca — aunque el guard fuera true y el backend reportara
+        // pendientes. Es idempotente: para legacy repinta la misma rama que
+        // habría pintado igual.
+        try { updateFinishButtons(slot); } catch (eUFB) {}
+        return;
+      }
       const idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
       if (idEspera.startsWith('TM-')) return; // TM se restaura por otra ruta
       const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
@@ -5729,4 +5739,3 @@ window._lineasLineasAAreasModal = _lineasLineasAAreasModal;
 window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
-
