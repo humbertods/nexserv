@@ -787,11 +787,22 @@
           if (window['_as' + _slotIdx + 'PintaTok'] !== _pintaTok) return;
           const _sigId  = (r && r.success && r.linea_id) ? String(r.linea_id) : '';
           const _sigLbl = _esc((r && r.servicio) || (r && r.componente_seq) || 'siguiente servicio');
-          if (!_sigId) {
+          var _pendientes = Number(r && r.pendientes || 0);
+          if (!_sigId && _pendientes === 0) {
             btnContainer.innerHTML =
               '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
               + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
               + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
+            return;
+          }
+          if (!_sigId && _pendientes > 0) {
+            btnContainer.innerHTML =
+              '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+              + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+              + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>'
+              + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+              + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
+              + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
             return;
           }
           btnContainer.innerHTML =
