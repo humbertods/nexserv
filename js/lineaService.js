@@ -194,6 +194,108 @@
     // asignarServicio({ codigo, servicio, area, precio, chica, observaciones })
     // Devuelve: Promise → { success, ... }
     // ----------------------------------------------------------
+
+    // solicitarExtra({ ticketRef, lineaPadre, area, servicioExtra, precio, nota })
+    // `staff` NO se envía: el backend la inyecta desde la sesión firmada.
+    solicitarExtra: function(opts) {
+      var lrid = 'EXTRA-' + String(opts.ticketRef || '').replace(/[^A-Za-z0-9_-]/g, '')
+               + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      return apiPost('solicitarExtraStaffNativo', {
+        ticketRef:     opts.ticketRef,
+        lineaPadre:    opts.lineaPadre,
+        area:          opts.area,
+        servicioExtra: opts.servicioExtra,
+        precio:        Number(opts.precio || 0),
+        lineRequestId: lrid,
+        obs:           opts.nota || ''
+      }).then(function(r) {
+        // Normalizar al contrato {success, authId} que espera el caller.
+        var ok = !!(r && (r.ok === true || r.success === true));
+        return { success: ok, authId: (r && (r.linea_id || r.lineaId)) || '',
+                 lineaId: (r && (r.linea_id || r.lineaId)) || '',
+                 ticketRef: (r && r.ticket_ref) || opts.ticketRef,
+                 message: (r && (r.message || r.error)) || '' };
+      });
+    },
+
+    // listarPropuestasExtra() → { success, autorizaciones:[...] }
+    // Devuelve la MISMA forma que el viejo getAutorizaciones para que
+    // renderAuthorizations y los polls del staff funcionen sin cambios.
+    listarPropuestasExtra: function() {
+      // Llamar es seguro para cualquier sesión válida:
+      //  · Backend actual → getAutorizacionesNativas exige rol admin/owner
+      //    (exigirRolAdminOwner_). NO hay alcance por staff: el flujo staff
+      //    consulta getTicketLineas, no esta acción.
+      //  · Backend viejo → responde 401 por rol, pero api.js ya trata a esta
+      //    acción como "rechazo de permiso" y NO cierra la sesión: el caller
+      //    recibe success:false y la vista queda vacía, sin expulsar a nadie.
+      return apiGet('getAutorizacionesNativas').then(function(r) {
+        if (!r || (r.ok !== true && r.success !== true)) {
+          return { success: false, autorizaciones: [], message: (r && (r.message || r.error)) || '' };
+        }
+        var lista = (r.propuestas || []).map(function(p) {
+          // 'propuesta' + auth 'pendiente' → estado 'pendiente' (lo que filtran las vistas).
+          // 'esperando' + auth 'aprobada'  → 'aprobado'. 'anulado' → 'rechazado'.
+          var est = 'pendiente';
+          if (p.estado === 'anulado') est = 'rechazado';
+          else if (p.authEstado === 'aprobada') est = 'aprobado';
+          else if (p.authEstado === 'pendiente') est = 'pendiente';
+          return {
+            id: p.id, authId: p.id, lineaId: p.id, lineaPadre: p.lineaPadre,
+            ticketRef: p.ticketRef, idEspera: p.ticketRef, visita: p.visita,
+            clienteCodigo: p.clienteCodigo, clienteNombre: p.clienteNombre,
+            staffNombre: p.staffNombre, servicioNombre: p.servicioNombre,
+            servicioArea: p.servicioArea, servicioPrecio: p.servicioPrecio,
+            nota: p.nota, estado: est, creada: p.creada, actualizada: p.actualizada,
+            // FIX-AUTH-02 — alias que consume renderAuthorizations. La tarjeta
+            // muestra CUÁNDO se solicitó la autorización, así que apunta a
+            // `creada`, nunca a `actualizada`.
+            fecha: p.creada
+          };
+        });
+        return { success: true, autorizaciones: lista };
+      });
+    },
+
+    // Esto reemplaza al poll contra getAutorizacionesNativas, que exige rol
+    // admin/owner: con el backend viejo devolvía 401 en bucle cada 8s y la
+    // staff nunca se enteraba de la aprobación, dejando su pantalla colgada.
+    estadoPropuestasDeTicket: function(ticketRef) {
+      return apiGet('getTicketLineas', { ticketRef: ticketRef || '' })
+        .then(function(r) {
+          if (!r || r.success !== true) return { success: false, porLinea: {} };
+          var porLinea = {};
+          (r.lineasActivas || []).forEach(function(l) {
+            porLinea[String(l.id || '')] = 'aprobado';
+          });
+          (r.lineasHistoricas || []).forEach(function(l) {
+            if (String(l.estado || '') === 'anulado') porLinea[String(l.id || '')] = 'rechazado';
+          });
+          return { success: true, porLinea: porLinea };
+        })
+        .catch(function() { return { success: false, porLinea: {} }; });
+    },
+
+    // aprobarExtra(ticketRef, lineaId) / rechazarExtra(ticketRef, lineaId, motivo)
+    aprobarExtra: function(ticketRef, lineaId) {
+      return apiPost('aprobarExtraNativo', { ticketRef: ticketRef, lineaId: lineaId })
+        .then(function(r) {
+          return { success: !!(r && (r.ok === true || r.success === true)),
+                   message: (r && (r.message || r.error)) || '' };
+        });
+    },
+
+    // FIX-AUTH-01 — el backend `_rechazarExtraNativoInterno_` exige `motivo`
+    // no vacío (MOTIVO_REQUERIDO). El motivo lo escribe Central; acá solo se
+    // transporta. No se fabrica ningún valor por defecto.
+    rechazarExtra: function(ticketRef, lineaId, motivo) {
+      return apiPost('rechazarExtraNativo', { ticketRef: ticketRef, lineaId: lineaId, motivo: motivo })
+        .then(function(r) {
+          return { success: !!(r && (r.ok === true || r.success === true)),
+                   message: (r && (r.message || r.error)) || '' };
+        });
+    },
+
     asignarServicio: function(opts) {
       return apiPost('asignarServicioNormal', opts);
     }
