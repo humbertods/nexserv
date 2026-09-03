@@ -563,12 +563,17 @@
   }
   window.iniciarClientaStaff = iniciarClientaStaff;
 
+  function _latTraceId_(){ return 'LAT-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); }
   async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
     if (!chica) { alert('Elegí una staff'); return; }
+    var _latTrace = _latTraceId_(); var _latT0 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T0] ASSIGN_CLICK', idEspera);}catch(e){}
     try {
-      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica, lineaId: String(lineaId || '') });
+      var _latT1 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T1] ASSIGN_POST_START', idEspera, 'elapsed_T0_T1='+( _latT1-_latT0));}catch(e){}
+      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica, lineaId: String(lineaId || ''), _latTrace: _latTrace, _latT1: _latT1 });
+      var _latT5 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T5] ASSIGN_POST_END', idEspera, 'elapsed_T1_T5='+(_latT5-_latT1), 'success='+(r&&r.success));}catch(e){}
+      var _latT6 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T6] CENTRAL_UI_CONFIRM', idEspera, 'elapsed_T5_T6='+(_latT6-_latT5));}catch(e){}
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         // Notificar SOLO a la staff asignada (no a toda el área)
