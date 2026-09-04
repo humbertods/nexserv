@@ -25,6 +25,18 @@
     return '';
   }
 
+  // requestId de TICKET — identidad de la INTENCIÓN de crear.
+  // El backend lo exige y lo nombra literalmente así en sus comentarios:
+  //   NexServ_Lineas.gs:6444  crearTicketServicioNormalNativo_  → REQUEST_ID_REQUERIDO
+  //   NexServ_Lineas.gs:10603 crearTicketPromoNativo_           → REQUEST_ID_REQUERIDO
+  //   NexServ_Lineas.gs:6864  "_nuevoTicketRequestId_ en goToList/goAssign, uno por click"
+  // Contrato de validación del backend: no vacío, máx 100 chars, solo [A-Za-z0-9_-].
+  // Mismo criterio que el lineRequestId que ya arma solicitarExtra más abajo.
+  function _nuevoTicketRequestId_() {
+    return 'TKR_' + Date.now().toString(36)
+         + '_' + Math.random().toString(36).slice(2, 10);
+  }
+
   // ─── LineaService ─────────────────────────────────────────────
   var LineaService = {
 
@@ -104,12 +116,21 @@
       var esMulti = payload && Array.isArray(payload.areas) && payload.areas.length > 1;
       var esPromo = !esMulti && !!(payload && payload.promoNombre);
 
+      // requestId de la intención. Se respeta el que traiga el caller (identidad
+      // estable si alguna vez la aporta); si no viene, se genera acá, UNA vez por
+      // llamada. apiPost reintenta hasta 2 veces con el MISMO objeto, así que los
+      // 3 intentos comparten requestId — que es exactamente el duplicado que la
+      // reconciliación del backend debe atrapar. Copia superficial: el payload del
+      // caller no se muta.
+      var data = Object.assign({}, payload);
+      if (!String(data.requestId || '').trim()) data.requestId = _nuevoTicketRequestId_();
+
       if (esMulti) {
-        return apiPost('crearTicketMulti', payload);
+        return apiPost('crearTicketMulti', data);
       } else if (esPromo) {
-        return apiPost('addServicioPromo', payload);
+        return apiPost('addServicioPromo', data);
       } else {
-        return apiPost('addServicioNormal', payload);
+        return apiPost('addServicioNormal', data);
       }
     },
 
