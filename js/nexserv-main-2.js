@@ -2657,7 +2657,7 @@
 
   // === ASIGNAR SERVICIOS/PROMOS (Mikaela) ===
   
-  function openAssignServiceModal(clientCode, clientName, extraTicketId) {
+  async function openAssignServiceModal(clientCode, clientName, extraTicketId) {
     window._extraTicketId = extraTicketId || null;
     window._assigningClient = { code: clientCode, name: clientName };
     document.getElementById('assignSvcClientName').textContent = clientName;
@@ -2666,6 +2666,16 @@
     var _svcNota = document.getElementById('assignSvcNota'); if (_svcNota) _svcNota.value = '';
     document.getElementById('assignSvcPriceDisplay').style.display = 'none';
     document.getElementById('assignServiceModal').classList.add('active');
+
+    const areaSel = document.getElementById('assignSvcArea');
+    if (areaSel) areaSel.disabled = true;
+    try {
+      await ensureCatalogoLoaded();
+    } catch (e) {
+      console.warn('[ServicioExtra] Error cargando catálogo:', e);
+    } finally {
+      if (areaSel) areaSel.disabled = false;
+    }
   }
   
   function openAssignServiceFromArrival() {
