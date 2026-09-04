@@ -1783,7 +1783,20 @@
     const u = window.currentUser;
     if (!u) return;
     let r;
-    try { r = await apiGet('getDescanso'); } catch(e) { return; }
+    // CACHÉ 60s (OPCIÓN A · latencia): getDescanso tardaba ~4.5s y corría en
+    // CADA ciclo de refresco. El estado de descanso cambia rarísimo (cuando
+    // alguien activa/desactiva el modo). Se reusa la última respuesta si tiene
+    // menos de 60s; las acciones que cambian el descanso invalidan el caché
+    // poniendo window._descansoCacheTs = 0 (ver setDescansoStaff / toggle).
+    // Mismo patrón que ensurePromosLoaded, ya probado en el proyecto.
+    const _ahora = Date.now();
+    if (window._descansoCache && window._descansoCacheTs &&
+        (_ahora - window._descansoCacheTs) < 60000) {
+      r = window._descansoCache;
+    } else {
+      try { r = await apiGet('getDescanso'); } catch(e) { return; }
+      if (r && r.success) { window._descansoCache = r; window._descansoCacheTs = _ahora; }
+    }
     if (!r || !r.success) return;
     window._descansoGlobalOn = (r.global === true);
 
@@ -1840,6 +1853,7 @@
     if (!activar && !confirm('¿Desbloquear y quitar el modo descanso del equipo?')) return;
     try {
       const r = await apiPost('setDescansoGlobal', { activar: activar, por: (u && u.name) || '' });
+      window._descansoCacheTs = 0;  // invalidar caché: el cambio debe verse ya
       if (r && r.success) {
         window._descansoGlobalOn = (r.global === true);
         refreshDescansoGlobalBtn();
@@ -5054,6 +5068,7 @@
   async function setDescansoStaff(staff, bloqueado) {
     try {
       await apiPost('setDescanso', { staff: staff, bloqueado: bloqueado });
+      window._descansoCacheTs = 0;  // invalidar caché: el cambio debe verse ya
       if (!window._descansoCfg) window._descansoCfg = {};
       if (bloqueado) window._descansoCfg[staff] = true; else delete window._descansoCfg[staff];
       showToast(bloqueado ? ('🔒 ' + staff + ' en descanso') : ('🔓 ' + staff + ' habilitada'));
