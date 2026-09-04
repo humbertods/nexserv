@@ -3503,6 +3503,13 @@
             const obs = String(w.observaciones || '');
             const esContinuacion = obs.indexOf('✅') !== -1;
             const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
+            // Asignación directa de Central: la staff elegida vive en
+            // TicketsFuente.destinataria y llega como `asignadaA`
+            // (NexServ_AppsScript.js:763). LINEAS.staff nace vacío por contrato,
+            // así que `tomadaPor` está vacío hasta que la staff TOMA la clienta.
+            // Sin esto, un ticket asignado directo se mostraba "Por asignar".
+            const _asignadaDirecta = (!estaAsignada && w.asignadaA && String(w.asignadaA).trim() !== '')
+              ? String(w.asignadaA).trim() : '';
             // Cita confirmada que vino agendada por SYNA (solo le falta asignar staff)
             const esSyna = obs.indexOf('SYNA') !== -1;
             const _citaMatch = obs.match(/cita\s+([0-9]{1,2}:[0-9]{2})/i);
@@ -3530,6 +3537,8 @@
                 : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
             } else if (estaAsignada) {
               estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + w.tomadaPor;
+            } else if (_asignadaDirecta) {
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignado directo</strong> a ' + _asignadaDirecta;
             } else {
               estadoLabel = '<strong style="color:var(--ink-soft);">Por asignar</strong>';
             }
