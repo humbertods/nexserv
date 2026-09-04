@@ -484,6 +484,7 @@
     'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
     'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
     'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
+    'Melany': { key: 'melany', area: 'Cejas · Depilacion · Lifting' },
     'Yadira': { key: 'yadira', area: 'Pestanas' },
     'Diana':  { key: 'diana',  area: 'Pestanas' },
     'Laura':  { key: 'laura',  area: 'Facial' },
@@ -2441,6 +2442,7 @@
       { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
+      { name: 'Melany', area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Yadira', area: 'Pestañas', areas: ['pestanas'] },
       { name: 'Diana',  area: 'Pestañas', areas: ['pestanas'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
@@ -4888,4 +4890,3 @@ function renderInformeServicios(d, pestanasData, tendData) {
 }
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
-
