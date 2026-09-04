@@ -796,28 +796,46 @@
             return;
           }
           if (_pendientes > 0) {
-            var _yoSigoBtn = _sigId
-              ? '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">Yo sigo: ' + _sigLbl + '</button>'
-              : '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;" onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">Yo sigo: ' + _sigLbl + '</button>';
-            btnContainer.innerHTML = _yoSigoBtn
-              + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+            // REGLA DEFINITIVA DE VISIBILIDAD "YO SIGO":
+            // El backend (siguientePendienteParaStaff_) ya distingue dos cosas:
+            //   · _sigId (linea_id): el siguiente pendiente COMPATIBLE con esta
+            //     staff — ya pasó el gate de capacidad _lnStaffPuedeTomarLineaInterno_.
+            //     Vacío si NINGÚN pendiente es de su área/familia.
+            //   · _pendientes: TODOS los pendientes vivos del bloque, compatibles
+            //     o no (así está documentado en el backend, línea ~8459).
+            // Por eso la decisión de mostrar "Yo sigo" se toma con _sigId, NO con
+            // _pendientes. No se recalcula compatibilidad en el frontend ni se
+            // toca backend: se usa la que el backend ya resolvió.
+            var _btnPasar =
+                '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
               + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
-              + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>'
-              + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+              + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>';
+            var _btnCancelar =
+                '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
               + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
               + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
+
+            if (_sigId) {
+              // Hay pendiente COMPATIBLE → "Yo sigo" + continuidad.
+              var _btnYoSigo =
+                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+                + ' onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">'
+                + 'Yo sigo: ' + _sigLbl + '</button>';
+              btnContainer.innerHTML = _btnYoSigo + _btnPasar + _btnCancelar;
+            } else {
+              // Quedan pendientes pero TODOS de otra área → NO "Yo sigo".
+              // Solo continuidad hacia Central / cancelación.
+              btnContainer.innerHTML = _btnPasar + _btnCancelar;
+            }
             return;
           }
+          // _pendientes > 0 && _sigId presente ya se resolvió arriba; si el flujo
+          // llega acá es _pendientes === 0 con _sigId (caso residual): tratar
+          // como sin pendientes → cerrar y mandar a central.
           btnContainer.innerHTML =
-              '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-            + ' onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">'
-            + 'Yo sigo: ' + _sigLbl + '</button>'
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-            + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
-            + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>'
-            + '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-            + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
-            + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>'
+              '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
+            + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+            + '&#9989; Termin&eacute; &mdash; mandar a central</button>'
 ;
         })
         .catch(function () {
@@ -5743,3 +5761,173 @@ window.cobrarPromoCompleta = cobrarPromoCompleta;
 window.finishAndContinueSameStaff = finishAndContinueSameStaff;
 window.compartirSiguienteServicio = compartirSiguienteServicio;
 
+// ============================================================
+// HANDLERS NATIVOS DEL MODAL POST-PARTE (contrato SP de 4 botones)
+// ------------------------------------------------------------
+// La rama nativa de updateFinishButtons (arriba) pinta hasta 4 botones cuyos
+// onclick invocan estas funciones. Estaban invocadas pero NUNCA definidas →
+// "ReferenceError: X is not defined" al tocarlas. Se definen acá, en el scope
+// global (como el resto de handlers onclick del archivo), sin tocar la rama
+// que los pinta.
+//
+// Mapeo verificado 1:1 contra el router (NexServ_AppsScript.js):
+//   nativoTerminarMandarCentral → 'finalizarComponentesStaff'   (case 1261)
+//   nativoYoSigo                → 'finalizarComponentesStaff'    (case 1261) + reload
+//   nativoPasarOtraStaff        → 'cederPendientesACentral'      (case 1313)
+//   nativoTerminarYCancelar     → 'terminarYCancelarPendientes'  (case 1319)
+//
+// Identidad de staff: window.currentUser.name (patrón vigente). El backend la
+// re-valida contra la sesión firmada y filtra los lineaIds del navegador
+// contra las líneas realmente en servicio (MIG-007-B): los ids son pista, no
+// autoridad.
+// ============================================================
+
+// Guard anti doble-clic COMÚN a los 4 (touch+click, doble tap, reintento).
+// Mismo patrón que goAssign (nexserv-main-4.js): ventana de 3 s por acción.
+function _nativoGuardEntrar_(nombreAccion) {
+  if (window._nativoAccionEnCurso) return false;
+  window._nativoAccionEnCurso = nombreAccion || true;
+  setTimeout(function () { window._nativoAccionEnCurso = null; }, 3000);
+  return true;
+}
+function _nativoGuardSalir_() { window._nativoAccionEnCurso = null; }
+
+// Fail-closed: sin ticketRef o sin staff no se llama al backend.
+function _nativoPrevuelo_(ticketRef) {
+  var user = window.currentUser;
+  var staff = (user && user.name) ? String(user.name).trim() : '';
+  var ref = String(ticketRef || '').trim();
+  if (!ref)   { alert('No se pudo identificar el ticket. Recargá la pantalla e intentá de nuevo.'); return null; }
+  if (!staff) { alert('No se pudo identificar tu sesión. Cerrá y volvé a entrar.'); return null; }
+  return { staff: staff, ref: ref };
+}
+
+// Normaliza el 2º argumento (la rama lo pinta como array JSON _idsMias).
+function _nativoIdsArray_(ids) {
+  if (Array.isArray(ids)) return ids.map(function (x) { return String(x); });
+  if (ids == null || ids === '') return [];
+  return [String(ids)];
+}
+
+// Refresco común post-acción — idéntico al cierre de completarAreaMultiFinal.
+async function _nativoRefrescarStaffHome_() {
+  try {
+    if (typeof show === 'function') show('staffHome');
+    await new Promise(function (res) { setTimeout(res, 300); });
+    if (typeof loadStaffHome === 'function') loadStaffHome();
+  } catch (e) { /* best-effort: la acción ya se ejecutó */ }
+}
+
+// BOTÓN "✅ Terminé — mandar a central": cerró todas sus líneas vivas y no
+// hay pendientes suyos. finalizarComponentesStaff acepta lineaIds vacío y
+// resuelve por (ticketRef, staff).
+async function nativoTerminarMandarCentral(ticketRef, ids) {
+  if (!_nativoGuardEntrar_('terminar')) return;
+  try {
+    var pv = _nativoPrevuelo_(ticketRef);
+    if (!pv) return;
+    const r = await apiPost('finalizarComponentesStaff', {
+      ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
+    });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('✅ Enviado a central');
+      await _nativoRefrescarStaffHome_();
+    } else {
+      alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo finalizar'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + (e && e.message ? e.message : e));
+  } finally {
+    _nativoGuardSalir_();
+  }
+}
+
+// BOTÓN "Yo sigo: <servicio>": cierra la parte actual; la misma staff seguirá
+// con el siguiente componente.
+//
+// NOTA DE ALCANCE: 'siguientePendienteBloque' devuelve linea_id, NO areaIdx, y
+// tomarServicioNormal/tomarAreaTicket exigen areaIdx — no hay conversión
+// disponible desde el frontend sin un endpoint que no existe. Por eso este
+// handler SOLO cierra la parte hecha (finalizarComponentesStaff) y recarga el
+// home: el siguiente componente reaparece como tomable y la staff lo toma con
+// el flujo de toma ya existente. NO se inventa un encadenamiento de toma ni se
+// manda un campo que el backend no consume (se descartó `continuarLineaId`,
+// verificado sin consumidor en el backend). Cerrar la toma automática es un
+// cambio aparte, cuando exista el endpoint que mapee linea_id → toma.
+async function nativoYoSigo(ticketRef, sigId) {
+  if (!_nativoGuardEntrar_('yosigo')) return;
+  try {
+    var pv = _nativoPrevuelo_(ticketRef);
+    if (!pv) return;
+    const r = await apiPost('finalizarComponentesStaff', {
+      ticketRef: pv.ref, staff: pv.staff, lineaIds: []   // cierra lo en servicio
+    });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('✅ Parte cerrada · tomá el siguiente servicio de tu lista');
+      await _nativoRefrescarStaffHome_();
+    } else {
+      alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar tu parte'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + (e && e.message ? e.message : e));
+  } finally {
+    _nativoGuardSalir_();
+  }
+}
+
+// BOTÓN "Ya terminé mi parte — enviar a central para la siguiente staff":
+// cierra lo suyo y CEDE los pendientes a Central para que los reasigne.
+async function nativoPasarOtraStaff(ticketRef, ids) {
+  if (!_nativoGuardEntrar_('pasar')) return;
+  try {
+    var pv = _nativoPrevuelo_(ticketRef);
+    if (!pv) return;
+    const r = await apiPost('cederPendientesACentral', {
+      ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
+    });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('✅ Tu parte cerrada · el resto vuelve a central');
+      await _nativoRefrescarStaffHome_();
+    } else {
+      alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo enviar a central'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + (e && e.message ? e.message : e));
+  } finally {
+    _nativoGuardSalir_();
+  }
+}
+
+// BOTÓN "✅ Terminé todo — la clienta se retira, mandar a central": cierra lo
+// suyo y ANULA los pendientes. Acción destructiva → exige confirmación.
+async function nativoTerminarYCancelar(ticketRef, ids, sigLbl) {
+  if (!_nativoGuardEntrar_('cancelar')) return;
+  try {
+    var pv = _nativoPrevuelo_(ticketRef);
+    if (!pv) return;
+    var _confirmar = (typeof confirm === 'function')
+      ? confirm('¿La clienta se retira y se cancelan los servicios pendientes? Esta acción no se puede deshacer.')
+      : true;
+    if (!_confirmar) return;
+    var motivo = 'La clienta se retira — pendientes cancelados por ' + pv.staff
+      + (sigLbl ? ' (' + String(sigLbl) + ')' : '');
+    const r = await apiPost('terminarYCancelarPendientes', {
+      ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids), motivo: motivo
+    });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('✅ Ticket cerrado · pendientes cancelados');
+      await _nativoRefrescarStaffHome_();
+    } else {
+      alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar el ticket'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + (e && e.message ? e.message : e));
+  } finally {
+    _nativoGuardSalir_();
+  }
+}
+
+window.nativoTerminarMandarCentral = nativoTerminarMandarCentral;
+window.nativoYoSigo                = nativoYoSigo;
+window.nativoPasarOtraStaff        = nativoPasarOtraStaff;
+window.nativoTerminarYCancelar     = nativoTerminarYCancelar;
