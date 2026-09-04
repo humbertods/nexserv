@@ -3802,8 +3802,15 @@
                   // reales fuera del combo, se respeta el mayor.)
                   totalAcumDisplay = Math.max(_promoPrecioFijo, Number(a.total) || 0);
                 } else {
-                  // Multi-servicio SIN promo fija: sí se suman las partes hechas + la actual.
-                  totalAcumDisplay = Math.max(totalAcumDisplay, totalDetalle + Number(a.total || 0));
+                  // Multi-servicio SIN promo fija.
+                  // FIX total duplicado (MIKAELA_DUPLICATE_TOTAL_VISUAL, variante
+                  // SN nativo): en el motor nativo, serviciosDetalle YA contiene
+                  // TODAS las líneas del ticket (las hechas + la actual), así que
+                  // totalDetalle ES el total completo. Sumarle a.total encima
+                  // contaba una línea dos veces — con 1 sola línea daba el doble
+                  // exacto ($8+$8=$16). Se usa totalDetalle tal cual (o a.total si
+                  // fuera mayor, por si trae un adicional no reflejado en detalle).
+                  totalAcumDisplay = Math.max(Number(a.total) || 0, totalDetalle);
                 }
               }
             }
