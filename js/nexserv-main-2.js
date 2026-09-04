@@ -2803,9 +2803,8 @@
     wrap.style.display = lista.length ? 'block' : 'none';
   }
 
-  function openAssignServiceModal(clientCode, clientName, extraTicketId) {
+  async function openAssignServiceModal(clientCode, clientName, extraTicketId) {
     window._extraTicketId = extraTicketId || null;
-    // Identidad de la intención: se fija UNA vez, al abrir.
     window._extraLineRequestId = extraTicketId ? _nuevoExtraLineRequestId_() : null;
     window._extraLineaPadre = null;
     window._assigningClient = { code: clientCode, name: clientName };
@@ -2821,6 +2820,10 @@
       if (_wrapOff) _wrapOff.style.display = 'none';
     }
     document.getElementById('assignServiceModal').classList.add('active');
+    const areaSel = document.getElementById('assignSvcArea');
+    if (areaSel) areaSel.disabled = true;
+    try { await ensureCatalogoLoaded(); } catch(e) {}
+    finally { if (areaSel) areaSel.disabled = false; }
   }
 
   
