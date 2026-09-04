@@ -484,7 +484,6 @@
     'Lesly':  { key: 'lesly',  area: 'Cejas · Depilacion · Lifting' },
     'Keyla':  { key: 'keyla',  area: 'Cejas · Depilacion · Lifting' },
     'Rosa':   { key: 'rosa',   area: 'Cejas · Depilacion · Lifting' },
-    'Melany': { key: 'melany', area: 'Cejas · Depilacion · Lifting' },
     'Yadira': { key: 'yadira', area: 'Pestanas' },
     'Diana':  { key: 'diana',  area: 'Pestanas' },
     'Laura':  { key: 'laura',  area: 'Facial' },
@@ -563,17 +562,12 @@
   }
   window.iniciarClientaStaff = iniciarClientaStaff;
 
-  function _latTraceId_(){ return 'LAT-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); }
-  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId){
+  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
     if (!chica) { alert('Elegí una staff'); return; }
-    var _latTrace = _latTraceId_(); var _latT0 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T0] ASSIGN_CLICK', idEspera);}catch(e){}
     try {
-      var _latT1 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T1] ASSIGN_POST_START', idEspera, 'elapsed_T0_T1='+( _latT1-_latT0));}catch(e){}
-      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica, lineaId: String(lineaId || ''), _latTrace: _latTrace, _latT1: _latT1 });
-      var _latT5 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T5] ASSIGN_POST_END', idEspera, 'elapsed_T1_T5='+(_latT5-_latT1), 'success='+(r&&r.success));}catch(e){}
-      var _latT6 = Date.now(); try{console.log('[NEX-LAT]['+_latTrace+'][T6] CENTRAL_UI_CONFIRM', idEspera, 'elapsed_T5_T6='+(_latT6-_latT5));}catch(e){}
+      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica });
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         // Notificar SOLO a la staff asignada (no a toda el área)
@@ -618,21 +612,17 @@
               return AREA_KEY_FROM_DIV(d.realArea || d.area || d.servicio || '') === akArea;
             })
           : [];
-        // F3-A — lineaId real de esta área (LINEAS.id), transportado desde
-        // handleGetListaCompleta. Si la promo se despliega en sub-partes, todas
-        // pertenecen a la MISMA fila LINEAS, así que comparten el mismo id.
-        var _lineaIdArea = String(a.lineaId || '');
         if (subPartes.length > 1) {
           subPartes.forEach(function(d){
-            filas.push({ label: (d.servicio || d.area || lbl), staff: a.staff||'—', monto: Number(d.monto||0), done: done, lineaId: _lineaIdArea });
+            filas.push({ label: (d.servicio || d.area || lbl), staff: a.staff||'—', monto: Number(d.monto||0), done: done });
           });
         } else {
-          filas.push({ label: lbl, staff: a.staff||'—', monto: Number(a.precio||0), done: done, lineaId: _lineaIdArea });
+          filas.push({ label: lbl, staff: a.staff||'—', monto: Number(a.precio||0), done: done });
         }
       });
     } else if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length) {
       c.serviciosDetalle.forEach(function(d){
-        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true, lineaId: String(d.lineaId || d.id || '') });
+        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true });
       });
     } else {
       const obs = String(c.observaciones||'');
@@ -675,26 +665,6 @@
   }
   function buildCompletadaCard(c){
     const nombreSafe = String(c.nombre||'').replace(/'/g, "\\'");
-    // F3-A — registro de candidatas a lineaPadre para este ticket.
-    // Se guarda en un mapa por ticket en vez de serializarlo en el onclick:
-    // el id viaja como dato, no incrustado en HTML (sin riesgo de escape) y
-    // llega intacto hasta el payload nativo. Solo se registran filas con un
-    // LINEAS.id real; nunca se fabrica uno a partir de idx/nombre/área.
-    try {
-      const _refTk = String(c.idEspera || '');
-      if (_refTk) {
-        window._extraCandidatosPorTicket = window._extraCandidatosPorTicket || {};
-        const _cands = [];
-        const _vistos = {};
-        _desgloseFilas(c).forEach(function(r){
-          const _lid = String(r.lineaId || '').trim();
-          if (!_lid || _vistos[_lid]) return;
-          _vistos[_lid] = true;
-          _cands.push({ lineaId: _lid, label: String(r.label || 'Servicio'), staff: String(r.staff || '') });
-        });
-        window._extraCandidatosPorTicket[_refTk] = _cands;
-      }
-    } catch (e) { /* el registro es auxiliar: nunca debe romper el render */ }
     // Total visible = suma de los servicios mostrados (agendados + extras)
     const total = _desgloseTotal(c) || Number(c.total||0);
     const totalStr = total > 0
@@ -1401,13 +1371,15 @@
         return '<span style="background:var(--bg);font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-pill);color:var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>';
       }).join('');
 
-      // GENERALIZACIÓN: se eliminó el sub-botón "Tomar promo completa" del selector.
-      // Regla única: al tocar una promo se aplica con applyPromo() → anula el servicio
-      // activo y crea las líneas de la promo. Las partes de OTRAS áreas quedan pendientes
-      // por confirmar con las otras staff. Ya no hay opción separada "promo completa" acá
-      // (evita la confusión de dos botones). El caso "yo hago todo" de pestañas es un
-      // flujo aparte (cobrarPromoCompleta), no de este selector.
       var _btnPromoCompleta = '';
+      if (_promoEsMasBarata) {
+        _btnPromoCompleta = '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);" onclick="event.stopPropagation()">'
+          + '<div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">&#128161; La clienta solo quiere tu servicio, pero la promo es m&#225;s barata que el precio normal</div>'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+          + '<button onclick="event.stopPropagation(); applyPromo(' + i + ')" style="flex:1;padding:8px 12px;background:var(--bg);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink-soft);">Solo mi parte &middot; $' + (_myDivPM ? _myDivPM.monto : '?') + '</button>'
+          + '<button onclick="event.stopPropagation(); applyPromoCompleta(' + i + ')" style="flex:1;padding:8px 12px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;color:white;">&#127919; Tomar promo completa &middot; $' + p.price + '</button>'
+          + '</div></div>';
+      }
 
       return '<div style="' + bgStyle + ' ' + borderStyle + ' border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="applyPromo(' + i + ')">'
         + assignedBadge
@@ -1442,29 +1414,8 @@
     // Agregar servicio de promo a slotServices.
     // _yaEnLinea: la promo se registra como sus propias líneas en LINEAS (aplicarPromoStaff),
     // así que este renglón es SOLO para mostrar — no debe re-sincronizarse al ticket.
-    // Nombre con desglose del componente, igual que el backend: el area de la
-    // staff identifica que parte del combo le toca. Antes se mostraba solo
-    // `promo.name` ("Combo 6") y el panel no distinguia los componentes,
-    // aunque el sheet y Central si los mostraran completos.
-    // Solo afecta lo que se dibuja en esta sesion: al recargar, el nombre sale
-    // de la linea ya guardada.
-    const _compPromo = (function () {
-      try {
-        const _divs = Array.isArray(promo.division) ? promo.division : [];
-        const _norm = s => String(s || '').toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        const _mia = _divs.find(d => _norm(d.area).indexOf(_norm(myArea)) >= 0
-                                  || _norm(myArea).indexOf(_norm(d.area)) >= 0);
-        return String((_mia && (_mia.servicio || _mia.area)) || '').trim();
-      } catch (e) { return ''; }
-    })();
-    const _yaEnvProm = _compPromo.indexOf(promo.name + ' (') === 0
-                    && _compPromo.charAt(_compPromo.length - 1) === ')';
-    const _nombrePromo = !_compPromo ? promo.name
-                       : (_yaEnvProm ? _compPromo
-                                     : promo.name + ' (' + _compPromo + ')');
     const servicioPromo = {
-      name: _nombrePromo,
+      name: promo.name,
       area: myArea,
       price: myPrice,
       esPromo: true,
@@ -1540,20 +1491,15 @@
       const _sumDiv = _mias.reduce(function (s, p) { return s + Number(p.monto || 0); }, 0) || 1;
       let _acum = 0;
       const _partes = _mias.map(function (p, idx) {
-        const _reg = Number(p.regular || p.montoRegular || p.precioRegular || p.normal || p.monto || 0);
+        const _reg = Number(p.monto || 0);
         let _val;
         if (idx === _mias.length - 1) {
           _val = Math.round((myPrice - _acum) * 100) / 100;   // última absorbe el redondeo
         } else {
-          // El MONTO promo se reparte por p.monto (misma base que _sumDiv) para que la
-          // suma de partes dé exactamente myPrice. OJO: NO usar _reg aquí — _reg es el
-          // precio REGULAR (tarjeta) y mezclarlo con _sumDiv (suma de montos promo)
-          // descuadra el reparto y puede dar partes negativas (Combo 3 Brow: parte A
-          // $36 y última −$6). El regular real va SOLO en montoRegular, no en el monto.
-          _val = Math.round((Number(p.monto || 0) / _sumDiv) * myPrice * 100) / 100;
+          _val = Math.round((_reg / _sumDiv) * myPrice * 100) / 100;
           _acum += _val;
         }
-        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg, regular: _reg };
+        return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg };
       });
       apiPost('aplicarPromoStaff', {
         idEspera      : _idEsperaPromo,
@@ -1883,256 +1829,13 @@
     `).join('');
   }
 
-  // ── D7.1 Fase 2B — Bloque B: normalizador de nombre de servicio ──────────
-  // Espejo EXACTO de _lnNormTextoSust_ (NexServ_Lineas.gs): minúsculas, sin
-  // acentos, espacios colapsados. Se usa SOLO para localizar el índice del
-  // componente origen dentro de la división de la promo — el mismo criterio
-  // que aplica _lnPromoContieneServicioOrigenInterno_ en el backend. No
-  // decide precios, áreas ni servicios: eso lo resuelve el backend contra
-  // Paquetes.
-  function _normTextoSustFront_(s) {
-    var x = String(s || '').trim().toLowerCase();
-    try { x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
-    return x.split(' ').filter(function (p) { return p !== ''; }).join(' ');
-  }
-
-  // ── D7.1 Fase 2B — Bloque B: reconstrucción del slot desde LINEAS ────────
-  // Relectura AUTORITATIVA tras una sustitución canónica exitosa. NO
-  // reconstruye la promo desde promoData.division: usa exclusivamente lo que
-  // LINEAS devuelve para este ticketRef, filtrado a en_servicio + staff
-  // actual. Solo toca el slot indicado.
-  //
-  // B.1 BLINDAJE — una respuesta no autoritativa (sin respuesta, success!==true,
-  // o lineasActivas que no es array) NO se degrada a "lista vacía": eso vaciaría
-  // el slot como si LINEAS hubiera confirmado cero líneas. Se lanza error y
-  // slotServices[slot] queda EXACTAMENTE como estaba. La mutación del slot
-  // ocurre únicamente DESPUÉS de validar la lectura.
-  async function _reconstruirSlotDesdeLineas_(slot, ticketRef) {
-    const user = window.currentUser;
-    const staffN = (user && user.name) || '';
-    const r = await apiGet('getTicketLineas', { ticketRef: ticketRef });
-
-    if (!r || r.success !== true || !Array.isArray(r.lineasActivas)) {
-      const _e = new Error('RELECTURA_LINEAS_NO_AUTORITATIVA');
-      _e.codigo = 'RELECTURA_LINEAS_NO_AUTORITATIVA';
-      _e.respuesta = r;
-      throw _e; // el slot NO se toca
-    }
-    const lineas = r.lineasActivas;
-
-    const mias = lineas.filter(function (l) {
-      return String(l.estado || '').trim() === 'en_servicio'
-        && String(l.staff || '').trim() === String(staffN).trim();
-    });
-
-    slotServices[slot] = mias.map(function (l) {
-      return {
-        name: l.servicio || l.area || 'Servicio',
-        area: l.area || '',
-        price: Number(l.monto || 0),
-        status: 'aprobado',
-        estado: String(l.estado || ''),
-        esPromo: (String(l.esPromo) === 'si' || l.esPromo === true),
-        promoRef: String(l.promoRef || ''),
-        lineaId: String(l.id || l.lineaId || ''),
-        _yaEnLinea: true
-      };
-    });
-
-    try { renderServicesForSlot(slot); } catch (e) {}
-    const _tot = slotServices[slot].reduce(function (s, v) { return s + Number(v.price || 0); }, 0);
-    const _tEl = document.getElementById('as' + slot + 'Total'); if (_tEl) _tEl.textContent = '$' + _tot;
-    const _cEl = document.getElementById('as' + slot + 'SvcCount'); if (_cEl) _cEl.textContent = String(slotServices[slot].length);
-    try { updateFinishButtons(slot); } catch (e) {}
-    return { lineas: lineas, mias: mias };
-  }
-
-  async function applyPromoFromAddSvc(promoIdx) {
+  function applyPromoFromAddSvc(promoIdx) {
     const promoData = (window._addSvcPromosList || PROMOS.filter(p => p.active))[promoIdx];
     if (!promoData) return;
     const slot = window._addServiceSlot || 1;
     const user = window.currentUser;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
-
-    // ══════════════════════════════════════════════════════════════════════
-    // D7.1 Fase 2B — B.1-A: RUTEO EXPLÍCITO POR FUENTE CANÓNICA
-    // Congelada una sola vez para todo el resto de la función. Tres vías
-    // mutuamente excluyentes — DESCONOCIDA/null/undefined/cualquier otro
-    // valor NUNCA cae al camino legacy (contrato D7.1: DESCONOCIDA ≠ LEGACY).
-    // La fuente viene de a.fuenteReal (backend/TicketsFuente); jamás se
-    // infiere por prefijo del idEspera.
-    // ══════════════════════════════════════════════════════════════════════
-    let fuenteCanonica = window['_as' + slot + 'FuenteCanonica'];
-    if (!fuenteCanonica) {
-      try {
-        if (typeof window._esSlotNativoLineas === 'function' &&
-            window._esSlotNativoLineas(slot)) {
-          fuenteCanonica = 'LINEAS';
-          window['_as' + slot + 'FuenteCanonica'] = 'LINEAS';
-        }
-      } catch (e) { /* fail closed: queda sin valor y el guard bloquea */ }
-    }
-
-    if (fuenteCanonica !== 'LINEAS' && fuenteCanonica !== 'LEGACY') {
-      // FAIL CLOSED: cero escritores. No se toca slotServices, activePromos,
-      // metadata por slot, total ni contador. Modal permanece abierto.
-      console.warn('[applyPromoFromAddSvc] fuente no confirmada — cambio bloqueado. slot=', slot, 'fuente=', fuenteCanonica);
-      alert('⚠️ No se pudo confirmar el origen de este ticket. Recargá la app antes de cambiar el servicio.');
-      return;
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // D7.1 Fase 2B — Bloque B: RAMA LINEAS (sustitución canónica nativa)
-    // Fuente canónica por slot ya establecida por D7.1 Fase 2 desde
-    // a.fuenteReal (backend/TicketsFuente). NUNCA se infiere por prefijo.
-    // Un solo escritor: sustituirServicioPorPromoStaffNativa. En esta rama
-    // NO se llama updateServiciosAtencion ni ninguna otra persistencia.
-    // ══════════════════════════════════════════════════════════════════════
-    if (fuenteCanonica === 'LINEAS') {
-      // 1) Congelar contexto del slot y releer el ticket fresco ANTES de mutar nada.
-      try { if (typeof ensureIdEsperaFresco === 'function') await ensureIdEsperaFresco(slot); } catch (e) {}
-      const ticketRefL = (slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '')).trim();
-
-      // 2) Línea origen por IDENTIDAD EXACTA (lineaId), capturada ANTES de
-      //    tocar slotServices. Nunca por nombre, monto, clienta, área ni
-      //    posición. Debe existir EXACTAMENTE UNA candidata con lineaId real.
-      const _conId = (slotServices[slot] || []).filter(function (s) {
-        return s && String(s.lineaId || '').trim() !== '';
-      });
-
-      // 3) FAIL CLOSED: sin ticket, sin lineaId único, o sin staff → no se
-      //    llama al backend, no se muta UI, no se muestra éxito.
-      if (!ticketRefL) {
-        alert('⚠️ No se pudo identificar el ticket de esta atención. Recargá la app antes de cambiar el servicio.');
-        return;
-      }
-      if (_conId.length !== 1) {
-        console.warn('[applyPromoFromAddSvc][LINEAS] lineaOrigenId no resoluble — candidatas con lineaId:', _conId.length, slotServices[slot]);
-        alert(_conId.length === 0
-          ? '⚠️ No se pudo identificar la línea a sustituir (falta identidad de línea). Recargá la app e intentá de nuevo.'
-          : '⚠️ Hay más de un servicio activo en este slot: no se puede determinar cuál sustituir. Avisá a soporte.');
-        return;
-      }
-      if (!user || !user.name) {
-        alert('⚠️ Sesión no identificada. Volvé a iniciar sesión antes de cambiar el servicio.');
-        return;
-      }
-
-      const lineaOrigenIdL = String(_conId[0].lineaId).trim();
-      const servicioOrigenL = String(_conId[0].name || '');
-
-      // 4) componentes[]: posicional contra la división que el backend
-      //    resuelve desde Paquetes. El frontend NO fabrica precios, áreas ni
-      //    servicios — solo la identidad de staff por componente:
-      //      · componente que sustituye al origen → staff actual
-      //      · componentes de otras áreas         → staff vacía ('esperando')
-      //    El índice origen se localiza con el MISMO criterio del backend
-      //    (_lnPromoContieneServicioOrigenInterno_): nombre de servicio
-      //    normalizado. Si no se puede localizar, FAIL CLOSED — el backend
-      //    igual rechazaría con STAFF_REQUERIDO, pero no se lo hace viajar.
-      const _divL = Array.isArray(promoData.division) ? promoData.division : [];
-      if (_divL.length === 0) {
-        alert('⚠️ Esta promo no tiene división configurada. Avisá a soporte.');
-        return;
-      }
-      const _servOrigN = _normTextoSustFront_(servicioOrigenL);
-      let _idxOrigen = -1;
-      for (let i = 0; i < _divL.length; i++) {
-        if (_normTextoSustFront_(_divL[i].servicio) === _servOrigN) { _idxOrigen = i; break; }
-      }
-      if (_idxOrigen === -1) {
-        console.warn('[applyPromoFromAddSvc][LINEAS] servicio origen no está en la división de la promo', servicioOrigenL, _divL);
-        alert('⚠️ Esta promo no incluye el servicio actual de la clienta, así que no puede reemplazarlo. Elegí otra promo.');
-        return;
-      }
-      const componentesL = _divL.map(function (d, i) {
-        return { staff: (i === _idxOrigen) ? user.name : '', lineaPadre: '' };
-      });
-
-      // 5) requestId estable para ESTE intento (idempotencia del backend).
-      const _rqId = 'SUST-' + ticketRefL + '-' + lineaOrigenIdL + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
-
-      // 6) Un solo escritor. staffSolicitante NO se envía: el router la
-      //    inyecta desde la sesión firmada (exigirSesionFirmada_).
-      let rSust = null;
-      try {
-        rSust = await apiPost('sustituirServicioPorPromoStaffNativa', {
-          ticketRef      : ticketRefL,
-          lineaOrigenId  : lineaOrigenIdL,
-          promoCatalogoId: promoData.name,
-          requestId      : _rqId,
-          componentes    : componentesL,
-          obs            : 'Cambio de servicio a promo por ' + user.name
-        });
-      } catch (eS) {
-        console.error('[applyPromoFromAddSvc][LINEAS] error de red:', eS);
-        rSust = null;
-      }
-
-      // 7) CONTRATO REAL: el núcleo devuelve { ok:true, ... } — NO 'success'.
-      //    Se acepta 'success' solo como alias defensivo si el router lo
-      //    envolviera en el futuro. Cualquier otra cosa = fallo → estado del
-      //    slot INTACTO, sin toast de éxito, sin "promo aplicada".
-      const _okSust = !!(rSust && (rSust.ok === true || rSust.success === true));
-      if (!_okSust) {
-        const _err = (rSust && (rSust.error || rSust.message)) || 'no se pudo conectar con el servidor';
-        console.warn('[applyPromoFromAddSvc][LINEAS] sustitución NO aplicada:', _err, rSust);
-        alert('⚠️ No se pudo cambiar el servicio a la promo.\n\nMotivo: ' + _err + '.\n\nLa clienta sigue con su servicio actual — volvé a intentar. Si sigue fallando, avisá a Mikaela.');
-        return; // slotServices/total/contador/promo previa: intactos
-      }
-
-      // 8) Éxito de escritura → relectura AUTORITATIVA de LINEAS.
-      //    B.1-B: si la relectura NO es autoritativa, la sustitución YA pudo
-      //    haberse escrito en LINEAS — no se finge rollback, pero TAMPOCO se
-      //    presenta la pantalla como confirmada. Sin lectura autoritativa no
-      //    se reconstruye el slot, no se toca la metadata de promo, no se
-      //    cierra el modal como éxito y no se muestra "Promo aplicada".
-      //    Nunca se reintenta la sustitución ni se genera un segundo
-      //    requestId: eso arriesgaría una doble escritura.
-      let _recon = null;
-      try {
-        _recon = await _reconstruirSlotDesdeLineas_(slot, ticketRefL);
-      } catch (eR) {
-        console.error('[applyPromoFromAddSvc][LINEAS] relectura NO autoritativa tras sustitución escrita:', eR);
-        alert('⚠️ El cambio fue registrado en LINEAS, pero no pudimos actualizar esta pantalla.\n\n'
-            + 'Recargá la app antes de continuar para ver el estado real del ticket.');
-        return; // slot intacto, sin metadata nueva, sin toast, modal abierto
-      }
-
-      // 9) Metadata de promo POR SLOT (contrato D7.1 Objetivo 3). Solo se
-      //    escribe con relectura autoritativa confirmada. El global
-      //    _availablePromo queda como espejo legacy, nunca decide.
-      window._availablePromosPerSlot = window._availablePromosPerSlot || {};
-      window._availablePromosPerSlot[slot] = {
-        name: promoData.name,
-        price: Number(promoData.price || 0),
-        regular: Number(promoData.regular || promoData.price || 0)
-      };
-
-      closeModal();
-      showToast('🏷 Promo "' + promoData.name + '" aplicada');
-
-      // 10) Aviso a Mikaela si quedaron componentes esperando para otra staff.
-      //     Se decide por el estado REAL de LINEAS, no por catálogo.
-      try {
-        const _pend = ((_recon && _recon.lineas) || []).filter(function (l) {
-          return String(l.estado || '').trim() === 'esperando';
-        });
-        if (_pend.length > 0) {
-          const _faltan = _pend.map(function (l) { return l.area || l.servicio || ''; })
-            .filter(function (v, i, a) { return v && a.indexOf(v) === i; }).join(', ');
-          enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
-            (user.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promoData.name + '". Falta asignar: ' + _faltan + '.');
-          showToast('🔄 Avisado a Mikaela: falta asignar ' + _faltan);
-        }
-      } catch (e) { console.warn('[applyPromoFromAddSvc][LINEAS] aviso Mikaela:', e); }
-      return; // ← la rama LINEAS termina acá. NUNCA cae al camino legacy.
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // RAMA LEGACY — comportamiento previo EXACTO, sin cambios.
-    // ══════════════════════════════════════════════════════════════════════
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
 
     // Limpiar servicios anteriores del slot y aplicar la promo
@@ -2269,20 +1972,7 @@
     document.getElementById('addSvcPriceDisplay').style.display = 'block';
   }
 
-  // ── GUARD DE DOBLE SUBMIT ────────────────────────────────────────────────────
-  // Mismo patrón que confirmTake()/confirmTake_() en nexserv-main-1.js: sin esto,
-  // un doble toque (o un toque mientras la red está lenta) puede disparar dos
-  // 'solicitarAutorizacion' para el mismo extra. El cuerpo real vive en
-  // confirmAddService_(); acá solo se serializa la entrada. index.html no
-  // cambia — el botón sigue llamando confirmAddService().
   async function confirmAddService() {
-    if (window._confirmAddServiceEnCurso) { console.warn('[confirmAddService] ignorado: ya hay un envío en curso'); return; }
-    window._confirmAddServiceEnCurso = true;
-    try { return await confirmAddService_(); }
-    finally { window._confirmAddServiceEnCurso = false; }
-  }
-
-  async function confirmAddService_() {
     const val = document.getElementById('addSvcService').value;
     if (!val) { alert('Seleccioná un servicio'); return; }
     
@@ -2335,28 +2025,9 @@
       if (addServiceToSlot(slot, svc)) {
         document.getElementById('addSvcNote').value = '';
         closeModal();
-        const _authResult = await sendAuthorizationRequest(clientName, svc, slot);
-        if (_authResult && _authResult.success === true) {
-          // Solo acá está confirmado que el backend realmente creó la
-          // autorización — recién ahora se declara éxito.
-          recargarAutorizacionesStaff(slot);
-          alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
-        } else {
-          // CORRECCIÓN — antes acá se declaraba éxito sin importar el
-          // resultado real. Ahora: revertir la inserción visual (no queda
-          // "pendiente autorización" huérfano localmente), restaurar
-          // totales/contador del slot, y mostrar el error real del backend.
-          const _idxRevertir = (slotServices[slot] || []).indexOf(svc);
-          if (_idxRevertir !== -1) slotServices[slot].splice(_idxRevertir, 1);
-          renderServicesForSlot(slot);
-          const _totalRevertido = (slotServices[slot] || []).reduce((s, v) => s + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
-          const _totEl = document.getElementById('as' + slot + 'Total');
-          if (_totEl) _totEl.textContent = '$' + _totalRevertido;
-          const _cntEl = document.getElementById('as' + slot + 'SvcCount');
-          if (_cntEl) _cntEl.textContent = String((slotServices[slot] || []).filter(s => s.status !== 'rechazado').length);
-          const _msgError = (_authResult && _authResult.message) || 'No se pudo enviar la solicitud.';
-          alert('❌ No se pudo enviar la solicitud a Mikaela: ' + _msgError + '\n\nEl servicio extra NO quedó registrado. Intentá de nuevo.');
-        }
+        await sendAuthorizationRequest(clientName, svc, slot);
+        recargarAutorizacionesStaff(slot);
+        alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
       }
       return;
     }
@@ -2369,16 +2040,7 @@
   async function sendAuthorizationRequest(clientName, service, slot) {
     const user = window.currentUser;
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
-
-    // CORRECCIÓN — mismo patrón ya usado en los otros 14 lugares del proyecto
-    // que dependen de window._as1IdEspera/_as2IdEspera (ver ensureIdEsperaFresco
-    // en nexserv-main-1.js): si el ticket lleva rato abierto, el id en memoria
-    // puede haber quedado viejo o vacío. Se re-resuelve desde getAtenciones
-    // (match por código de ESTA clienta, nunca por posición salvo fallback)
-    // ANTES de leer la variable — sendAuthorizationRequest era el único flujo
-    // dependiente del slot que no lo hacía.
-    await ensureIdEsperaFresco(slot);
-
+    
     console.log('📤 sendAuthorizationRequest called:', {
       clientName,
       clientCode,
@@ -2393,22 +2055,6 @@
       //   → slotServices solo tiene el nuevo servicio pendiente (sin servicios aprobados previos)
       // Extra: hay SP- pero el servicio original sigue en slotServices
       const _idEsperaSlot = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-
-      // ── BLOQUE 2N-2C.2 (corrección) — ticket exacto del slot, obligatorio ────
-      // Antes esta solicitud no llevaba ningún ticket_ref; el backend tenía que
-      // ADIVINARLO por código de clienta al aprobar (ambiguo si hay 2 tickets
-      // activos el mismo día). Ahora se propaga el idEspera REAL del slot que
-      // disparó la solicitud. Si no está disponible, NO se envía la solicitud
-      // — nunca se intenta resolver por código como reemplazo.
-      if (!_idEsperaSlot) {
-        console.error('[sendAuthorizationRequest] ticketRef vacío — no se puede enviar la solicitud sin ticket real (slot ' + slot + ')');
-        alert('No se pudo identificar el ticket de esta clienta. No se envió la solicitud de servicio extra — avisá a Mikaela.');
-        // CORRECCIÓN — antes esta función no devolvía nada; el caller
-        // (confirmAddService) no tenía forma de saber que la solicitud
-        // nunca se envió y declaraba éxito igual.
-        return { success: false, message: 'No se pudo identificar el ticket de esta clienta.' };
-      }
-
       const _esSP = _idEsperaSlot.startsWith('SP-');
       // Contar servicios aprobados (sin status o status !== pendiente/rechazado) excluyendo el nuevo
       const _svcsAprobados = (slotServices[slot] || []).filter(function(s) {
@@ -2426,75 +2072,12 @@
         nota: service.note,
         idEsperaSP: _esCambioPromo ? _idEsperaSlot : '',
         esCambioPromo: _esCambioPromo,
-        staffArea: user?.area || '',
-        // ticket exacto del slot — ver guardia arriba, nunca vacío en este punto.
-        ticketRef: _idEsperaSlot,
-        idEspera: _idEsperaSlot
+        staffArea: user?.area || ''
       };
       
-      // El backend exige que la línea padre esté EN SERVICIO
-      // (LN4_PADRE_ESTADOS_VALIDOS = ['en_servicio']) y que su staff sea la
-      // solicitante.
-      //
-      // ANTES se buscaba en slotServices, pero varios de los mapeos que lo
-      // construyen (nexserv-main-1.js) NO incluyen lineaId — según por dónde
-      // se haya cargado la atención, el campo simplemente no existe. Eso
-      // bloqueaba la solicitud con "sin lineaPadre" en tickets perfectamente
-      // válidos.
-      //
-      // Ahora se pregunta a getTicketLineas, que devuelve las líneas activas
-      // del ticket con su id, estado y staff. Es la fuente de verdad y no
-      // depende de cómo se pobló la pantalla. slotServices queda solo como
-      // respaldo por si la consulta falla.
-      let _lineaPadre = '';
-      const _miNombre = String((user && user.name) || '').trim().toLowerCase();
-      try {
-        const _rTL = await apiGet('getTicketLineas', { ticketRef: _idEsperaSlot });
-        const _activas = (_rTL && _rTL.success && Array.isArray(_rTL.lineasActivas))
-          ? _rTL.lineasActivas : [];
-        // Mi línea en curso en este ticket. Si hubiera varias (extras
-        // encadenados), la última es la que estoy atendiendo ahora.
-        const _mias = _activas.filter(function (l) {
-          return String(l.estado || '') === 'en_servicio'
-              && String(l.staff || '').trim().toLowerCase() === _miNombre;
-        });
-        if (_mias.length) _lineaPadre = String(_mias[_mias.length - 1].id || '').trim();
-        console.log('[sendAuthorizationRequest] lineaPadre desde backend:', _lineaPadre,
-                    '· activas:', _activas.length, '· mías en servicio:', _mias.length);
-      } catch (eTL) {
-        console.warn('[sendAuthorizationRequest] getTicketLineas falló:', eTL);
-      }
-
-      // Respaldo: slotServices, para los casos en que sí trae lineaId.
-      if (!_lineaPadre) {
-        const _cand = (slotServices[slot] || []).filter(function (sv) {
-          return sv !== service
-              && String(sv.lineaId || '').trim()
-              && sv.status !== 'pendiente' && sv.status !== 'rechazado';
-        });
-        const _enSrv = _cand.filter(function (sv) { return String(sv.estado || '') === 'en_servicio'; });
-        const _el = _enSrv.length ? _enSrv[_enSrv.length - 1]
-                                  : (_cand.length ? _cand[_cand.length - 1] : null);
-        if (_el) _lineaPadre = String(_el.lineaId).trim();
-      }
-
-      if (!_lineaPadre) {
-        console.error('[sendAuthorizationRequest] sin lineaPadre — no se envía la solicitud (slot ' + slot + ')');
-        alert('No se pudo identificar tu servicio en curso en este ticket. No se envió la solicitud — avisá a Mikaela.');
-        return { success: false, message: 'No se pudo identificar la línea en curso.' };
-      }
-
-      console.log('📤 Sending to backend (LINEAS):', { ticketRef: _idEsperaSlot, lineaPadre: _lineaPadre, payload: payload });
-
-      const result = await LineaService.solicitarExtra({
-        ticketRef:     _idEsperaSlot,
-        lineaPadre:    _lineaPadre,
-        area:          service.area,
-        servicioExtra: service.name,
-        precio:        service.price,
-        nota:          service.note
-      });
+      console.log('📤 Sending to backend:', payload);
       
+      const result = await apiPost('solicitarAutorizacion', payload);
       
       console.log('📥 Backend response:', result);
       
@@ -2511,14 +2094,11 @@
           enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar',
             _staff + ' → ' + (clientName || 'clienta') + ': ' + (service.name || 'servicio') + _precio);
         } catch (ePush) { console.warn('[Push] aviso de autorización a Mikaela falló:', ePush); }
-        return { success: true, authId: result.authId };
       } else {
         console.error('❌ Error al enviar autorización:', result.message);
-        return { success: false, message: result.message || result.error || 'No se pudo enviar la solicitud de autorización.' };
       }
     } catch (err) {
       console.error('❌ Exception al enviar autorización:', err);
-      return { success: false, message: 'Error de conexión al enviar la solicitud.' };
     }
   }
 
@@ -2601,15 +2181,6 @@
     // en un reemplazo dentro del mismo ticket (debe ir SIEMPRE a autorización de Mikaela).
     window._modoEnganche = false;
     window._editEngancheIdx = undefined;
-    // P4-FE — cancelación explícita del modal "+ Servicio Extra": se descarta
-    // la intención completa (ticket + lineRequestId + lineaPadre). Una nueva
-    // apertura genera una identidad nueva. En ÉXITO la limpieza ya ocurrió
-    // antes de llamar acá, así que esto es idempotente.
-    if (typeof window._limpiarCtxServicioExtra_ === 'function') {
-      window._limpiarCtxServicioExtra_();
-    } else {
-      window._extraTicketId = null; window._extraLineRequestId = null; window._extraLineaPadre = null;
-    }
     // Limpiar botones dinámicos del modal de finalización para evitar duplicados
     // Restaurar título del cobrarModal por si fue cobro grupal
     const modalTitleEl = document.querySelector('#cobrarModal .modal-title');
@@ -2647,18 +2218,6 @@
     if (window._goToListRunning) return;
     window._goToListRunning = true;
     setTimeout(() => { window._goToListRunning = false; }, 3000);
-
-    // C1 — identidad de ESTA intención de "enviar a lista". Nace UNA sola vez,
-    // acá, antes de bifurcar en normal/promo/TM, con el MISMO generador que ya
-    // usa goAssign (_nuevoTicketRequestId_ — no se crea un segundo generador).
-    // Viaja tal cual en el payload: si apiPost reenviara el mismo payload, el
-    // valor se conserva y el backend reconoce el reintento en vez de crear otro
-    // ticket. NO se regenera en LineaService ni en el backend.
-    //
-    // ALCANCE C1: aunque nace antes de la bifurcación, solo se CONECTA a la rama
-    // SN normal de 1 área. Las ramas promo y TM quedan exactamente como estaban
-    // — conectarlas es otro microtramo y no se amplía acá.
-    const _requestIdGTL = _nuevoTicketRequestId_();
 
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
@@ -2784,9 +2343,7 @@
           result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: a.tentativo,
             area: a.area, prioridad: prioridad, observaciones: obs,
-            esTop: isTop ? 'Sí' : 'No', total: a.precio,
-            // C1 — requestId de ESTA intención, generado arriba una sola vez.
-            requestId: _requestIdGTL
+            esTop: isTop ? 'Sí' : 'No', total: a.precio
           });
         }
         if (result && result.success) {
@@ -2884,7 +2441,6 @@
       { name: 'Keyla',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Lesly',  area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Rosa',   area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
-      { name: 'Melany', area: 'Cejas',    areas: ['cejas', 'depilacion', 'retiro_lifting'] },
       { name: 'Yadira', area: 'Pestañas', areas: ['pestanas'] },
       { name: 'Diana',  area: 'Pestañas', areas: ['pestanas'] },
       { name: 'Laura',  area: 'Facial',   areas: ['facial'] }
@@ -2907,7 +2463,7 @@
             : `${staff.area} · Disponible`);
       const initials = staff.name[0];
       const html = `
-        <div class="client-row" onclick="goAssign('${staff.name}', '${staff.area}')">
+        <div class="client-row" onclick="goAssign('${staff.name}')">
           <div class="client-avatar">${initials}</div>
           <div class="client-info">
             <div class="client-name">${staff.name}</div>
@@ -2929,31 +2485,7 @@
     document.getElementById('assignDirectStaffList').innerHTML = out;
   }
 
-  // ── D — identidad de operación para creación nativa de promo multiárea ────
-  // Genera UN requestId por intención de "Asignar directo" (2+ áreas). Mismo
-  // patrón que _nuevoExtraLineRequestId_ (nexserv-main-2.js) — no se reusa esa
-  // función porque es local a su propio módulo (nunca se exporta a window) y
-  // main-2.js está congelado; esto no es un segundo estándar, es la misma
-  // técnica aplicada donde hace falta. Formato exigido por
-  // _lnValidarDatosTicketNativo_/_lnValidarLineRequestId_ (NexServ_Lineas.gs):
-  // [A-Za-z0-9_-], ≤128 chars. Prefijo corto para dejar margen a los sufijos
-  // deterministas por componente ('-L2', '-L3', ...) sin acercarse al límite.
-  function _nuevoTicketRequestId_() {
-    var raw = '';
-    try {
-      if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
-        raw = crypto.randomUUID().replace(/-/g, '');
-      }
-    } catch (e) { raw = ''; }
-    if (!raw) {
-      raw = Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-          + Math.random().toString(36).slice(2, 10);
-    }
-    var id = ('TKR_' + raw).replace(/[^A-Za-z0-9_-]/g, '');
-    return id.slice(0, 40); // corto a propósito: deja margen de sobra para '-L2'..'-L99' bajo 128
-  }
-
-  async function goAssign(chica, areaStaff) {
+  async function goAssign(chica) {
     // Guard: evitar doble ejecución por touch+click o doble tap
     if (window._goAssignRunning) return;
     window._goAssignRunning = true;
@@ -2972,13 +2504,8 @@
     }
     // ── FIN MANDAMIENTO #8 ──
 
-    // Identidad de ESTE intento — nace una sola vez acá, viaja tal cual en el
-    // payload; apiPost reintenta el MISMO payload automáticamente (api.js,
-    // retries=2 por defecto), así que sus reintentos conservan este mismo
-    // requestId sin que se regenere. NO se regenera en LineaService,
-    // handleCrearTicketMulti ni crearTicketPromoNativo_.
-    const _requestIdGA = _nuevoTicketRequestId_();
-
+    // Leer área del formulario TM unificado
+    const area = getAreaFromTMForm();
     const _svcRawGA = svcEl?.value || '';
     let servicioGA = _svcRawGA, precioGA = 0;
     try { if (_svcRawGA.startsWith('{')) { const _d = JSON.parse(_svcRawGA); servicioGA = _d.nombre || _svcRawGA; precioGA = _d.precio || 0; } } catch(e) {}
@@ -2987,13 +2514,6 @@
     const promo = window._arrPromo || null;
 
     const _areaMapGA = { 'Cejas': 'cejas', 'Depilación': 'depilacion', 'Pestañas': 'pestanas', 'Lifting / Retiro': 'retiro_lifting', 'Facial': 'facial' };
-    // FIX ORDEN DE MIKAELA: el área inicial de una promo multiárea la determina
-    // la staff elegida (Mikaela hace click en la staff primero), NO el primer
-    // slot/formulario TM. `areaStaff` viene de renderAssignDirectStaff() con la
-    // especialidad real de la staff (metadata estable, no texto de UI). Si no
-    // llega (u otro caller futuro no la provee), se conserva EXACTAMENTE el
-    // comportamiento anterior: leer del formulario TM.
-    const area = (areaStaff && _areaMapGA[areaStaff]) ? areaStaff : getAreaFromTMForm();
     const areaKey = _areaMapGA[area] || 'cejas';
 
     const postData = {
@@ -3057,31 +2577,13 @@
             esTop: isTop ? 'Sí' : 'No', total: aGA.precio,
             promoNombre: aGA.tentativo, precioPromo: aGA.precio,
             precioRegular: aGA.precioNormal || aGA.precio,
-            asignadaA: chica,
-            // requestId: identidad estable de ESTE intento — el MISMO
-            // _requestIdGA generado arriba (una sola vez, antes de ambas
-            // ramas) y que la rama multi ya venía enviando. Esta rama
-            // enruta por LineaService → addServicioPromo →
-            // handleAddServicioPromo → crearTicketPromoNativo_, que lo
-            // exige y devolvía REQUEST_ID_REQUERIDO al faltar. No se
-            // genera otro acá, ni en LineaService, ni en el backend: los
-            // reintentos automáticos de apiPost reenvían este mismo
-            // payload, así que el valor se conserva y la idempotencia
-            // nativa puede detectarlos.
-            requestId: _requestIdGA
+            asignadaA: chica
           });
         } else {
           result = await LineaService.crearServicio( {
             codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
             area: aGA.area, prioridad: 'Normal', observaciones: obs,
-            esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica,
-            // C1 — requestId: el MISMO _requestIdGA generado arriba (una sola
-            // vez, antes de las tres ramas). Era la única de las tres que no lo
-            // enviaba: promo y TM ya lo hacían. Enruta por LineaService →
-            // addServicioNormal → crearTicketServicioNormalNativo_, que ahora lo
-            // exige y lo usa como identidad de intención para la idempotencia.
-            // NO se genera otro acá, ni en LineaService, ni en el backend.
-            requestId: _requestIdGA
+            esTop: isTop ? 'Sí' : 'No', total: aGA.precio, asignadaA: chica
           });
         }
         if (result && result.success) {
@@ -3103,17 +2605,7 @@
         codigo: codigo, nombre: nombre, prioridad: 'Normal',
         observaciones: obs, areas: areasMultiGA,
         secuencia: window._secuencia.map(s => s.area),
-        asignadaA: chica,
-        // areaInicial: única forma de que el backend sepa cuál era el área
-        // activa del formulario al momento de "Asignar directo" — data.areas
-        // no lo indica (el orden de sus componentes no es significativo,
-        // ver buildTMAreasFromForm), así que sin este campo la asignación
-        // por familia de área (promo nativa) no tendría con qué comparar.
-        areaInicial: areaKey,
-        // requestId: identidad estable de ESTE intento (generado arriba, una
-        // sola vez). Permite a crearTicketPromoNativo_ detectar reintentos
-        // automáticos de apiPost sin crear tickets/líneas duplicados.
-        requestId: _requestIdGA
+        asignadaA: chica
       });
       if (tmResult && tmResult.success) {
         initFormTM();
@@ -3265,53 +2757,7 @@
       document.getElementById('vdNombreExistente').value = '';
       document.getElementById('vdClienteSuggestions').style.display = 'none';
       document.getElementById('vdFormaPago').value = '';
-      _vdLimpiarTransfer();
     }
-  }
-
-  // ── PRE-CONFIRMACIÓN DE TRANSFERENCIA (venta directa) ────────────────────
-  // Mismo contrato que el cobro de servicios. Al salir de Transferencia se
-  // LIMPIAN los tres campos, no solo se ocultan: nunca se envía metadata
-  // bancaria de un método que ya no está seleccionado.
-  function _vdLimpiarTransfer() {
-    ['vdTransferResponsable', 'vdTransferBanco', 'vdTransferCodigo'].forEach(function (id) {
-      const e = document.getElementById(id); if (e) e.value = '';
-    });
-    const p = document.getElementById('vdTransferPanel');
-    if (p) p.style.display = 'none';
-  }
-
-  function vdOnFormaPagoChange() {
-    const metodo = (document.getElementById('vdFormaPago') || {}).value || '';
-    const panel = document.getElementById('vdTransferPanel');
-    if (!panel) return;
-    if (metodo === 'Transferencia') {
-      panel.style.display = 'block';
-      setTimeout(function () {
-        const r = document.getElementById('vdTransferResponsable'); if (r) r.focus();
-      }, 60);
-    } else {
-      _vdLimpiarTransfer();
-    }
-  }
-  window.vdOnFormaPagoChange = vdOnFormaPagoChange;
-
-  // Devuelve { ok, error, transferencias } con los TRES datos obligatorios.
-  // componente_index 0: la venta directa es siempre un pago simple.
-  function _vdRecolectarTransferencias(formaPago) {
-    if (formaPago !== 'Transferencia') return { ok: true, transferencias: [] };
-    const v = function (id) {
-      const e = document.getElementById(id);
-      return e ? String(e.value || '').trim() : '';
-    };
-    const responsable = v('vdTransferResponsable');
-    const banco = v('vdTransferBanco');
-    const codigo = v('vdTransferCodigo');
-    if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia.' };
-    if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia.' };
-    if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia.' };
-    return { ok: true, transferencias: [{ componente_index: 0, monto: 0,
-             responsable: responsable, banco: banco, codigo_confirmacion: codigo }] };
   }
 
   function vdOnTipoClienteChange() {
@@ -3421,29 +2867,9 @@
     if (!formaPago) { showToast('⚠ Seleccioná la forma de pago'); return; }
     const total = lineasValidas.reduce((s, l) => s + (l.precio * (l.cantidad || 1)), 0);
     const productos = lineasValidas.map(l => ({ nombre: l.producto, precio: l.precio, cantidad: l.cantidad || 1, subtotal: l.precio * (l.cantidad || 1) }));
-
-    // Pre-confirmación de transferencia ANTES de tocar nada. El backend
-    // (_validarTransferenciasCobro_) exige los tres datos y rechaza la venta
-    // sin ellos; validar acá evita el viaje y da un mensaje claro.
-    const _vtr = _vdRecolectarTransferencias(formaPago);
-    if (!_vtr.ok) { showToast('⚠ ' + _vtr.error); return; }
-
-    // FIX: antes se descontaba el stock ANTES del POST y no se comprobaba
-    // r.success. Si el backend rechazaba (p. ej. transferencia sin banco), el
-    // inventario ya había bajado y se mostraba "✓ Venta registrada" igual.
-    // Ahora: primero se confirma la escritura, y solo después se descuenta.
+    descontarStockVenta(productos);
     try {
-      const r = await apiPost('registrarVentaProductos', {
-        idEspera: '', clienteNombre: nombreCliente, productos, total,
-        esVentaDirecta: true, metodoPago: formaPago,
-        transferencias: _vtr.transferencias
-      });
-      if (!r || r.success === false) {
-        const msg = (r && (r.error || r.message)) || 'No se pudo registrar la venta.';
-        showToast('⚠ ' + msg);
-        return;                       // sin descuento de stock, sin falso éxito
-      }
-      descontarStockVenta(productos);
+      await apiPost('registrarVentaProductos', { idEspera: '', clienteNombre: nombreCliente, productos, total, esVentaDirecta: true, metodoPago: formaPago });
       showToast('✓ Venta registrada — $' + total.toFixed(2) + ' · ' + formaPago);
       toggleVentaDirecta();
       window._vdLineas = [{ producto: '', precio: 0, cantidad: 1 }];
@@ -4003,33 +3429,6 @@
         + '</div>'
         + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">Saltar ficha — solo registrar visita</button>';
     }
-
-    // ── EVIDENCIAS-CORE · acceso a "Evidencias de visita" (área facial) ──────
-    // Se agrega DESPUÉS de la Ficha facial, en ambas ramas (con y sin ficha),
-    // y no altera nada del bloque anterior. El contexto sale de variables de
-    // estado que ya fija el flujo de atención, nunca del DOM:
-    //   codigo/nombre  → window._currentFacialClient*   (de la atención)
-    //   servicio       → window._currentFacialSvcName   (de slotServices)
-    //   ticket_ref     → window._as1IdEspera/_as2IdEspera (LE-/SP-/TM-/SN-)
-    //   linea_id       → '' : no existe ninguna referencia LINEAS en frontend.
-    el.innerHTML += '<div id="evFacialAcc' + slot + '"></div>';
-    try {
-      if (window.EvidenciasCore && typeof EvidenciasCore.montarAcordeonFacial === 'function') {
-        EvidenciasCore.montarAcordeonFacial('evFacialAcc' + slot, {
-          codigo:     window._currentFacialClientCodigo || (client && client.code) || '',
-          nombre:     window._currentFacialClientNombre || (client && client.name) || '',
-          servicio:   window._currentFacialSvcName || '',
-          ticket_ref: (slot === 2 ? (window._as2IdEspera || '') : (window._as1IdEspera || '')),
-          linea_id:   '',
-          staff:      (window.currentUser && window.currentUser.name) || '',
-          readonly:   false,
-          // La ATENCIÓN asegura la visita: la staff no la crea a mano ni
-          // escribe servicio/fecha. Por eso autoEnsure sí y allowCreate no.
-          autoEnsure:  true,
-          allowCreate: false
-        });
-      }
-    } catch (eEv) { console.warn('[EvidenciasCore] facial staff:', eEv); }
   }
 
   function openNuevaFichaFacialFromPanel(clientKey, slot) {
@@ -5490,140 +4889,3 @@ function renderInformeServicios(d, pestanasData, tendData) {
 window.cargarInformeServicios = cargarInformeServicios;
 /* ========== /INFORME DE SERVICIOS ========== */
 
-// ============================================================================
-// G2 · DECISIÓN POST-PARTE — SP NATIVO (LINEAS)
-// ----------------------------------------------------------------------------
-// Handlers de los 4 botones que arma updateFinishButtons (nexserv-main-1.js).
-// Contrato aprobado (SP-0305):
-//   1 Yo sigo                -> el siguiente pendiente pasa a mí. Conservo el ticket.
-//   2 Terminé mi parte       -> congelo las mías, los pendientes quedan VIVOS en central.
-//   3 Terminé todo           -> la clienta se retira: congelo las mías y se ANULAN los pendientes.
-//   4 Devolver a central     -> devolverALista existente.
-// "Central" = lista de espera. Ningún botón manda a cobro: eso lo decide la admin.
-// ============================================================================
-(function () {
-  function _g2Cerrar(slot, msg) {
-    try {
-      slotServices[slot] = [];
-      window[slot === 1 ? '_as1IdEspera' : '_as2IdEspera'] = '';
-      window[slot === 1 ? '_as1Aten'     : '_as2Aten']     = null;
-      const u = window.currentUser;
-      if (u && activeClients[u.name]) {
-        activeClients[u.name].splice(slot - 1, 1);
-        updateCapacityUI(u.name);
-      }
-    } catch (e) {}
-    showToast(msg);
-    show('staffHome');
-    setTimeout(function () { try { loadStaffHome(); } catch (e) {} }, 300);
-  }
-
-  // 1 · Yo sigo — sin endpoint nuevo: es tomarClienta con el linea_id del siguiente.
-  //     No cierra el slot: la staff sigue con la misma clienta.
-  async function nativoYoSigo(ticketRef, lineaId) {
-    const u = window.currentUser;
-    if (!ticketRef || !lineaId) { alert('No se pudo identificar el siguiente servicio.'); return; }
-    try {
-      const r = await apiPost('tomarClienta', {
-        idListaEspera: ticketRef,
-        chicaNombre: u?.name || '',
-        componentesSeleccionados: [String(lineaId)]
-      });
-      if (r && r.success) {
-        showToast('✅ Servicio tomado — seguís vos');
-        show('staffHome');
-        setTimeout(function () { try { loadStaffHome(); } catch (e) {} }, 300);
-      } else {
-        alert(r?.message || 'No se pudo tomar el siguiente servicio');
-      }
-    } catch (e) { alert('Error de conexión'); }
-  }
-
-  // 2 · Terminé mi parte — pendientes VIVOS, ticket a central para reasignación.
-  async function nativoPasarOtraStaff(ticketRef, lineaIds) {
-    const u = window.currentUser;
-    const slot = window._finishingSlot || 1;
-    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
-    // lista (la atención puede venir de una lectura previa, o slotServices
-    // haberse repoblado por un camino que no conserva lineaId). El backend la
-    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
-    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
-    // única fuente que no depende del estado del navegador.
-    if (!Array.isArray(lineaIds)) lineaIds = [];
-    try {
-      const r = await apiPost('cederPendientesACentral', {
-        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds
-      });
-      if (r && r.success) {
-        if (r.advertencias && r.advertencias.length) {
-          alert('Se finalizó tu parte, pero revisá con Mikaela: ' + r.advertencias.join(', '));
-        }
-        _g2Cerrar(slot, '✅ Tu parte quedó lista · Los pendientes están en central');
-      } else {
-        alert(r?.message || 'No se pudo enviar a central');
-      }
-    } catch (e) { alert('Error de conexión'); }
-  }
-
-  // 3 · Terminé todo — la clienta se retira. ANULA los pendientes.
-  //     Acción destructiva: se nombra el servicio que se cancela en el toast para
-  //     que quede constancia de qué perdió la clienta.
-  async function nativoTerminarYCancelar(ticketRef, lineaIds, lblPendiente) {
-    const u = window.currentUser;
-    const slot = window._finishingSlot || 1;
-    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
-    // lista (la atención puede venir de una lectura previa, o slotServices
-    // haberse repoblado por un camino que no conserva lineaId). El backend la
-    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
-    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
-    // única fuente que no depende del estado del navegador.
-    if (!Array.isArray(lineaIds)) lineaIds = [];
-    try {
-      const r = await apiPost('terminarYCancelarPendientes', {
-        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds,
-        motivo: 'clienta se retira'
-      });
-      if (r && r.success) {
-        if (r.advertencias && r.advertencias.length) {
-          alert('Se finalizó tu parte, pero revisá con Mikaela: ' + r.advertencias.join(', '));
-        }
-        const _n = (r.anuladas || []).length;
-        _g2Cerrar(slot, '✅ Terminado · ' + (_n ? _n + ' servicio(s) cancelado(s)' : 'sin pendientes') + ' · En central');
-      } else {
-        alert(r?.message || 'No se pudo cerrar el ticket');
-      }
-    } catch (e) { alert('Error de conexión'); }
-  }
-
-  // Sin pendientes — cierro mi parte y el ticket queda en central.
-  async function nativoTerminarMandarCentral(ticketRef, lineaIds) {
-    const u = window.currentUser;
-    const slot = window._finishingSlot || 1;
-    // NO se corta acá por lineaIds vacío. El cliente no siempre puede armar la
-    // lista (la atención puede venir de una lectura previa, o slotServices
-    // haberse repoblado por un camino que no conserva lineaId). El backend la
-    // resuelve contra LINEAS con _lnMisLineasEnServicioTicket_ y devuelve
-    // SIN_LINEAS_EN_SERVICIO si de verdad no hay nada en curso — esa es la
-    // única fuente que no depende del estado del navegador.
-    if (!Array.isArray(lineaIds)) lineaIds = [];
-    try {
-      const r = await apiPost('finalizarComponentesStaff', {
-        ticketRef: ticketRef, staff: u?.name || '', lineaIds: lineaIds
-      });
-      if (r && r.success) _g2Cerrar(slot, '✅ Servicios finalizados · En central');
-      else alert(r?.message || 'No se pudo finalizar');
-    } catch (e) { alert('Error de conexión'); }
-  }
-
-  // 4 · Devolver a central — reutiliza el flujo existente, sin lógica nueva.
-  async function nativoDevolverACentral(slot) {
-    if (typeof devolverALista === 'function') { devolverALista(slot); return; }
-    alert('No se pudo devolver a central.');
-  }
-
-  window.nativoYoSigo                = nativoYoSigo;
-  window.nativoPasarOtraStaff        = nativoPasarOtraStaff;
-  window.nativoTerminarYCancelar     = nativoTerminarYCancelar;
-  window.nativoTerminarMandarCentral = nativoTerminarMandarCentral;
-  window.nativoDevolverACentral      = nativoDevolverACentral;
-})();
