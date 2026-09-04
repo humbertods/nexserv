@@ -1007,7 +1007,7 @@
         await recargarAutorizacionesStaff(slotNum);
         const aunPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
         if (!aunPendientes) { clearInterval(window[pollKeyImmediate]); window[pollKeyImmediate] = null; }
-      }, 8000);
+      }, 15000);  // 15s (antes 8s): getAutorizaciones tarda ~3.7s; a 8s saturaba el backend
     }
 
     try {
@@ -3912,9 +3912,24 @@
           mkRenderEsperandoCobro();
         }
         
-        // Autorizaciones pendientes
-        renderAuthorizations();
-        
+        // Autorizaciones pendientes — DESACOPLADAS del refresco principal.
+        // getAutorizaciones tarda ~3.7s sobre una hoja que casi siempre está
+        // vacía. Llamarla en cada refresco (cada 8-15s) saturaba el ScriptLock
+        // del backend y hacía lento TODO — incluido el alta/toma/cobro de SN.
+        // Ahora corre en su propio ciclo lento (30s) y NO bloquea el render de
+        // la lista de espera: las autorizaciones no son urgentes al segundo.
+        if (window._authRefreshMikaela) clearInterval(window._authRefreshMikaela);
+        renderAuthorizations();  // una vez al entrar, sin await (no bloquea)
+        window._authRefreshMikaela = setInterval(() => {
+          const cs = document.querySelector('.screen.active');
+          if (cs && cs.id === 'mikaelaHome') {
+            try { renderAuthorizations(); } catch (e) {}
+          } else {
+            clearInterval(window._authRefreshMikaela);
+            window._authRefreshMikaela = null;
+          }
+        }, 30000);
+
         // Auto-refresh inteligente: 8s si hay clientas en atención, 15s si no
         if (window._mikaelaAutoRefresh) clearInterval(window._mikaelaAutoRefresh);
         const refreshInterval = enServicio.length > 0 ? 8000 : 15000;
