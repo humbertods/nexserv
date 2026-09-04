@@ -1,11 +1,9 @@
 // NEXSERV nexserv-main-3.js — Cobros, facturación, asistencia
 // Depende de: nexserv-main-2.js
 
-  async function approveAuthorization(reqId, ticketRef) {
+  async function approveAuthorization(reqId) {
     try {
-      // APROBACIÓN 100% LINEAS. reqId es el linea_id de la propuesta;
-      // ticketRef viene de la misma tarjeta que la lista.
-      const result = await LineaService.aprobarExtra(ticketRef, reqId);
+      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
       
       if (result.success) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
@@ -20,15 +18,9 @@
     }
   }
   
-  async function rejectAuthorization(reqId, ticketRef) {
-    // FIX-AUTH-01 — el backend exige motivo no vacío. Lo escribe Central.
-    // Cancelar o dejarlo en blanco NO envía nada: no se fabrica un motivo
-    // por defecto ni se manda una cadena vacía.
-    const motivo = window.prompt('Motivo del rechazo:');
-    const motivoLimpio = String(motivo || '').trim();
-    if (!motivoLimpio) return;
+  async function rejectAuthorization(reqId) {
     try {
-      const result = await LineaService.rechazarExtra(ticketRef, reqId, motivoLimpio);
+      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
       
       if (result.success) {
         alert('✕ Servicio rechazado. El staff será notificado.');
@@ -1363,31 +1355,6 @@
         b.style.background = 'var(--bg-card)'; b.style.color = 'var(--ink)'; b.style.borderColor = 'var(--line)';
       }
     });
-
-    // ── FIX B — RESET FAIL-CLOSED DEL ESTADO DE PAGO ─────────────────────
-    // El reset de arriba es SOLO visual (resalta el botón Efectivo). Sin esto,
-    // un cobro anterior hecho con "Pago mixto" o "Transferencia" dejaba el
-    // estado interno y el DOM contaminados para la siguiente clienta: botón
-    // Efectivo resaltado, pero `_cobroPago === 'Pago mixto'` y los paneles
-    // abiertos con banco/código/montos de OTRA persona. Se fuerza el estado
-    // real a Efectivo y se limpia toda metadata bancaria heredada.
-    window._cobrarPago = 'Efectivo';
-    window._cobroPago  = 'Efectivo';
-    const _tPanelReset = document.getElementById('transferPanel');
-    if (_tPanelReset) _tPanelReset.style.display = 'none';
-    if (typeof _limpiarTransferSimple === 'function') _limpiarTransferSimple();
-    const _mPanelReset = document.getElementById('mixtoPanel');
-    if (_mPanelReset) _mPanelReset.style.display = 'none';
-    if (typeof _limpiarTransferMixto === 'function') _limpiarTransferMixto();
-    [1, 2, 3].forEach(i => {
-      const _mm = document.getElementById('mixtoMonto' + i);
-      if (_mm) _mm.value = '';
-    });
-    const _sumaReset = document.getElementById('mixtoSuma');
-    if (_sumaReset) { _sumaReset.textContent = ''; _sumaReset.style.color = 'var(--ink-soft)'; }
-    window._transferenciasCobro = [];
-    // ─────────────────────────────────────────────────────────────────────
-
     document.getElementById('cobrarModal').classList.add('active');
     _cobroCargarAbono();
   }
@@ -1554,94 +1521,6 @@
   }
   window._cobroRegistrarAbono = _cobroRegistrarAbono;
 
-  // ══════════════════════════════════════════════════════════════════
-  // PRE-CONFIRMACIÓN DE TRANSFERENCIAS (Mikaela)
-  // Banco + código de confirmación son obligatorios para TODO componente
-  // cuyo método sea Transferencia. Esto es PRE-confirmación: no verifica
-  // nada, solo deja registrado con qué banco y qué código entró el dinero.
-  // La confirmación final la hace el Owner en Verificación de Pagos.
-  // ══════════════════════════════════════════════════════════════════
-  function _val(id) {
-    const e = document.getElementById(id);
-    return e ? String(e.value || '').trim() : '';
-  }
-  function _limpiarTransferSimple() {
-    ['transferResponsable', 'transferBanco', 'transferCodigo'].forEach(id => {
-      const e = document.getElementById(id); if (e) e.value = '';
-    });
-  }
-  function _limpiarTransferMixto(soloFila) {
-    [1, 2, 3].forEach(i => {
-      if (soloFila && soloFila !== i) return;
-      ['mixtoResponsable' + i, 'mixtoBanco' + i, 'mixtoCodigo' + i].forEach(id => {
-        const e = document.getElementById(id); if (e) e.value = '';
-      });
-      const p = document.getElementById('mixtoTransfer' + i);
-      if (p) p.style.display = 'none';
-    });
-  }
-
-  // Cada fila del mixto muestra su propio Banco/Código solo si su método es
-  // Transferencia. Al cambiar a Efectivo/Tarjeta se limpia esa fila.
-  function onMixtoMetodoChange() {
-    [1, 2, 3].forEach(i => {
-      const met = document.getElementById('mixtoMetodo' + i);
-      const pan = document.getElementById('mixtoTransfer' + i);
-      if (!met || !pan) return;
-      if (String(met.value) === 'Transferencia') {
-        pan.style.display = 'block';
-      } else {
-        pan.style.display = 'none';
-        _limpiarTransferMixto(i);
-      }
-    });
-  }
-  window.onMixtoMetodoChange = onMixtoMetodoChange;
-
-  // Construye transferencias[] y valida. Devuelve { ok, error, transferencias }.
-  // componente_index es el ORDINAL del componente financiero dentro del pago:
-  // 0 para pago simple; para mixto, la posición de la fila entre las filas con
-  // monto > 0 — el mismo orden con el que se arma el string 'Mixto: ...'.
-  function _recolectarTransferencias() {
-    const metodo = window._cobrarPago || window._cobroPago || 'Efectivo';
-
-    if (metodo === 'Transferencia') {
-      const responsable = _val('transferResponsable');
-      const banco = _val('transferBanco'), codigo = _val('transferCodigo');
-      if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia.' };
-      if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia.' };
-      if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia.' };
-      return { ok: true, transferencias: [{ componente_index: 0, monto: 0,
-               responsable: responsable, banco: banco, codigo_confirmacion: codigo }] };
-    }
-
-    if (metodo === 'Pago mixto') {
-      const out = [];
-      let idx = 0;
-      for (let i = 1; i <= 3; i++) {
-        const met = document.getElementById('mixtoMetodo' + i);
-        const monto = parseFloat(_val('mixtoMonto' + i)) || 0;
-        if (monto <= 0) continue;                    // fila inactiva: no es componente
-        const m = met ? String(met.value) : 'Efectivo';
-        if (m === 'Transferencia') {
-          // Cada componente de transferencia del mixto exige sus TRES datos.
-          const responsable = _val('mixtoResponsable' + i);
-          const banco = _val('mixtoBanco' + i), codigo = _val('mixtoCodigo' + i);
-          if (!responsable) return { ok: false, error: 'Falta el RESPONSABLE de la transferencia de $' + monto.toFixed(2) + '.' };
-          if (!banco)       return { ok: false, error: 'Falta el BANCO de la transferencia de $' + monto.toFixed(2) + '.' };
-          if (!codigo)      return { ok: false, error: 'Falta el No. DE CONFIRMACIÓN de la transferencia de $' + monto.toFixed(2) + '.' };
-          out.push({ componente_index: idx, monto: monto,
-                     responsable: responsable, banco: banco, codigo_confirmacion: codigo });
-        }
-        idx++;
-      }
-      return { ok: true, transferencias: out };
-    }
-
-    return { ok: true, transferencias: [] };          // Efectivo / Tarjeta: no exige
-  }
-  window._recolectarTransferencias = _recolectarTransferencias;
-
   function selectPago(metodo, btn) {
     // Unificar ambas variables de pago (cobro individual y grupal usan la misma)
     window._cobrarPago = metodo;
@@ -1652,17 +1531,6 @@
       b.classList.remove('selected');
     });
     if (btn) { btn.style.background = 'var(--success)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--success)'; btn.classList.add('selected'); }
-
-    // ── PRE-CONFIRMACIÓN DE TRANSFERENCIA ────────────────────────────────
-    // Nunca se conserva metadata bancaria de un método que ya no está activo:
-    // al salir de Transferencia se limpian Banco/Código, no solo se ocultan.
-    const tPanel = document.getElementById('transferPanel');
-    if (tPanel) {
-      const esTransfer = (metodo === 'Transferencia');
-      tPanel.style.display = esTransfer ? 'block' : 'none';
-      if (!esTransfer) _limpiarTransferSimple();
-    }
-    if (metodo !== 'Pago mixto') _limpiarTransferMixto();   // incluye simple/efectivo/tarjeta
 
     // Mostrar/ocultar panel mixto
     const mixtoPanel = document.getElementById('mixtoPanel');
@@ -1677,12 +1545,6 @@
         if (m3) m3.value = '';
         const sumaEl = document.getElementById('mixtoSuma');
         if (sumaEl) { sumaEl.textContent = 'Ingresá los montos'; sumaEl.style.color = 'var(--ink-soft)'; }
-        // Sincroniza la visibilidad de los sub-paneles de transferencia con el
-        // valor ACTUAL de cada select al abrir el desglose. Sin esto, una fila
-        // cuyo <option> por defecto ya es "Transferencia" (fila 2) nunca dispara
-        // el evento 'change' y sus campos Responsable / Banco / No. de
-        // confirmación jamás se despliegan, aunque la validación sí los exija.
-        onMixtoMetodoChange();
         setTimeout(() => m1?.focus(), 100);
       }
     }
@@ -1942,19 +1804,6 @@
       window._cobroPago  = _metodoPagoFinal;
     }
 
-    // ── PRE-CONFIRMACIÓN OBLIGATORIA DE TRANSFERENCIAS ───────────────────
-    // Se recolecta ANTES de deshabilitar el botón y ANTES de cualquier
-    // apiPost: si falta banco o código, no hay cobro. El backend vuelve a
-    // validar (DevTools no puede saltarse la regla).
-    // OJO: se lee el método ORIGINAL, no el string 'Mixto: ...' ya armado.
-    const _metodoUI = (_metodoPagoFinal.indexOf('Mixto:') === 0) ? 'Pago mixto' : _metodoPagoFinal;
-    const _pagoPrev = window._cobrarPago;
-    window._cobrarPago = _metodoUI;
-    const _tr = _recolectarTransferencias();
-    window._cobrarPago = _pagoPrev;
-    if (!_tr.ok) { alert('⚠ ' + _tr.error); return; }
-    window._transferenciasCobro = _tr.transferencias || [];
-
     btn.textContent = '⏳ Procesando...';
     btn.disabled = true;
 
@@ -1985,57 +1834,22 @@
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           _payloadGrupal.clienteCodigo  = c.codigo || '';   // para el gate del piloto LINEAS
-          // pago_uid: identidad nativa del cobro. Cada clienta del grupal tiene el
-          // suyo (el frontend hace un confirmarCobro por clienta), así que sus
-          // productos se atan a SU pago y no al de otra.
-          const _respGrupal = await apiPost('confirmarCobro', _payloadGrupal);
-          // Mismo gate estricto que el individual: solo success === true cuenta
-          // como cobrada. Un { error:'Failed to fetch' } de apiPost (red caída
-          // tras los reintentos) no trae `success` y antes se colaba como éxito.
-          // Se lanza para que el catch del grupal deje el botón utilizable y NO
-          // se limpie el staging de productos.
-          if (!_respGrupal || _respGrupal.success !== true) {
-            throw new Error(
-              (c.nombre ? c.nombre + ': ' : '') +
-              ((_respGrupal && (_respGrupal.error || _respGrupal.message)) ||
-               'No se pudo confirmar el cobro')
-            );
-          }
-          const _pagoUidC = (_respGrupal && _respGrupal.pago_uid) || '';
+          await apiPost('confirmarCobro', _payloadGrupal);
           // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
           // (van a la caja, SIN comisión), igual que en el cobro individual.
           const _prodsC = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
           if (_prodsC.length > 0) {
             const _totProdC = _prodsC.reduce(function(s,p){ return s + (Number(p.precio) * Number(p.cantidad || 1)); }, 0);
-            let _prodOkC = false;
             try {
-              const _rpC = await apiPost('registrarVentaProductos', {
+              await apiPost('registrarVentaProductos', {
                 idEspera: c.idEspera,
                 clienteNombre: c.nombre || '',
                 productos: _prodsC,
                 total: _totProdC,
-                metodoPago: metodoPago,
-                pago_uid: _pagoUidC,        // mismo pago que el servicio de esta clienta
-                // Misma pre-confirmación del cobro de esta clienta: servicio y
-                // producto del mismo pago_uid son UN solo evento de pago. No se
-                // le pide a Mikaela que reescriba Responsable/Banco/No. de
-                // confirmación, ni se crea una segunda pre-confirmación.
-                transferencias: window._transferenciasCobro || []
+                metodoPago: metodoPago
               });
-              // Confirmación positiva obligatoria (mismo motivo que el individual).
-              _prodOkC = !!(_rpC && _rpC.success === true);
-              if (!_prodOkC) {
-                console.error('registrarVentaProductos (grupal) rechazado:', _rpC);
-                showToast('⚠ ' + (c.nombre || 'Clienta') + ': productos NO registrados — ' +
-                  ((_rpC && (_rpC.error || _rpC.message)) || 'error del servidor'));
-              }
-            } catch(eProd) {
-              console.error(eProd);
-              showToast('⚠ ' + (c.nombre || 'Clienta') + ': error de red al registrar productos');
-            }
-            // Solo se limpia el staging si el backend CONFIRMÓ el registro. Un
-            // success:false ya no borra los productos en silencio.
-            if (_prodOkC) delete window._apProductosEnTicket[c.idEspera];
+            } catch(eProd) { console.error(eProd); }
+            delete window._apProductosEnTicket[c.idEspera];
           }
         }
         // ── FACTURACIÓN grupal (OPCIONAL): factura a nombre de la pagadora (principal),
@@ -2061,16 +1875,9 @@
         const idx = window._cobroGrupal.idxEsperando;
         if (idx !== undefined) window._mkEsperandoCobro.splice(idx, 1);
         window._cobroGrupal = null;
-        // Vaciar el staging de las clientas de ESTE grupo: ningún producto
-        // sobrevive a un cobro para reaparecerle a la siguiente clienta (reúso
-        // de id). Los tickets cuyo registro de productos falló ya conservaron su
-        // entrada arriba y NO se borran acá: quedan visibles para reintentar.
-        clientas.forEach(function (c) {
-          if (c && c.idEspera && window._apProductosEnTicket &&
-              !window._apProductosEnTicket[c.idEspera]) {
-            delete window._apProductosEnTicket[c.idEspera];
-          }
-        });
+        // Vaciar TODO el mapa de productos staged tras cobro OK: ningún producto
+        // sobrevive a un cobro para reaparecerle a la siguiente clienta (reúso de id).
+        window._apProductosEnTicket = {};
         mkRenderEsperandoCobro();
         closeModal();
         showToast('✓ Cobro grupal confirmado — ' + metodoPago);
@@ -2125,28 +1932,9 @@
       _payloadM5.notaAjuste = window._cobrarAjustes.join(' · ');
     }
 
-    // pago_uid: se captura del cobro para que los productos del mismo ticket
-    // queden atados al MISMO pago (no se deduce por idEspera).
-    let _pagoUidTicket = '';
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
-      const _respCobro = await apiPost('confirmarCobro', _payloadM5);
-      // Éxito = CONFIRMACIÓN POSITIVA del backend (success === true), no
-      // "no vi un false". Hay tres formas de no-éxito y ninguna lanza:
-      //   1) { success:false, ... }  → rechazo del backend (TRANSFERENCIA_INCOMPLETO…)
-      //   2) { error:'Failed to fetch' } → apiPost agotó los reintentos y
-      //      devuelve ESO, sin clave `success` y sin excepción;
-      //   3) null / undefined.
-      // Con `success === false` el caso 2 pasaba de largo y el cobro se daba
-      // por bueno. Todas las rutas de confirmarCobro (LINEAS, SN, SP, TM y
-      // legacy) devuelven success:true cuando cobran — incluido yaCobrado.
-      if (!_respCobro || _respCobro.success !== true) {
-        throw new Error(
-          (_respCobro && (_respCobro.error || _respCobro.message)) ||
-          'No se pudo confirmar el cobro'
-        );
-      }
-      _pagoUidTicket = (_respCobro && _respCobro.pago_uid) || '';
+      await apiPost('confirmarCobro', _payloadM5);
     } catch (err) {
       console.error('confirmarCobro error:', err);
       btn.disabled = false;
@@ -2163,53 +1951,20 @@
     } catch (eAb) { console.error(eAb); }
 
     // Si hay productos, registrarlos en el historial
-    // `_ticketCobrado` y `_prodOk` se declaran ACÁ (no dentro del if) porque la
-    // limpieza final del staging, mucho más abajo, necesita saber qué ticket se
-    // cobró y si sus productos quedaron realmente registrados.
-    const _ticketCobrado = window._cobrarId || '';
-    // Sin productos staged no hay nada pendiente → la limpieza puede proceder.
-    let _prodOk = true;
-    const productosTicket = (_ticketCobrado && window._apProductosEnTicket && window._apProductosEnTicket[_ticketCobrado]) ? window._apProductosEnTicket[_ticketCobrado] : [];
+    const productosTicket = (window._cobrarId && window._apProductosEnTicket && window._apProductosEnTicket[window._cobrarId]) ? window._apProductosEnTicket[window._cobrarId] : [];
     if (productosTicket.length > 0) {
-      _prodOk = false;
       try {
-        const _rp = await apiPost('registrarVentaProductos', {
-          idEspera: _ticketCobrado,
+        await apiPost('registrarVentaProductos', {
+          idEspera: window._cobrarId,
           clienteNombre: document.getElementById('cobrarClientName')?.textContent || '',
           productos: productosTicket,
           total: totalProductos,
-          metodoPago: window._cobrarPago,
-          pago_uid: _pagoUidTicket,       // mismo pago que el servicio
-          // Misma pre-confirmación que ya validó este cobro. Servicio y
-          // producto del mismo pago_uid son UN solo evento de pago: no se pide
-          // dos veces Responsable/Banco/No. de confirmación ni se crea una
-          // segunda pre-confirmación. El agrupador de Verificación toma la
-          // metadata de la primera fila que la traiga, así que repetir el mismo
-          // JSON no duplica componentes ni dinero.
-          transferencias: window._transferenciasCobro || []
+          metodoPago: window._cobrarPago
         });
-        // Confirmación positiva obligatoria. `success !== false` daba true para
-        // { error:'Failed to fetch' } (apiPost tras agotar reintentos), y el
-        // staging se borraba sin que el producto se hubiera registrado.
-        // handleRegistrarVentaProductos devuelve success:true al escribir.
-        _prodOk = !!(_rp && _rp.success === true);
-        if (!_prodOk) {
-          console.error('registrarVentaProductos rechazado:', _rp);
-          showToast('⚠ Cobro registrado, pero los productos NO: ' +
-            ((_rp && (_rp.error || _rp.message)) || 'error del servidor'));
-        }
-      } catch(e) {
-        console.error(e);
-        showToast('⚠ Cobro registrado, pero hubo un error de red con los productos');
-      }
-      // El staging solo se limpia si el backend CONFIRMÓ el registro. Antes se
-      // borraba siempre, así que un rechazo hacía desaparecer los productos sin
-      // que quedaran guardados en ninguna parte.
-      if (_prodOk) {
-        delete window._apProductosEnTicket[_ticketCobrado];
-        const ticketDiv = document.getElementById('productos-ticket-' + _ticketCobrado);
-        if (ticketDiv) ticketDiv.innerHTML = '';
-      }
+      } catch(e) { console.error(e); }
+      delete window._apProductosEnTicket[window._cobrarId];
+      const ticketDiv = document.getElementById('productos-ticket-' + window._cobrarId);
+      if (ticketDiv) ticketDiv.innerHTML = '';
     }
 
     // ── FACTURACIÓN: guardar el documento (endpoint aparte, NUNCA bloquea el cobro) ──
@@ -2262,17 +2017,8 @@
       }
     } catch(e) {}
     await loadPorCobrar();
-    // Limpieza del staging: SOLO el ticket que se acaba de cobrar, y SOLO si sus
-    // productos quedaron efectivamente registrados (_prodOk).
-    // Antes acá se vaciaba el mapa entero (`window._apProductosEnTicket = {}`),
-    // lo que tenía dos efectos malos: (1) borraba el staging que el bloque de
-    // arriba había preservado a propósito cuando registrarVentaProductos
-    // devolvió success:false o hubo error de red, dejando los productos sin
-    // registrar Y sin rastro; y (2) se llevaba por delante los productos staged
-    // de OTROS tickets que no tienen nada que ver con este cobro.
-    if (_prodOk && _ticketCobrado && window._apProductosEnTicket) {
-      delete window._apProductosEnTicket[_ticketCobrado];
-    }
+    // Vaciar TODO el mapa de productos staged tras cobro OK (mismo motivo que en grupal).
+    window._apProductosEnTicket = {};
 
     let msg = '✓ Cobro de $' + totalFinal.toFixed(2) + ' registrado como ' + window._cobrarPago;
     if (totalProductos > 0) msg += '\n(Servicios: $' + totalServicios + ' + Productos: $' + totalProductos.toFixed(2) + ')';
@@ -2741,9 +2487,7 @@
           tentativo: d.nombre,
           precio: _m,
           precioNormal: _reg,
-          tipo: 'promo',
-          promoNombre: d.nombre,
-          servicioComponente: String(dv.servicio || dv.area || '')
+          tipo: 'promo'
         };
       });
 
@@ -2860,9 +2604,7 @@
       const montoMio = Number(divs[divMatchIdx].monto || 0) || Number(divs[0].monto || 0);
       if (montoMio > 0 && svc) {
         svc.precio = montoMio;
-      const regularMio = Number(divs[divMatchIdx].regular || 0) ||
-                         Number(divs[0].regular || 0);
-        svc.precioNormal = (regularMio > 0) ? regularMio : montoMio;
+        svc.precioNormal = montoMio;
       }
 
       // Mostrar info: área de esta staff y su precio
@@ -3995,24 +3737,7 @@
   async function renderPayments() {
     const list = document.getElementById('payStaffList');
     list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando comisiones...</div>';
-
-    // ── Resumen superior: SEMANA CALENDARIO REAL (lunes–sábado, America/Guayaquil) ──
-    // Alimenta SOLO #payWeekLabel / #payTotal / #payComm / #payNet. El listado de
-    // staff de más abajo sigue con getComisiones y su acumulado, sin cambios.
-    try {
-      const fin = await apiGet('getOwnerFinancialSummary');
-      if (fin && fin.success && fin.week) {
-        const w = fin.week;
-        const _set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
-        const _m = n => '$' + (Number(n) || 0).toFixed(0);
-        _set('payWeekLabel', w.label || '—');
-        _set('payTotal', _m(w.facturado));
-        _set('payComm',  _m(w.comisiones));
-        _set('payNet',   _m(w.neto));
-        window._ownerFinSummary = fin;
-      }
-    } catch (err) { console.error('Error resumen semana OWNER:', err); }
-
+    
     // Cargar comisiones reales del Sheet
     let staffData = PAY_STAFF;
     try {
@@ -4132,51 +3857,22 @@
     alert('✓ ' + p.name + ' marcada como pagada.');
   }
 
-  // ── OWNER · SEMANA CANÓNICA (frontend) ──────────────────────────────────
-  // Fuente primaria: el week que el backend ya dejó en window._ownerFinSummary
-  // vía renderPayments(). El fallback replica la MISMA regla (lunes–sábado +
-  // ISO-8601 por el jueves) y es el único cálculo local que existe: se
-  // eliminaron las fórmulas aproximadas Math.ceil(getDate()/7)+14 y
-  // mes + (getDate()-6) + '-' + getDate().
-  function _ownerWeekActual() {
-    const w = window._ownerFinSummary && window._ownerFinSummary.week;
-    if (w && w.number) return w;
-
-    const hoy = new Date();
-    const civil = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const lunes = new Date(civil.getFullYear(), civil.getMonth(), civil.getDate() - ((civil.getDay() + 6) % 7));
-    const sabado = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 5);
-    const jueves = new Date(lunes.getFullYear(), lunes.getMonth(), lunes.getDate() + 3);
-    const ene4 = new Date(jueves.getFullYear(), 0, 4);
-    const lunesSem1 = new Date(jueves.getFullYear(), 0, 4 - ((ene4.getDay() + 6) % 7));
-    const number = Math.round((jueves - lunesSem1) / 604800000) + 1;
-    const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    const dmy = d => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
-    const rango = (lunes.getMonth() === sabado.getMonth())
-      ? (MESES[lunes.getMonth()] + ' ' + lunes.getDate() + '–' + sabado.getDate())
-      : (MESES[lunes.getMonth()] + ' ' + lunes.getDate() + '–' + MESES[sabado.getMonth()] + ' ' + sabado.getDate());
-    return {
-      number: number,
-      label: 'Semana ' + number + ' · ' + rango,
-      periodo: 'Lunes ' + dmy(lunes) + ' — Sábado ' + dmy(sabado)
-    };
-  }
-
   function openCloseWeek() {
     const staffData = window._payStaffData || PAY_STAFF;
     const unpaid = staffData.filter(p => !p.paid);
     const total = unpaid.reduce((s, p) => s + p.acumulado, 0);
-    const w = _ownerWeekActual();
-    document.getElementById('closeWeekName').textContent = w.label || ('Semana ' + w.number);
+    const weekNum = new Date().getWeekNumber ? new Date().getWeekNumber() : Math.ceil((new Date().getDate()) / 7) + 14;
+    document.getElementById('closeWeekName').textContent = 'Semana ' + weekNum;
     document.getElementById('closeWeekTotal').textContent = '$' + total.toFixed(2);
     document.getElementById('closeWeekModal').classList.add('active');
   }
 
   async function confirmCloseWeek() {
-    // MISMA semana que muestra renderPayments: cero cálculo independiente.
-    const w = _ownerWeekActual();
-    const semana = 'Semana ' + w.number;
-    const periodo = w.periodo;
+    const now = new Date();
+    const weekNum = Math.ceil(now.getDate() / 7) + 14;
+    const semana = 'Semana ' + weekNum;
+    const mes = now.toLocaleDateString('es-EC', { month: 'short' });
+    const periodo = mes + ' ' + (now.getDate() - 6) + '-' + now.getDate();
 
     try {
       await apiPost('cierreSemanal', {
@@ -4353,24 +4049,17 @@
   // Función para cargar perfiles de clientas desde el servidor
   async function loadClientProfiles() {
     try {
-      // FIX-CLIENTS-01 — 'getAllClients' nunca existió en el backend (ni en DEV
-      // ni en PROD): la llamada caía en el default del router y CLIENT_PROFILES
-      // quedaba vacío, dejando el directorio sin perfiles. Se usa 'getClientas',
-      // que ya existe, está ruteada y lee la MISMA hoja Clientas. Solo cambian
-      // los nombres de campo: clients→clientas, code→codigo, visitas→totalVisitas.
-      // No se inventa ningún dato: los campos que el backend no trae se dejan
-      // exactamente como estaban.
-      const result = await apiGet('getClientas');
-      if (result.success && result.clientas) {
+      const result = await apiGet('getAllClients');
+      if (result.success && result.clients) {
         CLIENT_PROFILES = {};
-        result.clientas.forEach(client => {
-          const key = String(client.codigo || '').toLowerCase().replace('c-', 'c');
+        result.clients.forEach(client => {
+          const key = client.code.toLowerCase().replace('c-', 'c');
           CLIENT_PROFILES[key] = {
             name: client.nombre || '',
-            code: client.codigo || '',
+            code: client.code || '',
             initials: client.nombre ? client.nombre.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??',
             isTop: false,
-            visits: parseInt(client.totalVisitas) || 0,
+            visits: parseInt(client.visitas) || 0,
             spent: 0,
             last: client.ultimaVisita || '',
             obs: client.observaciones || '',
@@ -4388,3 +4077,4 @@
 
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
+
