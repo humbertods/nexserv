@@ -3421,7 +3421,10 @@ window._nexLatAbrir = _nexLatAbrir;
 // de la pantalla activa. No lee payload.data, no escribe estado, no
 // ejecuta ninguna acción comercial.
 // ══════════════════════════════════════════════════════════════════
-window._nexRefresh = { ultimo: 0, timer: null, enVuelo: false, pendiente: null };
+window._nexRefresh = {
+  ultimo: 0, timer: null, enVuelo: false, pendiente: null,
+  initialHomeLoadActive: false, initialHomeLoadDone: false
+};
 
 function _nexPantallaActiva() {
   const el = document.querySelector('.screen.active');
@@ -3439,6 +3442,10 @@ async function _nexRefrescarAhora(origen) {
   const st = window._nexRefresh;
   const u = window.currentUser;
   if (!u) return;
+  if (st.initialHomeLoadActive) {
+    if (_nexEsFCM(origen)) st.pendiente = origen;
+    return;
+  }
   const pantalla = _nexPantallaActiva();
   st.enVuelo = true;
   // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
@@ -3519,6 +3526,10 @@ function nexRefrescarUI(origen) {
     });
   } catch (e) {}
   // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
+  if (st.initialHomeLoadActive) {
+    if (_nexEsFCM(origen)) st.pendiente = origen;
+    return;
+  }
   if (st.enVuelo) {
     // Un FCM pendiente tiene prioridad sobre un focus/visibility pendiente:
     // representa un cambio nuevo y debe forzar lectura real al reanudar.
