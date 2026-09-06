@@ -4,6 +4,31 @@
 // Depende de: api.js, state.js
 // ================================================
 
+  function _nexEjecutarCargaHomeInicial_(loader) {
+    const st = window._nexRefresh || (window._nexRefresh = {
+      ultimo: 0, timer: null, enVuelo: false, pendiente: null
+    });
+    if (st.initialHomeLoadActive) return;
+    st.initialHomeLoadActive = true;
+    st.initialHomeLoadDone = false;
+    var carga;
+    try { carga = Promise.resolve(loader()); }
+    catch (e) { carga = Promise.reject(e); }
+    return carga.finally(function () {
+      st.initialHomeLoadActive = false;
+      st.initialHomeLoadDone = true;
+      if (st.pendiente && _nexEsFCM(st.pendiente) && !st.enVuelo) {
+        var origenPendiente = st.pendiente;
+        st.pendiente = null;
+        st.ultimo = 0;
+        if (typeof window.nexRefrescarUI === 'function')
+          window.nexRefrescarUI(origenPendiente + '+startup');
+      } else if (st.pendiente && !_nexEsFCM(st.pendiente)) {
+        st.pendiente = null;
+      }
+    });
+  }
+
   async function show(id) {
     const targetScreen = document.getElementById(id);
     if (!targetScreen) {
@@ -28,7 +53,7 @@
       }, 12000);
     }
     if (id === 'staffHome') {
-      loadStaffHome();
+      _nexEjecutarCargaHomeInicial_(loadStaffHome);
       // Auto-refresco del panel de la chica MIENTRAS lo tiene abierto (primer plano).
       // Así la clienta recién asignada aparece sola en pocos segundos, sin depender del push.
       // Se pausa solo si: no es la pantalla activa, la app está en segundo plano, hay un
@@ -39,7 +64,8 @@
         if (!el || !el.classList.contains('active')) {
           clearInterval(window._staffHomeRefresh); window._staffHomeRefresh = null; return;
         }
-        if (document.hidden || document.querySelector('.modal-bg.active') || window._staffHomeLoading) return;
+        if (document.hidden || document.querySelector('.modal-bg.active') || window._staffHomeLoading ||
+            (window._nexRefresh && window._nexRefresh.initialHomeLoadActive)) return;
         window._staffHomeLoading = true;
         try { await loadStaffHome(); } finally { window._staffHomeLoading = false; }
       }, 10000);
@@ -47,12 +73,16 @@
       clearInterval(window._staffHomeRefresh); window._staffHomeRefresh = null;
     }
     if (id === 'ownerHome') {
-      loadOwnerHome();
+      _nexEjecutarCargaHomeInicial_(loadOwnerHome);
       if (window._ownerHomeRefresh) clearInterval(window._ownerHomeRefresh);
       window._ownerHomeRefresh = setInterval(() => {
         const el = document.getElementById('ownerHome');
-        if (el && el.classList.contains('active')) refreshEstadoSalon();
-        else { clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null; }
+        if (!el || !el.classList.contains('active')) {
+          clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null;
+          return;
+        }
+        if (window._nexRefresh && window._nexRefresh.initialHomeLoadActive) return;
+        refreshEstadoSalon();
       }, 15000);
     } else if (window._ownerHomeRefresh) {
       clearInterval(window._ownerHomeRefresh); window._ownerHomeRefresh = null;
@@ -100,7 +130,7 @@
       const _uMH = window.currentUser;
       const _permitidoMH = _uMH && (_uMH.role === 'admin' || _uMH.role === 'owner');
       if (_uMH && !_permitidoMH) { show('staffHome'); return; }
-      loadMikaelaHome();
+      _nexEjecutarCargaHomeInicial_(loadMikaelaHome);
     }
     if (id === 'staffAsistencia') { _staffAsisCargar(); }
     if (id === 'asistenciaPanel') {
