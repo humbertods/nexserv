@@ -1720,15 +1720,25 @@
           });
           if (_mias.length > 0) {
             _peSection.style.display = 'block';
-            _peList.innerHTML = _mias.map(function (w) {
-              const _cod = String(w.codigo || '').replace(/'/g, "\\'");
-              const _nom = String(w.nombre || '').replace(/'/g, "\\'");
-              const _svc = String(w.servicio || w.promoNombre || 'Servicio');
-              const _tot = Number(w.total || 0);
+            var _porTicket = {};
+            _mias.forEach(function(w){
+              var tRef = String(w.ticketRef || w.promoRef || w.idEspera || w.id || '').trim();
+              if (!tRef) tRef = String(w.codigo || '').trim();
+              if (!_porTicket[tRef]) _porTicket[tRef] = { ticketRef: tRef, nombre: w.nombre || w.cliente || '', codigo: w.codigo || '', servicio: w.servicio || w.promoNombre || 'Servicio', total: 0, lineaIds: [] };
+              _porTicket[tRef].lineaIds.push(String(w.id || w.lineaId || '').trim());
+              _porTicket[tRef].total = Number(_porTicket[tRef].total || 0) + Number(w.total || w.monto || 0);
+            });
+            var _grupos = Object.keys(_porTicket).map(function(k){ return _porTicket[k]; });
+            _peList.innerHTML = _grupos.map(function (g) {
+              const _nom = String(g.nombre || '').replace(/'/g, "\\'");
+              const _svc = String(g.servicio || 'Servicio');
+              const _tot = Number(g.total || 0);
+              const _tRef = String(g.ticketRef || '').replace(/'/g, "\\'");
+              const _idsEnc = encodeURIComponent(JSON.stringify(g.lineaIds.filter(Boolean)));
               return '<div class="card" style="padding:14px;margin-bottom:8px;border:2px solid var(--top-purple,#8b5cf6);">'
-                + '<div style="font-weight:800;font-size:15px;">' + (w.nombre || w.codigo || 'Clienta') + '</div>'
+                + '<div style="font-weight:800;font-size:15px;">' + (g.nombre || g.codigo || 'Clienta') + '</div>'
                 + '<div style="font-size:12px;color:var(--ink-soft);margin:4px 0 10px;">' + _svc + (_tot ? ' · $' + _tot : '') + '</div>'
-                + '<button onclick="iniciarClientaStaff(\'' + _cod + '\',\'' + _nom + '\')" '
+                + '<button onclick="iniciarClientaStaff(\'' + _tRef + '\',\'' + _nom + '\',\'' + _idsEnc + '\')" '
                 + 'style="width:100%;padding:12px;background:var(--top-purple,#8b5cf6);color:#fff;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">▶ Confirmar / Empezar</button>'
                 + '</div>';
             }).join('');
@@ -1931,14 +1941,19 @@
       }
       
       // Actualizar contadores
-      const waitResult = await LineaService.obtenerListaEspera().then(function(l){ return {success:true, lista:l}; }).catch(function(){ return apiGet('getListaEspera'); });
+        const waitResult = await LineaService.obtenerListaEspera()
+          .then(function(l){ return {success:true, lista:l}; })
+          .catch(function(){ return {success:false, lista:[]}; });
       if (waitResult.success) {
         const allowed = AREA_FILTER[user.area] || [];
         const areaMap2 = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
         // MODELO CENTRALIZADO: contar solo las asignadas a esta staff (igual que la lista)
         const myCount = waitResult.lista.filter(w => {
-          const est = String(w.estado || w.status || '').toLowerCase();
-          if (est === 'en servicio' || est === 'completada') return false;
+          const est = String(w.estado || w.status || '').toLowerCase().replace(/_/g, ' ').trim();
+          const tomable = typeof window._staffQueueEsTomable === 'function'
+            ? window._staffQueueEsTomable(w)
+            : est === 'esperando';
+          if (!tomable || est !== 'esperando') return false;
           const quien = (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || ''; return quien !== '' && quien === user.name;
         }).length;
         var _nb=document.getElementById('navBadge'); if(_nb) _nb.textContent = myCount;
@@ -3973,7 +3988,8 @@
         staff: item.chica || '',
         servicio: item.servicio || '',
         precio: item.precio || 0,
-        comision: item.comision || 0
+        comision: item.comision || 0,
+        lineaId: item.lineaId || ''
       });
       if (result.success) {
         showToast('✓ Registro eliminado correctamente');
