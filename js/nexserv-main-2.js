@@ -3567,6 +3567,7 @@
               : [w.area, w.servicio, obs].join(' '));
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
+            const _lineaIdAttr = String(w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
             const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
             const reassignHTML = (() => {
               const selId   = 'reSel_'    + _uid;
@@ -3580,6 +3581,7 @@
                 + ' data-action="reasignar"'
                 + ' data-id-espera="' + (w.idEspera||'') + '"'
                 + ' data-area-idx="' + (_areaIdxAttr||'') + '"'
+                + ' data-linea-id="' + _lineaIdAttr.replace(/"/g, '&quot;') + '"'
                 + ' data-sel-id="' + selId + '"'
                 + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
                 + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
@@ -3607,6 +3609,7 @@
                 + ' data-action="reasignar"'
                 + ' data-id-espera="' + (w.idEspera||'') + '"'
                 + ' data-area-idx=""'
+                + ' data-linea-id="' + _lineaIdAttr.replace(/"/g, '&quot;') + '"'
                 + ' data-sel-id="' + selId + '"'
                 + ' data-nombre="' + String(w.nombre||'').replace(/"/g,'&quot;') + '"'
                 + ' data-codigo="' + String(w.codigo||'').replace(/"/g,'&quot;') + '"'
@@ -3674,10 +3677,11 @@
               if (action === 'reasignar') {
                 const idEspera = btn.getAttribute('data-id-espera') || '';
                 const areaIdx  = btn.getAttribute('data-area-idx')  || '';
+                const lineaId  = btn.getAttribute('data-linea-id')  || '';
                 const selId    = btn.getAttribute('data-sel-id')    || '';
                 const nombre   = btn.getAttribute('data-nombre')    || '';
                 const codigo   = btn.getAttribute('data-codigo')    || '';
-                reasignarStaff(idEspera, areaIdx, selId, nombre, codigo);
+                reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId);
               } else if (action === 'retirar') {
                 const idEspera = btn.getAttribute('data-id-espera') || '';
                 const nombre   = btn.getAttribute('data-nombre')    || '';
