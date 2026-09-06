@@ -2767,11 +2767,12 @@
             asignadaA: w.asignadaA || '',
             // INC-COLA-STAFF-02 · campos preservados: los filtros deben trabajar
             // con el item real, no con un objeto mutilado.
-            tomadaPor: w.tomadaPor || '',
-            estado: w.estado || '',
-            status: w.status || '',
-            fuente: w.fuente || '',
-            idEspera: w.idEspera || w.id || '',
+             tomadaPor: w.tomadaPor || '',
+             estado: w.estado || '',
+             status: w.status || '',
+             fuente: w.fuente || '',
+             lineaId: w.lineaId || w.linea_id || '',
+             idEspera: w.idEspera || w.id || '',
             ticketRef: w.ticketRef || '',
             areaIdx: (w.areaIdx === undefined || w.areaIdx === null) ? '' : w.areaIdx,
             tipo: w.tipo || '',
@@ -2932,22 +2933,24 @@
           result.cola || [], result.en_servicio || [], result.por_verificar || [],
           result.completado || [], result.cobrado || []) : [];
         const crudaAdaptada = cruda.map(function (w) {
-          return {
-            id: w.id || '',
+             return {
+             id: w.id || '',
             idEspera: w.ticketRef || w.promoRef || w.id || '',
             ticketRef: w.ticketRef || '',
-            lineaId: w.id || '',
             codigo: w.codigo || '',
             nombre: w.cliente || '',
             servicio: w.servicio || '',
             area: w.area || '',
             estado: w.estado || '',
-            tomadaPor: w.staff || '',
-            asignadaA: w.staff || '',
+             tomadaPor: w.staff || '',
+             asignadaA: w.staff || '',
+             fuente: w.fuente || (w.ticketRef && w.id ? 'LineasNativo' : ''),
+             lineaId: w.lineaId || w.id || '',
             total: Number(w.monto || 0),
             promoNombre: w.esPromo ? (w.servicio || '') : '',
             prioridad: 'normal',
-            observaciones: w.obs || ''
+             observaciones: w.obs || '',
+             serviciosDetalle: w.serviciosDetalle || [{ id: w.id || '', lineaId: w.id || '', servicio: w.servicio || '', area: w.area || '', monto: Number(w.monto || 0), estado: w.estado || '', staff: w.staff || '' }]
           };
         });
         const listaParaStaff = _staffQueueMapear(crudaAdaptada);
@@ -3130,6 +3133,8 @@
     window._takingClient = '';
     window._takingClientCode = '';
     window._takingService = '';
+    window._takingTicketRef = '';
+    window._takingLineaId = '';
   }
   window._resetTakingState = _resetTakingState;
 
@@ -3159,7 +3164,12 @@
     }
 
     window._takingData = w;
-    window._takingId = w.id;
+    const _nativeIdentityTake = String(w.fuente || '') === 'LineasNativo'
+      && String(w.ticketRef || '').trim() !== ''
+      && String(w.lineaId || '').trim() !== '';
+    window._takingId = _nativeIdentityTake ? String(w.ticketRef).trim() : w.id;
+    window._takingTicketRef = _nativeIdentityTake ? String(w.ticketRef).trim() : '';
+    window._takingLineaId = _nativeIdentityTake ? String(w.lineaId).trim() : '';
     window._takingClient = w.name;
     window._takingClientCode = w.codigo || w.code || '';
     window._takingService = w.service;
@@ -3470,7 +3480,10 @@
       // Legacy (sin fuente LineasNativo) mantiene el payload de siempre.
       const _tkData   = window._takingData || null;
       const _esNativo = !!(_tkData && String(_tkData.fuente || '') === 'LineasNativo');
-      let _payloadTomar = { idListaEspera: window._takingId, chicaNombre: name };
+      const _takeTicketRef = String(window._takingTicketRef || '').trim();
+      const _takeLineaId = String(window._takingLineaId || '').trim();
+      const _takeNativeIdentity = _takeTicketRef !== '' && _takeLineaId !== '';
+      let _payloadTomar = { idListaEspera: _takeNativeIdentity ? _takeTicketRef : window._takingId, chicaNombre: name };
       if (_esNativo) {
         const _selNat = (window._depiItems || []).filter(it => it.checked && !it.readonly && !it.completado && !it.bloqueado);
         const _idsNat = _selNat.map(it => String(it.id || '').trim()).filter(Boolean);
@@ -3483,6 +3496,8 @@
           return;   // cero POST, cero escrituras
         }
         _payloadTomar.componentesSeleccionados = _idsNat;
+        _payloadTomar.ticketRef = _takeTicketRef;
+        _payloadTomar.lineaId = _takeLineaId;
       }
       const result = await apiPost('tomarClienta', _payloadTomar);
       if (result.success) {
