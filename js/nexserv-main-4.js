@@ -570,12 +570,12 @@
   }
   window.iniciarClientaStaff = iniciarClientaStaff;
 
-  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo){
+  async function reasignarStaff(idEspera, areaIdx, selId, nombre, codigo, lineaId){
     const sel = document.getElementById(selId);
     const chica = sel ? sel.value : '';
     if (!chica) { alert('Elegí una staff'); return; }
     try {
-      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica });
+      const r = await apiPost('asignarStaff', { idEspera: idEspera, areaIdx: areaIdx || '', chicaNombre: chica, lineaId: String(lineaId || '') });
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('✓ ' + (nombre||'Clienta') + ' reasignada a ' + chica);
         // Notificar SOLO a la staff asignada (no a toda el área)
