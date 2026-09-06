@@ -545,14 +545,21 @@
       return '<option value="'+n+'">'+n+(ocup?' (Ocupada)':' (Disponible)')+'</option>';
     }).join('');
   }
-  // MODELO "Espera por staff": la staff toca "Confirmar / Empezar" en una clienta
-  // asignada → inicia TODOS sus servicios con esa staff (pasa a 'en_servicio').
-  async function iniciarClientaStaff(codigo, nombre){
+  // MODELO "Espera por staff" → Inicio nativo por ticketRef+lineaIds (Fase 3A)
+  async function iniciarClientaStaff(ticketRef, nombre, lineaIdsParam){
     const user = window.currentUser;
     if (!user) return;
+    if (!ticketRef) { alert('No se pudo identificar el ticket'); return; }
     if (!confirm('¿Empezar con ' + (nombre || 'esta clienta') + '?')) return;
     try {
-      const r = await apiPost('iniciarServicioStaff', { codigo: codigo, chicaNombre: user.name });
+      var lineaIds = [];
+      if (lineaIdsParam) {
+        try { lineaIds = JSON.parse(decodeURIComponent(lineaIdsParam)); } catch(e) {}
+        if (!Array.isArray(lineaIds)) lineaIds = [];
+      }
+      var payload = { idEspera: ticketRef, chicaNombre: user.name };
+      if (lineaIds.length) payload.componentesSeleccionados = lineaIds.map(function(id){ return {id: id}; });
+      const r = await apiPost('tomarClienta', payload);
       if (r && r.success) {
         if (typeof showToast === 'function') showToast('▶ Servicio iniciado con ' + (nombre || 'la clienta'));
         if (typeof loadStaffHome === 'function') loadStaffHome();
@@ -1109,7 +1116,8 @@
         staff: item.chica || '',
         servicio: item.servicio || '',
         precio: item.precio || 0,
-        comision: item.comision || 0
+        comision: item.comision || 0,
+        lineaId: item.lineaId || ''
       });
       if (result.success) {
         showToast('✓ Registro eliminado correctamente');
@@ -1574,9 +1582,12 @@
 
     // Sincronizar con el backend para que Mikaela vea el valor de la promo completa EN VIVO
     const _idEsperaPC = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const _atenPC = slot === 1 ? window._as1Aten : window._as2Aten;
+    const _lineaIdPC = (_atenPC && _atenPC.lineaId) || '';
     if (_idEsperaPC) {
       apiPost('updateServiciosAtencion', {
         idEspera      : _idEsperaPC,
+        lineaId       : _lineaIdPC,
         chicaNombre   : user?.name || '',
         clienteNombre : clientName,
         clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
@@ -1727,7 +1738,8 @@
 
   function addServiceToSlot(slot, service) {
     if (!slotServices[slot]) slotServices[slot] = [];
-    if (slotServices[slot].length >= 5) {
+    var _isNative = (typeof window._esSlotNativoLineas === 'function' && window._esSlotNativoLineas(slot)) || false;
+    if (!_isNative && slotServices[slot].length >= 5) {
       alert('Máximo 5 servicios por atención');
       return false;
     }
@@ -1774,7 +1786,8 @@
           chicaNombre: (_user && _user.name) || '',
           clienteCodigo: _clientCode || '',
           servicio: _removed.name,
-          monto: String(_removed.price != null ? _removed.price : '')
+          monto: String(_removed.price != null ? _removed.price : ''),
+          lineaId: _removed.lineaId || ''
         }).then(function (r) { console.log('🗑 Línea anulada:', r); })
           .catch(function (e) { console.warn('anularLineaTicket:', e); });
       }
@@ -1838,6 +1851,8 @@
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
     const clientKey = normalizeClientKey(clientName);
     const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+    const _atenAS = slot === 1 ? window._as1Aten : window._as2Aten;
+    const _lineaIdAS = (_atenAS && _atenAS.lineaId) || '';
 
     // Limpiar servicios anteriores del slot y aplicar la promo
     slotServices[slot] = [];
@@ -1869,6 +1884,7 @@
     if (idEspera) {
       apiPost('updateServiciosAtencion', {
         idEspera      : idEspera,
+        lineaId       : _lineaIdAS,
         chicaNombre   : user.name,
         clienteNombre : clientName,
         clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
@@ -2051,6 +2067,29 @@
     });
     
     try {
+      const _isNativeSlot = (typeof window._esSlotNativoLineas === 'function' && window._esSlotNativoLineas(slot)) || false;
+      if (_isNativeSlot) {
+        const ticketRef = (slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '';
+        const lineaPadre = String(service.lineaPadre || service._parentLineaId || service.parentLineaId || '').trim();
+        if (!service._lineRequestId) service._lineRequestId = 'EXTRA-' + String(ticketRef||'').replace(/[^A-Za-z0-9_-]/g,'') + '-' + Date.now() + '-' + Math.floor(Math.random()*1000);
+        const resultNative = await LineaService.solicitarExtra({
+          ticketRef: ticketRef,
+          lineaPadre: lineaPadre,
+          area: service.area,
+          servicioExtra: service.name,
+          precio: service.price,
+          nota: service.note || '',
+          lineRequestId: service._lineRequestId
+        });
+        console.log('📥 Backend response (nativo):', resultNative);
+        if (resultNative && resultNative.success) {
+          service.authId = resultNative.authId || resultNative.lineaId || '';
+          try { enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar', (user?.name||'Staff') + ' → ' + (clientName||'clienta') + ': ' + (service.name||'servicio') + ' · $' + service.price); } catch(ePush){}
+          return resultNative;
+        }
+        console.warn('Nativo falló sin fallback legacy para LINEAS', resultNative);
+        return resultNative;
+      }
       // Detectar si es un REEMPLAZO de promo o un EXTRA adicional
       // Reemplazo: hay SP- en el slot Y el staff borró el servicio original
       //   → slotServices solo tiene el nuevo servicio pendiente (sin servicios aprobados previos)
@@ -2218,7 +2257,8 @@
     // Guard: evitar doble ejecución
     if (window._goToListRunning) return;
     window._goToListRunning = true;
-    setTimeout(() => { window._goToListRunning = false; }, 3000);
+
+    try {
 
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
@@ -2320,7 +2360,6 @@
         });
       } else {
         alert('Seleccioná un servicio antes de continuar.');
-        window._goToListRunning = false;
         return;
       }
     }
@@ -2379,6 +2418,9 @@
         alert('Error al crear ticket: ' + (result?.message || 'Error desconocido'));
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
+    } finally {
+      window._goToListRunning = false;
+    }
   }
 
   function getAreaFromTMForm() {
@@ -2488,10 +2530,13 @@
   }
 
   async function goAssign(chica) {
-    // Guard: evitar doble ejecución por touch+click o doble tap
+    // Guard: evitar doble ejecución por touch+click o doble tap.
+    // Se mantiene activo durante TODA la operación (no por timer).
+    // Solo se libera cuando la request settle (éxito, error, o early return).
     if (window._goAssignRunning) return;
     window._goAssignRunning = true;
-    setTimeout(() => { window._goAssignRunning = false; }, 3000);
+
+    try {
 
     const tipo = window._arrTipo || 'normal';
     const nombre = document.getElementById('arrSelName')?.textContent || 'Clienta';
@@ -2561,7 +2606,6 @@
         });
       } else {
         alert('Seleccioná un servicio antes de asignar.');
-        window._goAssignRunning = false;
         return;
       }
     }
@@ -2620,6 +2664,12 @@
       }
     } catch(err) { alert('Error de conexión: ' + err.message); }
     return;
+
+    } finally {
+      // Liberar guard DESPUÉS de que la operación completa settle
+      // (éxito, error de red, error de backend, o early return por validación)
+      window._goAssignRunning = false;
+    }
 
     // Legacy path (no longer reached)
     try {
