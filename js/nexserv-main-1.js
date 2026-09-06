@@ -561,7 +561,8 @@
       precio:   Number(sv.precio || 0),
       comision: Number(sv.comision || 0),
       fecha:    sv.fecha || '',
-      hora:     sv.hora || ''
+      hora:     sv.hora || '',
+      lineaId:  sv.lineaId || ''
     });
   }
 
@@ -2941,10 +2942,32 @@
         // TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
         try { if (typeof window._nexLat === 'function') window._nexLat('QUEUE_REQUEST', { origen: origen }); } catch (e) {}
         // /TEMP INC-LATENCIA-TICKET-STAFF-RUNTIME
-        const result = await apiGet('getListaEspera');
-        const cruda = (result && result.success && result.lista) ? result.lista : [];
-        st.raw = cruda;
-        st.data = _staffQueueMapear(cruda);
+        const result = await apiGet('getTableroLineas');
+        const cruda = result && result.success ? [].concat(
+          result.cola || [], result.en_servicio || [], result.por_verificar || [],
+          result.completado || [], result.cobrado || []) : [];
+        const crudaAdaptada = cruda.map(function (w) {
+          return {
+            id: w.id || '',
+            idEspera: w.ticketRef || w.promoRef || w.id || '',
+            ticketRef: w.ticketRef || '',
+            lineaId: w.id || '',
+            codigo: w.codigo || '',
+            nombre: w.cliente || '',
+            servicio: w.servicio || '',
+            area: w.area || '',
+            estado: w.estado || '',
+            tomadaPor: w.staff || '',
+            asignadaA: w.staff || '',
+            total: Number(w.monto || 0),
+            promoNombre: w.esPromo ? (w.servicio || '') : '',
+            prioridad: 'normal',
+            observaciones: w.obs || ''
+          };
+        });
+        const listaParaStaff = _staffQueueMapear(crudaAdaptada);
+        st.raw = crudaAdaptada;
+        st.data = listaParaStaff;
         st.ts = Date.now();
         window._listaEsperaCache = st.data;
         const _mias = _staffQueueMias(st.data, user).length;
@@ -4636,7 +4659,8 @@
           chicaNombre: (_user && _user.name) || '',
           clienteCodigo: _clientCode || '',
           servicio: _removed.name,
-          monto: String(_removed.price != null ? _removed.price : '')
+          monto: String(_removed.price != null ? _removed.price : ''),
+          lineaId: _removed.lineaId || ''
         }).then(function (r) { console.log('🗑 Línea anulada:', r); })
           .catch(function (e) { console.warn('anularLineaTicket:', e); });
       }
