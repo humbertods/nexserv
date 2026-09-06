@@ -37,6 +37,23 @@
          + '_' + Math.random().toString(36).slice(2, 10);
   }
 
+  // Stable representation of the logical create payload. requestId is
+  // transport identity, so it must not participate in the signature.
+  function _firmaIntentoCreacion_(value, isRoot) {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(function (item) {
+      return _firmaIntentoCreacion_(item, false);
+    });
+    var out = {};
+    Object.keys(value).sort().forEach(function (key) {
+      if (isRoot && key === 'requestId') return;
+      out[key] = _firmaIntentoCreacion_(value[key], false);
+    });
+    return out;
+  }
+
+  var _intentoCreacionPendiente = null;
+
   // ─── LineaService ─────────────────────────────────────────────
   var LineaService = {
 
@@ -75,7 +92,7 @@
     obtenerListaEspera: function() {
       return apiGet('getTableroLineas')
         .then(function(r) {
-          if (!r || !r.success) return apiGet('getListaEspera').then(function(r2){ return r2 && r2.lista ? r2.lista : []; });
+          if (!r || !r.success) throw new Error('No se pudo leer LINEAS');
           // FIX nombres de campo: getTableroLineas devuelve { cola, en_servicio,
           // completado, cobrado } — NO { esperando, enServicio, porCobrar }. Antes
           // se leían los nombres equivocados → la lista volvía SIEMPRE vacía.
@@ -87,8 +104,9 @@
           );
           return lista;
         })
-        .catch(function() {
-          return apiGet('getListaEspera').then(function(r2){ return r2 && r2.lista ? r2.lista : []; });
+        .catch(function(err) {
+          console.warn('[LineaService] getTableroLineas falló:', err && err.message ? err.message : err);
+          return [];
         });
     },
 
@@ -116,31 +134,36 @@
       var esMulti = payload && Array.isArray(payload.areas) && payload.areas.length > 1;
       var esPromo = !esMulti && !!(payload && payload.promoNombre);
 
-      // requestId de la intención — SOLO para SN y SP, los dos caminos vivos del
+      // requestId de la intención — para MULTI, SN y SP, los caminos vivos del
       // motor nativo (LINEAS + TicketsFuente).
       //
-      // TM queda DELIBERADAMENTE FUERA. Es el camino obsoleto: el modelo vigente
-      // es un único ticket madre con N líneas repetibles, que se agregan como
-      // servicio extra desde staff o desde Central. No se le inyecta requestId
-      // para no reanimarlo en silencio — si alguien lo alcanza, debe fallar de
-      // forma visible en vez de crear un TM nuevo.
+      // El TM legacy queda DELIBERADAMENTE FUERA. El modelo vigente es un único
+      // ticket madre con N líneas repetibles, creado por la ruta MULTI nativa.
       //
       // Copia superficial: el payload del caller no se muta. apiPost reintenta
       // hasta 2 veces con el MISMO objeto, así que los 3 intentos comparten
       // requestId — que es justo el duplicado que el backend debe atrapar.
-      var data = payload;
-      if (!esMulti) {
-        data = Object.assign({}, payload);
-        if (!String(data.requestId || '').trim()) data.requestId = _nuevoTicketRequestId_();
+      var data = Object.assign({}, payload);
+      var firmaIntento = JSON.stringify(_firmaIntentoCreacion_(data, true));
+      var requestId = String(data.requestId || '').trim();
+      if (!requestId && _intentoCreacionPendiente &&
+          _intentoCreacionPendiente.firma === firmaIntento) {
+        requestId = _intentoCreacionPendiente.requestId;
       }
+      if (!requestId) requestId = _nuevoTicketRequestId_();
+      data.requestId = requestId;
+      _intentoCreacionPendiente = { firma: firmaIntento, requestId: requestId };
 
-      if (esMulti) {
-        return apiPost('crearTicketMulti', data);
-      } else if (esPromo) {
-        return apiPost('addServicioPromo', data);
-      } else {
-        return apiPost('addServicioNormal', data);
-      }
+      var endpoint = esMulti ? 'crearTicketMulti' : esPromo ? 'addServicioPromo' : 'addServicioNormal';
+      var resultado = apiPost(endpoint, data);
+      return resultado.then(function(r) {
+        if (r && r.success === true && _intentoCreacionPendiente &&
+            _intentoCreacionPendiente.firma === firmaIntento &&
+            _intentoCreacionPendiente.requestId === requestId) {
+          _intentoCreacionPendiente = null;
+        }
+        return r;
+      });
     },
 
     // ----------------------------------------------------------
@@ -228,7 +251,7 @@
     // solicitarExtra({ ticketRef, lineaPadre, area, servicioExtra, precio, nota })
     // `staff` NO se envía: el backend la inyecta desde la sesión firmada.
     solicitarExtra: function(opts) {
-      var lrid = 'EXTRA-' + String(opts.ticketRef || '').replace(/[^A-Za-z0-9_-]/g, '')
+      var lrid = String(opts.lineRequestId || '').trim() || 'EXTRA-' + String(opts.ticketRef || '').replace(/[^A-Za-z0-9_-]/g, '')
                + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
       return apiPost('solicitarExtraStaffNativo', {
         ticketRef:     opts.ticketRef,
