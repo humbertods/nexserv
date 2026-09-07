@@ -3472,6 +3472,13 @@
       'con el tiempo': '<span class="priority-badge tiempo">🟡 Con tiempo</span>',
     };
     const areaMap = { 'cejas': 'cejas', 'depilación': 'depilacion', 'depilacion': 'depilacion', 'pestañas': 'pestanas', 'pestanas': 'pestanas', 'facial': 'facial', 'lifting / retiro': 'retiro_lifting', 'pestañas/cejas': 'retiro_lifting' };
+    const _obsVisibleMikaela = function (raw) {
+      if (typeof window._limpiarObsInterna === 'function') return window._limpiarObsInterna(raw);
+      return String(raw == null ? '' : raw)
+        .replace(/\[NATIVE_[A-Z_]*:[^\]]*\]/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    };
 
     try {
       // Cargar lista de espera completa (esperando + en servicio)
@@ -3518,7 +3525,7 @@
         } else {
           esperaList.innerHTML = completadasHTML + esperando.map(w => {
             const pri = String(w.prioridad || 'normal').toLowerCase();
-            const obs = String(w.observaciones || '');
+             const obs = _obsVisibleMikaela(w.observaciones);
             const esContinuacion = obs.indexOf('✅') !== -1;
             const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
             // Asignación directa de Central: la staff elegida vive en
@@ -3549,7 +3556,9 @@
 
             // ESTADO de la clienta (3 estados): Asignada a X · Por asignar · Mandar a cobro
             let estadoLabel;
-            if (esContinuacion) {
+            if (_decisionMikaela) {
+              estadoLabel = '<strong style="color:var(--accent-deep);">Esperando decisión</strong>';
+            } else if (esContinuacion) {
               estadoLabel = sigueTxt
                 ? '<strong style="color:var(--accent-deep);">Por asignar</strong> <span style="color:var(--ink-soft);">· falta pasar a la siguiente staff</span>'
                 : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
@@ -3753,7 +3762,7 @@
               });
             } else {
               // ── TICKET NORMAL / PROMO: timeline original ──
-              const obs = String(a.observaciones || '');
+             const obs = _obsVisibleMikaela(a.observaciones);
               const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
               partesPrevias.forEach(parte => {
                 const matchArea = parte.match(/✅\s*([\w\/áéíóúñ]+)\s+completad[ao] por\s+([^·]+)/i);
