@@ -1875,6 +1875,10 @@
                   area: sd.area || a1.area || '',
                   esPromo: !!sd.esPromo,
                   status: 'aprobado',
+                  // B0 · identidad exacta del componente en LINEAS
+                  // (NexServ_AppsScript.js:5755). Antes se descartaba.
+                  lineaId: String(sd.lineaId || ''),
+                  estado:  String(sd.estado  || ''),
                   // ya vienen de líneas existentes en LINEAS → no re-sincronizar al ticket
                   _yaEnLinea: true
                 });
@@ -3826,8 +3830,9 @@
               // explícitamente. No se infiere por quién creó el servicio, ni por
               // Staff vs Central, ni por posición, ni por observaciones.
               //
-              // Mismo criterio conceptual que ya aplica la rama esTM de arriba
-              // sobre ar.estado; el contrato TM no se toca.
+              // La autoridad visual es LINEAS.estado y nada más. El badge NO se
+              // deriva de quién creó el servicio, ni de Staff vs Central, ni del
+              // tipo de ticket, ni de la posición, ni del texto de observaciones.
               //
               // Fail-open: estado ausente o desconocido → sin badge propio, que es
               // exactamente el comportamiento de hoy. Nunca se inventa un estado.
