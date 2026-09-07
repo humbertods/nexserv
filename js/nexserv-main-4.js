@@ -2617,12 +2617,19 @@
       try {
         let result;
         if (esPromoGA) {
+          // Una promo simple debe conservar el total de cabecera; aGA puede
+          // contener el precio de un componente cuando viene del formulario TM.
+          const promoNombreGA = promo && promo.name ? promo.name : aGA.tentativo;
+          const precioPromoGA = promo ? Number(promo.price || 0) : Number(aGA.precio || 0);
+          const precioRegularGA = promo
+            ? Number(promo.regular || promo.price || 0)
+            : Number(aGA.precioNormal || aGA.precio || 0);
           result = await LineaService.crearServicio( {
-            codigo: codigo, nombre: nombre, servicio: aGA.tentativo,
+            codigo: codigo, nombre: nombre, servicio: promoNombreGA,
             area: aGA.area, prioridad: 'Normal', observaciones: obs,
-            esTop: isTop ? 'Sí' : 'No', total: aGA.precio,
-            promoNombre: aGA.tentativo, precioPromo: aGA.precio,
-            precioRegular: aGA.precioNormal || aGA.precio,
+            esTop: isTop ? 'Sí' : 'No', total: precioPromoGA,
+            promoNombre: promoNombreGA, precioPromo: precioPromoGA,
+            precioRegular: precioRegularGA,
             asignadaA: chica
           });
         } else {
