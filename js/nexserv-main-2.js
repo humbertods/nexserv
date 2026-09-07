@@ -3814,10 +3814,43 @@
               const badgeColor = esPendConf ? 'var(--warning, #f59e0b)' : 'var(--info)';
               const badgeBg = esPendConf ? '#fff8e1' : 'var(--info-bg)';
               const badgeLabel = esPendConf ? '⏳ CONFIRMANDO' : 'EN CURSO';
+              // ── BADGE POR COMPONENTE ─────────────────────────────────
+              // ANTES: con varios componentes se listaba servicio y monto de cada
+              // uno, pero el único badge era el de la fila entera. Un ticket con
+              // dos líneas en_servicio mostraba UN solo "EN CURSO", y una línea
+              // 'esperando' quedaba indistinguible de una en curso.
+              //
+              // AHORA la autoridad visual es el estado REAL de cada componente
+              // (d.estado), que el backend ya envía por componente — ver
+              // NexServ_AppsScript.js:787-789, donde el contrato está declarado
+              // explícitamente. No se infiere por quién creó el servicio, ni por
+              // Staff vs Central, ni por posición, ni por observaciones.
+              //
+              // Mismo criterio conceptual que ya aplica la rama esTM de arriba
+              // sobre ar.estado; el contrato TM no se toca.
+              //
+              // Fail-open: estado ausente o desconocido → sin badge propio, que es
+              // exactamente el comportamiento de hoy. Nunca se inventa un estado.
+              const _badgeDeComponente = function (est) {
+                var e = String(est || '').toLowerCase().trim();
+                if (e === 'en_servicio' || e === 'en servicio')
+                  return { txt: 'EN CURSO',  col: 'var(--info)',    bg: 'var(--info-bg)' };
+                if (e === 'esperando')
+                  return { txt: '⏳ ESPERA', col: 'var(--warning)', bg: 'var(--warning-bg)' };
+                if (e === 'completado' || e === 'por_verificar' || e === 'por verificar')
+                  return { txt: 'LISTO',     col: 'var(--success)', bg: 'var(--success-bg)' };
+                return null;
+              };
               // Ticket madre con varios subtickets → listar cada servicio en su
               // renglón (antes se concatenaban en una sola línea: "A + B + C + D").
               const _subticketsHTML = (a.serviciosDetalle && a.serviciosDetalle.length > 1)
-                ? a.serviciosDetalle.map(d => `<div style="font-size:11px;color:var(--ink-soft);">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></div>`).join('')
+                ? a.serviciosDetalle.map(d => {
+                    const _bc = _badgeDeComponente(d.estado);
+                    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-soft);">`
+                      + `<span style="flex:1;">• ${d.servicio} · <strong>$${Number(d.monto||0)}</strong></span>`
+                      + (_bc ? `<span style="font-size:9px;font-weight:700;background:${_bc.bg};color:${_bc.col};padding:2px 7px;border-radius:100px;flex-shrink:0;">${_bc.txt}</span>` : '')
+                      + `</div>`;
+                  }).join('')
                 : `<div style="font-size:11px;color:var(--ink-soft);">${servicioLimpio}</div>`;
               timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
                 <div style="width:28px;height:28px;border-radius:50%;background:${badgeBg};border:2px solid ${badgeColor};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${iconActual}</div>
@@ -4401,8 +4434,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button data-action="approve-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button data-action="reject-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button data-action="approve-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -5496,20 +5529,13 @@
         e.stopPropagation();
         if (typeof showToast === 'function') showToast('✅ Se mantiene la ficha actual para este servicio.');
         break;
-      // ── IDENTIDAD EXACTA ticketRef + lineaId ─────────────────────────
-      // La propuesta vive en LINEAS: `id` es el linea_id (L-####) y el motor
-      // nativo exige ADEMÁS el ticket_ref de la madre. Se lee del propio botón
-      // (data-ticket-ref) en vez de declarar otra variable en este scope
-      // compartido, para no alterar el resto de los cases.
       case 'approve-auth':
         e.stopPropagation();
-        if (typeof approveAuthorization === 'function')
-          approveAuthorization(id, target.dataset.ticketRef || '');
+        if (typeof approveAuthorization === 'function') approveAuthorization(id);
         break;
       case 'reject-auth':
         e.stopPropagation();
-        if (typeof rejectAuthorization === 'function')
-          rejectAuthorization(id, target.dataset.ticketRef || '');
+        if (typeof rejectAuthorization === 'function') rejectAuthorization(id);
         break;
       case 'ac-select':
         e.stopPropagation();
