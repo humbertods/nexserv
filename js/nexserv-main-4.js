@@ -2903,6 +2903,13 @@
     if (el) el.textContent = '$' + total.toFixed(2);
   }
 
+  function vdOnFormaPagoChange() {
+    const formaPago = document.getElementById('vdFormaPago');
+    const panel = document.getElementById('vdTransferPanel');
+    if (panel) panel.style.display = formaPago && formaPago.value === 'Transferencia' ? 'block' : 'none';
+  }
+  window.vdOnFormaPagoChange = vdOnFormaPagoChange;
+
   async function vdPagarAhora() {
     const tipo = document.getElementById('vdTipoCliente').value;
     let nombreCliente = '';
@@ -2919,9 +2926,29 @@
     if (!formaPago) { showToast('⚠ Seleccioná la forma de pago'); return; }
     const total = lineasValidas.reduce((s, l) => s + (l.precio * (l.cantidad || 1)), 0);
     const productos = lineasValidas.map(l => ({ nombre: l.producto, precio: l.precio, cantidad: l.cantidad || 1, subtotal: l.precio * (l.cantidad || 1) }));
-    descontarStockVenta(productos);
+    let transferencias = [];
+    if (formaPago === 'Transferencia') {
+      const responsable = String((document.getElementById('vdTransferResponsable') || {}).value || '').trim();
+      const banco = String((document.getElementById('vdTransferBanco') || {}).value || '').trim();
+      const codigo = String((document.getElementById('vdTransferCodigo') || {}).value || '').trim();
+      if (!responsable || !banco || !codigo) {
+        showToast('⚠ Completá responsable, banco y código de confirmación');
+        return;
+      }
+      transferencias = [{ componente_index: 0, monto: total, responsable: responsable,
+        banco: banco, codigo_confirmacion: codigo }];
+    }
     try {
-      await apiPost('registrarVentaProductos', { idEspera: '', clienteNombre: nombreCliente, productos, total, esVentaDirecta: true, metodoPago: formaPago });
+      const result = await apiPost('registrarVentaProductos', {
+        idEspera: '', clienteNombre: nombreCliente, productos, total,
+        totalCobrado: total, esVentaDirecta: true, metodoPago: formaPago,
+        transferencias: transferencias
+      });
+      if (!result || result.success !== true) {
+        showToast('⚠ ' + ((result && (result.error || result.message)) || 'No se pudo registrar la venta'));
+        return;
+      }
+      descontarStockVenta(productos);
       showToast('✓ Venta registrada — $' + total.toFixed(2) + ' · ' + formaPago);
       toggleVentaDirecta();
       window._vdLineas = [{ producto: '', precio: 0, cantidad: 1 }];
