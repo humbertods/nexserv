@@ -1442,7 +1442,13 @@
         slotServices[slot] = a.serviciosDetalle.map(sd => ({
           name: sd.servicio || sd.nombre || sd.name || '',
           price: Number(sd.monto || sd.precio || sd.price || 0),
-          area: sd.area || a.area || ''
+          area: sd.area || a.area || '',
+          // B0 · identidad exacta del componente en LINEAS. La trae
+          // serviciosDetalle (NexServ_AppsScript.js:5755) y hasta ahora se
+          // descartaba aquí. Sin ella no hay forma de casar este renglon local
+          // con su linea real sin recurrir a nombre/precio/indice.
+          lineaId: String(sd.lineaId || ''),
+          estado:  String(sd.estado  || '')
         }));
       } else if (a.servicio && a.servicio !== '—') {
         let nom = a.servicio;
@@ -3042,26 +3048,7 @@
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${(function() {
-          // ── MARCADORES INTERNOS · NUNCA visibles para la staff ────────────
-          // w.obs llega del backend con los marcadores del contrato de líneas
-          // ([NATIVE_REQUEST_ID:…], [NATIVE_REQUEST_FP:…],
-          //  [NATIVE_LINE_REQUEST_ID:…], [NATIVE_LINE_REQUEST_FP:…]).
-          // Se estaban pintando crudos en la tarjeta de Lista de espera: identidad
-          // interna del sistema expuesta a la staff.
-          //
-          // Se sanea con _limpiarObsInterna, la MISMA función que ya usan
-          // _obsDeArea, _setNotaRecepcion y _obsVisibleMikaela (Central). No se
-          // duplica la regex ni se crea un saneador nuevo: esta vista era la
-          // única ruta que renderizaba obs sin pasar por ella.
-          //
-          // Se limpia ANTES del ternario de abajo a propósito: si la observación
-          // solo contenía marcadores, queda cadena vacía → falsy → el
-          // div.waitlist-obs NO se genera y no queda el recuadro beige vacío.
-          //
-          // SOLO CAMBIO VISUAL: el dato sigue llegando íntegro del backend y
-          // sigue registrándose en el ticket. No se toca lógica de negocio,
-          // ni estructuras de datos, ni la trazabilidad interna.
-          var obs = _limpiarObsInterna(w.obs || '');
+          var obs = w.obs || '';
           var parts = obs.split('|');
           var compPart = parts.find(function(p){ return p.indexOf('✅') >= 0; });
           if (compPart) {
@@ -3753,14 +3740,20 @@
             slotServices[1].push({
               name: servicioNombre,
               price: servicioPrecio,
-              area: a.area
+              area: a.area,
+              // B0 · identidad exacta de la atencion (NexServ_AppsScript.js:5670)
+              lineaId: String(a.lineaId || ''),
+              estado:  String(a.estado  || '')
             });
             // Si tiene serviciosDetalle (mismo área combinado), cargar todos
             if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
               slotServices[1] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
                 price: Number(sd.monto || sd.precio || sd.price || 0),
-                area: a.area, status: undefined
+                area: a.area, status: undefined,
+                // B0 · ver nota en restaurarServiciosNormalesSlot.
+                lineaId: String(sd.lineaId || ''),
+                estado:  String(sd.estado  || '')
               }));
               const totalCombinado = slotServices[1].reduce((s, v) => s + Number(v.price), 0);
               renderServicesForSlot(1);
@@ -4154,14 +4147,20 @@
             slotServices[2].push({
               name: _svcNom2,
               price: price,
-              area: a.area
+              area: a.area,
+              // B0 · identidad exacta de la atencion (NexServ_AppsScript.js:5670)
+              lineaId: String(a.lineaId || ''),
+              estado:  String(a.estado  || '')
             });
             // Si tiene serviciosDetalle (mismo área combinado), cargar todos
             if (a.serviciosDetalle && a.serviciosDetalle.length > 1) {
               slotServices[2] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
                 price: Number(sd.monto || sd.precio || sd.price || 0),
-                area: a.area, status: undefined
+                area: a.area, status: undefined,
+                // B0 · ver nota en restaurarServiciosNormalesSlot.
+                lineaId: String(sd.lineaId || ''),
+                estado:  String(sd.estado  || '')
               }));
               const totalCombinado2 = slotServices[2].reduce((s, v) => s + Number(v.price), 0);
               renderServicesForSlot(2);
@@ -4529,6 +4528,104 @@
     if (infoDiv) infoDiv.remove();
   }
   
+  // ══ B1+B2 · SINCRONIZADOR DE activeService ═════════════════════════
+  // PROBLEMA: _nexRefrescarAhora (index.html) solo repintaba waitList y
+  // staffHome. Con la staff dentro de la atencion (pantalla 'activeService')
+  // la ruta era 'queue-only': el backend cambiaba — p.ej. Central aprobaba un
+  // servicio extra y la linea pasaba a en_servicio en LINEAS — y el panel se
+  // quedaba congelado mostrando "PENDIENTE AUTORIZACION" y un total viejo.
+  //
+  // Esta funcion NO entra a la atencion: la SINCRONIZA. Son cosas distintas.
+  // loadClientAfterTake sigue siendo el camino de ENTRAR despues de "Tomar
+  // clienta" y no se toca ni se reutiliza: depende de window._takingId (estado
+  // que no sobrevive un reload) y resetea slotServices sin condicion.
+  //
+  // Reglas que cumple, por contrato:
+  //  · identifica la atencion por window._asNIdEspera contra a.idEspera.
+  //    NUNCA por atenciones[0]/[1] ni por slot: el orden remoto puede cambiar
+  //    y con capacidad 2 repintaria la clienta equivocada.
+  //  · casa componentes por lineaId contra lineaId. NUNCA por nombre, area,
+  //    precio, posicion ni codigo de clienta.
+  //  · fail-closed: si no encuentra la identidad exacta, no toca nada.
+  //  · no resetea slotServices, no borra el panel, no toca avatar, nombre,
+  //    observaciones ni banner de secuencia.
+  //  · no crea entradas nuevas: solo actualiza las que ya existen localmente.
+  //  · modelo nativo unicamente (TicketsFuente + LINEAS + ticketRef + lineaId).
+  //    No usa ni cablea nada hacia TM.
+  function _sincronizarSlotActiveService_(slot, atenciones) {
+    var idEspera = String((slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '').trim();
+    if (!idEspera) return false;                       // sin identidad → no se toca
+    var a = null;
+    for (var i = 0; i < atenciones.length; i++) {
+      if (String(atenciones[i].idEspera || '').trim() === idEspera) { a = atenciones[i]; break; }
+    }
+    if (!a) return false;                              // fail-closed: no es esta clienta
+    var det = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
+    if (!det.length) return false;
+    var locales = slotServices[slot] || [];
+    if (!locales.length) return false;
+
+    var cambio = false;
+    det.forEach(function (sd) {
+      var lid = String(sd.lineaId || '').trim();
+      if (!lid) return;                                // componente sin identidad exacta
+      // authId es donde LineaService.solicitarExtra deja hoy el linea_id real
+      // (lineaService.js:267). Se acepta como respaldo para las entradas
+      // creadas antes de que B0 escribiera lineaId, pero NUNCA se casa por
+      // nombre ni por ningun otro campo no identificatorio.
+      var loc = null;
+      for (var j = 0; j < locales.length; j++) {
+        var locId = String(locales[j].lineaId || locales[j].authId || '').trim();
+        if (locId && locId === lid) { loc = locales[j]; break; }
+      }
+      if (!loc) return;                                // no se crean entradas nuevas
+      var estRemoto = String(sd.estado || '').trim();
+      if (!estRemoto) return;
+      if (String(loc.estado || '') !== estRemoto) { loc.estado = estRemoto; cambio = true; }
+      if (!String(loc.lineaId || '').trim()) { loc.lineaId = lid; cambio = true; }
+      // Aprobacion: la propuesta ya es una linea operativa en LINEAS.
+      // El estado real de LINEAS es la autoridad, no el estado local.
+      if (loc.status === 'pendiente' && estRemoto === 'en_servicio') {
+        loc.status = 'aprobado'; cambio = true;
+      }
+      var montoRemoto = Number(sd.monto || 0);
+      if (montoRemoto && Number(loc.price || 0) !== montoRemoto) { loc.price = montoRemoto; cambio = true; }
+    });
+    if (!cambio) return false;
+
+    // Repintado PARCIAL: solo servicios, badges, contador y total.
+    renderServicesForSlot(slot);
+    // Mismo criterio de total que ya usa addServiceToSlot: los pendientes y
+    // rechazados no suman.
+    var total = (slotServices[slot] || []).reduce(function (s, v) {
+      if (v.status === 'pendiente' || v.status === 'rechazado') return s;
+      return s + Number(v.price || 0);
+    }, 0);
+    var elT = document.getElementById('as' + slot + 'Total');
+    if (elT) elT.textContent = '$' + total;
+    var elC = document.getElementById('as' + slot + 'SvcCount');
+    if (elC) elC.textContent = String((slotServices[slot] || []).filter(function (s) { return s.status !== 'rechazado'; }).length);
+    if (typeof updateFinishButtons === 'function') updateFinishButtons(slot);
+    return true;
+  }
+
+  // Una sola lectura de getAtenciones por ciclo, compartida por ambos slots.
+  // Se engancha a los triggers que YA existen (focus / visibilitychange / FCM);
+  // no crea timers ni sube la frecuencia de nada.
+  async function sincronizarActiveService(origen) {
+    try {
+      var user = window.currentUser;
+      if (!user || user.role !== 'staff') return;
+      var r = await apiGet('getAtenciones', { chica: user.name });
+      if (!r || !r.success || !Array.isArray(r.atenciones)) return;   // fail-closed
+      _sincronizarSlotActiveService_(1, r.atenciones);
+      if (user.maxClients === 2) _sincronizarSlotActiveService_(2, r.atenciones);
+    } catch (e) {
+      console.warn('[sincronizarActiveService] ' + (e && e.message));
+    }
+  }
+  window.sincronizarActiveService = sincronizarActiveService;
+
   function renderServicesForSlot(slot) {
     // INC-PROMO-FICHA-CEJAS-REENTRADA · resuelve la promo REAL de la clienta
     // igual que el render visible de más abajo (activePromos[clientKey].promo).
