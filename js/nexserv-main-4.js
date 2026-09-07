@@ -2084,15 +2084,6 @@
         console.log('📥 Backend response (nativo):', resultNative);
         if (resultNative && resultNative.success) {
           service.authId = resultNative.authId || resultNative.lineaId || '';
-          // B0 · identidad SEMÁNTICA del componente. LineaService.solicitarExtra
-          // normaliza el linea_id del backend y lo devuelve en authId Y en
-          // lineaId (lineaService.js:267-268). `authId` se conserva porque otro
-          // código existente lo consume, pero lo que ese valor representa es una
-          // LINEAS.lineaId: el modelo local lo transporta ahora con su nombre
-          // real, y es por este campo — nunca por nombre — que el
-          // sincronizador de activeService casa este renglon con su linea.
-          service.lineaId = resultNative.lineaId || resultNative.authId || '';
-          service.estado  = 'propuesta';
           try { enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar', (user?.name||'Staff') + ' → ' + (clientName||'clienta') + ': ' + (service.name||'servicio') + ' · $' + service.price); } catch(ePush){}
           return resultNative;
         }
