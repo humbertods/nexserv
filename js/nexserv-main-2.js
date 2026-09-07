@@ -3460,9 +3460,27 @@
   window.abrirSynaCita = abrirSynaCita;
   window.cerrarSynaCita = cerrarSynaCita;
 
+  function _programarMikaelaRefresh_(ms) {
+    if (window._mikaelaAutoRefresh) {
+      clearTimeout(window._mikaelaAutoRefresh);
+      clearInterval(window._mikaelaAutoRefresh);
+    }
+    window._mikaelaAutoRefresh = setTimeout(function () {
+      window._mikaelaAutoRefresh = null;
+      const screen = document.querySelector('.screen.active');
+      if (screen && screen.id === 'mikaelaHome') loadMikaelaHome();
+    }, ms);
+  }
+
   async function loadMikaelaHome() {
     window._mikaelaHomeLoadGen = (window._mikaelaHomeLoadGen || 0) + 1;
     const myGen = window._mikaelaHomeLoadGen;
+    if (window._mikaelaAutoRefresh) {
+      clearTimeout(window._mikaelaAutoRefresh);
+      clearInterval(window._mikaelaAutoRefresh);
+      window._mikaelaAutoRefresh = null;
+    }
+    let _mikaelaNextRefreshMs = 15000;
     loadCajaChica();
     loadPrelista();
     const priBadge = {
@@ -3490,6 +3508,7 @@
         const enServicio = result.enServicio || [];
         const porCobrar = result.porCobrar || [];
         const completadas = result.completadas || [];
+        _mikaelaNextRefreshMs = enServicio.length > 0 ? 8000 : 15000;
 
         // Set de staff ocupadas ahora mismo (para marcar Disponible/Ocupada al reasignar)
         const busyStaff = new Set();
@@ -3553,6 +3572,7 @@
                 + (sigueTxt ? '<div style="font-size:11px;color:var(--accent-deep);font-weight:700;margin-top:2px;">⏳ Falta: ' + sigueTxt + '</div>' : '')
                 + '</div>'
               : '';
+            const _decisionMikaela = w.esperandoDecisionMikaela === true;
 
             // ESTADO de la clienta (3 estados): Asignada a X · Por asignar · Mandar a cobro
             let estadoLabel;
@@ -3581,8 +3601,7 @@
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
              const _lineaIdAttr = String(w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
              const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
-            const _decisionMikaela = w.esperandoDecisionMikaela === true;
-            const _decisionHTML = _decisionMikaela
+             const _decisionHTML = _decisionMikaela
               ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
                    <button onclick="eliminarTicketEspera('${String(w.idEspera || '').replace(/'/g, "\\'")}','${_nombreSafe}')" style="flex:1;min-width:120px;padding:10px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">Eliminar ticket</button>
                    <button onclick="agregarServicioExtra('${String(w.idEspera || '').replace(/'/g, "\\'")}','${String(w.codigo || '').replace(/'/g, "\\'")}','${_nombreSafe}')" style="flex:1;min-width:120px;padding:10px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
@@ -3976,20 +3995,13 @@
           }
         }, 30000);
 
-        // Auto-refresh inteligente: 8s si hay clientas en atención, 15s si no
-        if (window._mikaelaAutoRefresh) clearInterval(window._mikaelaAutoRefresh);
-        const refreshInterval = enServicio.length > 0 ? 8000 : 15000;
-        window._mikaelaAutoRefresh = setInterval(() => {
-          const currentScreen = document.querySelector('.screen.active');
-          if (currentScreen && currentScreen.id === 'mikaelaHome') {
-            loadMikaelaHome();
-          } else {
-            clearInterval(window._mikaelaAutoRefresh);
-          }
-        }, refreshInterval);
       }
     } catch (err) {
       console.error('Error cargando dashboard Mikaela:', err);
+    } finally {
+      if (myGen === window._mikaelaHomeLoadGen) {
+        _programarMikaelaRefresh_(_mikaelaNextRefreshMs);
+      }
     }
   }
   
