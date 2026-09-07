@@ -3461,6 +3461,8 @@
   window.cerrarSynaCita = cerrarSynaCita;
 
   async function loadMikaelaHome() {
+    window._mikaelaHomeLoadGen = (window._mikaelaHomeLoadGen || 0) + 1;
+    const myGen = window._mikaelaHomeLoadGen;
     loadCajaChica();
     loadPrelista();
     const priBadge = {
@@ -3474,6 +3476,7 @@
     try {
       // Cargar lista de espera completa (esperando + en servicio)
       const result = await apiGet('getListaCompleta');
+      if (myGen !== window._mikaelaHomeLoadGen) return;
       
       if (result.success) {
         const esperando = result.esperando || [];
@@ -3567,8 +3570,16 @@
               : [w.area, w.servicio, obs].join(' '));
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
-            const _lineaIdAttr = String(w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
-            const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
+             const _lineaIdAttr = String(w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
+             const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
+            const _decisionMikaela = w.esperandoDecisionMikaela === true;
+            const _decisionHTML = _decisionMikaela
+              ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+                   <button onclick="eliminarTicketEspera('${String(w.idEspera || '').replace(/'/g, "\\'")}','${_nombreSafe}')" style="flex:1;min-width:120px;padding:10px;background:var(--bg-card);color:var(--danger);border:1.5px solid var(--danger);border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">Eliminar ticket</button>
+                   <button onclick="agregarServicioExtra('${String(w.idEspera || '').replace(/'/g, "\\'")}','${String(w.codigo || '').replace(/'/g, "\\'")}','${_nombreSafe}')" style="flex:1;min-width:120px;padding:10px;background:var(--bg-card);color:var(--ink);border:1.5px solid var(--ink);border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">+ Servicio Extra</button>
+                   <button onclick="mandarACobro('${String(w.idEspera || '').replace(/'/g, "\\'")}','${_nombreSafe}','${String(w.codigo || '').replace(/'/g, "\\'")}')" style="flex:1;min-width:120px;padding:10px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:11px;font-weight:800;cursor:pointer;">Mandar a cobro</button>
+                 </div>`
+              : '';
             const reassignHTML = (() => {
               const selId   = 'reSel_'    + _uid;
               const btnId   = 'reBtn_'    + _uid;
@@ -3653,10 +3664,10 @@
               </div>
               ${estadoHTML}
               ${_desgloseMultiHTML}
-              ${_esMultiPromo ? reassignHTML : `${(!estaAsignada && w.servicio && String(w.servicio).trim() && String(w.servicio).trim() !== '—') ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
-                <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
-                <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
-              </div>`}
+               ${_decisionMikaela ? _decisionHTML : (_esMultiPromo ? reassignHTML : `${(!estaAsignada && w.servicio && String(w.servicio).trim() && String(w.servicio).trim() !== '—') ? _syncAssignHTML : ''}<div style="display: flex; gap: 6px; margin-top: 10px;">
+                 <button data-action="asignarServicio" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">💼 Servicio</button>
+                 <button data-action="asignarPromo" data-codigo="${w.codigo}" data-nombre="${w.nombre}" style="flex: 1; padding: 8px 12px; background: var(--success); color: white; border: none; border-radius: var(--radius-pill); font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;">🏷 Promo</button>
+               </div>`)}
             </div>`;
           }).join('');
           // ── Event delegation para botones de reasignación (sin onclick inline) ──
