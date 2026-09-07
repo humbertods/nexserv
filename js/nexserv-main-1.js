@@ -3631,6 +3631,39 @@
     t.style.display = (t.style.display === 'none') ? 'block' : 'none';
   }
 
+  function _cargarFichaFacialStaff(clientKey, clientCodigo, clientNombre, slot) {
+    const el = document.getElementById('facialFichaQuick' + slot);
+    if (!el || !clientCodigo) return;
+    window._facialFichaLoadKey = window._facialFichaLoadKey || {};
+    window._facialFichaLoadKey[slot] = clientKey;
+    const perfil = CLIENT_PROFILES[clientKey];
+    const fichaCacheada = perfil && perfil.facial && perfil.facial.ficha;
+    el.style.display = 'block';
+    if (!fichaCacheada) {
+      el.innerHTML = '<div style="padding:18px;text-align:center;color:var(--ink-soft);">Cargando ficha facial…</div>';
+    }
+    apiGet('getFichaFacial', { codigo: clientCodigo }).then(function (facRes) {
+      if (window._facialFichaLoadKey[slot] !== clientKey) return;
+      if (facRes && facRes.success === true && facRes.ficha) {
+        if (!CLIENT_PROFILES[clientKey]) CLIENT_PROFILES[clientKey] = { name: clientNombre, code: clientCodigo, facial: {} };
+        if (!CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial = {};
+        CLIENT_PROFILES[clientKey].facial.ficha = facRes.ficha;
+        loadFacialFichaQuick(clientKey, slot);
+      } else if (facRes && facRes.success === true && facRes.ficha === null) {
+        if (CLIENT_PROFILES[clientKey] && CLIENT_PROFILES[clientKey].facial) CLIENT_PROFILES[clientKey].facial.ficha = null;
+        loadFacialFichaQuick(clientKey, slot);
+      } else if (fichaCacheada) {
+        loadFacialFichaQuick(clientKey, slot);
+      } else {
+        console.warn('[FichaFacial] respuesta inválida para ' + clientCodigo, facRes);
+      }
+    }).catch(function (err) {
+      if (window._facialFichaLoadKey[slot] !== clientKey) return;
+      if (fichaCacheada) loadFacialFichaQuick(clientKey, slot);
+      else console.warn('[FichaFacial] error leyendo ' + clientCodigo + ':', err);
+    });
+  }
+
   async function loadClientAfterTake() {
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
@@ -3959,7 +3992,7 @@
           }
 
           // ── MANDAMIENTO #7: facial siempre carga su ficha al abrir clienta ──
-          if (user.area === 'facial') {
+          if (String(user.area || '').trim().toLowerCase() === 'facial') {
             const _fKey1 = (a.codigo || '').toLowerCase().replace(/-/g, '');
             window._currentFacialClientKey = _fKey1;
             window._currentFacialClientNombre = a.nombre;
@@ -3968,7 +4001,7 @@
             window._currentFacialSvcName  = _fSvcs1.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
             window._currentFacialSvcPrice = _fSvcs1.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
             window._facialFichaSlot = 1;
-            setTimeout(function() { loadFacialFichaQuick(_fKey1, 1); }, 400);
+            setTimeout(function() { _cargarFichaFacialStaff(_fKey1, a.codigo, a.nombre, 1); }, 400);
           }
 
           // Limpiar SIEMPRE el panel de ficha cejas/pigmento antes de decidir si mostrarlo.
@@ -4337,7 +4370,7 @@
           }
 
           // ── MANDAMIENTO #7: facial y cejas cargan ficha en slot 2 también ──
-          if (user.area === 'facial') {
+          if (String(user.area || '').trim().toLowerCase() === 'facial') {
             const _fKey2 = (a.codigo || '').toLowerCase().replace(/-/g, '');
             window._currentFacialClientKey = _fKey2;
             window._currentFacialClientNombre = a.nombre;
@@ -4346,7 +4379,7 @@
             window._currentFacialSvcName  = _fSvcs2.filter(s => s.status !== 'rechazado').map(s => s.name).join(' + ') || '';
             window._currentFacialSvcPrice = _fSvcs2.filter(s => s.status !== 'rechazado').reduce((s,v) => s + Number(v.price||0), 0);
             window._facialFichaSlot = 2;
-            setTimeout(function() { loadFacialFichaQuick(_fKey2, 2); }, 400);
+            setTimeout(function() { _cargarFichaFacialStaff(_fKey2, a.codigo, a.nombre, 2); }, 400);
           }
           var _cqClear2 = document.getElementById('cejasQuick2');
           if (_cqClear2) { _cqClear2.innerHTML = ''; _cqClear2.style.display = 'none'; }
