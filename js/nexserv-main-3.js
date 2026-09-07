@@ -1,70 +1,32 @@
 // NEXSERV nexserv-main-3.js — Cobros, facturación, asistencia
 // Depende de: nexserv-main-2.js
 
-  // ══ AUTORIZACIONES DE SERVICIO EXTRA — RUTA NATIVA LINEAS ══════════════
-  // ANTES: estas dos funciones llamaban a 'aprobarAutorizacion' /
-  // 'rechazarAutorizacion', handlers que buscan la solicitud en la hoja LEGACY
-  // 'Autorizaciones' (NexServ_AppsScript.js:9404 y :9589).
-  //
-  // Pero Central ya NO lee de esa hoja: el case 'getAutorizaciones' delega en
-  // getAutorizacionesNativas(), que lee LINEAS y devuelve como `id` el
-  // linea_id (L-####). Ese id no existe en 'Autorizaciones', el bucle no
-  // encontraba match y el backend respondía "Solicitud no encontrada".
-  // El lector era nativo y el aprobador legacy: fuentes distintas.
-  //
-  // AHORA se usan las acciones nativas ya existentes en el router
-  // ('aprobarExtraNativo' / 'rechazarExtraNativo', AppsScript.js:1627 y :1637),
-  // que resuelven la línea con identidad EXACTA ticketRef + lineaId vía
-  // _lnBuscarLineaExactaInterno_. Sin búsqueda por nombre, por código ni por
-  // índice de array. El motor aplica el contrato de estados ya definido en
-  // _validarTransicionPropuesta_ (aprobar: esperando+aprobada; rechazar:
-  // anulado+denegada) y toca SOLO la fila de la propuesta: la línea original
-  // del servicio en curso no se modifica.
-  //
-  // El motor nativo responde { ok:true, ... } (no { success:true }), por eso
-  // se aceptan ambas formas. Los códigos de error vienen en `error`.
-  async function approveAuthorization(reqId, ticketRef) {
+  async function approveAuthorization(reqId) {
     try {
-      const _lineaId  = String(reqId || '').trim();
-      const _ticketRef = String(ticketRef || '').trim();
-      if (!_lineaId || !_ticketRef) {
-        alert('Error: no se pudo identificar la solicitud (falta ticket o línea).');
-        return;
-      }
-      const result = await apiPost('aprobarExtraNativo', {
-        ticketRef: _ticketRef, lineaId: _lineaId
-      });
-
-      if (result && (result.ok || result.success)) {
-        // El staff ve el cambio en su siguiente poll: la propuesta pasa de
-        // 'propuesta/pendiente' a 'esperando/aprobada' dentro de la MISMA madre.
+      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
+      
+      if (result.success) {
+        // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
+        // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
         await renderAuthorizations(); // Reload list
       } else {
-        alert('Error: ' + ((result && (result.message || result.error)) || 'No se pudo aprobar'));
+        alert('Error: ' + (result.message || 'No se pudo aprobar'));
       }
     } catch (err) {
       console.error('Error aprobando autorización:', err);
       alert('Error al aprobar la autorización');
     }
   }
-
-  async function rejectAuthorization(reqId, ticketRef) {
+  
+  async function rejectAuthorization(reqId) {
     try {
-      const _lineaId  = String(reqId || '').trim();
-      const _ticketRef = String(ticketRef || '').trim();
-      if (!_lineaId || !_ticketRef) {
-        alert('Error: no se pudo identificar la solicitud (falta ticket o línea).');
-        return;
-      }
-      const result = await apiPost('rechazarExtraNativo', {
-        ticketRef: _ticketRef, lineaId: _lineaId
-      });
-
-      if (result && (result.ok || result.success)) {
+      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
+      
+      if (result.success) {
         alert('✕ Servicio rechazado. El staff será notificado.');
         await renderAuthorizations(); // Reload list
       } else {
-        alert('Error: ' + ((result && (result.message || result.error)) || 'No se pudo rechazar'));
+        alert('Error: ' + (result.message || 'No se pudo rechazar'));
       }
     } catch (err) {
       console.error('Error rechazando autorización:', err);
@@ -1586,7 +1548,49 @@
         setTimeout(() => m1?.focus(), 100);
       }
     }
+    const transferPanel = document.getElementById('transferPanel');
+    if (transferPanel) transferPanel.style.display = metodo === 'Transferencia' ? 'block' : 'none';
+    if (metodo === 'Pago mixto') onMixtoMetodoChange();
     refreshCobrarTotal();
+  }
+
+  function onMixtoMetodoChange() {
+    [1, 2, 3].forEach(function (i) {
+      const metodo = document.getElementById('mixtoMetodo' + i);
+      const panel = document.getElementById('mixtoTransfer' + i);
+      if (panel) panel.style.display = metodo && metodo.value === 'Transferencia' ? 'block' : 'none';
+    });
+  }
+  window.onMixtoMetodoChange = onMixtoMetodoChange;
+
+  function _leerTransferenciasCobroUI_(montoSimple) {
+    const metodo = String(window._cobrarPago || '');
+    const transferencias = [];
+    function leer(prefix, componenteIndex, monto) {
+      const responsable = String((document.getElementById(prefix + 'Responsable') || {}).value || '').trim();
+      const banco = String((document.getElementById(prefix + 'Banco') || {}).value || '').trim();
+      const codigo = String((document.getElementById(prefix + 'Codigo') || {}).value || '').trim();
+      if (!responsable || !banco || !codigo) {
+        return { ok:false, message:'Completá responsable, banco y código de confirmación de la transferencia.' };
+      }
+      transferencias.push({ componente_index: componenteIndex, monto: Number(monto || 0),
+        responsable: responsable, banco: banco, codigo_confirmacion: codigo });
+      return { ok:true };
+    }
+    if (metodo === 'Transferencia') return (function () {
+      const r = leer('transfer', 0, montoSimple);
+      return r.ok ? { ok:true, items:transferencias } : r;
+    })();
+    if (/^mixto/i.test(metodo)) {
+      for (let i = 1; i <= 3; i++) {
+        const metodoParte = String((document.getElementById('mixtoMetodo' + i) || {}).value || '');
+        if (metodoParte !== 'Transferencia') continue;
+        const monto = Number((document.getElementById('mixtoMonto' + i) || {}).value || 0);
+        const r = leer('mixto' + i, i - 1, monto);
+        if (!r.ok) return r;
+      }
+    }
+    return { ok:true, items:transferencias };
   }
 
   // Regla de pago (local, no depende de archivos externos):
@@ -1842,6 +1846,17 @@
       window._cobroPago  = _metodoPagoFinal;
     }
 
+    let _transferUI = { ok:true, items:[] };
+    if (!(window._cobroGrupal && window._cobroGrupal.clientas)) {
+      const _totalServiciosPre = (window._cobrarTienePromo && window._cobrarPago === 'Tarjeta')
+        ? window._cobrarTotalRegular : window._cobrarTotalPromo;
+      _transferUI = _leerTransferenciasCobroUI_(_totalServiciosPre);
+      if (!_transferUI.ok) {
+        alert(_transferUI.message || 'Completá los datos de transferencia.');
+        return;
+      }
+    }
+
     btn.textContent = '⏳ Procesando...';
     btn.disabled = true;
 
@@ -1872,7 +1887,10 @@
           _payloadGrupal.promoNombre    = c.promoNombre || '';
           _payloadGrupal.esCobroGrupal  = true;
           _payloadGrupal.clienteCodigo  = c.codigo || '';   // para el gate del piloto LINEAS
-          await apiPost('confirmarCobro', _payloadGrupal);
+          const resultGrupal = await apiPost('confirmarCobro', _payloadGrupal);
+          if (!resultGrupal || resultGrupal.success !== true) {
+            throw new Error((resultGrupal && (resultGrupal.error || resultGrupal.message)) || 'El backend no confirmó el cobro.');
+          }
           // ── MANDAMIENTO #3: registrar los productos de ESTA clienta por separado
           // (van a la caja, SIN comisión), igual que en el cobro individual.
           const _prodsC = (c.idEspera && window._apProductosEnTicket && window._apProductosEnTicket[c.idEspera]) ? window._apProductosEnTicket[c.idEspera] : [];
@@ -1941,7 +1959,6 @@
     // Sumar productos si hay (solo para mostrar el total que paga la clienta)
     const totalProductos = window._cobrarTotalProductos || 0;
     const totalFinal = totalServicios + totalProductos;
-
     // ── MANDAMIENTO #5: construir payload completo para distribución a los 3 destinos ──
     // staff (comisiones) + Mikaela (CierresPagos) + Owner (HistorialOwner)
     // IMPORTANTE: el totalCobrado del SERVICIO debe ser SOLO los servicios, NO los
@@ -1969,10 +1986,15 @@
     if (window._cobrarAjustes && window._cobrarAjustes.length > 0) {
       _payloadM5.notaAjuste = window._cobrarAjustes.join(' · ');
     }
+    _payloadM5.transferencias = _transferUI.items;
 
     try {
       if (!window._cobrarId) throw new Error('ID de ticket vacío — no se puede confirmar cobro');
-      await apiPost('confirmarCobro', _payloadM5);
+      const result = await apiPost('confirmarCobro', _payloadM5);
+      if (!result || result.success !== true) {
+        const message = (result && (result.error || result.message)) || 'El backend no confirmó el cobro.';
+        throw new Error(message);
+      }
     } catch (err) {
       console.error('confirmarCobro error:', err);
       btn.disabled = false;
