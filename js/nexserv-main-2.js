@@ -4401,8 +4401,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button data-action="approve-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button data-action="reject-auth" data-id="${req.id}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button data-action="approve-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -5496,13 +5496,20 @@
         e.stopPropagation();
         if (typeof showToast === 'function') showToast('✅ Se mantiene la ficha actual para este servicio.');
         break;
+      // ── IDENTIDAD EXACTA ticketRef + lineaId ─────────────────────────
+      // La propuesta vive en LINEAS: `id` es el linea_id (L-####) y el motor
+      // nativo exige ADEMÁS el ticket_ref de la madre. Se lee del propio botón
+      // (data-ticket-ref) en vez de declarar otra variable en este scope
+      // compartido, para no alterar el resto de los cases.
       case 'approve-auth':
         e.stopPropagation();
-        if (typeof approveAuthorization === 'function') approveAuthorization(id);
+        if (typeof approveAuthorization === 'function')
+          approveAuthorization(id, target.dataset.ticketRef || '');
         break;
       case 'reject-auth':
         e.stopPropagation();
-        if (typeof rejectAuthorization === 'function') rejectAuthorization(id);
+        if (typeof rejectAuthorization === 'function')
+          rejectAuthorization(id, target.dataset.ticketRef || '');
         break;
       case 'ac-select':
         e.stopPropagation();
