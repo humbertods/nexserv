@@ -213,6 +213,8 @@
 
   async function _apiGetReal(action, params) {
     const url = new URL(API_URL);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
     url.searchParams.set('action', action);
     // Cache-busting: agregar timestamp para evitar respuestas cacheadas
     url.searchParams.set('_t', Date.now().toString());
@@ -222,7 +224,8 @@
     try {
       const res = await fetch(url.toString(), {
         method: 'GET',
-        redirect: 'follow'
+        redirect: 'follow',
+        signal: controller.signal
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -232,6 +235,8 @@
     } catch (err) {
       console.error('API Error:', err);
       return { error: err.message };
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
