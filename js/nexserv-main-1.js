@@ -3048,7 +3048,26 @@
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${(function() {
-          var obs = w.obs || '';
+          // ── MARCADORES INTERNOS · NUNCA visibles para la staff ────────────
+          // w.obs llega del backend con los marcadores del contrato de líneas
+          // ([NATIVE_REQUEST_ID:…], [NATIVE_REQUEST_FP:…],
+          //  [NATIVE_LINE_REQUEST_ID:…], [NATIVE_LINE_REQUEST_FP:…]).
+          // Se estaban pintando crudos en la tarjeta de Lista de espera: identidad
+          // interna del sistema expuesta a la staff.
+          //
+          // Se sanea con _limpiarObsInterna, la MISMA función que ya usan
+          // _obsDeArea, _setNotaRecepcion y _obsVisibleMikaela (Central). No se
+          // duplica la regex ni se crea un saneador nuevo: esta vista era la
+          // única ruta que renderizaba obs sin pasar por ella.
+          //
+          // Se limpia ANTES del ternario de abajo a propósito: si la observación
+          // solo contenía marcadores, queda cadena vacía → falsy → el
+          // div.waitlist-obs NO se genera y no queda el recuadro beige vacío.
+          //
+          // SOLO CAMBIO VISUAL: el dato sigue llegando íntegro del backend y
+          // sigue registrándose en el ticket. No se toca lógica de negocio,
+          // ni estructuras de datos, ni la trazabilidad interna.
+          var obs = _limpiarObsInterna(w.obs || '');
           var parts = obs.split('|');
           var compPart = parts.find(function(p){ return p.indexOf('✅') >= 0; });
           if (compPart) {
