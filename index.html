@@ -3453,7 +3453,6 @@ async function _nexRefrescarAhora(origen) {
   if (u.role === 'staff') {
     if (pantalla === 'waitList') _latRoute = 'queue+renderWaitList';
     else if (pantalla === 'staffHome') _latRoute = 'queue+loadStaffHome';
-    else if (pantalla === 'activeService') _latRoute = 'queue+syncActiveService';
     else _latRoute = 'queue-only';
   } else if (u.role === 'admin' || u.area === 'admin') {
     if (pantalla === 'mikaelaHome') _latRoute = 'loadMikaelaHome';
@@ -3473,13 +3472,6 @@ async function _nexRefrescarAhora(origen) {
         await renderWaitList();
       } else if (pantalla === 'staffHome' && typeof loadStaffHome === 'function') {
         await loadStaffHome();
-      } else if (pantalla === 'activeService' && typeof sincronizarActiveService === 'function') {
-        // B2 · activeService deja de ser 'queue-only'. Se reutilizan los
-        // triggers que ya existen (focus / visibilitychange / FCM): no se
-        // agrega ningún timer nuevo ni se sube la frecuencia de refresco.
-        // NO se llama a loadClientAfterTake: ese es el camino de ENTRAR a la
-        // atencion, no el de sincronizarla.
-        await sincronizarActiveService(origen);
       }
     } else if (u.role === 'admin' || u.area === 'admin') {
       if (pantalla === 'mikaelaHome' && typeof loadMikaelaHome === 'function') {
