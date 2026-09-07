@@ -1,32 +1,70 @@
 // NEXSERV nexserv-main-3.js — Cobros, facturación, asistencia
 // Depende de: nexserv-main-2.js
 
-  async function approveAuthorization(reqId) {
+  // ══ AUTORIZACIONES DE SERVICIO EXTRA — RUTA NATIVA LINEAS ══════════════
+  // ANTES: estas dos funciones llamaban a 'aprobarAutorizacion' /
+  // 'rechazarAutorizacion', handlers que buscan la solicitud en la hoja LEGACY
+  // 'Autorizaciones' (NexServ_AppsScript.js:9404 y :9589).
+  //
+  // Pero Central ya NO lee de esa hoja: el case 'getAutorizaciones' delega en
+  // getAutorizacionesNativas(), que lee LINEAS y devuelve como `id` el
+  // linea_id (L-####). Ese id no existe en 'Autorizaciones', el bucle no
+  // encontraba match y el backend respondía "Solicitud no encontrada".
+  // El lector era nativo y el aprobador legacy: fuentes distintas.
+  //
+  // AHORA se usan las acciones nativas ya existentes en el router
+  // ('aprobarExtraNativo' / 'rechazarExtraNativo', AppsScript.js:1627 y :1637),
+  // que resuelven la línea con identidad EXACTA ticketRef + lineaId vía
+  // _lnBuscarLineaExactaInterno_. Sin búsqueda por nombre, por código ni por
+  // índice de array. El motor aplica el contrato de estados ya definido en
+  // _validarTransicionPropuesta_ (aprobar: esperando+aprobada; rechazar:
+  // anulado+denegada) y toca SOLO la fila de la propuesta: la línea original
+  // del servicio en curso no se modifica.
+  //
+  // El motor nativo responde { ok:true, ... } (no { success:true }), por eso
+  // se aceptan ambas formas. Los códigos de error vienen en `error`.
+  async function approveAuthorization(reqId, ticketRef) {
     try {
-      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
-      
-      if (result.success) {
-        // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
-        // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
+      const _lineaId  = String(reqId || '').trim();
+      const _ticketRef = String(ticketRef || '').trim();
+      if (!_lineaId || !_ticketRef) {
+        alert('Error: no se pudo identificar la solicitud (falta ticket o línea).');
+        return;
+      }
+      const result = await apiPost('aprobarExtraNativo', {
+        ticketRef: _ticketRef, lineaId: _lineaId
+      });
+
+      if (result && (result.ok || result.success)) {
+        // El staff ve el cambio en su siguiente poll: la propuesta pasa de
+        // 'propuesta/pendiente' a 'esperando/aprobada' dentro de la MISMA madre.
         await renderAuthorizations(); // Reload list
       } else {
-        alert('Error: ' + (result.message || 'No se pudo aprobar'));
+        alert('Error: ' + ((result && (result.message || result.error)) || 'No se pudo aprobar'));
       }
     } catch (err) {
       console.error('Error aprobando autorización:', err);
       alert('Error al aprobar la autorización');
     }
   }
-  
-  async function rejectAuthorization(reqId) {
+
+  async function rejectAuthorization(reqId, ticketRef) {
     try {
-      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
-      
-      if (result.success) {
+      const _lineaId  = String(reqId || '').trim();
+      const _ticketRef = String(ticketRef || '').trim();
+      if (!_lineaId || !_ticketRef) {
+        alert('Error: no se pudo identificar la solicitud (falta ticket o línea).');
+        return;
+      }
+      const result = await apiPost('rechazarExtraNativo', {
+        ticketRef: _ticketRef, lineaId: _lineaId
+      });
+
+      if (result && (result.ok || result.success)) {
         alert('✕ Servicio rechazado. El staff será notificado.');
         await renderAuthorizations(); // Reload list
       } else {
-        alert('Error: ' + (result.message || 'No se pudo rechazar'));
+        alert('Error: ' + ((result && (result.message || result.error)) || 'No se pudo rechazar'));
       }
     } catch (err) {
       console.error('Error rechazando autorización:', err);
@@ -4077,4 +4115,3 @@
 
   let currentProfileClient = null;
   let currentProfileTab = 'cejas';
-
