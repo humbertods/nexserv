@@ -3016,6 +3016,15 @@
     }).catch(() => {}).then(() => { window._frecInFlight = false; });
   }
 
+  // Solo presentación: oculta metadata técnica NATIVE al
+  // pintar la tarjeta Staff. No muta el dato original.
+  function _obsVisibleStaff(s) {
+    return String(s == null ? '' : s)
+      .replace(/\[NATIVE_(?:REQUEST_ID|REQUEST_FP|LINE_REQUEST_ID|LINE_REQUEST_FP):[^\]]*\]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   function _renderWaitListDOM(content, myList) {
     // INC-COLA-STAFF-02 · el índice se reconstruye DESDE CERO en cada render.
     // Antes solo se sobreescribían las posiciones nuevas, dejando residuos de
@@ -3042,11 +3051,13 @@
         <div class="waitlist-service"><strong>${w.service}</strong></div>
         ${w.isTop ? '<div class="top-paciencia">⭐ Cliente frecuente. Brindale el trato premium habitual.</div>' : ''}
         ${(function() {
-          var obs = w.obs || '';
+          var obs = _obsVisibleStaff(w.obs || '');
           var parts = obs.split('|');
           var compPart = parts.find(function(p){ return p.indexOf('✅') >= 0; });
           if (compPart) {
-            var clean = compPart.replace(/_completedAreas:[^|]*/,'').trim();
+            var clean = _obsVisibleStaff(compPart)
+              .replace(/_completedAreas:[^|]*/,'')
+              .trim();
             return '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;padding:5px 10px;background:var(--success-bg);border-radius:8px;">'
               + '<span style="font-size:12px;">✅</span>'
               + '<span style="font-size:11px;color:var(--success);font-weight:700;">' + clean + '</span>'
