@@ -3599,7 +3599,11 @@
               : [w.area, w.servicio, obs].join(' '));
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
-             const _lineaIdAttr = String(w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
+             const _lineaIdAttr = String((Array.isArray(w.serviciosDetalle)
+               ? w.serviciosDetalle.find(function (d) {
+                   return String(d.estado || '').toLowerCase() === 'esperando' && !String(d.staff || '').trim();
+                 })
+               : null)?.lineaId || w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
              const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
              const _decisionHTML = _decisionMikaela
               ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
