@@ -3752,66 +3752,77 @@
             let timelineHTML = '';
             const esTM = LineaService.clasificarTicket(a).esMulti;
 
-            // ── SP MULTI NATIVO · proyección visual por componente ─────────
-            // Promo pura nativa: mismo ticketRef, N líneas, TODAS con el MISMO
-            // grupoPromoId (un solo subticket). Sin grupoPromoId, con uno solo
-            // vacío, o con bloques distintos NO se entra: un SN nativo, un SP
-            // de un servicio y un ticket madre de varios bloques caen al
-            // timeline de siempre, intacto (§15: nunca fusionar grupos).
-            // Es SOLO proyección: no se escribe nada y no se transforma el
-            // estado real de LINEAS.
-            const _gruposNat = (!esTM && a.fuente === 'LineasNativo'
-                && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length > 1)
-              ? a.serviciosDetalle.map(function (d) { return String(d.grupoPromoId || '').trim(); })
-              : [];
+            // ── SP MULTI NATIVO (LINEAS) · proyección por componente ───────
+            // Bloque PROPIO del motor nativo. No comparte renderizador, shape
+            // ni estados con TM: lee LINEAS tal como viene (en_servicio /
+            // esperando / completado) y pinta su propia fila por lineaId.
+            // Discriminador: grupoPromoId, que SOLO emiten las proyecciones
+            // nativas de LINEAS — ningún camino legacy lo pone en
+            // serviciosDetalle. Se exige más de un componente y que TODOS
+            // compartan el MISMO grupo: un ticket madre con bloques distintos
+            // no entra (nunca se fusionan grupos). Es solo proyección visual:
+            // no escribe nada ni transforma ningún estado.
+            const _compsNat = (!esTM && Array.isArray(a.serviciosDetalle)
+              && a.serviciosDetalle.length > 1) ? a.serviciosDetalle : [];
+            const _gruposNat = _compsNat.map(function (d) { return String(d.grupoPromoId || '').trim(); });
             const _esNativePromoMulti = _gruposNat.length > 1
               && _gruposNat.every(function (g) { return g !== '' && g === _gruposNat[0]; });
-            // Mapeo al shape que el renderizador de áreas ya sabe pintar.
-            // 'en_servicio' → 'en servicio' es la MISMA normalización que ya
-            // hace _lineasLineasAAreasModal (nexserv-main-1.js) al mapear
-            // LINEAS a este shape: es vocabulario del renderizador, no un
-            // cambio de estado. El resto de estados pasan tal cual.
-            const _centralComponentRows = _esNativePromoMulti
-              ? a.serviciosDetalle.map(function (d) {
-                  return {
-                    area: d.area, tentativo: d.servicio, confirmado: d.servicio,
-                    precio: d.monto, staff: d.staff,
-                    estado: (String(d.estado || '') === 'en_servicio')
-                      ? 'en servicio' : (d.estado || 'esperando'),
-                    // Identidad exacta del componente (§10): lineaId dentro de
-                    // ticketRef + grupoPromoId. No se pinta, se conserva.
-                    _lineaId: String(d.id || d.lineaId || ''),
-                    _grupoPromoId: String(d.grupoPromoId || ''),
-                    _ticketRef: String(d.ticketRef || a.idEspera || '')
-                  };
-                })
-              : (a.areas || []);
 
-            if (esTM || _esNativePromoMulti) {
+            if (_esNativePromoMulti) {
+              _compsNat.forEach(function (comp, idxNat) {
+                const kNat = String(comp.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
+                const iconNat  = areaIcons[kNat] || areaIcons[comp.area] || '🔄';
+                const labelNat = areaLabels[kNat] || areaLabels[comp.area] || comp.area || 'Servicio';
+                const servNat  = String(comp.servicio || '');
+                const precioNat = Number(comp.monto || 0);
+                const staffNat = String(comp.staff || '').trim();
+                const estNat   = String(comp.estado || '').toLowerCase().trim();
+                const sepNat   = idxNat < (_compsNat.length - 1) ? 'border-bottom:1px solid var(--line);' : '';
+                // Estados de LINEAS, sin traducir a otro vocabulario.
+                const esCursoNat = estNat === 'en_servicio';
+                const esListoNat = estNat === 'completado';
+                const esperaNat  = estNat === 'esperando';
+                const textoNat = esListoNat ? 'Completado'
+                               : esCursoNat ? 'En curso'
+                               : esperaNat  ? 'Pendiente'
+                               : estNat.replace(/_/g, ' ');
+                const colorNat = esListoNat ? 'var(--success)' : esCursoNat ? 'var(--info)' : 'var(--warning)';
+                const fondoNat = esListoNat ? 'var(--success-bg)' : esCursoNat ? 'var(--info-bg)' : 'var(--warning-bg)';
+                const bordeNat = esperaNat || (!esListoNat && !esCursoNat)
+                  ? '2px dashed var(--line)' : ('2px solid ' + colorNat);
+                const pulseNat = esCursoNat ? 'animation:pulse 2s infinite;' : '';
+                const opacNat  = (esperaNat || (!esListoNat && !esCursoNat)) ? 'opacity:0.6;' : '';
+                timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${opacNat}${sepNat}">
+                  <div style="width:28px;height:28px;border-radius:50%;background:${esCursoNat||esListoNat?fondoNat:'var(--bg)'};border:${bordeNat};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;${pulseNat}">${iconNat}</div>
+                  <div style="flex:1;"><div style="font-size:12px;font-weight:${esCursoNat?'800':'700'};color:${esCursoNat||esListoNat?colorNat:'var(--ink-soft)'};">${labelNat}${staffNat?' · '+staffNat:''} · <strong>$${precioNat}</strong></div>
+                  <div style="font-size:11px;color:var(--ink-soft);">${servNat}</div></div>
+                  <div style="font-size:10px;font-weight:700;background:${fondoNat};color:${colorNat};padding:3px 8px;border-radius:100px;${esperaNat?'border:1px solid #e0c89a;':''}${pulseNat}">${textoNat}</div></div>`;
+              });
+            } else if (esTM) {
               // ── TICKET MULTI: desglose real por área ──
-              _centralComponentRows.forEach((ar, arIdx) => {
+              (a.areas || []).forEach((ar, arIdx) => {
                 const aKey = String(ar.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
                 const icon = areaIcons[aKey] || areaIcons[ar.area] || '🔄';
                 const label = areaLabels[aKey] || areaLabels[ar.area] || ar.area || 'Servicio';
                 const serv = ar.confirmado || ar.tentativo || '';
                 const precio = ar.precio || 0;
                 const est = String(ar.estado || '').toLowerCase();
-                const notLast = arIdx < (_centralComponentRows.length - 1);
+                const notLast = arIdx < (a.areas.length - 1);
                 if (est === 'completado') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">${_esNativePromoMulti ? 'Completado' : 'LISTO ✅'}</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO ✅</div></div>`;
                 } else if (est === 'en servicio') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+_hhmm(ar.hora):''}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${_esNativePromoMulti ? 'En curso' : 'EN CURSO'}</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
                 } else {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv || 'Esperando asignación'}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">${_esNativePromoMulti && est === 'esperando' ? 'Pendiente' : '⏳ ESPERA'}</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
                 }
               });
             } else {
@@ -3887,15 +3898,15 @@
             const _promoFullTot = a.promoNombre ? (PROMOS || []).find(p => p.name === a.promoNombre) : null;
             const _promoPrecioFijo = _promoFullTot ? Number(_promoFullTot.price || _promoFullTot.precio || 0) : 0;
             if (_esNativePromoMulti) {
-              // TOTAL OPERATIVO ACTUAL (§11-14): solo los componentes que YA
-              // entraron en ejecución. 'esperando' sin staff y 'anulado' no
-              // suman todavía; cuando se tomen, el total sube solo.
-              // NO cambia economía: el valor de la promo, el precio y el cobro
-              // salen de otro lado — esto es únicamente lo que Central muestra.
-              totalAcumDisplay = a.serviciosDetalle
+              // TOTAL OPERATIVO ACTUAL: solo los componentes que YA entraron en
+              // ejecución. 'esperando' sin staff y 'anulado' no suman todavía;
+              // cuando la siguiente staff tome el pendiente, el total sube solo
+              // hasta el valor completo de la promo. NO cambia economía: precio,
+              // valor de la promo y cobro salen de otro lado.
+              totalAcumDisplay = _compsNat
                 .filter(function (d) {
-                  const _eOp = String(d.estado || '').toLowerCase();
-                  return _eOp === 'en_servicio' || _eOp === 'en servicio' || _eOp === 'completado';
+                  const eOp = String(d.estado || '').toLowerCase().trim();
+                  return eOp === 'en_servicio' || eOp === 'completado';
                 })
                 .reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
             } else if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
