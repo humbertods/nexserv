@@ -2998,11 +2998,24 @@
             return;
           }
           const _first = _parts[0];
+          const _operationalParts = _parts.filter(function (part) {
+            const _state = String(part.estado || '').toLowerCase();
+            return _state === 'esperando' || _state === 'en servicio' || _state === 'en_servicio';
+          });
+          const _motherState = _parts.some(function (part) {
+            const _state = String(part.estado || '').toLowerCase();
+            return _state === 'en servicio' || _state === 'en_servicio';
+          }) ? 'en servicio' : _parts.some(function (part) {
+            return String(part.estado || '').toLowerCase() === 'esperando';
+          }) ? 'esperando' : _first.estado;
           const _owners = [];
+          _operationalParts.forEach(function (part) {
+            const _owner = String(part.staff || '').trim();
+            if (_owner && _owners.indexOf(_owner) === -1) _owners.push(_owner);
+          });
           const _details = _parts.map(function (part) {
             const _lineId = String(part.lineaId || part.id || '').trim();
             const _owner = String(part.staff || '').trim();
-            if (_owner && _owners.indexOf(_owner) === -1) _owners.push(_owner);
             return {
               id: _lineId,
               lineaId: _lineId,
@@ -3020,6 +3033,8 @@
             idEspera: _first.ticketRef || _first.id,
             servicio: String(_first.servicio || '').split(' (')[0],
             lineaId: _details[0].lineaId,
+            estado: _motherState,
+            status: _motherState,
             asignadaA: _owners.join(', '),
             tomadaPor: _owners.join(', '),
             serviciosDetalle: _details,
