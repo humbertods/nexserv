@@ -3753,15 +3753,15 @@
             const esTM = LineaService.clasificarTicket(a).esMulti;
 
             // ── SP MULTI NATIVO (LINEAS) · proyección por componente ───────
-            // Bloque PROPIO del motor nativo. No comparte renderizador, shape
-            // ni estados con TM: lee LINEAS tal como viene (en_servicio /
-            // esperando / completado) y pinta su propia fila por lineaId.
+            // Bloque PROPIO del motor nativo: recorrido, marcado y estados
+            // propios. No comparte renderizador, shape ni vocabulario con
+            // ninguna rama anterior — lee LINEAS tal cual (en_servicio /
+            // esperando / completado).
             // Discriminador: grupoPromoId, que SOLO emiten las proyecciones
-            // nativas de LINEAS — ningún camino legacy lo pone en
-            // serviciosDetalle. Se exige más de un componente y que TODOS
+            // nativas de LINEAS. Se exige más de un componente y que TODOS
             // compartan el MISMO grupo: un ticket madre con bloques distintos
-            // no entra (nunca se fusionan grupos). Es solo proyección visual:
-            // no escribe nada ni transforma ningún estado.
+            // no entra, y los grupos nunca se fusionan. Solo proyección
+            // visual: no escribe nada ni transforma ningún estado.
             const _compsNat = (!esTM && Array.isArray(a.serviciosDetalle)
               && a.serviciosDetalle.length > 1) ? a.serviciosDetalle : [];
             const _gruposNat = _compsNat.map(function (d) { return String(d.grupoPromoId || '').trim(); });
@@ -3771,34 +3771,35 @@
             if (_esNativePromoMulti) {
               _compsNat.forEach(function (comp, idxNat) {
                 const kNat = String(comp.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
-                const iconNat  = areaIcons[kNat] || areaIcons[comp.area] || '🔄';
-                const labelNat = areaLabels[kNat] || areaLabels[comp.area] || comp.area || 'Servicio';
-                const servNat  = String(comp.servicio || '');
+                const iconNat   = areaIcons[kNat] || areaIcons[comp.area] || '🔄';
+                const labelNat  = areaLabels[kNat] || areaLabels[comp.area] || comp.area || 'Servicio';
+                const servNat   = String(comp.servicio || '');
                 const precioNat = Number(comp.monto || 0);
-                const staffNat = String(comp.staff || '').trim();
-                const estNat   = String(comp.estado || '').toLowerCase().trim();
-                const sepNat   = idxNat < (_compsNat.length - 1) ? 'border-bottom:1px solid var(--line);' : '';
-                // Estados de LINEAS, sin traducir a otro vocabulario.
+                const staffNat  = String(comp.staff || '').trim();
+                const estNat    = String(comp.estado || '').toLowerCase().trim();
+                const sepNat    = idxNat < (_compsNat.length - 1) ? 'border-bottom:1px solid var(--line);' : '';
                 const esCursoNat = estNat === 'en_servicio';
                 const esListoNat = estNat === 'completado';
                 const esperaNat  = estNat === 'esperando';
+                const vivoNat    = esCursoNat || esListoNat;
                 const textoNat = esListoNat ? 'Completado'
                                : esCursoNat ? 'En curso'
                                : esperaNat  ? 'Pendiente'
                                : estNat.replace(/_/g, ' ');
                 const colorNat = esListoNat ? 'var(--success)' : esCursoNat ? 'var(--info)' : 'var(--warning)';
                 const fondoNat = esListoNat ? 'var(--success-bg)' : esCursoNat ? 'var(--info-bg)' : 'var(--warning-bg)';
-                const bordeNat = esperaNat || (!esListoNat && !esCursoNat)
-                  ? '2px dashed var(--line)' : ('2px solid ' + colorNat);
+                const bordeNat = vivoNat ? ('2px solid ' + colorNat) : '2px dashed var(--line)';
                 const pulseNat = esCursoNat ? 'animation:pulse 2s infinite;' : '';
-                const opacNat  = (esperaNat || (!esListoNat && !esCursoNat)) ? 'opacity:0.6;' : '';
+                const opacNat  = vivoNat ? '' : 'opacity:0.6;';
                 timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${opacNat}${sepNat}">
-                  <div style="width:28px;height:28px;border-radius:50%;background:${esCursoNat||esListoNat?fondoNat:'var(--bg)'};border:${bordeNat};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;${pulseNat}">${iconNat}</div>
-                  <div style="flex:1;"><div style="font-size:12px;font-weight:${esCursoNat?'800':'700'};color:${esCursoNat||esListoNat?colorNat:'var(--ink-soft)'};">${labelNat}${staffNat?' · '+staffNat:''} · <strong>$${precioNat}</strong></div>
+                  <div style="width:28px;height:28px;border-radius:50%;background:${vivoNat?fondoNat:'var(--bg)'};border:${bordeNat};display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;${pulseNat}">${iconNat}</div>
+                  <div style="flex:1;"><div style="font-size:12px;font-weight:${esCursoNat?'800':'700'};color:${vivoNat?colorNat:'var(--ink-soft)'};">${labelNat}${staffNat?' · '+staffNat:''} · <strong>$${precioNat}</strong></div>
                   <div style="font-size:11px;color:var(--ink-soft);">${servNat}</div></div>
                   <div style="font-size:10px;font-weight:700;background:${fondoNat};color:${colorNat};padding:3px 8px;border-radius:100px;${esperaNat?'border:1px solid #e0c89a;':''}${pulseNat}">${textoNat}</div></div>`;
               });
-            } else if (esTM) {
+            }
+
+            if (esTM) {
               // ── TICKET MULTI: desglose real por área ──
               (a.areas || []).forEach((ar, arIdx) => {
                 const aKey = String(ar.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
@@ -3825,7 +3826,7 @@
                     <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
                 }
               });
-            } else {
+            } else if (!_esNativePromoMulti) {
               // ── TICKET NORMAL / PROMO: timeline original ──
              const obs = _obsVisibleMikaela(a.observaciones);
               const partesPrevias = obs.split(' | ').filter(p => p.includes('✅'));
@@ -3897,19 +3898,7 @@
             let totalAcumDisplay = Number(a.total) || 0;
             const _promoFullTot = a.promoNombre ? (PROMOS || []).find(p => p.name === a.promoNombre) : null;
             const _promoPrecioFijo = _promoFullTot ? Number(_promoFullTot.price || _promoFullTot.precio || 0) : 0;
-            if (_esNativePromoMulti) {
-              // TOTAL OPERATIVO ACTUAL: solo los componentes que YA entraron en
-              // ejecución. 'esperando' sin staff y 'anulado' no suman todavía;
-              // cuando la siguiente staff tome el pendiente, el total sube solo
-              // hasta el valor completo de la promo. NO cambia economía: precio,
-              // valor de la promo y cobro salen de otro lado.
-              totalAcumDisplay = _compsNat
-                .filter(function (d) {
-                  const eOp = String(d.estado || '').toLowerCase().trim();
-                  return eOp === 'en_servicio' || eOp === 'completado';
-                })
-                .reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
-            } else if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+            if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
               const totalDetalle = a.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
               if (totalDetalle > 0) {
                 if (_promoPrecioFijo > 0) {
@@ -3929,6 +3918,19 @@
                   totalAcumDisplay = Math.max(Number(a.total) || 0, totalDetalle);
                 }
               }
+            }
+            // TOTAL OPERATIVO ACTUAL del SP multi nativo: solo los componentes
+            // que YA entraron en ejecución. 'esperando' sin staff y 'anulado'
+            // no suman todavía; cuando la siguiente staff tome el pendiente,
+            // el total sube solo hasta el valor completo de la promo. NO toca
+            // economía: precio, valor de la promo y cobro salen de otro lado.
+            if (_esNativePromoMulti) {
+              totalAcumDisplay = _compsNat
+                .filter(function (d) {
+                  const eOp = String(d.estado || '').toLowerCase().trim();
+                  return eOp === 'en_servicio' || eOp === 'completado';
+                })
+                .reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
             }
             const totalStr = totalAcumDisplay > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);"><span style="font-size:11px;color:var(--ink-faint);font-weight:600;">TOTAL ACUMULADO</span><span style="font-size:16px;font-weight:800;color:var(--accent-deep);">$${totalAcumDisplay.toFixed(2)}</span></div>` : '';
             const tmBadge = esTM ? ' <span style="font-size:10px;background:var(--accent);color:white;padding:2px 8px;border-radius:100px;font-weight:700;">MULTI</span>' : '';
