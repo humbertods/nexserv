@@ -2773,8 +2773,9 @@
              fuente: w.fuente || '',
              lineaId: w.lineaId || w.linea_id || '',
              idEspera: w.idEspera || w.id || '',
-            ticketRef: w.ticketRef || '',
-            areaIdx: (w.areaIdx === undefined || w.areaIdx === null) ? '' : w.areaIdx,
+             ticketRef: w.ticketRef || '',
+             grupoPromoId: w.grupoPromoId || '',
+             areaIdx: (w.areaIdx === undefined || w.areaIdx === null) ? '' : w.areaIdx,
             tipo: w.tipo || '',
             promoNombre: w.promoNombre || '',
             precioPromo: w.precioPromo || '',
@@ -2783,7 +2784,7 @@
             secuencia: w.secuencia || [],
             promasExtra: w.promasExtra || [],
             destinataria: w.destinataria || '',
-            promoMultiPreTake: w.promoMultiPreTake === true,
+              promoMultiPreTake: w.promoMultiPreTake === true,
             // INC-SP-PRESEL · el mapeo anterior descartaba serviciosDetalle y
             // componentes, así que window._takingData llegaba al modal SIN la
             // identidad de las líneas (linea_id). Con fuente='LineasNativo' eso
@@ -2974,7 +2975,58 @@
             serviciosDetalle: w.serviciosDetalle || [{ id: w.id || '', lineaId: w.id || '', servicio: w.servicio || '', area: w.area || '', monto: Number(w.monto || 0), estado: w.estado || '', staff: w.staff || '' }]
           };
         });
-        const listaParaStaff = _staffQueueMapear(crudaAdaptada);
+        const _queueGroups = Object.create(null);
+        const _queueSingles = [];
+        crudaAdaptada.forEach(function (w) {
+          if (!w.promoMultiPreTake) {
+            _queueSingles.push(w);
+            return;
+          }
+          const _groupKey = String(w.ticketRef || '').trim() + '|' + String(w.grupoPromoId || '').trim();
+          if (_groupKey === '|') {
+            _queueSingles.push(w);
+            return;
+          }
+          if (!_queueGroups[_groupKey]) _queueGroups[_groupKey] = [];
+          _queueGroups[_groupKey].push(w);
+        });
+        const _queueMotherCards = [];
+        Object.keys(_queueGroups).forEach(function (_groupKey) {
+          const _parts = _queueGroups[_groupKey];
+          if (_parts.length < 2) {
+            _queueSingles.push(_parts[0]);
+            return;
+          }
+          const _first = _parts[0];
+          const _owners = [];
+          const _details = _parts.map(function (part) {
+            const _lineId = String(part.lineaId || part.id || '').trim();
+            const _owner = String(part.staff || '').trim();
+            if (_owner && _owners.indexOf(_owner) === -1) _owners.push(_owner);
+            return {
+              id: _lineId,
+              lineaId: _lineId,
+              servicio: part.servicio || '',
+              area: part.area || '',
+              monto: Number(part.monto || 0),
+              estado: part.estado || '',
+              staff: _owner,
+              grupoPromoId: part.grupoPromoId || '',
+              ticketRef: part.ticketRef || ''
+            };
+          });
+          _queueMotherCards.push(Object.assign({}, _first, {
+            id: _first.ticketRef || _first.id,
+            idEspera: _first.ticketRef || _first.id,
+            servicio: String(_first.servicio || '').split(' (')[0],
+            lineaId: _details[0].lineaId,
+            asignadaA: _owners.join(', '),
+            tomadaPor: _owners.join(', '),
+            serviciosDetalle: _details,
+            promoMultiPreTake: true
+          }));
+        });
+        const listaParaStaff = _staffQueueMapear(_queueSingles.concat(_queueMotherCards));
         st.raw = crudaAdaptada;
         st.data = listaParaStaff;
         st.ts = Date.now();
