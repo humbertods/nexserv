@@ -3624,16 +3624,32 @@
             // ── Control de reasignación (multi-servicio / promo-dúo) ──
             const _fuente = w.fuente || '';
             const _esMultiPromo = LineaService.clasificarTicket(w).esMulti || LineaService.clasificarTicket(w).tienePromo;
-            const _pendKey = _normAreaKey(esContinuacion
-              ? [sigueTxt, w.area, w.servicio, obs].join(' ')
-              : [w.area, w.servicio, obs].join(' '));
+            // FIX · SP multi nativo: el selector de staff y el lineaId que viaja
+            // al backend deben salir del MISMO componente pendiente. El calculo
+            // por texto agregado de la tarjeta mezclaba las areas de todos los
+            // componentes y _normAreaKey cortaba en la primera coincidencia de su
+            // cadena, devolviendo 'cejas' aunque el pendiente real fuera pestanas.
+            // El componente se resuelve UNA sola vez, con el mismo criterio que ya
+            // usaba _lineaIdAttr (estado 'esperando' + staff vacia), y se reutiliza
+            // para ambos. Fuera de SP multi nativo la expresion previa se conserva
+            // intacta. No se toca _normAreaKey ni _staffOpcionesReasignar.
+            const _compPendiente = Array.isArray(w.serviciosDetalle)
+              ? w.serviciosDetalle.find(function (d) {
+                  return String(d.estado || '').toLowerCase() === 'esperando' && !String(d.staff || '').trim();
+                })
+              : null;
+            const _compObjetivoSPMulti = (_esSPMultiNativo && _compPendiente) ? _compPendiente : null;
+            const _pendKey = _compObjetivoSPMulti
+              ? _normAreaKey(String(_compObjetivoSPMulti.area || _compObjetivoSPMulti.servicio || ''))
+              : _normAreaKey(esContinuacion
+                ? [sigueTxt, w.area, w.servicio, obs].join(' ')
+                : [w.area, w.servicio, obs].join(' '));
             const _uid = (String(w.idEspera || w.codigo || '').replace(/[^A-Za-z0-9_-]/g,'')) || ('x' + Math.floor(Math.random()*1e6));
             const _areaIdxAttr = (_fuente === 'TicketMulti' && w.areaIdx) ? w.areaIdx : '';
-             const _lineaIdAttr = String((Array.isArray(w.serviciosDetalle)
-               ? w.serviciosDetalle.find(function (d) {
-                   return String(d.estado || '').toLowerCase() === 'esperando' && !String(d.staff || '').trim();
-                 })
-               : null)?.lineaId || w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
+             // Reutiliza el MISMO _compPendiente resuelto arriba (identico criterio
+             // y identico resultado que la busqueda que estaba aqui): una sola
+             // fuente para el lineaId y para el area del selector.
+             const _lineaIdAttr = String(_compPendiente?.lineaId || w.lineaId || w.linea_id || (w.componente_esperando && (w.componente_esperando.linea_id || w.componente_esperando.id)) || '').trim();
              const _nombreSafe = String(w.nombre || '').replace(/'/g, "\\'");
              const _decisionHTML = _decisionMikaela
               ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
