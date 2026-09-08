@@ -3364,7 +3364,7 @@
         // Componente de OTRA área — visible pero no seleccionable, para que la
         // staff entienda qué más lleva el ticket sin poder tomarlo.
         return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:12px;margin-bottom:8px;opacity:0.65;border:1.5px dashed var(--line);">
-          <span style="font-size:16px;flex-shrink:0;">🔒</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ink-faint)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
           <div style="flex:1;">
             <div style="font-size:13px;font-weight:700;color:var(--ink-soft);">${item.nombre}</div>
             <div style="font-size:11px;color:var(--ink-faint);font-weight:600;">Otra área (${item.area || '—'}) · lo toma otra staff</div>
