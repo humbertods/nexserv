@@ -3752,31 +3752,66 @@
             let timelineHTML = '';
             const esTM = LineaService.clasificarTicket(a).esMulti;
 
-            if (esTM) {
+            // ── SP MULTI NATIVO · proyección visual por componente ─────────
+            // Promo pura nativa: mismo ticketRef, N líneas, TODAS con el MISMO
+            // grupoPromoId (un solo subticket). Sin grupoPromoId, con uno solo
+            // vacío, o con bloques distintos NO se entra: un SN nativo, un SP
+            // de un servicio y un ticket madre de varios bloques caen al
+            // timeline de siempre, intacto (§15: nunca fusionar grupos).
+            // Es SOLO proyección: no se escribe nada y no se transforma el
+            // estado real de LINEAS.
+            const _gruposNat = (!esTM && a.fuente === 'LineasNativo'
+                && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length > 1)
+              ? a.serviciosDetalle.map(function (d) { return String(d.grupoPromoId || '').trim(); })
+              : [];
+            const _esNativePromoMulti = _gruposNat.length > 1
+              && _gruposNat.every(function (g) { return g !== '' && g === _gruposNat[0]; });
+            // Mapeo al shape que el renderizador de áreas ya sabe pintar.
+            // 'en_servicio' → 'en servicio' es la MISMA normalización que ya
+            // hace _lineasLineasAAreasModal (nexserv-main-1.js) al mapear
+            // LINEAS a este shape: es vocabulario del renderizador, no un
+            // cambio de estado. El resto de estados pasan tal cual.
+            const _centralComponentRows = _esNativePromoMulti
+              ? a.serviciosDetalle.map(function (d) {
+                  return {
+                    area: d.area, tentativo: d.servicio, confirmado: d.servicio,
+                    precio: d.monto, staff: d.staff,
+                    estado: (String(d.estado || '') === 'en_servicio')
+                      ? 'en servicio' : (d.estado || 'esperando'),
+                    // Identidad exacta del componente (§10): lineaId dentro de
+                    // ticketRef + grupoPromoId. No se pinta, se conserva.
+                    _lineaId: String(d.id || d.lineaId || ''),
+                    _grupoPromoId: String(d.grupoPromoId || ''),
+                    _ticketRef: String(d.ticketRef || a.idEspera || '')
+                  };
+                })
+              : (a.areas || []);
+
+            if (esTM || _esNativePromoMulti) {
               // ── TICKET MULTI: desglose real por área ──
-              (a.areas || []).forEach((ar, arIdx) => {
+              _centralComponentRows.forEach((ar, arIdx) => {
                 const aKey = String(ar.area || '').toLowerCase().replace(/[ó]/g,'o').replace(/[á]/g,'a').replace(/[é]/g,'e').replace(/[ñ]/g,'n');
                 const icon = areaIcons[aKey] || areaIcons[ar.area] || '🔄';
                 const label = areaLabels[aKey] || areaLabels[ar.area] || ar.area || 'Servicio';
                 const serv = ar.confirmado || ar.tentativo || '';
                 const precio = ar.precio || 0;
                 const est = String(ar.estado || '').toLowerCase();
-                const notLast = arIdx < (a.areas.length - 1);
+                const notLast = arIdx < (_centralComponentRows.length - 1);
                 if (est === 'completado') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--success-bg);border:2px solid var(--success);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">LISTO ✅</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--success-bg);color:var(--success);padding:3px 8px;border-radius:100px;">${_esNativePromoMulti ? 'Completado' : 'LISTO ✅'}</div></div>`;
                 } else if (est === 'en servicio') {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--info-bg);border:2px solid var(--info);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;animation:pulse 2s infinite;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:800;color:var(--info);">${label} · ${ar.staff||'—'} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${serv.split(" + ").map(s => `<div style="font-size:11px;color:var(--ink-soft);">• ${s.trim()}</div>`).join("")}</div><div style="font-size:10px;color:var(--ink-faint);">🔄 En curso${ar.hora?' desde '+_hhmm(ar.hora):''}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">EN CURSO</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--info-bg);color:var(--info);padding:3px 8px;border-radius:100px;animation:pulse 2s infinite;">${_esNativePromoMulti ? 'En curso' : 'EN CURSO'}</div></div>`;
                 } else {
                   timelineHTML += `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;opacity:0.55;${notLast?'border-bottom:1px solid var(--line);':''}">
                     <div style="width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;">${icon}</div>
                     <div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--ink-soft);">${label} · <strong>$${precio}</strong></div><div style="font-size:11px;color:var(--ink-faint);">${serv || 'Esperando asignación'}</div></div>
-                    <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">⏳ ESPERA</div></div>`;
+                    <div style="font-size:10px;font-weight:700;background:var(--warning-bg);color:var(--warning);padding:3px 8px;border-radius:100px;border:1px solid #e0c89a;">${_esNativePromoMulti && est === 'esperando' ? 'Pendiente' : '⏳ ESPERA'}</div></div>`;
                 }
               });
             } else {
@@ -3851,7 +3886,19 @@
             let totalAcumDisplay = Number(a.total) || 0;
             const _promoFullTot = a.promoNombre ? (PROMOS || []).find(p => p.name === a.promoNombre) : null;
             const _promoPrecioFijo = _promoFullTot ? Number(_promoFullTot.price || _promoFullTot.precio || 0) : 0;
-            if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+            if (_esNativePromoMulti) {
+              // TOTAL OPERATIVO ACTUAL (§11-14): solo los componentes que YA
+              // entraron en ejecución. 'esperando' sin staff y 'anulado' no
+              // suman todavía; cuando se tomen, el total sube solo.
+              // NO cambia economía: el valor de la promo, el precio y el cobro
+              // salen de otro lado — esto es únicamente lo que Central muestra.
+              totalAcumDisplay = a.serviciosDetalle
+                .filter(function (d) {
+                  const _eOp = String(d.estado || '').toLowerCase();
+                  return _eOp === 'en_servicio' || _eOp === 'en servicio' || _eOp === 'completado';
+                })
+                .reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
+            } else if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
               const totalDetalle = a.serviciosDetalle.reduce((s, d) => s + Number(d.monto || 0), 0);
               if (totalDetalle > 0) {
                 if (_promoPrecioFijo > 0) {
