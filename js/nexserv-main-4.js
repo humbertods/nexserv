@@ -630,7 +630,8 @@
       });
     } else if (Array.isArray(c.serviciosDetalle) && c.serviciosDetalle.length) {
       c.serviciosDetalle.forEach(function(d){
-        filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), done: true });
+      const estado = String(d.estado || '').toLowerCase();
+      filas.push({ label: (d.servicio || d.area || 'Servicio'), staff: d.staff||'—', monto: Number(d.monto||0), estado: estado, done: estado === 'completado' });
       });
     } else {
       const obs = String(c.observaciones||'');
@@ -661,11 +662,13 @@
   }
   function buildDesgloseHTML(c){
     return _desgloseFilas(c).map(function(r){
-      const ic = r.done ? '✅' : '⏳';
-      const col = r.done ? 'var(--success)' : 'var(--accent-deep)';
+      const enCurso = r.estado === 'en servicio' || r.estado === 'en_servicio';
+      const pendiente = r.estado === 'esperando';
+      const ic = r.done ? '✅' : enCurso ? '🔄' : '⏳';
+      const col = r.done ? 'var(--success)' : enCurso ? 'var(--info)' : pendiente ? 'var(--warning)' : 'var(--accent-deep)';
       const right = r.done
         ? (r.staff + (r.monto ? (' · $'+r.monto) : ''))
-        : ((r.staff && r.staff !== '—') ? (r.staff + ' · por confirmar') : 'falta asignar staff');
+        : ((r.staff && r.staff !== '—') ? (r.staff + (enCurso ? ' · en curso' : ' · por confirmar')) : 'falta asignar staff');
       return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;">'
         + '<span style="color:'+col+';font-weight:700;">'+ic+' '+r.label+'</span>'
         + '<span style="color:var(--ink-soft);white-space:nowrap;">'+right+'</span></div>';
