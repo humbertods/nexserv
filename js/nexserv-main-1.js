@@ -779,8 +779,25 @@
       // "Devolver a central". Pintarlo también desde esta rama dejaba DOS
       // botones con el mismo texto y comportamiento distinto en la misma
       // pantalla, imposibles de distinguir para la staff.
-      btnContainer.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:var(--ink-faint);">Cargando opciones…</div>';
       const _lineaActual = _miasNat.length ? String(_miasNat[_miasNat.length - 1].id) : '';
+      const _pendingLocal = Array.isArray(window._depiItems) && window._depiItems.some(function (it) {
+        return !it.readonly && !it.completado && !it.bloqueado && !it.checked;
+      });
+      const _btnPasarImmediate =
+        '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+      + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+      + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>';
+      const _btnCancelarImmediate =
+        '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+      + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'siguiente servicio\')">'
+      + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
+      const _btnTerminarImmediate =
+        '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
+      + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+      + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
+      btnContainer.innerHTML = _pendingLocal
+        ? _btnPasarImmediate + _btnCancelarImmediate
+        : _btnTerminarImmediate;
       apiPost('siguientePendienteBloque', { ticketRef: _refNat, lineaActualId: _lineaActual })
         .then(function (r) {
           // Descartar si ya hubo otra invocación para este slot: pintar acá
@@ -3484,7 +3501,7 @@
   function updateDepiTotal() {
     const items = window._depiItems || [];
     // Only sum non-readonly (pending) items
-    const total = items.filter(i => i.checked && !i.readonly && !i.completado && !i.bloqueado).reduce((sum, i) => sum + Number(i.precio || 0), 0);
+    const total = items.filter(i => i.checked && !i.readonly && !i.completado && !i.bloqueado).reduce((sum, i) => sum + Number(i.precio || i.monto || i.price || 0), 0);
     const el = document.getElementById('takeDepiTotal');
     if (el) el.textContent = '$' + total;
   }
