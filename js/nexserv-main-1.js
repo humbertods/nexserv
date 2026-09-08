@@ -3008,7 +3008,7 @@
               lineaId: _lineId,
               servicio: part.servicio || '',
               area: part.area || '',
-              monto: Number(part.monto || 0),
+              monto: Number(part.total || part.monto || 0),
               estado: part.estado || '',
               staff: _owner,
               grupoPromoId: part.grupoPromoId || '',
