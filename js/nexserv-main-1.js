@@ -2782,6 +2782,8 @@
             total: w.total || 0,
             secuencia: w.secuencia || [],
             promasExtra: w.promasExtra || [],
+            destinataria: w.destinataria || '',
+            promoMultiPreTake: w.promoMultiPreTake === true,
             // INC-SP-PRESEL · el mapeo anterior descartaba serviciosDetalle y
             // componentes, así que window._takingData llegaba al modal SIN la
             // identidad de las líneas (linea_id). Con fuente='LineasNativo' eso
@@ -2872,8 +2874,10 @@
     const asignada = String((w.asignadaA == null ? '' : w.asignadaA)).trim();
     const dueno = asignada !== '' ? asignada
                 : String((w.tomadaPor == null ? '' : w.tomadaPor)).trim();
-    if (dueno === '') return false;
-    return dueno.split(',').some(function (n) { return _nsNorm(n) === yo; });
+    if (dueno !== '') return dueno.split(',').some(function (n) { return _nsNorm(n) === yo; });
+    // Routing fallback only for an unowned native promo with multiple components.
+    if (!w.promoMultiPreTake) return false;
+    return _nsNorm(w.destinataria) === yo;
   }
   window._staffQueueEsMia = _staffQueueEsMia;
   window._staffQueueEsTomable = _staffQueueEsTomable;
@@ -2932,8 +2936,23 @@
         const cruda = result && result.success ? [].concat(
           result.cola || [], result.en_servicio || [], result.por_verificar || [],
           result.completado || [], result.cobrado || []) : [];
+        const _promoMultiCounts = {};
+        cruda.forEach(function (w) {
+          const _esPromo = w.esPromo === true || String(w.esPromo || '').toLowerCase() === 'si';
+          const _refPromo = String(w.ticketRef || '').trim();
+          const _grupoPromo = String(w.grupoPromoId || '').trim();
+          if (_esPromo && _refPromo && _grupoPromo) {
+            const _clavePromo = _refPromo + '|' + _grupoPromo;
+            _promoMultiCounts[_clavePromo] = (_promoMultiCounts[_clavePromo] || 0) + 1;
+          }
+        });
         const crudaAdaptada = cruda.map(function (w) {
-             return {
+            const _refAdaptada = String(w.ticketRef || '').trim();
+            const _grupoAdaptada = String(w.grupoPromoId || '').trim();
+            const _esPromoAdaptada = w.esPromo === true || String(w.esPromo || '').toLowerCase() === 'si';
+            const _promoMultiPreTake = _esPromoAdaptada && _refAdaptada && _grupoAdaptada &&
+              (_promoMultiCounts[_refAdaptada + '|' + _grupoAdaptada] || 0) >= 2;
+            return {
              id: w.id || '',
             idEspera: w.ticketRef || w.promoRef || w.id || '',
             ticketRef: w.ticketRef || '',
@@ -2950,7 +2969,9 @@
             promoNombre: w.esPromo ? (w.servicio || '') : '',
             prioridad: 'normal',
              observaciones: w.obs || '',
-             serviciosDetalle: w.serviciosDetalle || [{ id: w.id || '', lineaId: w.id || '', servicio: w.servicio || '', area: w.area || '', monto: Number(w.monto || 0), estado: w.estado || '', staff: w.staff || '' }]
+            destinataria: w.destinataria || '',
+            promoMultiPreTake: _promoMultiPreTake,
+            serviciosDetalle: w.serviciosDetalle || [{ id: w.id || '', lineaId: w.id || '', servicio: w.servicio || '', area: w.area || '', monto: Number(w.monto || 0), estado: w.estado || '', staff: w.staff || '' }]
           };
         });
         const listaParaStaff = _staffQueueMapear(crudaAdaptada);
@@ -2964,16 +2985,15 @@
         try {
           if (typeof window._nexLat === 'function') {
             const _t = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-            const _q = w => (w.asignadaA && String(w.asignadaA).trim()) || (w.tomadaPor && String(w.tomadaPor).trim()) || '';
             const _n = x => String(x || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             window._nexLat('QUEUE_RESPONSE', {
               origen: origen,
               duracionMs: Math.round(_t - _t0),
               ok: !!(result && result.success),
               totalItems: cruda.length,
-              assignedToCurrentUserCount: cruda.filter(w => { const q = _q(w); return q !== '' && q === user.name; }).length,
+              assignedToCurrentUserCount: _mias,
               mias: _mias,
-              trimmedCaseInsensitiveMatchCount: cruda.filter(w => _q(w) !== '' && _n(_q(w)) === _n(user.name)).length
+              trimmedCaseInsensitiveMatchCount: _mias
             });
           }
         } catch (e) {}
