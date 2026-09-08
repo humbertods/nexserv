@@ -3546,7 +3546,27 @@
             const pri = String(w.prioridad || 'normal').toLowerCase();
              const obs = _obsVisibleMikaela(w.observaciones);
             const esContinuacion = obs.indexOf('✅') !== -1;
-            const _nativeMultiDetails = w.fuente === 'LineasNativo' && Array.isArray(w.serviciosDetalle)
+            // FIX B · SP multi nativo. El backend proyecta estos tickets con
+            // fuente='ServicioPromo' (derivada del prefijo SP- en _lineaAItem),
+            // asi que la condicion por fuente no los reconocia y el encabezado
+            // caia a "Por asignar" aunque el componente pendiente ya tuviera
+            // staff. Se detectan por la MISMA estructura que el backend ya usa
+            // para clasificarlos (_esSPMultiMadre): ticket madre real + >=2
+            // componentes que comparten un grupoPromoId no vacio. No se toca el
+            // backend, ni _lineaAItem, ni el valor de `fuente`.
+            const _esSPMultiNativo = (function () {
+              if (!Array.isArray(w.serviciosDetalle) || w.serviciosDetalle.length < 2) return false;
+              if (String(w.ticketRef || '').trim() === '') return false;
+              const _gruposSPMulti = {};
+              for (let _iSPMulti = 0; _iSPMulti < w.serviciosDetalle.length; _iSPMulti++) {
+                const _gSPMulti = String(w.serviciosDetalle[_iSPMulti].grupoPromoId || '').trim();
+                if (!_gSPMulti) continue;
+                _gruposSPMulti[_gSPMulti] = (_gruposSPMulti[_gSPMulti] || 0) + 1;
+                if (_gruposSPMulti[_gSPMulti] >= 2) return true;
+              }
+              return false;
+            })();
+            const _nativeMultiDetails = (w.fuente === 'LineasNativo' || _esSPMultiNativo) && Array.isArray(w.serviciosDetalle)
               ? w.serviciosDetalle.filter(function (d) {
                   const _estado = String(d.estado || '').toLowerCase();
                   return (_estado === 'esperando' || _estado === 'en_servicio') && String(d.staff || '').trim();
