@@ -3546,7 +3546,15 @@
             const pri = String(w.prioridad || 'normal').toLowerCase();
              const obs = _obsVisibleMikaela(w.observaciones);
             const esContinuacion = obs.indexOf('✅') !== -1;
-            const estaAsignada = w.tomadaPor && String(w.tomadaPor).trim() !== '';
+            const _nativeMultiDetails = w.fuente === 'LineasNativo' && Array.isArray(w.serviciosDetalle)
+              ? w.serviciosDetalle.filter(function (d) {
+                  const _estado = String(d.estado || '').toLowerCase();
+                  return (_estado === 'esperando' || _estado === 'en_servicio') && String(d.staff || '').trim();
+                })
+              : [];
+            const _nativeMultiStaff = [...new Set(_nativeMultiDetails.map(function (d) { return String(d.staff).trim(); }))].join(', ');
+            const _tomadaPorVisual = _nativeMultiDetails.length ? _nativeMultiStaff : (w.tomadaPor || '');
+            const estaAsignada = String(_tomadaPorVisual).trim() !== '';
             // Asignación directa de Central: la staff elegida vive en
             // TicketsFuente.destinataria y llega como `asignadaA`
             // (NexServ_AppsScript.js:763). LINEAS.staff nace vacío por contrato,
@@ -3578,12 +3586,14 @@
             let estadoLabel;
             if (_decisionMikaela) {
               estadoLabel = '<strong style="color:var(--accent-deep);">Esperando decisión</strong>';
+            } else if (_nativeMultiDetails.length) {
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + _tomadaPorVisual;
             } else if (esContinuacion) {
               estadoLabel = sigueTxt
                 ? '<strong style="color:var(--accent-deep);">Por asignar</strong> <span style="color:var(--ink-soft);">· falta pasar a la siguiente staff</span>'
                 : '<strong style="color:var(--success);">Mandar a cobro</strong> <span style="color:var(--ink-soft);">· servicios completados</span>';
             } else if (estaAsignada) {
-              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + w.tomadaPor;
+              estadoLabel = '<strong style="color:var(--accent-deep);">Asignada</strong> a ' + _tomadaPorVisual;
             } else if (_asignadaDirecta) {
               estadoLabel = '<strong style="color:var(--accent-deep);">Asignado directo</strong> a ' + _asignadaDirecta;
             } else {
@@ -3842,7 +3852,14 @@
                   const icon = areaIcons[areaComp] || '✅';
                   const label = areaLabels[areaComp] || areaComp;
                   let montoStr = '';
-                  if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
+             if (a.fuente === 'LineasNativo' && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length > 1) {
+               totalAcumDisplay = a.serviciosDetalle
+                 .filter(function (d) {
+                   const _estado = String(d.estado || '').toLowerCase();
+                   return _estado === 'en_servicio' || _estado === 'completado';
+                 })
+                 .reduce(function (s, d) { return s + Number(d.monto || 0); }, 0);
+             } else if (a.serviciosDetalle && a.serviciosDetalle.length > 0) {
                     // Sumar TODAS las entradas de esa staff (promo + adicionales)
                     const entradasStaff = a.serviciosDetalle.filter(d =>
                       String(d.staff||'').toLowerCase() === staffComp.toLowerCase() ||
