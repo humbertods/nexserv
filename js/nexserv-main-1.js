@@ -2979,6 +2979,11 @@
             servicio: w.servicio || '',
             area: w.area || '',
             estado: w.estado || '',
+             // FIX A · La staff real de la linea se conserva ademas de sus dos
+             // proyecciones. El constructor de la tarjeta madre (mas abajo) lee
+             // part.staff para resolver la titularidad; sin esta clave devolvia
+             // undefined y la madre nacia sin duena.
+             staff: w.staff || '',
              tomadaPor: w.staff || '',
              asignadaA: w.staff || '',
              fuente: w.fuente || (w.ticketRef && w.id ? 'LineasNativo' : ''),
