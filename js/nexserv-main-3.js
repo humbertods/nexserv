@@ -1,32 +1,66 @@
 // NEXSERV nexserv-main-3.js — Cobros, facturación, asistencia
 // Depende de: nexserv-main-2.js
 
-  async function approveAuthorization(reqId) {
+  // ── EXTRAS NATIVOS · aprobacion / rechazo desde Central ────────────────────
+  // getAutorizaciones ya devuelve UNICAMENTE propuestas nativas de LINEAS, con
+  // id = lineaId y ticketRef del ticket madre. Los motores nativos exigen esa
+  // pareja (ticketRef + lineaId): el authId legacy por si solo no es identidad
+  // suficiente y por eso 'aprobarAutorizacion' respondia "Solicitud no
+  // encontrada" (busca en la hoja legacy Autorizaciones, donde la propuesta
+  // nativa nunca existio). Las acciones legacy quedan intactas en el backend,
+  // solo dejan de usarse desde esta pantalla.
+  // Los motores nativos responden { ok: true }, no { success: true }.
+  function _extraNativoOk(r) {
+    return !!(r && (r.ok === true || r.success === true));
+  }
+  function _extraNativoMsg(r, fallback) {
+    return (r && (r.message || r.error)) || fallback;
+  }
+
+  async function approveAuthorization(reqId, ticketRef) {
+    const lineaId = String(reqId || '').trim();
+    const tRef    = String(ticketRef || '').trim();
+    if (!lineaId || !tRef) {
+      alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
+      return;
+    }
     try {
-      const result = await apiPost('aprobarAutorizacion', { authId: reqId });
-      
-      if (result.success) {
+      const result = await apiPost('aprobarExtraNativo', { ticketRef: tRef, lineaId: lineaId });
+
+      if (_extraNativoOk(result)) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
         // detecta el cambio de estado (pendiente → aprobado) en su próximo poll (cada 8s)
         await renderAuthorizations(); // Reload list
+        if (typeof loadMikaelaHome === 'function') loadMikaelaHome();
       } else {
-        alert('Error: ' + (result.message || 'No se pudo aprobar'));
+        alert('Error: ' + _extraNativoMsg(result, 'No se pudo aprobar'));
       }
     } catch (err) {
       console.error('Error aprobando autorización:', err);
       alert('Error al aprobar la autorización');
     }
   }
-  
-  async function rejectAuthorization(reqId) {
+
+  async function rejectAuthorization(reqId, ticketRef) {
+    const lineaId = String(reqId || '').trim();
+    const tRef    = String(ticketRef || '').trim();
+    if (!lineaId || !tRef) {
+      alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
+      return;
+    }
+    // El motor nativo exige motivo (MOTIVO_ANULACION_REQUERIDO): se pide a
+    // Central en vez de inventar uno por defecto.
+    const motivo = String(window.prompt('Motivo del rechazo:') || '').trim();
+    if (!motivo) return;
     try {
-      const result = await apiPost('rechazarAutorizacion', { authId: reqId });
-      
-      if (result.success) {
+      const result = await apiPost('rechazarExtraNativo', { ticketRef: tRef, lineaId: lineaId, motivo: motivo });
+
+      if (_extraNativoOk(result)) {
         alert('✕ Servicio rechazado. El staff será notificado.');
         await renderAuthorizations(); // Reload list
+        if (typeof loadMikaelaHome === 'function') loadMikaelaHome();
       } else {
-        alert('Error: ' + (result.message || 'No se pudo rechazar'));
+        alert('Error: ' + _extraNativoMsg(result, 'No se pudo rechazar'));
       }
     } catch (err) {
       console.error('Error rechazando autorización:', err);
