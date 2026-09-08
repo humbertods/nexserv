@@ -6039,7 +6039,7 @@ async function nativoPasarOtraStaff(ticketRef, ids) {
     if (!pv) return;
     const r = await apiPost('cederPendientesACentral', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
-    });
+    }, { retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Tu parte cerrada · el resto vuelve a central');
       await _nativoRefrescarStaffHome_();
