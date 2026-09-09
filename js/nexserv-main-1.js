@@ -795,9 +795,29 @@
         '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);"'
       + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
       + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
-      btnContainer.innerHTML = _pendingLocal
-        ? _btnPasarImmediate + _btnCancelarImmediate
-        : _btnTerminarImmediate;
+      // Placeholder NEUTRO: no es accionable. Antes acá se pintaba
+      // _btnTerminarImmediate ("Terminé — mandar a central") mientras el
+      // servidor respondía, y en un SP de dos áreas esa es la decisión
+      // EQUIVOCADA: cierra la parte de la staff y manda el ticket a Central con
+      // el componente hermano todavía pendiente. Además producía el parpadeo
+      // de pantalla (verde → modal → verde → modal), porque cada repintado
+      // volvía a pisar el modal ya resuelto. Mientras no se sepa, no se ofrece
+      // ninguna acción.
+      const _btnCargandoOpciones =
+        '<button class="btn-primary" disabled style="margin-bottom:10px;background:var(--ink-soft);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);opacity:0.65;cursor:wait;">'
+      + 'Cargando opciones&hellip;</button>';
+      // Cache por slot + ticket: en los repintados (focus, visibility, refresh)
+      // se vuelve a pintar la MISMA decisión ya resuelta, sin parpadeo. Se
+      // invalida sola al cambiar de ticket (la clave es el ref) y en cuanto la
+      // staff dispara cualquier acción nativa (ver _nativoGuardEntrar_).
+      var _cacheBtns = window['_as' + _slotIdx + 'BtnsCache'];
+      if (_cacheBtns && _cacheBtns.ref === _refNat && _cacheBtns.html) {
+        btnContainer.innerHTML = _cacheBtns.html;
+      } else if (_pendingLocal) {
+        btnContainer.innerHTML = _btnPasarImmediate + _btnCancelarImmediate;
+      } else {
+        btnContainer.innerHTML = _btnCargandoOpciones;
+      }
       apiPost('siguientePendienteBloque', { ticketRef: _refNat, lineaActualId: _lineaActual })
         .then(function (r) {
           // Descartar si ya hubo otra invocación para este slot: pintar acá
@@ -880,6 +900,17 @@
             + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
             + '&#9989; Termin&eacute; &mdash; mandar a central</button>'
 ;
+        })
+        // Punto ÚNICO de cacheo: corre después de cualquiera de las ramas y
+        // guarda lo que quedó pintado, sea la decisión resuelta o el fail-safe.
+        // Solo la última invocación del slot cachea (mismo token que gobierna
+        // el pintado), así una consulta vieja no deja una decisión fantasma.
+        .then(function () {
+          try {
+            if (window['_as' + _slotIdx + 'PintaTok'] !== _pintaTok) return;
+            window['_as' + _slotIdx + 'BtnsCache'] =
+              { ref: String(_refNat || ''), html: btnContainer.innerHTML };
+          } catch (eCache) { /* best-effort */ }
         });
       return;
     }
@@ -6002,6 +6033,11 @@ window.compartirSiguienteServicio = compartirSiguienteServicio;
 // Mismo patrón que goAssign (nexserv-main-4.js): ventana de 3 s por acción.
 function _nativoGuardEntrar_(nombreAccion) {
   if (window._nativoAccionEnCurso) return false;
+  // La decisión cacheada deja de ser válida en cuanto la staff actúa: el
+  // siguiente repintado vuelve a preguntarle al servidor en vez de repetir una
+  // decisión vieja.
+  window._as1BtnsCache = null;
+  window._as2BtnsCache = null;
   window._nativoAccionEnCurso = nombreAccion || true;
   setTimeout(function () { window._nativoAccionEnCurso = null; }, 3000);
   return true;
