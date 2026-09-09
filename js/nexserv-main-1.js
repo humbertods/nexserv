@@ -833,6 +833,21 @@
               + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
               + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
 
+            // ── PROMO MIXTA CEJAS/PESTAÑAS · "Yo hago la promoción completa" ──
+            // Reemplaza a "Yo sigo" SOLO cuando el backend confirma el
+            // escenario: grupo promo de exactamente dos componentes, uno de
+            // cejas/depilación y otro de pestañas, el suyo en curso y el otro
+            // libre. La disponibilidad la decide el servidor
+            // (promoMixtaCejasPestanasDisponible_), nunca el frontend: acá solo
+            // se lee la bandera. Los otros dos botones no cambian.
+            if (r && r.promo_mixta_completa === true) {
+              var _btnPromoCompleta =
+                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
+                + ' onclick="window._finishingSlot=' + _slotN + '; nativoPromoCompleta(\'' + _esc(_refNat) + '\')">'
+                + 'Yo hago la promoci&oacute;n completa</button>';
+              btnContainer.innerHTML = _btnPromoCompleta + _btnPasar + _btnCancelar;
+              return;
+            }
             if (_sigId) {
               // Hay pendiente COMPATIBLE → "Yo sigo" + continuidad.
               var _btnYoSigo =
@@ -6068,6 +6083,30 @@ async function nativoYoSigo(ticketRef, sigId) {
       await _nativoRefrescarStaffHome_();
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar tu parte'));
+    }
+  } catch (e) {
+    alert('Error de conexión: ' + (e && e.message ? e.message : e));
+  } finally {
+    _nativoGuardSalir_();
+  }
+}
+
+// BOTÓN "Yo hago la promoción completa": la staff se queda con los DOS
+// componentes de la promo mixta cejas/pestañas. El backend le asigna el
+// hermano, lo inicia y cierra ambos; el ticket viaja a Central, que decide
+// cuándo mandarlo a cobro. Nada más del ticket madre se toca: otros SN, extras
+// u otras promos quedan pendientes para que Central los reasigne.
+async function nativoPromoCompleta(ticketRef) {
+  if (!_nativoGuardEntrar_('promocompleta')) return;
+  try {
+    var pv = _nativoPrevuelo_(ticketRef);
+    if (!pv) return;
+    const r = await apiPost('promoMixtaCompleta', { ticketRef: pv.ref }, { retries: 0 });
+    if (r && r.success) {
+      if (typeof showToast === 'function') showToast('✅ Promo completa cerrada · va a central');
+      await _nativoRefrescarStaffHome_();
+    } else {
+      alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo tomar la promo completa'));
     }
   } catch (e) {
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
