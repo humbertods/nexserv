@@ -3518,6 +3518,64 @@
         + '</div>'
         + '<button onclick="openRegistrarVisitaFacialFromPanel()" style="width:100%;padding:10px;background:var(--bg-card);border:1.5px solid var(--line);border-radius:var(--radius-pill);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink-soft);">Saltar ficha — solo registrar visita</button>';
     }
+
+    // ── EVIDENCIAS DE VISITA (facial) · panel de la staff en atención ────────
+    // Mismo módulo que ya se usa en el Historial (nexserv-main-1.js:2477), pero
+    // acá SÍ hay atención activa, así que va con permiso de escritura:
+    //   allowCreate: true  → habilita la creación (el Historial la apaga porque
+    //                        allí no hay servicio ni ticket_ref y la visita
+    //                        nacería vacía).
+    //   autoEnsure:  true  → asegura UNA sola visita por (codigo + ticket_ref).
+    //                        Es la vía idempotente: handleCrearVisita hace
+    //                        appendRow y crea una fila NUEVA en cada pulsación,
+    //                        así que sin esto dos toques dejarían el "antes" en
+    //                        una visita y el "después" en otra.
+    // El módulo no escribe al montar: guarda las banderas en el montaje
+    // (evidencias-core.js:490) y recién carga dentro del click del encabezado
+    // (:514). Abrir el panel de una clienta no crea nada.
+    // El Owner entra en readonly, igual que en el Historial: la autoridad real
+    // es el backend, esto solo evita mostrarle controles que serían rechazados.
+    try {
+      var _evFacCont = 'evFacialAtencion_' + slot;
+      // insertAdjacentHTML, no innerHTML += : el '+=' reserializa y vuelve a
+      // parsear TODO el panel, recreando los nodos ya pintados. Acá solo se
+      // agrega el contenedor al final, sin tocar lo anterior. El Historial hace
+      // el equivalente al concatenar sobre su string ANTES de inyectarlo.
+      el.insertAdjacentHTML('beforeend', '<div id="' + _evFacCont + '" style="margin-top:8px;"></div>');
+
+      var _evRolAt = String((window.currentUser && (window.currentUser.role || window.currentUser.rol)) || '').toLowerCase();
+      var _evReadonlyAt = (_evRolAt === 'owner' || _evRolAt === 'dueño' || _evRolAt === 'dueno');
+
+      var _evTicketRef = String(window['_as' + slot + 'IdEspera'] || '');
+      // Línea facial en curso de este slot: identidad por lineaId, nunca por
+      // nombre. Si no se puede resolver, se manda vacío: el backend solo exige
+      // codigo, y el ensure exige codigo + ticket_ref, que sí tenemos.
+      var _evLinea = null;
+      try {
+        var _svcs = (typeof slotServices !== 'undefined' && slotServices[slot]) ? slotServices[slot] : [];
+        _evLinea = _svcs.filter(function (sv) {
+          return String(sv.area || '').toLowerCase().indexOf('facial') >= 0 && String(sv.estado || '') !== 'anulado';
+        })[0] || _svcs[0] || null;
+      } catch (eSv) { _evLinea = null; }
+
+      setTimeout(function () {
+        try {
+          if (window.EvidenciasCore && document.getElementById(_evFacCont)) {
+            EvidenciasCore.montarAcordeonFacial(_evFacCont, {
+              codigo:     clientKey || '',
+              nombre:     (client && client.name) || '',
+              servicio:   (_evLinea && (_evLinea.name || _evLinea.servicio)) || '',
+              ticket_ref: _evTicketRef,
+              linea_id:   (_evLinea && (_evLinea.lineaId || _evLinea.id)) || '',
+              staff:      (window.currentUser && window.currentUser.name) || '',
+              readonly:   _evReadonlyAt,
+              allowCreate: true,
+              autoEnsure:  true
+            });
+          }
+        } catch (eEvAt) { console.warn('[EvidenciasCore] panel facial en atención:', eEvAt); }
+      }, 0);
+    } catch (eEvMount) { console.warn('[EvidenciasCore] montaje facial:', eEvMount); }
   }
 
   function openNuevaFichaFacialFromPanel(clientKey, slot) {
