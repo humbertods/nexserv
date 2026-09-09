@@ -1108,6 +1108,47 @@
         try { updateFinishButtons(slotNum); } catch(eUFB) {}
       }
 
+      // ── RECONCILIACION CONTRA LINEAS (fuente de verdad tras la aprobacion) ──
+      // getAutorizacionesNativas solo expone propuestas PENDIENTES: al aprobar o
+      // rechazar, la solicitud desaparece del feed. Antes eso dejaba el chip
+      // "PENDIENTE AUTORIZACION" congelado y el poll girando para siempre.
+      // Cuando una pendiente de este slot ya no esta en el feed, se relee la
+      // atencion real y se reconstruye slotServices desde serviciosDetalle con
+      // el MISMO contrato nativo que ya usa restaurarServiciosNormalesSlot: no
+      // se interpreta ningun estado aca.
+      const _idsFeed = {};
+      (authResult.autorizaciones || []).forEach(function (a) {
+        if (a && a.id) _idsFeed[String(a.id)] = String(a.estado || '');
+      });
+      const _resueltas = (slotServices[slotNum] || []).filter(function (s) {
+        return s.status === 'pendiente' && s.authId && !_idsFeed[String(s.authId)];
+      });
+      if (_resueltas.length && typeof restaurarServiciosNormalesSlot === 'function') {
+        await restaurarServiciosNormalesSlot(slotNum, { forzarNativo: true });
+        // Las propuestas que SIGUEN pendientes vuelven a marcarse: la
+        // reconstruccion nativa trae la linea con estado 'propuesta' pero sin el
+        // status de la UI. Identidad por lineaId, nunca por nombre.
+        (slotServices[slotNum] || []).forEach(function (s) {
+          const _lid = String(s.lineaId || '');
+          if (_lid && String(s.estado || '') === 'propuesta' && _idsFeed[_lid] === 'pendiente') {
+            s.status = 'pendiente';
+            s.authId = _lid;
+          }
+        });
+        // Mismo criterio de total que ya usa esta funcion: pendiente, rechazado
+        // y enganche-enviado no suman.
+        const _totalRec = (slotServices[slotNum] || []).reduce(function (sum, s) {
+          if (s.status === 'pendiente' || s.status === 'rechazado' || s.status === 'enganche-enviado') return sum;
+          return sum + Number(s.price || 0);
+        }, 0);
+        renderServicesForSlot(slotNum);
+        const _elTot = document.getElementById('as' + slotNum + 'Total');
+        if (_elTot) _elTot.textContent = '$' + _totalRec;
+        const _elCnt = document.getElementById('as' + slotNum + 'SvcCount');
+        if (_elCnt) _elCnt.textContent = (slotServices[slotNum] || []).filter(function (s) { return s.status !== 'rechazado'; }).length;
+        try { updateFinishButtons(slotNum); } catch (eUFBR) {}
+      }
+
       // Polling: si hay pendientes en slotServices (independiente de si myAuths tenia datos)
       const hayPendientes = (slotServices[slotNum] || []).some(s => s.status === 'pendiente');
       const pollKey = '_authPoll' + slotNum;
@@ -3814,9 +3855,18 @@
             // visual: no escribe nada ni transforma ningún estado.
             const _compsNat = (!esTM && Array.isArray(a.serviciosDetalle)
               && a.serviciosDetalle.length > 1) ? a.serviciosDetalle : [];
-            const _gruposNat = _compsNat.map(function (d) { return String(d.grupoPromoId || '').trim(); });
-            const _esNativePromoMulti = _gruposNat.length > 1
-              && _gruposNat.every(function (g) { return g !== '' && g === _gruposNat[0]; });
+            // Contrato visual nativo: TODO ticket nativo con mas de un componente
+            // se pinta POR LINEA. grupoPromoId sigue siendo metadata del bloque
+            // promo, pero ya NO decide si las lineas se muestran individualmente
+            // (un SN con extra las tiene vacias y caia al renderer que fusionaba
+            // por staff: "Rosa · original + extra · un solo EN CURSO").
+            // Discriminador nativo: ticketRef madre (solo lo emite la proyeccion
+            // jerarquica de LINEAS) + cada componente con su lineaId real.
+            // Legacy sin ticketRef y TM llegan con serviciosDetalle null, asi que
+            // no entran; SN/SP single tienen un solo componente.
+            const _esNativePromoMulti = _compsNat.length > 1
+              && String(a.ticketRef || '').trim() !== ''
+              && _compsNat.every(function (d) { return String(d.lineaId || d.id || '').trim() !== ''; });
 
             if (_esNativePromoMulti) {
               _compsNat.forEach(function (comp, idxNat) {
