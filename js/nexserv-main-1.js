@@ -6101,7 +6101,14 @@ async function nativoPromoCompleta(ticketRef) {
   try {
     var pv = _nativoPrevuelo_(ticketRef);
     if (!pv) return;
-    const r = await apiPost('promoMixtaCompleta', { ticketRef: pv.ref }, { retries: 0 });
+    // timeoutMs generoso: la acción encadena TRES motores (reasignar, iniciar,
+    // finalizar) y cada uno relee LINEAS completa. Medido en PROD: más de un
+    // minuto de punta a punta. Con el timeout por defecto el navegador abortaba
+    // la espera aunque el backend terminara bien.
+    // retries: 0 es obligatorio — es una MUTACIÓN. Reintentar a ciegas
+    // reenviaría una operación que podría estar corriendo en el servidor.
+    const r = await apiPost('promoMixtaCompleta', { ticketRef: pv.ref },
+                            { timeoutMs: 120000, retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Promo completa cerrada · va a central');
       await _nativoRefrescarStaffHome_();
@@ -6109,6 +6116,21 @@ async function nativoPromoCompleta(ticketRef) {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo tomar la promo completa'));
     }
   } catch (e) {
+    // ── ABORT: el navegador cortó la espera, NO es un fallo del backend ──────
+    // Tras un abort el frontend no puede saber si la operación se completó (en
+    // el caso real de PROD sí se completó: las dos líneas quedaron cerradas y
+    // el ticket viajó a Central). Por eso no se afirma error: se releen los
+    // datos reales y que el estado de LINEAS pinte la pantalla. Si de verdad no
+    // se ejecutó, la staff vuelve a ver su modal intacto y puede reintentar.
+    var _nombreErr = String((e && (e.name || '')) || '');
+    var _msgErr    = String((e && (e.message || '')) || '');
+    if (_nombreErr === 'AbortError' || /abort/i.test(_nombreErr + ' ' + _msgErr)) {
+      if (typeof showToast === 'function') {
+        showToast('⏳ Está tardando más de lo normal · verificando el estado real');
+      }
+      await _nativoRefrescarStaffHome_();
+      return;
+    }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
   } finally {
     _nativoGuardSalir_();
