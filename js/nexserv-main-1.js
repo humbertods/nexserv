@@ -1399,11 +1399,18 @@
   // Restaura servicios NORMALES (no promo, no TM) desde el backend cuando el slot
   // quedó vacío (ej. tras refrescar la PWA). No pisa lo que ya hay en memoria, así
   // los servicios permanecen visibles hasta que la staff toque un botón de acción.
-  async function restaurarServiciosNormalesSlot(slot) {
+  // opts.forzarNativo — RECONCILIACION contra LINEAS. Se usa cuando una
+  // propuesta de extra dejo de estar pendiente (Central aprobo o rechazo) y hay
+  // que releer la atencion real aunque el slot YA tenga servicios en memoria.
+  // Sin el flag el comportamiento es identico al de siempre (early-return).
+  // Con el flag SOLO se admite la rama nativa: si la atencion no es LINEAS se
+  // sale sin tocar nada, para no reconstruir un slot legacy desde aca.
+  async function restaurarServiciosNormalesSlot(slot, opts) {
+    opts = opts || {};
     try {
       const user = window.currentUser;
       if (!user) return;
-      if ((slotServices[slot] || []).length > 0) {
+      if ((slotServices[slot] || []).length > 0 && !opts.forzarNativo) {
         // Los servicios ya están: no hay que reconstruirlos. PERO los botones sí
         // hay que evaluarlos. En el camino de RECARGA nadie más llama a
         // updateFinishButtons, así que el contenedor se quedaba con su contenido
@@ -1430,6 +1437,8 @@
       }
       if (!a) a = res.atenciones[slot === 1 ? 0 : 1];
       var _fcRest = String(a.fuenteReal || '').toUpperCase();
+      // Reconciliacion forzada: solo camino nativo. Legacy queda intacto.
+      if (opts.forzarNativo && _fcRest !== 'LINEAS') return;
       if (_fcRest === 'LINEAS' && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length) {
         var _yoRest = String(user.name || '').trim().toLowerCase();
         var _miasRest = a.serviciosDetalle.filter(function (sd) {
