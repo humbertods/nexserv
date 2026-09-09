@@ -2168,9 +2168,15 @@
     const areaIdx  = (t.fuente === 'TicketMulti' && t.areaIdx) ? t.areaIdx : '';
 
     function kv(l,v){
+      // Desbordamiento: el valor se pinta CRUDO (marcadores incluidos: esto es
+      // un laboratorio de diagnóstico), así que puede traer cadenas larguísimas
+      // sin espacios como [NATIVE_LINE_REQUEST_FP:529145c82ca2...]. En un flex,
+      // un hijo no baja de su ancho de contenido salvo min-width:0, y sin
+      // overflow-wrap una cadena sin espacios no quiebra: por eso se salía del
+      // recuadro. Estas tres reglas son locales a esta fila del laboratorio.
       return '<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;">'
-        + '<span style="color:var(--ink-soft);">' + l + '</span>'
-        + '<span style="font-weight:700;text-align:right;">' + _solEsc(v || '—') + '</span></div>';
+        + '<span style="color:var(--ink-soft);flex:0 0 auto;">' + l + '</span>'
+        + '<span style="font-weight:700;text-align:right;min-width:0;overflow-wrap:anywhere;word-break:break-word;">' + _solEsc(v || '—') + '</span></div>';
     }
     let info = '';
     info += kv('Cliente', nombre);
@@ -2201,13 +2207,19 @@
     const staffJs = String(staff).replace(/'/g, "\\'");
     const aIdxJs  = String(areaIdx).replace(/'/g, "\\'");
 
-    const staffAll = ['María','Keyla','Lesly','Rosa','Yadira','Diana','Laura'];
+    // Fuente única: STAFF_META, a través del contrato que el sistema ya usa
+    // (buildStaffPorArea → STAFF_POR_AREA._todos, nexserv-main-4.js:499-524).
+    // Ese helper deduplica por persona y prefiere el nombre CON TILDE, que es el
+    // del login: por eso 'María' sigue viajando igual que con la lista vieja y
+    // el payload de solReasignar no cambia. Melany aparece porque está en
+    // STAFF_META, no porque se haya agregado a mano a una segunda lista.
+    const staffAll = STAFF_POR_AREA._todos;
     const picker = staffAll.map(function(s){
       return '<button onclick="solReasignar(\'' + idJs + '\',\'' + aIdxJs + '\',\'' + s + '\',\'' + nomJs + '\',\'' + codJs + '\')" style="padding:8px 13px;border:1px solid var(--line);border-radius:20px;background:var(--bg-card);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">' + s + '</button>';
     }).join('');
 
     let acc = '<div style="font-size:12px;font-weight:800;color:var(--ink-soft);margin:18px 0 8px;">Acciones</div>';
-    acc += '<button onclick="solDevolver(\'' + idJs + '\',\'' + nomJs + '\',\'' + staffJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('undo',16) + ' Devolver a la lista de espera<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Para que otra staff la tome desde cero</div></button>';
+    acc += '<button onclick="solDevolver(\'' + idJs + '\',\'' + nomJs + '\',\'' + staffJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('undo',16) + ' Devolver a Central<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Central recupera el control del ticket para continuar su gesti&oacute;n o reasignarlo</div></button>';
     acc += '<button onclick="solRetirarCobrar(\'' + idJs + '\',\'' + nomJs + '\')" style="width:100%;padding:13px;margin-bottom:8px;border:1px solid var(--line);border-radius:12px;background:var(--bg-card);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('exit',16) + ' Retirar y cobrar lo realizado<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Anula lo pendiente y cobra solo lo hecho</div></button>';
     acc += '<div style="border:1px solid var(--line);border-radius:12px;padding:13px;"><div style="font-size:14px;font-weight:700;margin-bottom:10px;">' + _solIcon('refresh',16) + ' Reasignar a otra staff</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + picker + '</div></div>';
     acc += '<button onclick="solAbrirConsulta(\'' + nomJs + '\',\'' + idJs + '\')" style="width:100%;margin-top:8px;padding:13px;border:1.5px dashed var(--accent-deep);border-radius:12px;background:var(--bg-card);color:var(--accent-deep);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left;">' + _solIcon('chat',16) + ' Tengo una duda con este ticket<div style="font-size:11px;color:var(--ink-faint);font-weight:500;margin-top:2px;">Le consultás al dueño y queda guardado</div></button>';
