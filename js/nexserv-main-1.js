@@ -784,16 +784,16 @@
         return !it.readonly && !it.completado && !it.bloqueado && !it.checked;
       });
       const _btnPasarImmediate =
-        '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-      + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+        '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+      + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
       + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>';
       const _btnCancelarImmediate =
-        '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-      + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'siguiente servicio\')">'
+        '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+      + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'siguiente servicio\')">'
       + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
       const _btnTerminarImmediate =
-        '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
-      + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+        '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);"'
+      + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
       + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
       btnContainer.innerHTML = _pendingLocal
         ? _btnPasarImmediate + _btnCancelarImmediate
@@ -808,8 +808,8 @@
           var _pendientes = Number(r && r.pendientes || 0);
           if (!_sigId && _pendientes === 0) {
             btnContainer.innerHTML =
-              '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
-              + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+              '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);"'
+              + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
               + '&#9989; Termin&eacute; &mdash; mandar a central</button>';
             return;
           }
@@ -825,12 +825,12 @@
             // _pendientes. No se recalcula compatibilidad en el frontend ni se
             // toca backend: se usa la que el backend ya resolvió.
             var _btnPasar =
-                '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-              + ' onclick="window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+                '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--accent);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+              + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoPasarOtraStaff(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
               + 'Ya termin&eacute; mi parte &mdash; enviar a central para la siguiente staff</button>';
             var _btnCancelar =
-                '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-              + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
+                '<button style="margin-bottom:8px;width:100%;padding:14px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+              + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarYCancelar(\'' + _esc(_refNat) + '\',' + _idsMias + ',\'' + _sigLbl + '\')">'
               + '&#9989; Termin&eacute; todo &mdash; la clienta se retira, mandar a central</button>';
 
             // ── PROMO MIXTA CEJAS/PESTAÑAS · "Yo hago la promoción completa" ──
@@ -842,8 +842,8 @@
             // se lee la bandera. Los otros dos botones no cambian.
             if (r && r.promo_mixta_completa === true) {
               var _btnPromoCompleta =
-                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-                + ' onclick="window._finishingSlot=' + _slotN + '; nativoPromoCompleta(\'' + _esc(_refNat) + '\')">'
+                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+                + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoPromoCompleta(\'' + _esc(_refNat) + '\')">'
                 + 'Yo hago la promoci&oacute;n completa</button>';
               btnContainer.innerHTML = _btnPromoCompleta + _btnPasar + _btnCancelar;
               return;
@@ -851,8 +851,8 @@
             if (_sigId) {
               // Hay pendiente COMPATIBLE → "Yo sigo" + continuidad.
               var _btnYoSigo =
-                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;color:white;"'
-                + ' onclick="window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">'
+                  '<button style="margin-bottom:8px;width:100%;padding:14px;background:var(--ink);border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.10);color:white;"'
+                + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoYoSigo(\'' + _esc(_refNat) + '\',\'' + _esc(_sigId) + '\')">'
                 + 'Yo sigo: ' + _sigLbl + '</button>';
               btnContainer.innerHTML = _btnYoSigo + _btnPasar + _btnCancelar;
             } else {
@@ -866,8 +866,8 @@
           // llega acá es _pendientes === 0 con _sigId (caso residual): tratar
           // como sin pendientes → cerrar y mandar a central.
           btnContainer.innerHTML =
-              '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
-            + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+              '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);"'
+            + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
             + '&#9989; Termin&eacute; &mdash; mandar a central</button>'
 ;
         })
@@ -876,8 +876,8 @@
           // Fail-safe: si no se pudo consultar el siguiente, NO se ofrecen las
           // acciones destructivas. Solo cerrar mi parte o devolver.
           btnContainer.innerHTML =
-            '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;"'
-            + ' onclick="window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
+            '<button class="btn-primary" style="margin-bottom:10px;background:var(--success);font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);"'
+            + ' onclick="_nativoMarcarCargando_(this); window._finishingSlot=' + _slotN + '; nativoTerminarMandarCentral(\'' + _esc(_refNat) + '\',' + _idsMias + ')">'
             + '&#9989; Termin&eacute; &mdash; mandar a central</button>'
 ;
         });
@@ -6006,7 +6006,60 @@ function _nativoGuardEntrar_(nombreAccion) {
   setTimeout(function () { window._nativoAccionEnCurso = null; }, 3000);
   return true;
 }
-function _nativoGuardSalir_() { window._nativoAccionEnCurso = null; }
+function _nativoGuardSalir_() {
+  window._nativoAccionEnCurso = null;
+  _nativoRestaurarBotones_();
+}
+
+// ── FEEDBACK VISUAL DE LOS BOTONES DEL MODAL NATIVO ────────────────────────
+// Estas acciones tardan (la cadena nativa relee LINEAS completa; medido en PROD
+// mas de un minuto). Sin feedback la staff no sabe si el toque registro y
+// vuelve a pulsar. Al pulsar: el boton dice "Loading..." y TODOS los del
+// contenedor quedan deshabilitados, para que no se dispare una segunda accion
+// sobre el mismo ticket. Se restaura desde _nativoGuardSalir_, que corre en el
+// finally de las cuatro acciones nativas: si la accion falla y no hay repintado,
+// los botones vuelven solos a su texto original y quedan usables.
+// Solo toca el DOM. No cambia payloads, ni estados, ni decide nada.
+function _nativoMarcarCargando_(btn) {
+  try {
+    if (!btn || btn.getAttribute('data-nx-cargando') === '1') return;
+    var cont = btn.parentElement;
+    var lista = cont ? cont.querySelectorAll('button') : [btn];
+    var snapshot = [];
+    for (var i = 0; i < lista.length; i++) {
+      snapshot.push({ el: lista[i], html: lista[i].innerHTML,
+                      opacity: lista[i].style.opacity, cursor: lista[i].style.cursor });
+      if (lista[i] !== btn) {
+        lista[i].disabled = true;
+        lista[i].style.opacity = '0.45';
+        lista[i].style.cursor = 'not-allowed';
+      }
+    }
+    btn.setAttribute('data-nx-cargando', '1');
+    btn.disabled = true;
+    btn.innerHTML = 'Loading...';
+    btn.style.opacity = '0.8';
+    btn.style.cursor = 'wait';
+    window._nativoBtnsSnapshot = snapshot;
+  } catch (e) { /* best-effort: el feedback nunca bloquea la accion */ }
+}
+
+function _nativoRestaurarBotones_() {
+  try {
+    var snapshot = window._nativoBtnsSnapshot;
+    if (!snapshot || !snapshot.length) return;
+    for (var i = 0; i < snapshot.length; i++) {
+      var s = snapshot[i];
+      if (!s || !s.el || !s.el.isConnected) continue;   // ya repintado: no se toca
+      s.el.disabled = false;
+      s.el.innerHTML = s.html;
+      s.el.style.opacity = s.opacity || '';
+      s.el.style.cursor = s.cursor || '';
+      s.el.removeAttribute('data-nx-cargando');
+    }
+  } catch (e) { /* best-effort */ }
+  window._nativoBtnsSnapshot = null;
+}
 
 // Fail-closed: sin ticketRef o sin staff no se llama al backend.
 function _nativoPrevuelo_(ticketRef) {
