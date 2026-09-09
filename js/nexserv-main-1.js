@@ -6031,6 +6031,32 @@ window.compartirSiguienteServicio = compartirSiguienteServicio;
 
 // Guard anti doble-clic COMÚN a los 4 (touch+click, doble tap, reintento).
 // Mismo patrón que goAssign (nexserv-main-4.js): ventana de 3 s por acción.
+// ── ERRORES DE LAS ACCIONES NATIVAS · criterio único ───────────────────────
+// Estas acciones son MUTACIONES largas (la cadena nativa relee LINEAS completa;
+// medido en PROD más de un minuto). Dos situaciones no son "error" y no deben
+// dejar la pantalla congelada:
+//
+//  1. ABORT — el navegador cortó la espera. El backend puede haber terminado
+//     igual, y de hecho suele terminar. No se afirma nada: se releen los datos
+//     reales y que LINEAS pinte la pantalla.
+//  2. "No tenés servicios en curso" — el ticket YA avanzó. Insistir con un
+//     alert deja a la staff mirando un ticket que en el servidor ya cerró.
+//
+// En ambos casos: aviso suave + refresco. Cualquier otro error sí se alerta.
+function _nativoEsAbort_(e) {
+  var n = String((e && (e.name || '')) || '');
+  var m = String((e && (e.message || '')) || '');
+  return n === 'AbortError' || /abort/i.test(n + ' ' + m);
+}
+function _nativoYaNoHayNadaEnCurso_(r) {
+  var t = String((r && (r.message || r.error)) || '');
+  return /no ten[eé]s servicios en curso/i.test(t);
+}
+async function _nativoResolverDesincronizado_(mensaje) {
+  if (typeof showToast === 'function') showToast(mensaje);
+  await _nativoRefrescarStaffHome_();
+}
+
 function _nativoGuardEntrar_(nombreAccion) {
   if (window._nativoAccionEnCurso) return false;
   // La decisión cacheada deja de ser válida en cuanto la staff actúa: el
@@ -6131,16 +6157,26 @@ async function nativoTerminarMandarCentral(ticketRef, ids) {
   try {
     var pv = _nativoPrevuelo_(ticketRef);
     if (!pv) return;
+    // retries: 0 es OBLIGATORIO — es una mutación. Sin esto api.js reintentaba
+    // tras el abort, y el segundo intento llegaba cuando el primero YA había
+    // cerrado las líneas: el backend respondía "No tenés servicios en curso" y
+    // la staff veía un error sobre una operación que en realidad salió bien.
     const r = await apiPost('finalizarComponentesStaff', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
-    });
+    }, { timeoutMs: 120000, retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Enviado a central');
       await _nativoRefrescarStaffHome_();
+    } else if (_nativoYaNoHayNadaEnCurso_(r)) {
+      await _nativoResolverDesincronizado_('✅ Este ticket ya fue enviado a central');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo finalizar'));
     }
   } catch (e) {
+    if (_nativoEsAbort_(e)) {
+      await _nativoResolverDesincronizado_('⏳ Está tardando más de lo normal · verificando el estado real');
+      return;
+    }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
   } finally {
     _nativoGuardSalir_();
@@ -6166,14 +6202,20 @@ async function nativoYoSigo(ticketRef, sigId) {
     if (!pv) return;
     const r = await apiPost('finalizarComponentesStaff', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: []   // cierra lo en servicio
-    });
+    }, { timeoutMs: 120000, retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Parte cerrada · tomá el siguiente servicio de tu lista');
       await _nativoRefrescarStaffHome_();
+    } else if (_nativoYaNoHayNadaEnCurso_(r)) {
+      await _nativoResolverDesincronizado_('✅ Tu parte ya estaba cerrada');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar tu parte'));
     }
   } catch (e) {
+    if (_nativoEsAbort_(e)) {
+      await _nativoResolverDesincronizado_('⏳ Está tardando más de lo normal · verificando el estado real');
+      return;
+    }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
   } finally {
     _nativoGuardSalir_();
@@ -6201,6 +6243,8 @@ async function nativoPromoCompleta(ticketRef) {
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Promo completa cerrada · va a central');
       await _nativoRefrescarStaffHome_();
+    } else if (_nativoYaNoHayNadaEnCurso_(r)) {
+      await _nativoResolverDesincronizado_('✅ Esta promo ya fue cerrada y enviada a central');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo tomar la promo completa'));
     }
@@ -6211,13 +6255,8 @@ async function nativoPromoCompleta(ticketRef) {
     // el ticket viajó a Central). Por eso no se afirma error: se releen los
     // datos reales y que el estado de LINEAS pinte la pantalla. Si de verdad no
     // se ejecutó, la staff vuelve a ver su modal intacto y puede reintentar.
-    var _nombreErr = String((e && (e.name || '')) || '');
-    var _msgErr    = String((e && (e.message || '')) || '');
-    if (_nombreErr === 'AbortError' || /abort/i.test(_nombreErr + ' ' + _msgErr)) {
-      if (typeof showToast === 'function') {
-        showToast('⏳ Está tardando más de lo normal · verificando el estado real');
-      }
-      await _nativoRefrescarStaffHome_();
+    if (_nativoEsAbort_(e)) {
+      await _nativoResolverDesincronizado_('⏳ Está tardando más de lo normal · verificando el estado real');
       return;
     }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
@@ -6235,14 +6274,20 @@ async function nativoPasarOtraStaff(ticketRef, ids) {
     if (!pv) return;
     const r = await apiPost('cederPendientesACentral', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
-    }, { retries: 0 });
+    }, { timeoutMs: 120000, retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Tu parte cerrada · el resto vuelve a central');
       await _nativoRefrescarStaffHome_();
+    } else if (_nativoYaNoHayNadaEnCurso_(r)) {
+      await _nativoResolverDesincronizado_('✅ Tu parte ya estaba cerrada · el resto está en central');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo enviar a central'));
     }
   } catch (e) {
+    if (_nativoEsAbort_(e)) {
+      await _nativoResolverDesincronizado_('⏳ Está tardando más de lo normal · verificando el estado real');
+      return;
+    }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
   } finally {
     _nativoGuardSalir_();
@@ -6264,14 +6309,20 @@ async function nativoTerminarYCancelar(ticketRef, ids, sigLbl) {
       + (sigLbl ? ' (' + String(sigLbl) + ')' : '');
     const r = await apiPost('terminarYCancelarPendientes', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids), motivo: motivo
-    });
+    }, { timeoutMs: 120000, retries: 0 });
     if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Ticket cerrado · pendientes cancelados');
       await _nativoRefrescarStaffHome_();
+    } else if (_nativoYaNoHayNadaEnCurso_(r)) {
+      await _nativoResolverDesincronizado_('✅ Este ticket ya estaba cerrado');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar el ticket'));
     }
   } catch (e) {
+    if (_nativoEsAbort_(e)) {
+      await _nativoResolverDesincronizado_('⏳ Está tardando más de lo normal · verificando el estado real');
+      return;
+    }
     alert('Error de conexión: ' + (e && e.message ? e.message : e));
   } finally {
     _nativoGuardSalir_();
