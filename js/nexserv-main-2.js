@@ -3746,8 +3746,27 @@
                 + ' style="display:none;width:100%;margin-top:6px;padding:11px;background:var(--ink);color:white;border:none;border-radius:var(--radius-pill);font-family:inherit;font-size:13px;font-weight:800;cursor:pointer;">Asignar a esta chica</button>'
                 + '</div>';
             })();
-            // Para multi/promo con partes ya hechas: mostrar desglose (completado por X · falta asignar)
-            const _desgloseMultiHTML = _esMultiPromo
+            // Ticket NATIVO con varias líneas: se pinta LÍNEA POR LÍNEA, aunque no
+            // sea promo ni multi. Un SN con un extra tiene dos líneas reales, con
+            // su propia staff y su propio estado, pero _esMultiPromo lo clasifica
+            // como simple: caía al else y se pintaba `base.servicio`, que el
+            // backend arma como detalle.map(d => d.servicio).join(' + ')
+            // (AppsScript:3901). De ahí el texto colapsado "Limpieza profunda +
+            // Depilación de cejas", con el `area` de la PRIMERA línea — por eso
+            // además el área se veía equivocada.
+            // El detalle ya viaja completo en los tres buckets (esperando,
+            // esperando_decision_mikaela y en servicio): base.serviciosDetalle se
+            // asigna sin condición en AppsScript:3902. Solo faltaba usarlo.
+            // grupoPromoId NO es requisito: un SN con extra no tiene grupo.
+            const _esNativoMultiLinea = Array.isArray(w.serviciosDetalle)
+              && w.serviciosDetalle.length > 1
+              && String(w.ticketRef || '').trim() !== ''
+              && w.serviciosDetalle.every(function (d) {
+                   return String(d.lineaId || d.id || '').trim() !== '';
+                 });
+            // _esMultiPromo se conserva como disyunción: todo lo que ya entraba al
+            // desglose sigue entrando igual (promo, multi, TM, legacy).
+            const _desgloseMultiHTML = (_esMultiPromo || _esNativoMultiLinea)
               ? `<div style="background:var(--bg);border-radius:12px;padding:8px 12px;margin-top:6px;">${buildDesgloseHTML(w)}</div>`
               : `<div class="waitlist-service"><strong>${w.servicio}</strong> · ${w.area}</div>`;
 
