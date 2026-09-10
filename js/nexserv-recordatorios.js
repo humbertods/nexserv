@@ -384,6 +384,14 @@
   function recVerHistorial(id) {
     var it = buscar(id);
     if (!it) return;
+    // Historial de VISITAS (pantalla historialClienta), filtrado por el área del
+    // recordatorio. Antes se abría openClientProfile, que muestra el perfil y no
+    // la lista de visitas que necesita el seguimiento.
+    // Única dependencia autorizada de este módulo hacia main-1..4.
+    if (typeof abrirHistorialServicios === 'function') {
+      abrirHistorialServicios(it.codigo, it.area);
+      return;
+    }
     if (typeof openClientProfile === 'function') { openClientProfile(it.codigo); return; }
     toast('Historial no disponible en esta pantalla.');
   }
