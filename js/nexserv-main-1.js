@@ -1493,11 +1493,24 @@
         });
         if (!_miasRest.length) return;
         slotServices[slot] = _miasRest.map(function (sd) {
-          return { name: sd.servicio || sd.nombre || sd.name || '',
-                   price: Number(sd.monto || sd.precio || sd.price || 0),
-                   area: sd.area || a.area || '',
-                   lineaId: String(sd.id || sd.lineaId || ''),
-                   estado: String(sd.estado || '') };
+          var _lid = String(sd.id || sd.lineaId || '');
+          var _est = String(sd.estado || '');
+          var _it  = { name: sd.servicio || sd.nombre || sd.name || '',
+                       price: Number(sd.monto || sd.precio || sd.price || 0),
+                       area: sd.area || a.area || '',
+                       lineaId: _lid,
+                       estado: _est };
+          // Una propuesta de extra sigue PENDIENTE aunque el slot se reconstruya.
+          // Sin estos dos campos la pantalla quedaba huérfana: el chip se pinta
+          // con status==='pendiente' (:4801), el poll arranca con ese mismo
+          // criterio (main-2:1001 y :1153) y la reconciliación exige ADEMAS
+          // authId. Al reconstruir sin ellos, nada volvía a sincronizar y la
+          // aprobación de Central no se reflejaba nunca.
+          // En el camino nativo el authId ES el lineaId: así lo devuelve
+          // solicitarExtraStaffNativo y así lo consume getAutorizaciones. No se
+          // inventa identidad, se reusa la que ya existe.
+          if (_est === 'propuesta' && _lid) { _it.status = 'pendiente'; _it.authId = _lid; }
+          return _it;
         });
         window['_as' + slot + 'Aten'] = a;
         window['_as' + slot + 'EsNativo'] = true;
