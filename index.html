@@ -2964,7 +2964,10 @@
   <script src="js/nexserv-main-3.js?v=20260902a"></script>
   <script src="js/nexserv-main-4.js?v=20260904a"></script>
   <script src="js/pagos-verificacion.js?v=20260819a"></script>
-  <!-- Módulo Recordatorios: independiente, no toca main-1..4. -->
+  <!-- Módulo Recordatorios: independiente. Única dependencia autorizada hacia
+       main-1..4: abrirHistorialServicios(codigo, areaFiltro) de
+       nexserv-main-1.js, usada por "Ver historial". Ambos parámetros son
+       opcionales: sin ellos la pantalla se comporta como siempre. -->
   <script src="js/nexserv-recordatorios.js?v=20260818a"></script>
 
 
