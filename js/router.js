@@ -217,8 +217,15 @@
           return; // TM procesado — no seguir con lógica de promo
         }
 
+        // Ticket NATIVO (SN-/SP-): LINEAS es la única fuente de verdad de esta
+        // pantalla. El reconstructor de abajo arma la promo desde activePromos
+        // —estado del navegador, con el nombre genérico del combo— y convivía
+        // con la reconstrucción desde LINEAS, que trae el nombre real del
+        // componente: el mismo servicio aparecía dos veces y el total se
+        // duplicaba. En nativo se salta; los tickets legacy siguen igual.
+        var _esNat1 = /^(SN|SP)-/.test(String(window._as1IdEspera || ''));
         // ── PROMO (SP / no-TM): restaurar desde activePromos o backend ─────────
-        if (clientName && activePromos[clientKey] && (!slotServices[1] || slotServices[1].length === 0)) {
+        if (!_esNat1 && clientName && activePromos[clientKey] && (!slotServices[1] || slotServices[1].length === 0)) {
           const _promo = activePromos[clientKey].promo;
           const _price = getMyPromoPrice(_promo, user1?.area || 'cejas');
           slotServices[1] = [{ name: _promo.name, price: _price, area: user1?.area || 'cejas' }];
@@ -255,8 +262,12 @@
           } catch(e) { console.error('Error recargando promo:', e); }
         }
         if (activePromos[clientKey]) updateFinishButtons(1);
-        // Restaurar servicios normales (no promo/no TM) si el slot quedó vacío tras refrescar
-        await restaurarServiciosNormalesSlot(1);
+        // Restaurar servicios normales (no promo/no TM) si el slot quedó vacío tras refrescar.
+        // En NATIVO se fuerza la reconciliación aunque el slot tenga datos: al
+        // volver a la pantalla debe quedar como está en LINEAS, no como quedó en
+        // memoria. Eso hace que la aprobación de Central ya esté reflejada al
+        // entrar, y evita mezclar dos reconstrucciones sobre el mismo slot.
+        await restaurarServiciosNormalesSlot(1, _esNat1 ? { forzarNativo: true } : undefined);
       }, 500);
     }
     if (id === 'activeService2') {
@@ -327,8 +338,15 @@
           return; // TM procesado
         }
 
+        // Ticket NATIVO (SN-/SP-): LINEAS es la única fuente de verdad de esta
+        // pantalla. El reconstructor de abajo arma la promo desde activePromos
+        // —estado del navegador, con el nombre genérico del combo— y convivía
+        // con la reconstrucción desde LINEAS, que trae el nombre real del
+        // componente: el mismo servicio aparecía dos veces y el total se
+        // duplicaba. En nativo se salta; los tickets legacy siguen igual.
+        var _esNat2 = /^(SN|SP)-/.test(String(window._as2IdEspera || ''));
         // PROMO: restaurar desde activePromos si el slot quedó vacío
-        if (clientName2 && activePromos[clientKey2] && (!slotServices[2] || slotServices[2].length === 0)) {
+        if (!_esNat2 && clientName2 && activePromos[clientKey2] && (!slotServices[2] || slotServices[2].length === 0)) {
           const _promo2 = activePromos[clientKey2].promo;
           const _price2 = getMyPromoPrice(_promo2, user2?.area || 'cejas', activePromos[clientKey2].completedAreas || []);
           slotServices[2] = [{ name: _promo2.name, price: _price2, area: user2?.area || 'cejas' }];
@@ -336,8 +354,12 @@
           document.getElementById('as2Total').textContent = '$' + _price2;
           document.getElementById('as2SvcCount').textContent = '1';
         }
-        // NORMAL: restaurar desde backend si sigue vacío
-        await restaurarServiciosNormalesSlot(2);
+        // NORMAL: restaurar desde backend si sigue vacío.
+        // En NATIVO se fuerza la reconciliación aunque el slot tenga datos: al
+        // volver a la pantalla debe quedar como está en LINEAS, no como quedó en
+        // memoria. Eso hace que la aprobación de Central ya esté reflejada al
+        // entrar, y evita mezclar dos reconstrucciones sobre el mismo slot.
+        await restaurarServiciosNormalesSlot(2, _esNat2 ? { forzarNativo: true } : undefined);
         updateFinishButtons(2);
       }, 500);
     }
