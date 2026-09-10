@@ -3258,7 +3258,14 @@
   // pintar la tarjeta Staff. No muta el dato original.
   function _obsVisibleStaff(s) {
     return String(s == null ? '' : s)
-      .replace(/\[NATIVE_(?:REQUEST_ID|REQUEST_FP|LINE_REQUEST_ID|LINE_REQUEST_FP):[^\]]*\]/g, '')
+      // Antes enumeraba cuatro nombres exactos, así que cada marcador nuevo del
+      // motor nativo se le escapaba y salía crudo en la tarjeta: pasó con
+      // [NATIVE_PROMO_REQUEST_ID:…], [NATIVE_PROMO_REQUEST_FP:…],
+      // [NATIVE_PROMO_COMPONENT_FP:…], [NATIVE_EXTRA_SOURCE:…] y
+      // [NATIVE_EXTRA_MODE:…]. Ahora cubre cualquier NATIVE_*, incluidos los que
+      // se agreguen después. SOLO PRESENTACIÓN: el dato en la hoja no cambia,
+      // los marcadores siguen ahí para diagnóstico y Central los sigue viendo.
+      .replace(/\[NATIVE_[A-Z_]*:[^\]]*\]/g, '')
       .replace(/\s{2,}/g, ' ')
       .trim();
   }
