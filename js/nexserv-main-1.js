@@ -2627,11 +2627,25 @@
       }).join('') + '</div>';
     }
 
-    html += '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin:14px 4px 6px;">Historial de visitas</div>';
-    if (!hist.length) {
-      html += '<div class="card" style="padding:14px;color:var(--ink-faint);font-size:13px;">Sin registros de servicios.</div>';
+    // Filtro por área: solo cuando lo pidió quien abrió la pantalla (hoy, el
+    // módulo de Recordatorios). Sin filtro, `visibles` es `hist` entero.
+    var _fArea = _histAreaFiltro ? _histNormArea(_histAreaFiltro) : '';
+    var visibles = _fArea
+      ? hist.filter(function (h) { return _histNormArea(h.area) === _fArea; })
+      : hist;
+    // El escape a "ver todo" NO es decorativo: hay visitas antiguas sin área,
+    // y filtrando quedarían invisibles sin manera de recuperarlas.
+    html += '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:14px 4px 6px;">'
+      +  '<div style="font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;">Historial de visitas'
+      +  (_fArea ? ' &middot; ' + _histEsc(_histAreaFiltro) : '') + '</div>'
+      +  (_fArea ? '<a onclick="_histQuitarFiltroArea()" style="font-size:11px;font-weight:700;color:var(--accent-deep);cursor:pointer;">Ver todo</a>' : '')
+      +  '</div>';
+    if (!visibles.length) {
+      html += '<div class="card" style="padding:14px;color:var(--ink-faint);font-size:13px;">'
+        + (_fArea ? ('Sin visitas de ' + _histEsc(_histAreaFiltro) + '.') : 'Sin registros de servicios.')
+        + '</div>';
     } else {
-      html += '<div class="card" style="padding:6px 14px;">' + hist.map(function(h){
+      html += '<div class="card" style="padding:6px 14px;">' + visibles.map(function(h){
         const val = h.valor ? '$' + (Number(h.valor)||0).toFixed(2) : '';
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);">'
           + '<div><div style="font-weight:700;font-size:13px;">' + (h.servicio || h.area || 'Servicio') + '</div>'
@@ -2650,7 +2664,25 @@
   }
   window.volverInicioDesdeHistorial = volverInicioDesdeHistorial;
 
-  async function abrirHistorialServicios() {
+  // ── HISTORIAL DE SERVICIOS ────────────────────────────────────────────────
+  // Filtro de área activo. Vacío = sin filtro = comportamiento de siempre.
+  // Solo lo setea quien abre la pantalla; el render lo lee.
+  var _histAreaFiltro = '';
+  // Se normaliza con el MISMO criterio que el resto del sistema
+  // (_normAreaKey, nexserv-main-4.js:527): resuelve acentos y variantes.
+  // Si por orden de carga no estuviera, se cae a una comparación literal en
+  // minúsculas: nunca se inventa un criterio de áreas propio.
+  function _histNormArea(a) {
+    if (typeof _normAreaKey === 'function') return _normAreaKey(a);
+    return String(a || '').trim().toLowerCase();
+  }
+
+  // codigo    (opcional) → salta el buscador y abre esa clienta directo.
+  // areaFiltro(opcional) → el historial de visitas se filtra por esa área.
+  // SIN argumentos el comportamiento es idéntico al de siempre: es como lo
+  // sigue llamando Mikaela desde su menú.
+  async function abrirHistorialServicios(codigo, areaFiltro) {
+    _histAreaFiltro = String(areaFiltro || '');
     show('historialClienta');
     const inp = document.getElementById('histBuscarInput');
     if (inp) inp.value = '';
@@ -2662,11 +2694,27 @@
       const r = await apiGet('getClientas');
       window._histClientas = (r && r.clientas) ? r.clientas : [];
       res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--ink-faint);font-size:13px;">Escribí un nombre para buscar.</div>';
+      // Con código: se abre esa clienta sin pasar por el buscador. La lista de
+      // clientas se carga igual, para que el buscador siga sirviendo si después
+      // quiere mirar a otra.
+      if (codigo) { histSeleccionarClienta(String(codigo)); }
     } catch(e) {
       res.innerHTML = '<div style="text-align:center;padding:16px;color:var(--danger,#e53);font-size:13px;">Error al cargar clientas.</div>';
     }
   }
   window.abrirHistorialServicios = abrirHistorialServicios;
+
+  // Quita el filtro y repinta la MISMA clienta. No vuelve al buscador.
+  function _histQuitarFiltroArea() {
+    _histAreaFiltro = '';
+    var cod = window._histCodigoActual || '';
+    if (cod) histSeleccionarClienta(cod);
+  }
+  window._histQuitarFiltroArea = _histQuitarFiltroArea;
+  function _histEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
 
   function histFiltrarClientas(q) {
     const res = document.getElementById('histResultados');
@@ -2689,6 +2737,7 @@
   window.histFiltrarClientas = histFiltrarClientas;
 
   async function histSeleccionarClienta(codigo) {
+    window._histCodigoActual = String(codigo || '');
     const perfil = document.getElementById('histPerfil');
     document.getElementById('histResultados').innerHTML = '';
     const inp = document.getElementById('histBuscarInput');
