@@ -1595,9 +1595,9 @@
         const _faltan = _otras.map(a => _LBL[a] || a).join(', ');
         enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
           (user?.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promo.name + '". Falta asignar a otra chica: ' + _faltan + '.');
-        showToast('🔄 Avisado a Mikaela: falta asignar ' + _faltan);
+        showToast('🔄 Avisado a Central: falta asignar ' + _faltan);
       }
-    } catch (e) { console.warn('[applyPromo] aviso Mikaela:', e); }
+    } catch (e) { console.warn('[applyPromo] aviso Central:', e); }
   }
 
   // Tomar promo completa: la staff cobra el precio total aunque solo haga su parte
@@ -2053,9 +2053,9 @@
         const _faltan = _otras.map(a => _LBL[a] || a).join(', ');
         enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
           (user?.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promoData.name + '". Falta asignar a otra chica: ' + _faltan + '.');
-        showToast('🔄 Avisado a Mikaela: falta asignar ' + _faltan);
+        showToast('🔄 Avisado a Central: falta asignar ' + _faltan);
       }
-    } catch (e) { console.warn('[applyPromoFromAddSvc] aviso Mikaela:', e); }
+    } catch (e) { console.warn('[applyPromoFromAddSvc] aviso Central:', e); }
   }
 
   function openAddService(slot, modoEnganche) {
@@ -2141,145 +2141,170 @@
     const areaNames = { cejas: 'Cejas', depilacion: 'Depilación', pestanas: 'Pestañas', retiro_lifting: 'Lifting / Retiro', facial: 'Facial' };
     svc.area = areaNames[svc.area] || svc.area;
 
-    // MODO ENGANCHE: Staff 2 cambia servicio directamente sin autorización
-    if (window._modoEnganche) {
-      window._modoEnganche = false;
-      const engIdx = window._editEngancheIdx;
-      // Reemplazar el servicio en el slot
-      svc.status = undefined; // sin estado = aprobado por defecto
-      if (slotServices[slot] && engIdx !== undefined) {
-        slotServices[slot][engIdx] = svc;
-      } else {
-        slotServices[slot] = slotServices[slot] || [];
-        slotServices[slot][0] = svc;
-      }
-      renderServicesForSlot(slot);
-      const total = slotServices[slot].reduce((s, v) => s + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
-      document.getElementById('as' + slot + 'Total').textContent = '$' + total;
-      document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].filter(s => s.status !== 'rechazado').length;
-      // Restaurar modal a modo normal
-      const modalTitle = document.querySelector('#addServiceModal .modal-title');
-      if (modalTitle) modalTitle.textContent = '➕ Agregar servicio';
-      const noteGroup = document.getElementById('addSvcNote')?.closest('.input-group');
-      if (noteGroup) noteGroup.style.display = 'block';
-      closeModal();
-      syncServiciosBackend(slot, total);
-      alert('✓ Servicio de enganche actualizado a: ' + svc.name + ' ($' + svc.price + ')');
-      return;
-    }
+    // ══════════════════════════════════════════════════════════════════════
+    // MANDAMIENTO 1 · SERVICIO EXTRA PEDIDO POR LA STAFF
+    // Un servicio extra pedido desde la staff SIEMPRE requiere autorización de
+    // Central antes de liberarse, sea servicio normal o promo. No existe
+    // ninguna vía por la que la staff agregue o cambie un servicio sin esa
+    // autorización, y si la solicitud no se puede registrar la staff ve un
+    // ERROR — nunca "enviada".
+    //
+    // ELIMINADO: la rama MODO ENGANCHE liberaba el servicio con estado
+    // aprobado por defecto, sin pedirle autorización a nadie, y su único gate
+    // era una heurística de texto (obs de la clienta con un '✅'). Violaba el
+    // mandamiento de raíz. El enganche sigue existiendo como atajo de UI, pero
+    // ahora pasa por la MISMA autorización que cualquier otro extra.
+    // ══════════════════════════════════════════════════════════════════════
+    const _esEngancheUI = !!window._modoEnganche;
+    window._modoEnganche = false;
 
-    // MODO NORMAL: requiere nota y autorización de Mikaela
-    // Solo validar nota si NO estamos en modo enganche
-    if (!window._modoEnganche) {
-      const note = document.getElementById('addSvcNote').value.trim();
+    // La nota es obligatoria en el flujo normal. En enganche el modal la
+    // oculta, así que se genera una nota descriptiva en vez de bloquear a la
+    // staff con un campo que no puede ver. Lo que NO cambia es que hay
+    // autorización.
+    let note = '';
+    if (_esEngancheUI) {
+      note = 'Cambio de servicio de enganche a: ' + svc.name;
+      // Restaurar el modal a su estado normal
+      const modalTitleEng = document.querySelector('#addServiceModal .modal-title');
+      if (modalTitleEng) modalTitleEng.textContent = '➕ Agregar servicio';
+      const noteGroupEng = document.getElementById('addSvcNote')?.closest('.input-group');
+      if (noteGroupEng) noteGroupEng.style.display = 'block';
+    } else {
+      note = document.getElementById('addSvcNote').value.trim();
       if (!note || note.length < 10) {
-        alert('La nota para Mikaela es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+        alert('La nota para Central es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
         return;
       }
-      svc.status = 'pendiente';
-      svc.note = note;
-      svc.requestedBy = user?.name || 'Staff';
-      svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
-      if (addServiceToSlot(slot, svc)) {
-        document.getElementById('addSvcNote').value = '';
-        closeModal();
-        await sendAuthorizationRequest(clientName, svc, slot);
-        recargarAutorizacionesStaff(slot);
-        alert('⏳ Solicitud enviada a Mikaela. El servicio estará pendiente hasta que ella lo apruebe.');
-      }
+    }
+
+    svc.status = 'pendiente';
+    svc.note = note;
+    svc.requestedBy = user?.name || 'Staff';
+    svc.requestedAt = new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+    if (_esEngancheUI) svc._engancheIdx = window._editEngancheIdx;
+    window._editEngancheIdx = undefined;
+
+    if (!addServiceToSlot(slot, svc)) return;
+    document.getElementById('addSvcNote').value = '';
+    closeModal();
+
+    // ── La solicitud manda. NO se confirma nada antes de saber si se registró ──
+    const _rAuth = await sendAuthorizationRequest(clientName, svc, slot);
+    if (!_rAuth || _rAuth.success !== true) {
+      // La solicitud NO quedó registrada en ningún lado. Se retira el renglón
+      // pendiente para no dejarle a la staff un servicio fantasma que Central
+      // jamás va a ver, y se muestra el motivo real.
+      try {
+        const _ix = slotServices[slot].indexOf(svc);
+        if (_ix >= 0) slotServices[slot].splice(_ix, 1);
+        renderServicesForSlot(slot);
+        const _tot = slotServices[slot].reduce((s, v) =>
+          s + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
+        document.getElementById('as' + slot + 'Total').textContent = '$' + _tot;
+        document.getElementById('as' + slot + 'SvcCount').textContent =
+          slotServices[slot].filter(s => s.status !== 'rechazado').length;
+      } catch (eUndo) { console.warn('[confirmAddService] revertir pendiente:', eUndo); }
+
+      console.error('[confirmAddService] ⛔ solicitud NO registrada:', _rAuth);
+      alert('⚠ NO se pudo enviar la solicitud a Central.\n\n'
+          + ((_rAuth && (_rAuth.message || _rAuth.error)) || 'Sin respuesta del servidor.')
+          + '\n\nEl servicio NO quedó agregado. Pedile a Central que lo agregue ella.');
       return;
     }
 
-    // MODO ENGANCHE: llegamos aquí si _modoEnganche estaba true pero no se procesó arriba
-    // (por si el bloque enganche de arriba falló por alguna razón de índice)
-    window._modoEnganche = false;
+    recargarAutorizacionesStaff(slot);
+    alert('⏳ Solicitud enviada a Central. El servicio estará pendiente hasta que Central lo apruebe.');
   }
   
+  // ══════════════════════════════════════════════════════════════════════════
+  // MANDAMIENTO 1 · la solicitud viaja SIEMPRE por la ruta nativa LINEAS.
+  //
+  // ELIMINADO: el desvío a la acción legacy 'solicitarAutorizacion'. Esa acción
+  // escribe en la hoja Autorizaciones, que Central ya NO lee (getAutorizaciones
+  // devuelve únicamente propuestas nativas de LINEAS). Cada solicitud que se
+  // iba por ahí quedaba 'pendiente' en una hoja muerta: la staff veía "enviada",
+  // Central nunca la recibía y el servicio quedaba atascado sin registro
+  // consultable. Evidencia real: 5 solicitudes atascadas entre el 9 y el 11 de
+  // septiembre de 2026 (C-1018 Selena Fajardo, C-0536 Lisbeth Vera, C-0446
+  // Kaina Ortiz).
+  //
+  // La decisión de ruta NO la toma el frontend. `_esSlotNativoLineas` es una
+  // heurística de pantalla y fue justamente la que falló: dio false para un
+  // ticket que debía ir por nativo. Ahora se llama SIEMPRE a la ruta nativa y
+  // la FUENTE REAL la resuelve el backend contra TicketsFuente. Si el ticket no
+  // es nativo, el backend lo rechaza con un motivo explícito y la staff lo ve.
+  //
+  // Devuelve SIEMPRE { success:boolean, ... }. El caller depende de eso.
+  // ══════════════════════════════════════════════════════════════════════════
   async function sendAuthorizationRequest(clientName, service, slot) {
     const user = window.currentUser;
     const clientCode = slot === 1 ? window._as1Client : window._as2Client;
-    
-    console.log('📤 sendAuthorizationRequest called:', {
-      clientName,
-      clientCode,
-      service,
-      slot,
-      user: user?.name
-    });
-    
+    const ticketRef = (slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '';
+
+    console.log('📤 sendAuthorizationRequest:', { clientName, clientCode, ticketRef, service, slot, user: user?.name });
+
+    if (!ticketRef) {
+      return { success: false, error: 'TICKET_REF_AUSENTE',
+               message: 'No se pudo identificar el ticket de la clienta. Actualizá la pantalla e intentá de nuevo.' };
+    }
+
+    // ── GUARD DEL MANDAMIENTO #9 (nexserv-mandamientos.js) ──────────────────
+    // La ruta del servicio extra de la staff es única. Este chequeo no cambia
+    // el comportamiento normal: existe para que una regresión futura falle a la
+    // vista en vez de perder la solicitud en silencio.
     try {
-      const _isNativeSlot = (typeof window._esSlotNativoLineas === 'function' && window._esSlotNativoLineas(slot)) || false;
-      if (_isNativeSlot) {
-        const ticketRef = (slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '';
-        const lineaPadre = String(service.lineaPadre || service._parentLineaId || service.parentLineaId || '').trim();
-        if (!service._lineRequestId) service._lineRequestId = 'EXTRA-' + String(ticketRef||'').replace(/[^A-Za-z0-9_-]/g,'') + '-' + Date.now() + '-' + Math.floor(Math.random()*1000);
-        const resultNative = await LineaService.solicitarExtra({
-          ticketRef: ticketRef,
-          lineaPadre: lineaPadre,
-          area: service.area,
-          servicioExtra: service.name,
-          precio: service.price,
-          nota: service.note || '',
-          lineRequestId: service._lineRequestId
-        });
-        console.log('📥 Backend response (nativo):', resultNative);
-        if (resultNative && resultNative.success) {
-          service.authId = resultNative.authId || resultNative.lineaId || '';
-          try { enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar', (user?.name||'Staff') + ' → ' + (clientName||'clienta') + ': ' + (service.name||'servicio') + ' · $' + service.price); } catch(ePush){}
-          return resultNative;
+      if (typeof window.validarAccionExtraStaffM9 === 'function') {
+        const _m9 = window.validarAccionExtraStaffM9(window.M9_ACCION_EXTRA_STAFF);
+        if (!_m9.ok) {
+          console.error('[M9]', _m9.motivo);
+          return { success: false, error: 'M9_RUTA_INVALIDA', message: _m9.motivo };
         }
-        console.warn('Nativo falló sin fallback legacy para LINEAS', resultNative);
+      }
+    } catch (eM9) { console.warn('[M9] guard:', eM9); }
+
+    try {
+      const lineaPadre = String(service.lineaPadre || service._parentLineaId || service.parentLineaId || '').trim();
+      if (!service._lineRequestId) {
+        service._lineRequestId = 'EXTRA-' + String(ticketRef).replace(/[^A-Za-z0-9_-]/g, '')
+                               + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      }
+      const resultNative = await LineaService.solicitarExtra({
+        ticketRef: ticketRef,
+        lineaPadre: lineaPadre,
+        area: service.area,
+        servicioExtra: service.name,
+        precio: service.price,
+        nota: service.note || '',
+        lineRequestId: service._lineRequestId
+      });
+      console.log('📥 Backend response (nativo):', resultNative);
+
+      if (resultNative && resultNative.success === true) {
+        service.authId = resultNative.authId || resultNative.lineaId || '';
+        service.lineaId = resultNative.lineaId || service.lineaId || '';
+        try {
+          enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar',
+            (user?.name || 'Staff') + ' → ' + (clientName || 'clienta') + ': '
+            + (service.name || 'servicio') + ' · $' + service.price);
+        } catch (ePush) { console.warn('[Push] aviso a Mikaela falló:', ePush); }
         return resultNative;
       }
-      // Detectar si es un REEMPLAZO de promo o un EXTRA adicional
-      // Reemplazo: hay SP- en el slot Y el staff borró el servicio original
-      //   → slotServices solo tiene el nuevo servicio pendiente (sin servicios aprobados previos)
-      // Extra: hay SP- pero el servicio original sigue en slotServices
-      const _idEsperaSlot = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
-      const _esSP = _idEsperaSlot.startsWith('SP-');
-      // Contar servicios aprobados (sin status o status !== pendiente/rechazado) excluyendo el nuevo
-      const _svcsAprobados = (slotServices[slot] || []).filter(function(s) {
-        return s !== service && s.status !== 'pendiente' && s.status !== 'rechazado';
-      });
-      // Es reemplazo si: hay SP- activo Y no quedan servicios aprobados (el original fue borrado)
-      const _esCambioPromo = _esSP && _svcsAprobados.length === 0;
-      const payload = {
-        clienteCodigo: clientCode,
-        clienteNombre: clientName,
-        staffNombre: user?.name || 'Staff',
-        servicioNombre: service.name,
-        servicioArea: service.area,
-        servicioPrecio: service.price,
-        nota: service.note,
-        idEsperaSP: _esCambioPromo ? _idEsperaSlot : '',
-        esCambioPromo: _esCambioPromo,
-        staffArea: user?.area || ''
+
+      // Fallo real. NO hay desvío legacy: el servicio no queda agregado y la
+      // staff ve el motivo. Un ticket legacy real cae acá con un motivo claro,
+      // y la salida es que Central agregue el servicio desde su pantalla.
+      console.error('❌ Solicitud de extra NO registrada:', resultNative);
+      return {
+        success: false,
+        error: (resultNative && resultNative.error) || 'SOLICITUD_NO_REGISTRADA',
+        message: (resultNative && resultNative.message)
+                 || 'Central no pudo recibir la solicitud para este ticket.'
       };
-      
-      console.log('📤 Sending to backend:', payload);
-      
-      const result = await apiPost('solicitarAutorizacion', payload);
-      
-      console.log('📥 Backend response:', result);
-      
-      if (result.success) {
-        // Guardar ID de autorización en el servicio
-        service.authId = result.authId;
-        console.log('✅ Solicitud de autorización enviada:', result.authId);
-        // Avisar a Mikaela por push: antes la solicitud solo aparecía si ella
-        // estaba mirando el polling; ahora le llega notificación aunque tenga la app cerrada.
-        try {
-          const _staff  = user?.name || 'Staff';
-          const _precio = (service.price !== undefined && service.price !== null && service.price !== '')
-            ? (' · $' + service.price) : '';
-          enviarPushStaff(['Mikaela'], '✋ Servicio extra para aprobar',
-            _staff + ' → ' + (clientName || 'clienta') + ': ' + (service.name || 'servicio') + _precio);
-        } catch (ePush) { console.warn('[Push] aviso de autorización a Mikaela falló:', ePush); }
-      } else {
-        console.error('❌ Error al enviar autorización:', result.message);
-      }
     } catch (err) {
-      console.error('❌ Exception al enviar autorización:', err);
+      console.error('❌ Excepción al enviar autorización:', err);
+      return { success: false, error: 'EXCEPCION',
+               message: 'No hubo respuesta del servidor. No se envió la solicitud.' };
     }
   }
 
@@ -3385,7 +3410,7 @@
         if (r.todasCompletadas) {
           // FIX: si todas las áreas quedaron completas, la clienta pasa a cobro con Mikaela
           // (aunque se haya usado el botón "pasar a otra staff" — el sistema detecta que ya no hay más)
-          showToast('✅ Multi-servicio completo · $' + totalHechoMu + ' · Enviado a cobrar con Mikaela');
+          showToast('✅ Multi-servicio completo · $' + totalHechoMu + ' · Enviado a cobrar con Central');
         } else {
           showToast('✅ ' + svcNombreMu + ' $' + totalHechoMu + ' · Tu comisión: $' + comisionMu + ' · Sigue: ' + (r.siguienteArea || 'siguiente área') + ' en lista de espera');
         }
@@ -3466,7 +3491,7 @@
           // ── TODAS las áreas completadas → clienta pasa a "Por cobrar" con Mikaela ──
           // El TM ya está marcado como "Por cobrar" en el backend.
           // Solo mostrar toast y volver al home — Mikaela lo verá en su sección "Por cobrar".
-          showToast('✅ Multi-servicio completo · $' + totalFinal2 + ' · Enviado a cobrar con Mikaela');
+          showToast('✅ Multi-servicio completo · $' + totalFinal2 + ' · Enviado a cobrar con Central');
         } else {
           // Aún quedan áreas → la clienta vuelve a lista de espera para la siguiente staff
           showToast('✅ ' + svcFinalNombre + ' completado · Sigue: ' + (r.siguienteArea || 'siguiente área'));
@@ -3955,7 +3980,7 @@
           showToast('🎯 Todo completado — este es el último servicio');
           const btnContainer = document.getElementById('as' + slot + 'FinishBtns');
           if (btnContainer) {
-            btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slot + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Mikaela</button>';
+            btnContainer.innerHTML = '<button class="btn-primary" style="margin-bottom:10px;background:linear-gradient(135deg,#2d6a4f,#1a4a32);font-size:14px;padding:16px;" onclick="window._finishingSlot=' + slot + '; completarAreaMultiFinal();">✅ Terminé todo mi trabajo — enviar a cobro con Central</button>';
           }
         } else {
           // ── Reconstruir la lista desde el backend (no parchear estado local) ──
