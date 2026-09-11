@@ -11,11 +11,17 @@
 // Las funciones aquí definidas son globales y las usa el index.
 // Cuando actualices index.html, este archivo NO cambia.
 // Cuando quieras agregar un mandamiento nuevo, editás solo este archivo.
+//
+// NOMENCLATURA (2026-09-11): el rol se llama CENTRAL, no por el nombre de la
+// persona que lo ocupa. Todo el texto de este archivo dice "Central".
+// ATENCIÓN: 'Mikaela' SIGUE siendo un identificador válido en el código
+// (clave de STAFF_PUSH_MAP → push_mikaela, y loadMikaelaHome). Esos NO se
+// renombran: son identificadores, no texto.
 // ================================================================
 
 // ── MANDAMIENTO #1 — ÁREA PRIORITARIA ───────────────────────────
-// Todo servicio se guía por el orden que dicte Mikaela (_secuencia).
-// Si Mikaela no toca el orden → primer servicio del formulario.
+// Todo servicio se guía por el orden que dicte CENTRAL (_secuencia).
+// Si Central no toca el orden → primer servicio del formulario.
 // SIN EXCEPCIONES. Esta es la ÚNICA función que determina el área.
 // ──────────────────────────────────────────────────────────────────
 window.getAreaPrioritaria = function(tipo) {
@@ -28,7 +34,7 @@ window.getAreaPrioritaria = function(tipo) {
     'Facial': 'facial', 'Lifting / Retiro': 'retiro_lifting'
   };
 
-  // Regla 1: secuencia de Mikaela manda siempre
+  // Regla 1: secuencia de Central manda siempre
   if (window._secuencia && window._secuencia.length > 0) {
     const k = String(window._secuencia[0].area || '').toLowerCase();
     return { key: k, label: AL[k] || 'Cejas' };
@@ -44,7 +50,7 @@ window.getAreaPrioritaria = function(tipo) {
     if (pr && pr.division && pr.division.length > 0) {
       // Área inicial = PRIMERA parte de la división, tal como fue creada la promo.
       // ANTES ordenaba por monto desc y elegía la MÁS CARA → en cejas+pestañas forzaba
-      // siempre pestañas sin importar la staff. El orden lo manda Mikaela vía _secuencia
+      // siempre pestañas sin importar la staff. El orden lo manda Central vía _secuencia
       // (Regla 1, arriba); esto es solo el fallback cuando no hay secuencia.
       const d  = String(pr.division[0].area || '').toLowerCase();
       const k  = d.includes('pest') || d.includes('lifting') || d.includes('retiro') ? 'pestanas'
@@ -85,9 +91,9 @@ window.confirmarServicioObligatorio = function(slot, delayMs) {
 };
 
 // ── MANDAMIENTO #3 — SERVICIOS EXTRA ────────────────────────────
-// Todo servicio extra requiere aprobación de Mikaela antes de activarse.
-// Tipo 1 — Mismo área: Mikaela aprueba → suma al total de esa staff.
-// Tipo 2 — Otra área:  Mikaela aprueba → va a lista para otra staff.
+// Todo servicio extra requiere aprobación de CENTRAL antes de activarse.
+// Tipo 1 — Mismo área: Central aprueba → suma al total de esa staff.
+// Tipo 2 — Otra área:  Central aprueba → va a lista para otra staff.
 // Ambos tipos son infinitamente repetibles.
 // ──────────────────────────────────────────────────────────────────
 window.AREA_FAMILIA_M3 = {
@@ -161,7 +167,7 @@ window.tmTienePromoM4 = function(areas) {
 //             recibe: servicio + monto cobrado (base para comisión %)
 //             para CADA staff involucrada en el servicio
 //
-//   Mikaela → CierresPagos: servicio / staff / precio final (sin comisión)
+//   Central → CierresPagos: servicio / staff / precio final (sin comisión)
 //             el desglose multi-staff debe llegar completo como JSON
 //
 //   Owner   → HistorialOwner: servicio / staff / precio final /
@@ -356,8 +362,8 @@ window.cargarFichaSegunAreaM7 = function(area, clientKey, slot, clientCodigo, cl
 //
 // El botón "Servicio Promo" maneja 4 tipos de ticket.
 // NexServ DEBE clasificar automáticamente el tipo correcto según las promos
-// ingresadas por Mikaela, antes de crear el ticket.
-// La clasificación es determinista — Mikaela no elige el tipo manualmente.
+// ingresadas por Central, antes de crear el ticket.
+// La clasificación es determinista — Central no elige el tipo manualmente.
 //
 // ┌─────────────────────────────────────────────────────────────────────────┐
 // │ TIPO 1 — ServicioPromoIndividual                                        │
@@ -444,7 +450,7 @@ window.clasificarTicketPromoM8 = function() {
   return { tipo: 2, nombre: 'ServicioPromoDuo', ticket: 'LE', areasUnicas: areasUnicas };
 };
 
-// Devuelve un string legible con el resumen del ticket para mostrarle a Mikaela
+// Devuelve un string legible con el resumen del ticket para mostrarle a Central
 // antes de confirmar el envío.
 window.resumenTicketPromoM8 = function() {
   var c = window.clasificarTicketPromoM8();
@@ -460,8 +466,80 @@ window.resumenTicketPromoM8 = function() {
   }
 };
 
+// ── MANDAMIENTO #9 — RUTA ÚNICA DEL SERVICIO EXTRA Y ALCANCE DE APLICAR PROMO ─
+//
+// EXTIENDE al Mandamiento #3, que ya declaraba que todo servicio extra requiere
+// aprobación de Central. #3 decía la regla; #9 la hace INELUDIBLE y fija por
+// dónde viaja.
+//
+// ┌───────────────────────────────────────────────────────────────────────────┐
+// │ 9.1 — SERVICIO EXTRA PEDIDO POR LA STAFF                                  │
+// │   SIEMPRE manda autorización a Central antes de liberarse.                │
+// │   Da igual si el extra es servicio normal o promo.                        │
+// │   NO existe ninguna vía por la que la staff agregue o cambie un servicio  │
+// │   sin esa autorización. Tampoco el atajo de "enganche".                   │
+// │   Si la solicitud no se registra: la staff ve un ERROR y el servicio NO   │
+// │   queda agregado. Nunca "enviada".                                        │
+// ├───────────────────────────────────────────────────────────────────────────┤
+// │ 9.2 — RUTA ÚNICA                                                          │
+// │   La solicitud viaja SOLO por 'solicitarExtraStaffNativo'.                │
+// │   'solicitarAutorizacion' (legacy) queda PROHIBIDA para este flujo: su    │
+// │   destino es la hoja Autorizaciones, que Central ya no lee.               │
+// │   La ruta NO la decide el frontend. La fuente real la resuelve el backend │
+// │   contra TicketsFuente.                                                   │
+// ├───────────────────────────────────────────────────────────────────────────┤
+// │ 9.3 — APLICAR PROMO ES AUTOMÁTICO                                         │
+// │   El botón "Aplicar promo" NO pide autorización.                          │
+// │   Sustituye el servicio original por la promo elegida.                    │
+// │   Venga con 1, 2 o 3 subtickets, es el MISMO camino: el número de         │
+// │   componentes es un dato, NUNCA una bifurcación.                          │
+// ├───────────────────────────────────────────────────────────────────────────┤
+// │ 9.4 — ALCANCE EN TICKET MULTI-SERVICIO                                    │
+// │   Aplicar promo sustituye ÚNICAMENTE el servicio que esa staff tiene      │
+// │   abierto. No toca los completados, ni los de otras staff, ni los         │
+// │   pendientes de asignar.                                                  │
+// ├───────────────────────────────────────────────────────────────────────────┤
+// │ 9.5 — SERVICIO EXTRA DESDE CENTRAL CON ASIGNACIÓN DIRECTA                 │
+// │   Entra directo a la staff, sin autorización.                             │
+// │   Congela los servicios que el ticket ya tiene.                           │
+// └───────────────────────────────────────────────────────────────────────────┘
+//
+// POR QUÉ EXISTE ESTE MANDAMIENTO
+//   Entre el 9 y el 11 de septiembre de 2026 se perdieron 5 solicitudes de
+//   servicio extra. El frontend decidía la ruta con una heurística de pantalla
+//   y, cuando fallaba, desviaba a la acción legacy. Las solicitudes quedaban
+//   'pendiente' en una hoja que nadie lee: la staff veía "enviada" y Central
+//   nunca las recibía. Un segundo camino, el atajo de "enganche", liberaba
+//   servicios sin pedirle autorización a nadie.
+// ──────────────────────────────────────────────────────────────────────────────
+window.M9_ACCION_EXTRA_STAFF = 'solicitarExtraStaffNativo';
+
+window.M9_ACCIONES_PROHIBIDAS_EXTRA_STAFF = ['solicitarAutorizacion'];
+
+// Guard de ruta. Se llama ANTES de postear una solicitud de extra de la staff.
+// Existe para que una regresión futura falle a la vista en vez de perder la
+// solicitud en silencio, que es exactamente lo que pasó en septiembre de 2026.
+window.validarAccionExtraStaffM9 = function(accion) {
+  var a = String(accion || '').trim();
+  if (!a) {
+    return { ok: false, motivo: 'M9: acción vacía para una solicitud de servicio extra.' };
+  }
+  if (window.M9_ACCIONES_PROHIBIDAS_EXTRA_STAFF.indexOf(a) !== -1) {
+    return { ok: false,
+             motivo: 'M9: "' + a + '" es la ruta legacy y está PROHIBIDA para el servicio '
+                   + 'extra de la staff. Su destino es la hoja Autorizaciones, que Central '
+                   + 'ya no lee. Usar ' + window.M9_ACCION_EXTRA_STAFF + '.' };
+  }
+  if (a !== window.M9_ACCION_EXTRA_STAFF) {
+    return { ok: false,
+             motivo: 'M9: la única ruta permitida para el servicio extra de la staff es '
+                   + window.M9_ACCION_EXTRA_STAFF + ' (se intentó "' + a + '").' };
+  }
+  return { ok: true };
+};
+
 // ================================================================
 // FIN DE LOS MANDAMIENTOS
-// Versión: 1.5 — Fecha: 2026-05-23
+// Versión: 1.6 — Fecha: 2026-09-11
 // Para agregar un mandamiento nuevo, editá SOLO este archivo.
 // ================================================================
