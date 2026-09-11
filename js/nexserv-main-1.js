@@ -3256,18 +3256,23 @@
 
   // Solo presentación: oculta metadata técnica NATIVE al
   // pintar la tarjeta Staff. No muta el dato original.
+  // ── LIMPIEZA DE MARCADORES · UN SOLO LIMPIADOR ──────────────────────────────
+  // ANTES había DOS limpiadores en este mismo archivo con el mismo propósito y
+  // distinto alcance: éste solo filtraba [NATIVE_*] y _limpiarObsInterna
+  // filtraba además [PROMO_NOMBRE:…], [paralelo…], [promo …] y _completedAreas.
+  // Por eso la tarjeta de lista de espera mostraba crudo
+  // "[PROMO_NOMBRE:Combo 3 Brow]" a la staff (visto en PROD el 11/09/2026).
+  //
+  // Se elimina el regex duplicado y se delega en el limpiador que ya existe.
+  // No se crea un segundo regex, no se cambia cómo se guardan las
+  // observaciones y no se borra nada en el backend: los marcadores siguen
+  // intactos en la hoja y Central los sigue viendo. Esto es SOLO presentación.
+  //
+  // _limpiarObsInterna es una declaración de función del mismo ámbito, así que
+  // está disponible por hoisting aunque se defina más abajo en el archivo.
   function _obsVisibleStaff(s) {
-    return String(s == null ? '' : s)
-      // Antes enumeraba cuatro nombres exactos, así que cada marcador nuevo del
-      // motor nativo se le escapaba y salía crudo en la tarjeta: pasó con
-      // [NATIVE_PROMO_REQUEST_ID:…], [NATIVE_PROMO_REQUEST_FP:…],
-      // [NATIVE_PROMO_COMPONENT_FP:…], [NATIVE_EXTRA_SOURCE:…] y
-      // [NATIVE_EXTRA_MODE:…]. Ahora cubre cualquier NATIVE_*, incluidos los que
-      // se agreguen después. SOLO PRESENTACIÓN: el dato en la hoja no cambia,
-      // los marcadores siguen ahí para diagnóstico y Central los sigue viendo.
-      .replace(/\[NATIVE_[A-Z_]*:[^\]]*\]/g, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
+    if (typeof _limpiarObsInterna === 'function') return _limpiarObsInterna(s);
+    return String(s == null ? '' : s).trim();   // salvaguarda, nunca debería usarse
   }
 
   function _renderWaitListDOM(content, myList) {
