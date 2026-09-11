@@ -1413,7 +1413,15 @@
     document.getElementById('promoSelectModal').classList.add('active');
   }
 
-  function applyPromo(promoIdx) {
+  // ── applyPromo · NO OPTIMISTA (Decisión 1 = B del dueño) ───────────────────
+  // ANTES: repintaba la UI, mostraba '✓ Promo aplicada' y cerraba el modal ANTES
+  // de mandar el request, y después ignoraba la respuesta. La staff veía éxito
+  // aunque el backend hubiera fallado y el ticket quedara sin líneas.
+  //
+  // AHORA: se manda primero, se espera, y solo se confirma y repinta si el
+  // backend devolvió éxito REAL y completo (creadas === esperadas).
+  // Si falla: no se toca la UI, se avisa el error y se recarga el estado real.
+  async function applyPromo(promoIdx) {
     const promo = PROMOS[promoIdx];
     const slot = window._promoSlot;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
@@ -1426,49 +1434,64 @@
     // Agregar servicio de promo a slotServices.
     // _yaEnLinea: la promo se registra como sus propias líneas en LINEAS (aplicarPromoStaff),
     // así que este renglón es SOLO para mostrar — no debe re-sincronizarse al ticket.
+    // lineaIds se rellena DESPUÉS, con los ids reales que devuelve el backend: es la
+    // identidad que necesita la ✕ para retirar la promo entera como una sola operación.
     const servicioPromo = {
       name: promo.name,
       area: myArea,
       price: myPrice,
       esPromo: true,
       status: 'aprobado',
-      _yaEnLinea: true
+      _yaEnLinea: true,
+      lineaIds: []
     };
-    
-    // Aplicar promo = REEMPLAZAR el servicio que tenía la clienta (cambió de opinión),
-    // no sumarlo. Antes se hacía push() y el servicio que asignó Mikaela quedaba sumado
-    // en vez de reemplazado — por eso "no cambiaba".
-    slotServices[slot] = [servicioPromo];
-    
-    // Actualizar UI
-    renderServicesForSlot(slot);
-    
-    // Actualizar total
-    const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
-    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
-    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
-    
-    // Registrar promo activa usando clave normalizada (igual que finishSlot1)
-    const promoClientKey = normalizeClientKey(clientName);
-    activePromos[promoClientKey] = {
-      promo: promo,
-      startedBy: myArea,
-      completedAreas: []   // vacío: se llena al terminar cada área, no al iniciar
-    };
-    
-    // Ocultar banner de promo asignada si existe
-    const assignedInfo = document.getElementById('promoAssignedInfo' + slot);
-    if (assignedInfo) assignedInfo.remove();
-    
-    // Cambiar botón
-    const promoBtn = document.getElementById('promoBtn' + slot);
-    if (promoBtn) {
-      promoBtn.textContent = '✓ Promo aplicada';
-      promoBtn.style.background = 'var(--success)';
+
+    // Confirmación visual y repintado: se ejecuta SOLO tras éxito real.
+    function _confirmarPromoEnUI(idsCreados) {
+      servicioPromo.lineaIds = Array.isArray(idsCreados) ? idsCreados.slice() : [];
+      // Una promo puede ser 1, 2 o 3 líneas. El renglón es UNO en cualquier caso:
+      // el conteo es un dato, no una bifurcación.
+      if (servicioPromo.lineaIds.length === 1) servicioPromo.lineaId = servicioPromo.lineaIds[0];
+
+      // Aplicar promo = REEMPLAZAR el servicio que tenía la clienta (cambió de opinión),
+      // no sumarlo.
+      slotServices[slot] = [servicioPromo];
+      renderServicesForSlot(slot);
+
+      const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
+      document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+      document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+
+      // Registrar promo activa usando clave normalizada (igual que finishSlot1)
+      const promoClientKey = normalizeClientKey(clientName);
+      activePromos[promoClientKey] = {
+        promo: promo,
+        startedBy: myArea,
+        completedAreas: []   // vacío: se llena al terminar cada área, no al iniciar
+      };
+
+      // Ocultar banner de promo asignada si existe
+      const assignedInfo = document.getElementById('promoAssignedInfo' + slot);
+      if (assignedInfo) assignedInfo.remove();
+
+      // Cambiar botón
+      const promoBtn = document.getElementById('promoBtn' + slot);
+      if (promoBtn) {
+        promoBtn.textContent = '✓ Promo aplicada';
+        promoBtn.style.background = 'var(--success)';
+      }
     }
-    
-    closeModal();
-    alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
+
+    // Fallo real del backend: NO se repinta nada, no se inventa optimismo local.
+    function _fallaPromo(msg) {
+      closeModal();
+      alert('⚠ No se pudo aplicar la promo.\n\n' + (msg || 'Intentá de nuevo.')
+          + '\n\nEl servicio anterior sigue activo.');
+      // Recarga del estado REAL desde el backend. loadStaffHome es la función
+      // que ya usa el resto del frontend para repoblar la vista de la staff;
+      // no se inventa un recargador nuevo.
+      try { if (typeof loadStaffHome === 'function') loadStaffHome(); } catch (eR) {}
+    }
 
     // Registrar el cambio a promo en el backend DEJANDO EVIDENCIA:
     // la línea original (la que asignó Mikaela) se ANULA y se crean N líneas nuevas
@@ -1513,16 +1536,54 @@
         }
         return { servicio: (p.servicio || p.area || ''), area: (p.area || myArea), monto: _val, montoRegular: _reg };
       });
-      apiPost('aplicarPromoStaff', {
-        idEspera      : _idEsperaPromo,
-        chicaNombre   : user?.name || '',
-        clienteNombre : clientName,
-        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
-        promoNombre   : promo.name,
-        precioRegular : String(promo.regular || promo.price || myPrice),
-        partes        : JSON.stringify(_partes)
-      }).then(function (r) { console.log('✅ Promo registrada (anular original + crear', (r && r.creadas) || 0, 'líneas):', r); })
-        .catch(function (e) { console.warn('⚠ Error registrando promo:', e); });
+      let _rPromo = null;
+      try {
+        _rPromo = await apiPost('aplicarPromoStaff', {
+          idEspera      : _idEsperaPromo,
+          chicaNombre   : user?.name || '',
+          clienteNombre : clientName,
+          clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+          promoNombre   : promo.name,
+          precioRegular : String(promo.regular || promo.price || myPrice),
+          partes        : JSON.stringify(_partes)
+        });
+      } catch (ePromo) {
+        console.warn('⚠ Error registrando promo:', ePromo);
+        _fallaPromo('No hubo respuesta del servidor.');
+        return;
+      }
+      console.log('[applyPromo] respuesta backend:', _rPromo);
+
+      // Contrato del backend: success true SOLO si creadas === esperadas.
+      // Igual se verifica acá por si el backend es una versión anterior.
+      const _ok = !!(_rPromo && _rPromo.success === true);
+      const _esp = Number((_rPromo && _rPromo.esperadas) != null ? _rPromo.esperadas : _partes.length);
+      const _cre = Number((_rPromo && _rPromo.creadas) || 0);
+      if (!_ok || _cre !== _esp) {
+        _fallaPromo((_rPromo && (_rPromo.message || _rPromo.error))
+                    || ('Solo se registraron ' + _cre + ' de ' + _esp + ' partes.'));
+        return;
+      }
+      // Para un ticket NATIVO, éxito exige TF reconciliado. El backend ya
+      // devuelve success:false y compensa en ese caso; esta verificación es la
+      // segunda barrera por si corre contra un backend anterior.
+      // tf_aplicable:false = ticket LEGACY real, donde TF no corresponde.
+      if (_rPromo.tf_aplicable === true && _rPromo.tf_sincronizado === false) {
+        console.error('[applyPromo] ⛔ TicketsFuente NO sincronizado:', _rPromo.tf_error);
+        _fallaPromo('El ticket quedó sin sincronizar con Central ('
+                  + (_rPromo.tf_error || 'motivo desconocido') + '). Avisá a Central.');
+        return;
+      }
+
+      // ── ÉXITO REAL → recién ahora se confirma y repinta ──────────────────
+      _confirmarPromoEnUI(_rPromo.ids || []);
+      closeModal();
+      alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
+    } else {
+      // Sin idEspera ni código no hay ticket al que aplicar la promo: no se
+      // puede registrar en LINEAS, así que tampoco se confirma en pantalla.
+      _fallaPromo('No se pudo identificar el ticket de la clienta.');
+      return;
     }
 
     // Si la promo incluye áreas que esta staff NO hace, avisar a Mikaela del cambio
@@ -1761,7 +1822,12 @@
     return true;
   }
 
-  function removeServiceItem(slot, index) {
+  // ── removeServiceItem · NO SINCRONIZA ANTES DE CONOCER EL RESULTADO ───────
+  // ANTES: disparaba anularLineaTicket sin await y seguía derecho a
+  // syncServiciosBackend. Si la anulación nativa fallaba y se compensaba, el
+  // espejo legacy quedaba escrito como si el servicio se hubiera eliminado.
+  // AHORA: se espera la respuesta y solo se sincroniza tras éxito real.
+  async function removeServiceItem(slot, index) {
     if (!slotServices[slot]) return;
     if (!confirm('¿Quitar este servicio?')) return;
     const _removed = slotServices[slot][index];   // capturar ANTES de quitar
@@ -1784,20 +1850,92 @@
       const _idEspera = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
       const _clientCode = slot === 1 ? (window._as1Client || '') : (window._as2Client || '');
       if (_removed && _removed.name && _removed.status !== 'pendiente') {
-        apiPost('anularLineaTicket', {
-          idEspera: _idEspera,
-          chicaNombre: (_user && _user.name) || '',
-          clienteCodigo: _clientCode || '',
-          servicio: _removed.name,
-          monto: String(_removed.price != null ? _removed.price : ''),
-          lineaId: _removed.lineaId || ''
-        }).then(function (r) { console.log('🗑 Línea anulada:', r); })
-          .catch(function (e) { console.warn('anularLineaTicket:', e); });
-      }
-    } catch (eAnul) { console.warn('[removeServiceItem] anular:', eAnul); }
+        // ── UN RENGLÓN VISUAL = N lineaId = UNA sola intención de anulación ──
+        // Una promo se muestra como un renglón pero son N líneas en LINEAS. Se
+        // manda el CONJUNTO completo en UNA sola llamada: el backend valida los
+        // N ids antes de escribir y compensa si algo falla. Nunca N requests
+        // independientes, que podrían dejar la promo a medio anular.
+        // N = 1 no es un caso especial: entra por el mismo camino.
+        var _idsAnular = [];
+        if (Array.isArray(_removed.lineaIds)) {
+          _idsAnular = _removed.lineaIds.filter(function (x) { return !!String(x || '').trim(); });
+        }
+        if (!_idsAnular.length && _removed.lineaId) _idsAnular = [_removed.lineaId];
 
-    // Sincronizar el string de servicios del ticket (col F en ListaEspera).
-    try { if (typeof syncServiciosBackend === 'function') syncServiciosBackend(slot, total); } catch (eS) {}
+        var r = null;
+        try {
+          r = await apiPost('anularLineaTicket', {
+            idEspera: _idEspera,
+            chicaNombre: (_user && _user.name) || '',
+            clienteCodigo: _clientCode || '',
+            servicio: _removed.name,
+            monto: String(_removed.price != null ? _removed.price : ''),
+            lineaId: _idsAnular.length === 1 ? _idsAnular[0] : '',
+            lineaIds: JSON.stringify(_idsAnular)
+          });
+        } catch (eNet) {
+          console.warn('anularLineaTicket:', eNet);
+          r = { success: false, message: 'No hubo respuesta del servidor.' };
+        }
+        {
+          console.log('🗑 Anulación de conjunto:', r);
+          if (!r || r.success !== true) {
+            // ── ESTADO PARCIAL: NUNCA se oculta (orden del dueño) ───────────
+            // Dos escenarios distintos, y NO se pueden tratar igual:
+            //
+            //  a) compensacion_completa === true → el backend restauró todo, en
+            //     la hoja no quedó nada anulado. Reinsertar el renglón dice la
+            //     verdad.
+            //  b) compensacion_completa === false → hay líneas REALMENTE
+            //     anuladas en la hoja. Reinsertar el renglón sería mentir. Se
+            //     muestran los ids afectados y se recarga el estado real.
+            var _compIncompleta = (r && r.compensacion_completa === false);
+            var _msg = '⚠ No se pudo quitar el servicio.\n\n'
+                     + ((r && (r.message || r.error)) || 'Intentá de nuevo.');
+            if (_compIncompleta) {
+              var _si = (r.compensadas || []).join(', ') || '(ninguna)';
+              var _no = (r.compensacion_fallida || []).map(function (x) {
+                return (x && (x.lineaId || x.id)) || '?';
+              }).join(', ') || '(ninguna)';
+              _msg = '⚠ El servicio quedó a MEDIO QUITAR.\n\n'
+                   + 'Restauradas: ' + _si + '\n'
+                   + 'NO restauradas: ' + _no + '\n\n'
+                   + 'Avisá a Central antes de seguir. Se va a recargar la pantalla '
+                   + 'con el estado real.';
+              console.error('[removeServiceItem] ⛔ ESTADO PARCIAL', r);
+            }
+            alert(_msg);
+            if (_compIncompleta) {
+              // No se repinta desde memoria: se relee del backend.
+              try { if (typeof loadStaffHome === 'function') loadStaffHome(); } catch (eLS) {}
+            } else {
+              try {
+                slotServices[slot].splice(index, 0, _removed);
+                renderServicesForSlot(slot);
+              } catch (eRest) { console.warn('[removeServiceItem] restaurar UI:', eRest); }
+            }
+            // Fallo real: NO se sincroniza nada como si se hubiera eliminado.
+            return;
+          }
+        }
+      }
+    } catch (eAnul) { console.warn('[removeServiceItem] anular:', eAnul); return; }
+
+    // ── SINCRONIZACIÓN POSTERIOR · solo tras éxito real y solo si CORRESPONDE ──
+    // syncServiciosBackend escribe el espejo LEGACY (updateServiciosAtencion →
+    // col F de ListaEspera). En un slot NATIVO esa escritura no aporta verdad
+    // operacional: LINEAS ya es la fuente. La propia función se autoprotege
+    // (nexserv-main-1.js: return temprano si _esSlotNativoLineas), pero acá se
+    // decide por FUENTE REAL en el punto de llamada para que la intención quede
+    // explícita y no dependa de un guard remoto.
+    // Los slots LEGACY conservan la sincronización intacta.
+    try {
+      var _slotNativo = (typeof window._esSlotNativoLineas === 'function'
+                         && window._esSlotNativoLineas(slot)) || false;
+      if (!_slotNativo && typeof syncServiciosBackend === 'function') {
+        syncServiciosBackend(slot, total);
+      }
+    } catch (eS) { console.warn('[removeServiceItem] sync:', eS); }
   }
 
   function openEditService() {
