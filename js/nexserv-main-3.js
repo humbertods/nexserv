@@ -2777,9 +2777,36 @@
   }
 
   // Build TM areas from form - expands combo multi-area promos into individual areas
+  // ══════════════════════════════════════════════════════════════════════
+  // IDENTIDAD DE OCURRENCIA (12/09/2026)
+  //
+  // Un combo multi-área se expande en una entrada POR ÁREA porque el TM
+  // legacy escribe cada área en su propia columna (TM_AREA_COL). Eso es
+  // correcto para legacy y NO se toca.
+  //
+  // Pero el motor nativo interpreta CADA entrada tipo:'promo' como una
+  // OCURRENCIA completa y la expande entera desde Paquetes. Resultado en
+  // PROD el 12/09/2026 (SN-9292): Combo 20 Aura, de dos áreas, produjo dos
+  // ocurrencias con grupoPromoId distintos y slots 3 y 4 — la promo
+  // duplicada dentro de la misma madre.
+  //
+  // SOLUCIÓN: cada entrada lleva `ocurrencia`, un identificador de la
+  // SELECCIÓN concreta del formulario. Las N entradas de un mismo combo
+  // comparten ocurrencia; dos selecciones reales de la misma promo llevan
+  // ocurrencias distintas y siguen siendo dos promos.
+  //
+  // Es ADITIVO: legacy solo lee tentativo, area, precio, precioNormal y
+  // tipo. El campo nuevo le es invisible y su payload no cambia.
+  // ══════════════════════════════════════════════════════════════════════
   function buildTMAreasFromForm() {
     const result = [];
+    let _ocurrenciaSeq = 0;
     _tmServicios.filter(s => s.servicio).forEach(s => {
+      // Una selección del formulario = una ocurrencia, cualquiera sea el
+      // número de áreas internas. El contador avanza por SELECCIÓN, nunca
+      // por área, y nunca por nombre de promo.
+      _ocurrenciaSeq++;
+      const _ocurrencia = 'OCC-' + _ocurrenciaSeq;
       if (s._isComboMultiArea && s._comboAreas && s._comboAreas.length > 0) {
         // Combo multi-área: expandir en slots individuales por área
         s._comboAreas.forEach(ca => {
@@ -2788,7 +2815,8 @@
             area:         ca.area,
             precio:       ca.precio,
             precioNormal: ca.precioNormal || ca.precio,
-            tipo:         'promo'
+            tipo:         'promo',
+            ocurrencia:   _ocurrencia
           });
         });
       } else if (s.area) {
@@ -2798,7 +2826,8 @@
           area:         s.areaKey,
           precio:       s.precio,
           precioNormal: s.precioNormal,
-          tipo:         s.tipo
+          tipo:         s.tipo,
+          ocurrencia:   _ocurrencia
         });
       }
     });
