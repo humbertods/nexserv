@@ -3083,22 +3083,42 @@
         const cruda = result && result.success ? [].concat(
           result.cola || [], result.en_servicio || [], result.por_verificar || [],
           result.completado || [], result.cobrado || []) : [];
-        const _promoMultiCounts = {};
+        // ── PRE-TAKE DE MADRE NATIVA MULTICOMPONENTE ──────────────────────
+        // ANTES este conteo exigía esPromo=true Y grupoPromoId no vacío, así
+        // que solo veía promos. Una madre multi nativa con componentes
+        // NORMALES (esPromo=no, grupoPromoId='') nunca entraba, y sus líneas
+        // sin staff quedaban invisibles para la destinataria: en SN-9282 Rosa
+        // recibió solo L-4072 (que ya tenía su nombre) y nunca vio L-4073.
+        // Como consecuencia, "Yo sigo" tampoco podía resolver _sigId.
+        //
+        // IDENTIDAD DE LA MADRE = ticketRef, Y NADA MÁS.
+        // grupoPromoId NO crea otra madre: una clienta es UNA tarjeta. Usar
+        // ticketRef|grupoPromoId partiría una madre MIXTA en varias tarjetas
+        //   SN-XXXX|      → los normales
+        //   SN-XXXX|GP-A  → la promo A
+        //   SN-XXXX|GP-B  → la promo B
+        // y la staff vería tres clientas donde hay una.
+        // El grupoPromoId se conserva POR COMPONENTE dentro de serviciosDetalle,
+        // que es donde hace falta para no perder la identidad de cada ocurrencia
+        // promo. Madres distintas nunca se mezclan porque difiere el ticketRef.
+        const _madreMultiCounts = {};
         cruda.forEach(function (w) {
-          const _esPromo = w.esPromo === true || String(w.esPromo || '').toLowerCase() === 'si';
-          const _refPromo = String(w.ticketRef || '').trim();
-          const _grupoPromo = String(w.grupoPromoId || '').trim();
-          if (_esPromo && _refPromo && _grupoPromo) {
-            const _clavePromo = _refPromo + '|' + _grupoPromo;
-            _promoMultiCounts[_clavePromo] = (_promoMultiCounts[_clavePromo] || 0) + 1;
-          }
+          const _refMadre = String(w.ticketRef || '').trim();
+          if (!_refMadre) return;                       // sin madre no hay grupo
+          _madreMultiCounts[_refMadre] = (_madreMultiCounts[_refMadre] || 0) + 1;
         });
         const crudaAdaptada = cruda.map(function (w) {
             const _refAdaptada = String(w.ticketRef || '').trim();
             const _grupoAdaptada = String(w.grupoPromoId || '').trim();
             const _esPromoAdaptada = w.esPromo === true || String(w.esPromo || '').toLowerCase() === 'si';
-            const _promoMultiPreTake = _esPromoAdaptada && _refAdaptada && _grupoAdaptada &&
-              (_promoMultiCounts[_refAdaptada + '|' + _grupoAdaptada] || 0) >= 2;
+            // El flag ya NO significa "promo multicomponente pre-take" sino
+            // "madre nativa con varios componentes pendientes, ofrecible a su
+            // destinataria antes de tomar". No decide por esPromo ni exige
+            // grupoPromoId. Se conserva el nombre promoMultiPreTake porque es
+            // la clave que consumen _staffQueueEsMia y la agrupación; cambiarlo
+            // obligaría a tocar código fuera del alcance autorizado.
+            const _promoMultiPreTake = !!_refAdaptada &&
+              (_madreMultiCounts[_refAdaptada] || 0) >= 2;
             return {
              id: w.id || '',
             idEspera: w.ticketRef || w.promoRef || w.id || '',
@@ -3119,6 +3139,12 @@
              lineaId: w.lineaId || w.id || '',
             total: Number(w.monto || 0),
             promoNombre: w.esPromo ? (w.servicio || '') : '',
+            // IDENTIDAD DE OCURRENCIA PROMO — se propagan aunque la tarjeta
+            // madre agrupe por ticketRef. Sin estas dos claves, _details las
+            // leía como undefined y el grupo promo se perdía al armar la
+            // tarjeta: cada componente quedaba sin saber a qué promo pertenece.
+            grupoPromoId: _grupoAdaptada,
+            esPromo: _esPromoAdaptada,
             prioridad: 'normal',
              observaciones: w.obs || '',
             destinataria: w.destinataria || '',
@@ -3133,8 +3159,9 @@
             _queueSingles.push(w);
             return;
           }
-          const _groupKey = String(w.ticketRef || '').trim() + '|' + String(w.grupoPromoId || '').trim();
-          if (_groupKey === '|') {
+          // Clave de la tarjeta madre: SOLO ticketRef (ver nota del conteo).
+          const _groupKey = String(w.ticketRef || '').trim();
+          if (_groupKey === '') {
             _queueSingles.push(w);
             return;
           }
@@ -3175,7 +3202,10 @@
               monto: Number(part.total || part.monto || 0),
               estado: part.estado || '',
               staff: _owner,
+              // Identidad por componente: el grupo promo y la marca esPromo
+              // viajan en el detalle aunque la madre sea una sola tarjeta.
               grupoPromoId: part.grupoPromoId || '',
+              esPromo: part.esPromo === true || String(part.esPromo || '').toLowerCase() === 'si',
               ticketRef: part.ticketRef || ''
             };
           });
