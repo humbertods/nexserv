@@ -915,6 +915,50 @@
       return;
     }
 
+    // ══════════════════════════════════════════════════════════════════════
+    // UI LEGACY DE FINALIZACIÓN · DESCONECTADA (14/09/2026)
+    //
+    // Todo lo que sigue debajo de esta compuerta son las ramas LEGACY de
+    // finalización: SP- de una y varias áreas, TM-, SN- sin promo, SN-, y los
+    // bloques de promo legacy. Pintaban "Finalizar servicio",
+    // "Terminé — enviar a cobro con Mikaela" y variantes, y llamaban a
+    // prepararYFinalizar, finalizarServicioSP, completarAreaMultiFinal,
+    // finishAndNextPromo y finishAndSendAll.
+    //
+    // POR QUÉ SE DESCONECTAN
+    //   Esas ramas solo se alcanzan cuando _esSlotNativoLineas devuelve false.
+    //   Esa función NO tiene un tercer estado para "todavía no sé": mientras
+    //   getAtenciones no responde —entre 4 y 15 s— devuelve false y el "no sé"
+    //   caía en LEGACY. Resultado observado en PROD: la staff recibía
+    //   "Finalizar servicio" en tickets nativos y el botón verde aparecía uno
+    //   o dos minutos después. Con LEGACY_ABIERTOS = 0 y TM_ABIERTOS = 0
+    //   confirmados en las hojas, esas rutas ya no tienen nada que atender.
+    //
+    // CATCH-ALL
+    //   updateFinishButtons no tenía rama final sin condición: si ninguna
+    //   aplicaba, btnContainer conservaba lo pintado para el ticket ANTERIOR.
+    //   Esta compuerta cierra ese hueco: a partir de aquí siempre se escribe
+    //   el contenedor, nunca se hereda.
+    //
+    // QUÉ SE PINTA
+    //   Estado neutro "Cargando opciones…", deshabilitado. NO se fabrica el
+    //   botón verde: ese lo decide EXCLUSIVAMENTE la rama nativa de arriba,
+    //   que ya retornó si correspondía.
+    //
+    // NO se borra ninguna función. Solo se desconecta este punto de entrada.
+    // finishAndSend, finishAndSendAll y devolverALista siguen intactas: las
+    // usan flujos compartidos.
+    // ══════════════════════════════════════════════════════════════════════
+    btnContainer.innerHTML =
+      '<button class="btn-primary" disabled style="margin-bottom:10px;background:var(--ink-soft);'
+    + 'font-size:14px;padding:16px;box-shadow:0 2px 6px rgba(0,0,0,0.10);opacity:0.65;cursor:wait;">'
+    + 'Cargando opciones&hellip;</button>';
+    return;
+
+    // ── DESDE AQUÍ, CÓDIGO LEGACY INALCANZABLE ────────────────────────────
+    // Se conserva sin modificar, por orden del dueño: no se borra código
+    // muerto en esta fase.
+
     // SP- con promo → si hay servicios de OTRA área en el slot, ofrecer pasarlos a otra staff
     if (_idEsperaSlot.startsWith('SP-') && !_esSlotNativoLineas(slot1 ? 1 : 2)) {
       const _slotSP = slot1 ? 1 : 2;
