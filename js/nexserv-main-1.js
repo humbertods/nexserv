@@ -6384,8 +6384,13 @@ async function nativoPromoCompleta(ticketRef) {
 // BOTÓN "Ya terminé mi parte — enviar a central para la siguiente staff":
 // cierra lo suyo y CEDE los pendientes a Central para que los reasigne.
 async function nativoPasarOtraStaff(ticketRef, ids) {
-  if (!_nativoGuardEntrar_('pasar')) return;
   try {
+    // El guard va DENTRO del try: el onclick ya dejó el botón en "Loading..."
+    // antes de entrar aquí, así que cualquier salida temprana tiene que pasar
+    // por el finally para que _nativoGuardSalir_ restaure los botones. Con el
+    // return fuera del try, un guard ocupado dejaba el botón muerto para
+    // siempre y la petición nunca salía (SN-9306, 14/09/2026).
+    if (!_nativoGuardEntrar_('pasar')) return;
     var pv = _nativoPrevuelo_(ticketRef);
     if (!pv) return;
     const r = await apiPost('cederPendientesACentral', {
