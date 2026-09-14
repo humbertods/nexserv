@@ -1767,7 +1767,12 @@
 
     <!-- Botones de finalización — cambian según si hay promo multi-área -->
     <div id="as1FinishBtns">
-      <button class="btn-primary" style="margin-bottom: 10px;" onclick="window.finishSlot1(); return false;">Finalizar servicio</button>
+      <!-- LEGACY DESCONECTADO (14/09/2026) — El motor nativo LINEAS decide
+     qué botones de finalización se muestran, desde updateFinishButtons.
+     Este botón estático NO pasaba por ninguna guarda: se pintaba desde
+     el primer render, antes de que corriera lógica alguna, y por eso
+     aparecía "Finalizar servicio" en tickets nativos. La función sigue
+     existiendo; solo se desconecta este punto de entrada. -->
     </div>
     <button class="btn-primary outline" id="as1DevolverBtn" style="color: var(--danger); background: #fff; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 4px 12px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06);" onclick="devolverALista(1)">Devolver a central</button>
 
@@ -2248,7 +2253,12 @@
       </div>
     </div>
 
-    <button class="btn-primary" style="margin-bottom: 10px;" onclick="finishSlot2()">Finalizar servicio</button>
+<!-- LEGACY DESCONECTADO (14/09/2026) — El motor nativo LINEAS decide
+     qué botones de finalización se muestran, desde updateFinishButtons.
+     Este botón estático NO pasaba por ninguna guarda: se pintaba desde
+     el primer render, antes de que corriera lógica alguna, y por eso
+     aparecía "Finalizar servicio" en tickets nativos. La función sigue
+     existiendo; solo se desconecta este punto de entrada. -->
     <button class="btn-primary outline" id="as2DevolverBtn" style="color: var(--danger); background: #fff; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 4px 12px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06);" onclick="devolverALista(2)">Devolver a central</button>
 
     <nav class="nav">
@@ -2958,7 +2968,7 @@
   <script src="js/router.js?v=20260815b"></script>
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/evidencias-core.js?v=20260815e"></script>
-  <script src="js/nexserv-main-1.js?v=20260908a"></script>
+  <script src="js/nexserv-main-1.js?v=20260914a"></script>
   <script src="js/nexserv-main-2.js?v=20260908d"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
   <script src="js/nexserv-main-3.js?v=20260902a"></script>
@@ -3031,10 +3041,9 @@
       🤝 Compartir siguiente servicio con otra staff
     </button>
 
-    <!-- BTN 2: Finalizar servicio (servicio normal o promo de 1 área) -->
-    <button id="finishSendBtn" class="btn-primary" style="margin-bottom:10px;" onclick="finishAndSend()">
-      💰 Finalizar servicio
-    </button>
+    <!-- BTN 2: Finalizar servicio — LEGACY DESCONECTADO (14/09/2026).
+         finishAndSend() se CONSERVA: la usan flujos compartidos. Solo se
+         retira este punto de entrada de la UI. -->
 
     <!-- BTN 3: Promo completada (última área, manda total acumulado a Mikaela) -->
     <button id="finishPromoCompleteBtn" class="btn-primary" style="margin-bottom:10px; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); display:none;" onclick="finishAndSend()">
