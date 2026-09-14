@@ -3514,14 +3514,33 @@
   }
 
   async function loadMikaelaHome() {
+    if (window._mikaelaLoadPromise) {
+      window._mikaelaRefreshPending = true;
+      return window._mikaelaLoadPromise;
+    }
+    window._mikaelaRefreshPending = false;
+    let _mikaelaNextRefreshMs = 15000;
+    // El generation token se calcula ANTES del IIFE. Si se asignara dentro y
+    // el cuerpo fallara antes de llegar a esa línea, _mikaelaLoadGenForRun
+    // quedaría en 0, la comparación con _mikaelaHomeLoadGen daría falso y NO
+    // se reprogramaría el refresco: la pantalla se quedaría congelada.
     window._mikaelaHomeLoadGen = (window._mikaelaHomeLoadGen || 0) + 1;
     const myGen = window._mikaelaHomeLoadGen;
+    const _mikaelaLoadGenForRun = myGen;
+    // GUARD ANTES DEL TRABAJO. El IIFE se ejecuta de inmediato y lanza
+    // loadCajaChica() y loadPrelista() SIN await. Si el guard se asignara
+    // después de crearlo, una segunda llamada que entrara en ese hueco
+    // encontraría _mikaelaLoadPromise nulo y arrancaría una carga completa
+    // paralela — justo lo que este patch viene a evitar.
+    let _resolverGuard;
+    window._mikaelaLoadPromise = new Promise(function (res) { _resolverGuard = res; });
+    const _mikaelaLoadRun = (async function () {
     if (window._mikaelaAutoRefresh) {
       clearTimeout(window._mikaelaAutoRefresh);
       clearInterval(window._mikaelaAutoRefresh);
       window._mikaelaAutoRefresh = null;
     }
-    let _mikaelaNextRefreshMs = 15000;
+    _mikaelaNextRefreshMs = 15000;
     loadCajaChica();
     loadPrelista();
     const priBadge = {
@@ -4184,11 +4203,22 @@
       }
     } catch (err) {
       console.error('Error cargando dashboard Mikaela:', err);
-    } finally {
-      if (myGen === window._mikaelaHomeLoadGen) {
+    }
+    })();
+    const _mikaelaManagedPromise = _mikaelaLoadRun.finally(function () {
+      const _pending = window._mikaelaRefreshPending === true;
+      window._mikaelaRefreshPending = false;
+      window._mikaelaLoadPromise = null;
+      // Libera a quien esperaba la promesa del guard (las llamadas colapsadas).
+      try { _resolverGuard(); } catch (eRG) {}
+      if (_pending) {
+        const screen = document.querySelector('.screen.active');
+        if (screen && screen.id === 'mikaelaHome') loadMikaelaHome();
+      } else if (_mikaelaLoadGenForRun === window._mikaelaHomeLoadGen) {
         _programarMikaelaRefresh_(_mikaelaNextRefreshMs);
       }
-    }
+    });
+    return _mikaelaManagedPromise;
   }
   
   
@@ -4532,6 +4562,8 @@
   }
 
     async function renderAuthorizations() {
+    if (window._authRenderPromise) return window._authRenderPromise;
+    const _authRenderRun = (async function () {
     console.log('🔍 renderAuthorizations called');
     try {
       // Cargar autorizaciones desde el backend
@@ -4596,6 +4628,12 @@
       console.error('Error rendering authorizations:', err);
       document.getElementById('authorizationsSection').style.display = 'none';
     }
+    })();
+    const _authManagedPromise = _authRenderRun.finally(function () {
+      if (window._authRenderPromise === _authManagedPromise) window._authRenderPromise = null;
+    });
+    window._authRenderPromise = _authManagedPromise;
+    return _authManagedPromise;
   }
   
   window.closeResumenSemana = closeResumenSemana;
