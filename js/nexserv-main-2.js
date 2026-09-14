@@ -2793,12 +2793,43 @@
     // ── Modo "+ Servicio Extra": agregar al ticket existente y reabrir a la lista ──
     if (window._extraTicketId) {
       const idEx = window._extraTicketId;
+
+      // ── INC-DUPLICACION-SERVICIO-EXTRA-CENTRAL ───────────────────────────
+      // Esta ruta creaba DOS LINEAS para una sola intención por dos vías:
+      //   1) segundo click mientras el primer POST seguía en vuelo: el modal no
+      //      se cierra hasta que responde y `_extraTicketId` sigue seteado, así
+      //      que el segundo click volvía a entrar acá y lanzaba otro apiPost;
+      //   2) el reintento interno de apiPost reenviaba el MISMO cuerpo y, como
+      //      no llevaba `lineRequestId`, el backend generaba su fallback nuevo
+      //      en cada request → otra LINEA.
+      // Se corrige SIN tocar apiPost: un guard inflight (máximo 1 POST activo)
+      // + un `lineRequestId` generado UNA sola vez para esa operación lógica y
+      // reutilizado en cualquier reenvío de ESA misma operación. La identidad
+      // se libera al cerrarse la operación con éxito, para que una operación
+      // nueva y deliberada sobre el mismo servicio sí pueda crear otra línea.
+      const _opSig = [idEx, svc.area, svc.name, String(svc.price), chica].join('|');
+      let _op = window._extraCentralOp;
+      if (_op && _op.inflight) {
+        console.warn('[ServicioExtra] Ya hay un envío en curso para esta operación — reenvío ignorado');
+        return;
+      }
+      if (!_op || _op.sig !== _opSig) {
+        _op = window._extraCentralOp = {
+          sig: _opSig,
+          lineRequestId: 'EXTRA-CENTRAL-' + String(idEx).replace(/[^A-Za-z0-9_-]/g, '')
+                         + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+          inflight: false
+        };
+      }
+      _op.inflight = true;
       try {
         const rEx = await apiPost('agregarServicioExtra', {
-          idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica
+          idEspera: idEx, area: svc.area, servicio: svc.name, precio: svc.price, chica: chica,
+          lineRequestId: _op.lineRequestId
         });
         window._extraTicketId = null;
         if (rEx && rEx.success) {
+          window._extraCentralOp = null; // operación cerrada: la próxima nace con identidad propia
           if (typeof showToast === 'function') showToast('✓ Servicio extra agregado para ' + (client ? client.name : 'la clienta'));
           closeModal();
           loadMikaelaHome();
@@ -2809,6 +2840,8 @@
         window._extraTicketId = null;
         console.error(err);
         alert('Error al agregar servicio extra');
+      } finally {
+        if (window._extraCentralOp) window._extraCentralOp.inflight = false;
       }
       return;
     }
