@@ -742,10 +742,13 @@
       // handleGetAtenciones filtra por staff (AppsScript:5006), así que
       // serviciosDetalle SOLO trae mis líneas. Es correcto para esto.
       const _compsNat = Array.isArray(_atenSlot.serviciosDetalle) ? _atenSlot.serviciosDetalle : [];
+      // FIN-STAFF-IDS · getAtenciones entrega la identidad en `lineaId`
+      // (serviciosDetalle[].lineaId); `id` se conserva por compatibilidad.
       let _miasNat = _compsNat.filter(c =>
         String(c.estado || '') === 'en_servicio'
         && String(c.staff || '').trim().toLowerCase() === _yoNat.toLowerCase()
-        && String(c.id || '').trim());
+        && String(c.id || c.lineaId || '').trim())
+        .map(c => ({ id: String(c.id || c.lineaId).trim(), servicio: c.servicio }));
       // RESPALDO · slotServices ya tiene MIS componentes con su lineaId (lo
       // arman los bloques nativos de loadClientAfterTake y loadStaffHome).
       // _as1Aten puede venir de una lectura previa a que la toma se reflejara,
@@ -755,9 +758,20 @@
       // slotServices es lo que la staff está viendo en pantalla: si hay algo
       // ahí, eso es lo suyo.
       if (!_miasNat.length) {
+        // FIN-STAFF-IDS · Respaldo SOLO dentro de esta rama nativa: si el ítem
+        // no trae lineaId, un extra nativo ya resuelto usa su authId, que en el
+        // flujo nativo ES el lineaId por contrato (lineaService.js:267-268,
+        // :297 · AppsScript:1110-1117). Pendiente/rechazado nunca aportan id.
+        // El backend filtra contra las líneas vivas propias (AppsScript:1428).
         _miasNat = (slotServices[_slotN] || [])
-          .filter(function (sv) { return String(sv.lineaId || '').trim(); })
-          .map(function (sv) { return { id: String(sv.lineaId).trim(), servicio: sv.name }; });
+          .map(function (sv) {
+            if (String(sv.estado || '') === 'completado') return null;
+            var _lid = String(sv.lineaId || '').trim();
+            if (!_lid && sv.authId && sv.status !== 'pendiente' && sv.status !== 'rechazado')
+              _lid = String(sv.authId).trim();
+            return _lid ? { id: _lid, servicio: sv.name } : null;
+          })
+          .filter(function (x) { return !!x; });
       }
       // JSON.stringify usa comillas DOBLES, y el onclick del botón también va
       // entre comillas dobles: ["L-1505"] cerraba el atributo en la primera
@@ -810,8 +824,11 @@
       // se vuelve a pintar la MISMA decisión ya resuelta, sin parpadeo. Se
       // invalida sola al cambiar de ticket (la clave es el ref) y en cuanto la
       // staff dispara cualquier acción nativa (ver _nativoGuardEntrar_).
+      // FIN-STAFF-IDS · la caché solo vale para el MISMO ticket y el MISMO
+      // conjunto de líneas: si cambió (extra aprobado, promo, anulación) el HTML
+      // guardado lleva ids viejos y no se reutiliza.
       var _cacheBtns = window['_as' + _slotIdx + 'BtnsCache'];
-      if (_cacheBtns && _cacheBtns.ref === _refNat && _cacheBtns.html) {
+      if (_cacheBtns && _cacheBtns.ref === _refNat && _cacheBtns.ids === _idsMias && _cacheBtns.html) {
         btnContainer.innerHTML = _cacheBtns.html;
       } else if (_pendingLocal) {
         btnContainer.innerHTML = _btnPasarImmediate + _btnCancelarImmediate;
@@ -909,7 +926,7 @@
           try {
             if (window['_as' + _slotIdx + 'PintaTok'] !== _pintaTok) return;
             window['_as' + _slotIdx + 'BtnsCache'] =
-              { ref: String(_refNat || ''), html: btnContainer.innerHTML };
+              { ref: String(_refNat || ''), ids: _idsMias, html: btnContainer.innerHTML };
           } catch (eCache) { /* best-effort */ }
         });
       return;
@@ -1515,7 +1532,11 @@
       if (idEspera.startsWith('TM-')) return; // TM se restaura por otra ruta
       const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || '';
       const clientKey = normalizeClientKey(clientName);
-      if (activePromos[clientKey]) return; // promo se restaura por otra ruta
+      // FIN-STAFF-IDS · T2b · activePromos gobierna la REPRESENTACIÓN de la promo,
+      // no la identidad operativa. En reconciliación nativa forzada no corta aquí:
+      // se decide abajo, cuando ya se sabe si LINEAS trae serviciosDetalle.
+      const _apRest = !!activePromos[clientKey];
+      if (_apRest && !opts.forzarNativo) return; // promo se restaura por otra ruta
       const res = await apiGet('getAtenciones', { chica: user.name });
       if (!res.success || !res.atenciones || !res.atenciones.length) return;
       // Localizar la atención de este slot (por idEspera, por código, o por orden)
@@ -1529,6 +1550,10 @@
       var _fcRest = String(a.fuenteReal || '').toUpperCase();
       // Reconciliacion forzada: solo camino nativo. Legacy queda intacto.
       if (opts.forzarNativo && _fcRest !== 'LINEAS') return;
+      // Con promo activa SOLO se reconstruye desde LINEAS con serviciosDetalle
+      // (identidad real por línea). Cualquier otro caso conserva la salida previa;
+      // activePromos no se modifica y sigue controlando el render.
+      if (_apRest && !(_fcRest === 'LINEAS' && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length)) return;
       if (_fcRest === 'LINEAS' && Array.isArray(a.serviciosDetalle) && a.serviciosDetalle.length) {
         var _yoRest = String(user.name || '').trim().toLowerCase();
         var _miasRest = a.serviciosDetalle.filter(function (sd) {
@@ -4161,7 +4186,7 @@
               slotServices[1] = _miasNat1.map(function (sd) {
                 return { name: sd.servicio || sd.nombre || sd.name,
                          price: Number(sd.monto || sd.precio || sd.price || 0),
-                         area: sd.area || a.area || '', lineaId: String(sd.id || ''),
+                         area: sd.area || a.area || '', lineaId: String(sd.id || sd.lineaId || ''),
                          estado: String(sd.estado || '') };
               });
               var _totNat1 = slotServices[1].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
@@ -4170,6 +4195,12 @@
               var _e1c = document.getElementById('as1SvcCount'); if (_e1c) _e1c.textContent = String(slotServices[1].length);
             }
             try { updateFinishButtons(); } catch (eF1) {}
+            // LAT-BTN-VERDE · la atención leída ES el ticket recién tomado
+            // (misma identidad ticketRef) → show('activeService') no necesita
+            // reconstruirla otra vez. Solo se marca con coincidencia exacta.
+            if (a && _takenId && String(a.idEspera || '') === _takenId) {
+              window._as1TomaHidratada = { ref: _takenId, t: Date.now() };
+            }
           }
           // Si viene con promo asignada, guardarla pero permitir cambiarla
           if (window._availablePromo && !_esNat1) {
@@ -4554,7 +4585,7 @@
               slotServices[2] = _miasNat2.map(function (sd) {
                 return { name: sd.servicio || sd.nombre || sd.name,
                          price: Number(sd.monto || sd.precio || sd.price || 0),
-                         area: sd.area || a.area || '', lineaId: String(sd.id || ''),
+                         area: sd.area || a.area || '', lineaId: String(sd.id || sd.lineaId || ''),
                          estado: String(sd.estado || '') };
               });
               var _totNat2 = slotServices[2].reduce(function (x, v) { return x + Number(v.price || 0); }, 0);
@@ -4563,6 +4594,10 @@
               var _e2c = document.getElementById('as2SvcCount'); if (_e2c) _e2c.textContent = String(slotServices[2].length);
             }
             try { updateFinishButtons(2); } catch (eF2) {}
+            // LAT-BTN-VERDE · ver nota del slot 1.
+            if (a && _takenId && String(a.idEspera || '') === _takenId) {
+              window._as2TomaHidratada = { ref: _takenId, t: Date.now() };
+            }
           }
           if (window._availablePromo && !_esNat2) {
             const promoBasic = window._availablePromo;
@@ -4812,7 +4847,12 @@
         }
         
         // recargarAutorizacionesStaff se llama automaticamente desde show('activeService')
-        setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
+        // LAT-BTN-VERDE · toma nativa ya hidratada → sin espera artificial.
+        if (window['_as' + (slot === 0 ? 1 : 2) + 'TomaHidratada']) {
+          show(slot === 0 ? 'activeService' : 'activeService2');
+        } else {
+          setTimeout(() => { show(slot === 0 ? 'activeService' : 'activeService2'); }, 300);
+        }
       }
     } catch (err) {
       console.error('Error cargando datos de la clienta:', err);
@@ -6324,7 +6364,35 @@ async function nativoTerminarMandarCentral(ticketRef, ids) {
     const r = await apiPost('finalizarComponentesStaff', {
       ticketRef: pv.ref, staff: pv.staff, lineaIds: _nativoIdsArray_(ids)
     }, { timeoutMs: 120000, retries: 0 });
-    if (r && r.success) {
+    // FIN-STAFF-IDS · "Enviado a central" solo si NO quedan líneas propias vivas.
+    // Backend sin el campo (despliegue escalonado): quedan_propias undefined →
+    // se comporta exactamente como antes.
+    var _quedan = (r && r.quedan_propias !== undefined && r.quedan_propias !== null)
+      ? Number(r.quedan_propias) : 0;
+    if (r && r.success && _quedan > 0) {
+      var _slotFin = (window._finishingSlot === 2) ? 2 : 1;
+      if (typeof showToast === 'function')
+        showToast('⚠️ Quedan ' + _quedan + ' servicio(s) tuyos en curso en este ticket');
+      try {
+        if (typeof restaurarServiciosNormalesSlot === 'function')
+          await restaurarServiciosNormalesSlot(_slotFin, { forzarNativo: true });
+      } catch (eRest) {}
+      // Las líneas que el backend CONFIRMÓ finalizadas no vuelven a ofrecerse,
+      // aunque la atención en memoria sea anterior a esta finalización.
+      try {
+        var _finConf = Array.isArray(r.finalized_ids) ? r.finalized_ids.map(String) : [];
+        var _atFin = window['_as' + _slotFin + 'Aten'];
+        if (_atFin && Array.isArray(_atFin.serviciosDetalle)) {
+          _atFin.serviciosDetalle.forEach(function (sd) {
+            if (_finConf.indexOf(String(sd.id || sd.lineaId || '')) !== -1) sd.estado = 'completado';
+          });
+        }
+        (slotServices[_slotFin] || []).forEach(function (sv) {
+          if (_finConf.indexOf(String(sv.lineaId || '')) !== -1) sv.estado = 'completado';
+        });
+      } catch (eFinConf) {}
+      try { updateFinishButtons(_slotFin); } catch (eUfb) {}
+    } else if (r && r.success) {
       if (typeof showToast === 'function') showToast('✅ Enviado a central');
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
