@@ -273,7 +273,16 @@
         // volver a la pantalla debe quedar como está en LINEAS, no como quedó en
         // memoria. Eso hace que la aprobación de Central ya esté reflejada al
         // entrar, y evita mezclar dos reconstrucciones sobre el mismo slot.
-        await restaurarServiciosNormalesSlot(1, _esNat1 ? { forzarNativo: true } : undefined);
+        // VERDE-MIPANEL · la restauración tiene salidas tempranas sin pintar
+        // botones (promo de un componente propio, fuente no LINEAS, lectura
+        // fallida). Entrando desde Mi panel el contenedor quedaba VACÍO. Igual
+        // que el slot 2, se asegura la evaluación, pero SOLO si la restauración
+        // no la hizo ya (sin consulta duplicada).
+        var _ufbSeqAntes1 = window._as1UfbSeq || 0;
+        try {
+          await restaurarServiciosNormalesSlot(1, _esNat1 ? { forzarNativo: true } : undefined);
+        } catch (eRest1) { console.error('Error restaurando slot 1:', eRest1); }
+        if ((window._as1UfbSeq || 0) === _ufbSeqAntes1) updateFinishButtons(1);
       }, 500);
     }
     if (id === 'activeService2') {
