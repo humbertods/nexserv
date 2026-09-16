@@ -163,7 +163,13 @@
       restoreActivePromos();
       recargarAutorizacionesStaff(1);
       if (typeof _gateCejasBtn === 'function') _gateCejasBtn();  // botón cejas solo para staff de cejas
-      setTimeout(async () => {
+      // LAT-BTN-VERDE · consumo único: si esta entrada viene de una toma nativa
+      // ya hidratada para ESTE mismo ticket, no se relee ni se reconstruye.
+      var _hid1 = window._as1TomaHidratada; window._as1TomaHidratada = null;
+      var _skipRest1 = !!(_hid1 && (Date.now() - _hid1.t) < 5000
+        && _hid1.ref === String(window._as1IdEspera || '')
+        && typeof _esSlotNativoLineas === 'function' && _esSlotNativoLineas(1));
+      if (!_skipRest1) setTimeout(async () => {
         const idEsperaActual = window._as1IdEspera || '';
         const clientName = document.getElementById('as1Name')?.textContent?.replace(' ⭐','') || '';
         const clientKey = normalizeClientKey(clientName);
@@ -274,7 +280,12 @@
       restoreActivePromos();
       recargarAutorizacionesStaff(2);
       if (typeof _gateCejasBtn === 'function') _gateCejasBtn();  // botón cejas solo para staff de cejas
-      setTimeout(async () => {
+      // LAT-BTN-VERDE · ver nota del slot 1.
+      var _hid2 = window._as2TomaHidratada; window._as2TomaHidratada = null;
+      var _skipRest2 = !!(_hid2 && (Date.now() - _hid2.t) < 5000
+        && _hid2.ref === String(window._as2IdEspera || '')
+        && typeof _esSlotNativoLineas === 'function' && _esSlotNativoLineas(2));
+      if (!_skipRest2) setTimeout(async () => {
         const user2 = window.currentUser;
         const clientName2 = document.getElementById('as2Name')?.textContent?.replace(' ⭐','') || '';
         const clientKey2 = normalizeClientKey(clientName2);
@@ -377,4 +388,4 @@
       resetArrivalExtras();
       document.getElementById('arrService').value = '';
     }
-  }
+  
