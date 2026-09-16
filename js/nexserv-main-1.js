@@ -680,6 +680,10 @@
     const slot1 = slot === 1 || !slot;
     const btnContainer = document.getElementById('as' + (slot1?1:2) + 'FinishBtns');
     if (!btnContainer) return;
+    // VERDE-MIPANEL · contador monótono de evaluaciones de botones (nunca se
+    // resetea). show('activeService') lo usa para saber si la restauración ya
+    // pintó los botones o si hay que pintarlos, sin repetir la consulta.
+    window['_as' + (slot1?1:2) + 'UfbSeq'] = (window['_as' + (slot1?1:2) + 'UfbSeq'] || 0) + 1;
 
     // ── G2-RACE · higiene del flag monótono ─────────────────────────────────
     // _asNEsNativo no se degrada nunca (ver notas en loadStaffHome), así que el
@@ -1550,6 +1554,16 @@
       var _fcRest = String(a.fuenteReal || '').toUpperCase();
       // Reconciliacion forzada: solo camino nativo. Legacy queda intacto.
       if (opts.forzarNativo && _fcRest !== 'LINEAS') return;
+      // VERDE-MIPANEL · entrando desde Mi panel (recarga, reabrir la app, volver)
+      // loadStaffHome no sella la identidad nativa del slot y las salidas de abajo
+      // (promo de un componente, una sola línea) tampoco. Se sella AQUÍ, con la
+      // atención que LINEAS confirma para EXACTAMENTE este ticket (idEspera
+      // idéntico; nunca por código u orden). Reemplaza además una atención
+      // rancia de otro ticket de la misma sesión.
+      if (opts.forzarNativo && idEspera && String(a.idEspera || '') === String(idEspera)) {
+        window['_as' + slot + 'Aten'] = a;
+        window['_as' + slot + 'EsNativo'] = true;
+      }
       // Con promo activa SOLO se reconstruye desde LINEAS con serviciosDetalle
       // (identidad real por línea). Cualquier otro caso conserva la salida previa;
       // activePromos no se modifica y sigue controlando el render.
@@ -1602,6 +1616,8 @@
         let nom = a.servicio;
         if (String(nom).trim().startsWith('{')) { try { const p = JSON.parse(nom); nom = p.nombre || p.name || nom; } catch (e) {} }
         slotServices[slot] = [{ name: nom, price: Number(a.total || 0), area: a.area || '' }];
+        // VERDE-MIPANEL · identidad explícita LINEAS de la única línea (getAtenciones la entrega en a.lineaId).
+        if (_fcRest === 'LINEAS' && String(a.lineaId || '').trim()) slotServices[slot][0].lineaId = String(a.lineaId).trim();
       } else { return; }
       renderServicesForSlot(slot);
       const total = (slotServices[slot] || []).reduce((s, v) => s + Number(v.price || 0), 0);
