@@ -388,4 +388,4 @@
       resetArrivalExtras();
       document.getElementById('arrService').value = '';
     }
-  
+  }
