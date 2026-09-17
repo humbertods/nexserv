@@ -4483,17 +4483,26 @@ async function loadCierreMes() {
       body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--danger);font-size:13px;">No se pudo cargar el cierre.' + (r && r.error ? '<br><span style="font-size:11px;color:var(--ink-faint);">' + r.error + '</span>' : '') + '</div>';
       return;
     }
-    // SIRA: prioridad => edición manual de esta sesión > valor automático de SIRA > valor guardado > 0
-    const key = mes + '-' + anio;
-    window._cmSiraPorMes = window._cmSiraPorMes || {};
     window._cmData = r;
-    const siraAuto     = (r.siraOk && r.gastoSIRA != null) ? Number(r.gastoSIRA) : null;
-    const siraGuardado = (r.guardado && r.guardado.gastoSIRA != null) ? Number(r.guardado.gastoSIRA) : null;
-    let siraInicial = 0;
-    if (window._cmSiraPorMes[key] != null)      siraInicial = window._cmSiraPorMes[key];
-    else if (siraAuto != null)                  siraInicial = siraAuto;
-    else if (siraGuardado != null)              siraInicial = siraGuardado;
-    renderCierreMes(r, siraInicial);
+    window._cmSira = { estado: 'cargando' };
+    renderCierreMes(r);
+
+    // SIRA aparte: no debe frenar el reporte. Si falla, se ve el motivo.
+    const token = (window._cmToken = (window._cmToken || 0) + 1);
+    apiGet('getCierreMesSira', { mes: mes, anio: anio }).then(function (rs) {
+      if (token !== window._cmToken) return;                       // respuesta vieja
+      if (!window._cmData || window._cmData.mes !== mes || window._cmData.anio !== anio) return;
+      if (rs && rs.success && Number(rs.mes) === mes && Number(rs.anio) === anio) {
+        window._cmSira = { estado: 'ok', d: rs };
+      } else {
+        window._cmSira = { estado: 'error', error: (rs && rs.error) ? String(rs.error) : 'Respuesta inválida de SIRA' };
+      }
+      renderCierreMesSira();
+    }).catch(function (e) {
+      if (token !== window._cmToken) return;
+      window._cmSira = { estado: 'error', error: e && e.message ? e.message : String(e) };
+      renderCierreMesSira();
+    });
 
     const rb = document.getElementById('cmRefreshBtn');
     if (rb) {
@@ -4505,11 +4514,10 @@ async function loadCierreMes() {
   }
 }
 
-function renderCierreMes(d, siraInicial) {
+function renderCierreMes(d) {
   const body = document.getElementById('cmBody');
   if (!body) return;
   const money = n => '$' + (Number(n) || 0).toFixed(2);
-  const sira = Number(siraInicial) || 0;
 
   // ---- Tarjeta principal: generado del mes ----
   let html = '';
@@ -4556,46 +4564,10 @@ function renderCierreMes(d, siraInicial) {
           + '<span><svg class="nx-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> Productos vendidos (' + d.numProductos + ')</span><span style="font-weight:700;">' + money(d.generadoProductos) + '</span></div>';
   }
 
-  // ---- Gastos ---- (solo SIRA; caja chica es control diario, no entra al cuadre)
-  html += '<div class="section-title" style="margin-top:18px;">Gastos del mes</div>';
-  html += '<div class="card" style="padding:14px 16px;font-size:14px;">';
-  const _siraFuente   = d.siraFuente || '';
-  const _siraProd     = Number(d.siraTotalProductos    || 0);
-  const _siraGastos   = Number(d.siraTotalGastosVarios || 0);
-  const _siraEsCierre = _siraFuente === 'cierre';
-  const _siraSubtit   = d.siraOk
-    ? (_siraEsCierre
-        ? '✓ Cierre de SIRA · productos + gastos varios'
-        : '✓ Estimado SIRA · cierre pendiente — se actualizará al cerrar en SIRA')
-    : ('<svg class="nx-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> No se pudo leer SIRA — ingrésalo manual'
-      + (d.siraError ? ' · ' + String(d.siraError).replace(/[<>]/g,'') : ''));
-  // Mostrar desglose productos/gastos tanto para cierre oficial como para estimado del fallback
-  const _siraDesglose = (d.siraOk && (_siraProd > 0 || _siraGastos > 0))
-    ? '<br><span style="font-size:11px;color:var(--ink-soft);">📦 Productos: <b>$' + _siraProd.toFixed(2) + '</b> &nbsp;·&nbsp; 💸 Gastos varios: <b>$' + _siraGastos.toFixed(2) + '</b></span>'
-    : '';
-  html +=   '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:4px 0;">'
-        +     '<span>SIRA — gastos del mes<br>'
-        +       '<span style="font-size:11px;color:' + (d.siraOk ? 'var(--success)' : 'var(--ink-faint)') + ';">' + _siraSubtit + '</span>'
-        +       _siraDesglose
-        +     '</span>'
-        +     '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
-        +       '<input id="cmSiraInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (sira ? sira : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" '
-        +       'style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;border-top:1.5px solid var(--line);margin-top:6px;font-weight:800;">'
-        +     '<span>Total gastos</span><span id="cmTotalGastos" style="color:var(--danger);">-' + money(sira) + '</span></div>';
-  html += '</div>';
-
-  // ---- TOTAL GENERAL ----
-  const totalGeneral = d.generadoTotal - d.comisionTotal - sira;
-  html += '<div id="cmTotalGeneralCard" style="background:var(--bg);border:2px solid var(--accent-deep);border-radius:18px;padding:16px 18px;margin-top:16px;">';
-  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Gastos (SIRA)</span><span id="cmTotalGastosResumen">-' + money(sira) + '</span></div>';
-  html +=   '<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;border-top:1.5px solid var(--accent-deep);margin-top:8px;padding-top:10px;">'
-        +     '<span>TOTAL GENERAL</span><span id="cmTotalGeneral" style="color:' + (totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)') + ';">' + money(totalGeneral) + '</span></div>';
-  html += '</div>';
-
-  html += '<div style="font-size:11px;color:var(--ink-faint);padding:12px 4px 0;line-height:1.5;">El Total general es lo generado del mes menos comisiones y gastos de SIRA. El valor de SIRA se trae automáticamente desde su sistema; puedes ajustarlo a mano si algún mes hace falta.</div>';
+  // ---- SIRA · VISTA CAJA · VISTA OPERATIVA · INVENTARIO ----
+  // Se pintan al llegar getCierreMesSira (renderCierreMesSira). Compras y
+  // consumo miden cosas distintas y NUNCA se suman como un solo egreso.
+  html += '<div id="cmSiraBloque">' + _cmSiraBloqueHTML() + '</div>';
 
   // Caja chica — solo referencia informativa, NO se descuenta del cuadre
   html += '<div style="font-size:11px;color:var(--ink-faint);padding:8px 4px 0;margin-top:8px;border-top:1px dashed var(--line);line-height:1.5;">'
@@ -4629,54 +4601,190 @@ function renderCierreMes(d, siraInicial) {
   body.innerHTML = html;
 }
 
+// ── Bloque SIRA + las dos vistas del cuadre ────────────────────────────────
+function _cmMoney(n) { return '$' + (Number(n) || 0).toFixed(2); }
+
+// Valores vigentes: lo que devolvió SIRA, o lo que el Owner escribió a mano
+// cuando SIRA falla. Nunca inventa 0 silencioso.
+function _cmCuadre() {
+  const d = window._cmData;
+  if (!d) return null;
+  const s = window._cmSira || { estado: 'cargando' };
+  const key = d.mes + '-' + d.anio;
+  const man = (window._cmSiraPorMes && window._cmSiraPorMes[key]) || null;
+  const num = v => (v === '' || v == null) ? null : (Number(v) || 0);
+
+  let compras = null, consumo = null, gastosVarios = null, inventario = null, inventarioInicial = null;
+  let fuente = s.estado, manual = false;
+
+  let totalMovimientos = null;
+  if (s.estado === 'ok') {
+    totalMovimientos  = (s.d.totalMovimientos == null) ? null : Number(s.d.totalMovimientos);
+    compras           = num(s.d.comprasMes);
+    consumo           = num(s.d.consumoMes);
+    gastosVarios      = num(s.d.gastosVariosMes);
+    inventario        = num(s.d.valorInventario);
+    inventarioInicial = num(s.d.inventarioInicial);
+    fuente = s.d.fuente;
+  }
+  if (s.estado === 'error' && man) {
+    compras = num(man.compras);
+    gastosVarios = num(man.gastosVarios);
+    manual = true;
+  }
+
+  let egresos = null;
+  if (s.estado === 'ok' && s.d.fuente === 'cierre_anterior') egresos = num(s.d.egresosCajaSira);
+  else if (compras != null || gastosVarios != null) egresos = (compras || 0) + (gastosVarios || 0);
+
+  const generado  = Number(d.generadoTotal) || 0;
+  const servicios = Number(d.generadoServicios) || 0;
+  const comis     = Number(d.comisionTotal) || 0;
+  const caja   = (egresos == null) ? null : generado - comis - egresos;
+  const margen = (consumo == null) ? null : servicios - comis - consumo;
+  const teorico = (inventarioInicial == null || compras == null || consumo == null)
+    ? null : inventarioInicial + compras - consumo;
+  const variacion = (teorico == null || inventario == null) ? null : inventario - teorico;
+
+  return { estado: s.estado, error: s.error || '', fuente: fuente, manual: manual,
+           totalMovimientos: totalMovimientos,
+           compras: compras, consumo: consumo, gastosVarios: gastosVarios, egresos: egresos,
+           inventario: inventario, inventarioInicial: inventarioInicial,
+           teorico: teorico, variacion: variacion, caja: caja, margen: margen,
+           diagnostico: (s.estado === 'ok' ? s.d.diagnostico : null) };
+}
+
+function _cmSiraBloqueHTML() {
+  const d = window._cmData;
+  const x = _cmCuadre();
+  if (!d || !x) return '';
+  const m = _cmMoney;
+  const pend = '<span style="color:var(--ink-faint);">—</span>';
+  let h = '';
+
+  // ---- Gastos del mes (SIRA) ----
+  h += '<div class="section-title" style="margin-top:18px;">SIRA · movimientos del mes</div>';
+  h += '<div class="card" style="padding:14px 16px;font-size:14px;">';
+  if (x.estado === 'cargando') {
+    h += '<div style="color:var(--ink-faint);font-size:13px;">⏳ Consultando SIRA…</div>';
+  } else if (x.estado === 'error') {
+    h += '<div style="color:var(--danger);font-size:13px;font-weight:700;">No se pudo consultar SIRA</div>';
+    h += '<div style="font-size:11px;color:var(--ink-faint);margin:4px 0 10px;">' + String(x.error).replace(/[<>]/g, '') + '</div>';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;"><span>Compras del mes</span>'
+      +  '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
+      +  '<input id="cmComprasInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (x.compras != null ? x.compras : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;"><span>Gastos varios</span>'
+      +  '<span style="display:flex;align-items:center;gap:4px;color:var(--danger);font-weight:700;">-$'
+      +  '<input id="cmGvInput" type="number" inputmode="decimal" min="0" step="0.01" value="' + (x.gastosVarios != null ? x.gastosVarios : '') + '" placeholder="0.00" oninput="onCierreSiraInput()" style="width:92px;padding:7px 8px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;font-weight:700;text-align:right;color:var(--danger);background:var(--bg-card);"></span></div>';
+    h += '<div style="font-size:11px;color:var(--ink-faint);padding-top:8px;line-height:1.5;">El consumo de staff no se puede ingresar a mano: la vista operativa queda sin dato.</div>';
+  } else {
+    const rot = x.fuente === 'cierre_nexserv' ? 'Cierre guardado'
+              : x.fuente === 'cierre_anterior' ? 'Cierre formato anterior'
+              : 'SIRA · mes en curso';
+    h += '<div style="font-size:11px;color:var(--success);font-weight:700;margin-bottom:8px;">' + rot + '</div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Compras (valor SIRA)</span><span style="font-weight:700;">' + (x.compras != null ? m(x.compras) : pend) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:4px 0;"><span>Gastos varios</span><span style="font-weight:700;">' + (x.gastosVarios != null ? m(x.gastosVarios) : pend) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;border-top:1.5px solid var(--line);margin-top:6px;font-weight:800;"><span>Egresos de caja (SIRA)</span><span style="color:var(--danger);">' + (x.egresos != null ? '-' + m(x.egresos) : pend) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;padding:8px 0 2px;border-top:1px dashed var(--line);margin-top:6px;"><span>Consumo staff (costo de insumos)</span><span style="font-weight:700;">' + (x.consumo != null ? m(x.consumo) : pend) + '</span></div>';
+    h += '<div style="font-size:11px;color:var(--ink-faint);padding-top:6px;line-height:1.5;">El consumo no se resta en caja: ese dinero ya salió al comprar.</div>';
+    if (x.diagnostico && Number(x.diagnostico.movimientosSinCosto) > 0) {
+      const lista = (x.diagnostico.detalleSinCosto || []).join(', ').replace(/[<>]/g, '');
+      h += '<div style="font-size:11px;color:var(--danger);padding-top:8px;line-height:1.5;">⚠ ' + x.diagnostico.movimientosSinCosto + ' movimiento(s) sin costo, valorados en $0: ' + lista + '</div>';
+    }
+  }
+  h += '</div>';
+
+  // ---- VISTA CAJA ----
+  h += '<div style="background:var(--bg);border:2px solid var(--accent-deep);border-radius:18px;padding:16px 18px;margin-top:16px;">';
+  h +=   '<div style="font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Vista caja · dinero del mes</div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>Generado</span><span>' + m(d.generadoTotal) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Comisiones</span><span>-' + m(d.comisionTotal) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Compras</span><span>' + (x.compras != null ? '-' + m(x.compras) : pend) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Gastos varios</span><span>' + (x.gastosVarios != null ? '-' + m(x.gastosVarios) : pend) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:18px;border-top:1.5px solid var(--accent-deep);margin-top:8px;padding-top:10px;"><span>RESULTADO DE CAJA</span><span style="color:' + (x.caja == null ? 'var(--ink-faint)' : (x.caja >= 0 ? 'var(--success)' : 'var(--danger)')) + ';">' + (x.caja != null ? m(x.caja) : 'sin SIRA') + '</span></div>';
+  h += '</div>';
+
+  // ---- VISTA OPERATIVA ----
+  h += '<div style="background:var(--bg);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;margin-top:12px;">';
+  h +=   '<div style="font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Vista operativa · servicios</div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>Ventas de servicios</span><span>' + m(d.generadoServicios) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Comisiones</span><span>-' + m(d.comisionTotal) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink-soft);padding:2px 0;"><span>− Consumo staff</span><span>' + (x.consumo != null ? '-' + m(x.consumo) : pend) + '</span></div>';
+  h +=   '<div style="display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:16px;border-top:1.5px solid var(--line);margin-top:8px;padding-top:10px;"><span>MARGEN OPERATIVO</span><span style="color:' + (x.margen == null ? 'var(--ink-faint)' : (x.margen >= 0 ? 'var(--success)' : 'var(--danger)')) + ';">' + (x.margen != null ? m(x.margen) : 'sin dato SIRA') + '</span></div>';
+  h += '</div>';
+
+  // ---- INVENTARIO ----
+  h += '<div class="card" style="padding:14px 16px;margin-top:12px;font-size:13px;">';
+  h +=   '<div style="font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Inventario</div>';
+  if (x.inventario == null) {
+    h += '<div style="color:var(--ink-faint);">Sin dato de inventario.</div>';
+  } else {
+    h += '<div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Valor actual</span><span style="font-weight:700;">' + m(x.inventario) + '</span></div>';
+    if (x.teorico == null) {
+      h += '<div style="color:var(--ink-faint);padding-top:6px;line-height:1.5;">Sin base para conciliar: falta el cierre del mes anterior con inventario.</div>';
+    } else {
+      h += '<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--ink-soft);"><span>Inicial + compras − consumo</span><span>' + m(x.teorico) + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;padding:6px 0 0;border-top:1px dashed var(--line);margin-top:6px;font-weight:800;"><span>Diferencia</span><span style="color:' + (Math.abs(x.variacion) < 0.01 ? 'var(--success)' : 'var(--danger)') + ';">' + m(x.variacion) + '</span></div>';
+    }
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderCierreMesSira() {
+  const cont = document.getElementById('cmSiraBloque');
+  if (cont) cont.innerHTML = _cmSiraBloqueHTML();
+}
+
 function onCierreSiraInput() {
   const d = window._cmData;
   if (!d) return;
-  const inp = document.getElementById('cmSiraInput');
-  const sira = Number(inp && inp.value) || 0;
-  // Guardar el SIRA por mes/año para que no se pierda al actualizar
   const key = d.mes + '-' + d.anio;
+  const c = document.getElementById('cmComprasInput');
+  const g = document.getElementById('cmGvInput');
   window._cmSiraPorMes = window._cmSiraPorMes || {};
-  window._cmSiraPorMes[key] = sira;
+  window._cmSiraPorMes[key] = {
+    compras: (c && c.value !== '') ? (Number(c.value) || 0) : null,
+    gastosVarios: (g && g.value !== '') ? (Number(g.value) || 0) : null
+  };
+  renderCierreMesSiraTotales();
+}
 
-  const money = n => '$' + (Number(n) || 0).toFixed(2);
-  const totalGastos = sira; // caja chica no entra al cuadre
-  const totalGeneral = d.generadoTotal - d.comisionTotal - totalGastos;
-
-  const tg  = document.getElementById('cmTotalGastos');
-  const tgr = document.getElementById('cmTotalGastosResumen');
-  const tge = document.getElementById('cmTotalGeneral');
-  if (tg)  tg.textContent  = '-' + money(totalGastos);
-  if (tgr) tgr.textContent = '-' + money(totalGastos);
-  if (tge) {
-    tge.textContent = money(totalGeneral);
-    tge.style.color = totalGeneral >= 0 ? 'var(--success)' : 'var(--danger)';
-  }
+// Repinta solo los totales afectados; no reconstruye los campos manuales
+// para no perder el foco mientras el Owner escribe.
+function renderCierreMesSiraTotales() {
+  const cont = document.getElementById('cmSiraBloque');
+  const x = _cmCuadre();
+  if (!cont || !x) return;
+  const m = _cmMoney;
+  cont.querySelectorAll('span').forEach(function (sp) {
+    const sig = sp.nextElementSibling;
+    if (!sig) return;
+    if (sp.textContent === '− Compras')       sig.textContent = (x.compras != null) ? '-' + m(x.compras) : '—';
+    if (sp.textContent === '− Gastos varios') sig.textContent = (x.gastosVarios != null) ? '-' + m(x.gastosVarios) : '—';
+    if (sp.textContent === 'RESULTADO DE CAJA') {
+      sig.textContent = (x.caja != null) ? m(x.caja) : 'sin SIRA';
+      sig.style.color = (x.caja == null) ? 'var(--ink-faint)' : (x.caja >= 0 ? 'var(--success)' : 'var(--danger)');
+    }
+  });
 }
 
 // ── Export del Cierre de mes (PDF imprimible + Excel .xls) ──────────────────
 function _cierreDatos() {
   const d = window._cmData;
   if (!d) return null;
-  const inp = document.getElementById('cmSiraInput');
-  const key = d.mes + '-' + d.anio;
-  let sira = 0;
-  if (inp && inp.value !== '' && inp.value != null)            sira = Number(inp.value) || 0;
-  else if (window._cmSiraPorMes && window._cmSiraPorMes[key] != null) sira = Number(window._cmSiraPorMes[key]) || 0;
-  else if (d.guardado && d.guardado.gastoSIRA != null)        sira = Number(d.guardado.gastoSIRA) || 0;
-  else if (d.siraOk && d.gastoSIRA != null)                   sira = Number(d.gastoSIRA) || 0;
-  // Caja chica NO entra en el cuadre mensual: es solo el control diario de caja de
-  // Mikaela. El gasto real del mes lo lleva SIRA (productos, ingresos, gastos varios).
-  // Contar ambos duplicaría el gasto.
-  const totalGastos  = sira;
-  const totalGeneral = (Number(d.generadoTotal) || 0) - (Number(d.comisionTotal) || 0) - totalGastos;
-  return { d: d, sira: sira, totalGastos: totalGastos, totalGeneral: totalGeneral };
+  const x = _cmCuadre();
+  if (!x) return null;
+  // Caja chica NO entra en el cuadre mensual: es el control diario de Mikaela.
+  // Compras y consumo miden cosas distintas y nunca se suman como un solo egreso.
+  return { d: d, x: x, sira: x.egresos, totalGastos: x.egresos, totalGeneral: x.caja };
 }
 
 function _cierreReportHTML() {
   const x = _cierreDatos();
   if (!x) return '';
   const d = x.d;
+  const c = x.x;
   const money = n => '$' + (Number(n) || 0).toFixed(2);
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const mesNom = CM_MESES[d.mes - 1] + ' ' + d.anio;
@@ -4721,16 +4829,33 @@ function _cierreReportHTML() {
     +   '<tr class="tot"><td>Total</td><td class="c">' + (d.numServicios||0) + '</td><td class="r">' + money(d.generadoServicios) + '</td><td class="r rojo">' + money(d.comisionTotal) + '</td></tr>'
     + '</tbody></table>'
     + (d.numProductos ? '<div class="box row"><span>Productos vendidos (' + d.numProductos + ')</span><strong>' + money(d.generadoProductos) + '</strong></div>' : '')
-    + '<div class="st">Gastos del mes</div>'
+    + '<div class="st">SIRA — movimientos del mes</div>'
     + '<div class="box">'
-    +   '<div class="row"><span>SIRA (mes)' + (d.siraOk ? ' &middot; ' + (d.siraCount||0) + ' gasto(s)' : '') + '</span><span class="rojo">-' + money(x.sira) + '</span></div>'
-    +   '<div class="row" style="border-top:1.5px solid #e5e5e5;margin-top:6px;padding-top:8px;font-weight:800;"><span>Total gastos</span><span class="rojo">-' + money(x.totalGastos) + '</span></div>'
+    +   '<div class="row"><span>Compras (valor SIRA)</span><span class="rojo">' + (c.compras != null ? '-' + money(c.compras) : '—') + '</span></div>'
+    +   '<div class="row"><span>Gastos varios</span><span class="rojo">' + (c.gastosVarios != null ? '-' + money(c.gastosVarios) : '—') + '</span></div>'
+    +   '<div class="row" style="border-top:1.5px solid #e5e5e5;margin-top:6px;padding-top:8px;font-weight:800;"><span>Egresos de caja (SIRA)</span><span class="rojo">' + (c.egresos != null ? '-' + money(c.egresos) : '—') + '</span></div>'
+    +   '<div class="row" style="border-top:1px dashed #e5e5e5;margin-top:6px;padding-top:8px;"><span>Consumo staff (costo de insumos, no sale de caja)</span><span>' + (c.consumo != null ? money(c.consumo) : '—') + '</span></div>'
     + '</div>'
     + '<div class="tg">'
+    +   '<div class="row" style="font-weight:700;"><span>VISTA CAJA</span><span></span></div>'
     +   '<div class="row" style="color:#777;"><span>Generado</span><span>' + money(d.generadoTotal) + '</span></div>'
     +   '<div class="row" style="color:#777;"><span>&minus; Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>'
-    +   '<div class="row" style="color:#777;"><span>&minus; Gastos (SIRA)</span><span>-' + money(x.totalGastos) + '</span></div>'
-    +   '<div class="fin"><span>TOTAL GENERAL</span><span style="color:' + (x.totalGeneral>=0?'#1e7e34':'#c0392b') + ';">' + money(x.totalGeneral) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Compras</span><span>' + (c.compras != null ? '-' + money(c.compras) : '—') + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Gastos varios</span><span>' + (c.gastosVarios != null ? '-' + money(c.gastosVarios) : '—') + '</span></div>'
+    +   '<div class="fin"><span>RESULTADO DE CAJA</span><span style="color:' + (c.caja == null ? '#999' : (c.caja >= 0 ? '#1e7e34' : '#c0392b')) + ';">' + (c.caja != null ? money(c.caja) : 'sin SIRA') + '</span></div>'
+    + '</div>'
+    + '<div class="tg" style="border-color:#e5e5e5;">'
+    +   '<div class="row" style="font-weight:700;"><span>VISTA OPERATIVA</span><span></span></div>'
+    +   '<div class="row" style="color:#777;"><span>Ventas de servicios</span><span>' + money(d.generadoServicios) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Comisiones</span><span>-' + money(d.comisionTotal) + '</span></div>'
+    +   '<div class="row" style="color:#777;"><span>&minus; Consumo staff</span><span>' + (c.consumo != null ? '-' + money(c.consumo) : '—') + '</span></div>'
+    +   '<div class="fin" style="border-top-color:#e5e5e5;"><span>MARGEN OPERATIVO</span><span style="color:' + (c.margen == null ? '#999' : (c.margen >= 0 ? '#1e7e34' : '#c0392b')) + ';">' + (c.margen != null ? money(c.margen) : 'sin dato SIRA') + '</span></div>'
+    + '</div>'
+    + '<div class="box"><div class="row"><span>Inventario · valor actual</span><span>' + (c.inventario != null ? money(c.inventario) : '—') + '</span></div>'
+    +   (c.teorico != null
+          ? '<div class="row" style="color:#777;"><span>Inicial + compras &minus; consumo</span><span>' + money(c.teorico) + '</span></div>'
+            + '<div class="row" style="font-weight:800;border-top:1px dashed #e5e5e5;margin-top:6px;padding-top:8px;"><span>Diferencia</span><span>' + money(c.variacion) + '</span></div>'
+          : '<div class="row" style="color:#999;"><span>Sin base para conciliar</span><span></span></div>')
     + '</div>'
     + '<div class="foot">Caja chica de Mikaela este mes: ' + money(d.gastoCajaChica) + ' en ' + (d.numGastosCaja||0) + ' gasto(s) — control diario de caja, no se incluye en el cuadre (el gasto del mes lo lleva SIRA).<br>' + guardadoTxt + '<br>Reporte generado el ' + fechaGen + '</div>'
     + '</body></html>';
@@ -4768,6 +4893,7 @@ function exportarCierreExcel() {
   const x = _cierreDatos();
   if (!x) { showToast('Primero cargá un cierre del mes.'); return; }
   const d = x.d;
+  const c = x.x;
   const num = n => (Number(n) || 0).toFixed(2);
   const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const mesNom = CM_MESES[d.mes - 1] + ' ' + d.anio;
@@ -4786,10 +4912,17 @@ function exportarCierreExcel() {
     + rows
     + '<tr><td>TOTAL</td><td>'+(d.numServicios||0)+'</td><td>'+num(d.generadoServicios)+'</td><td>'+num(d.comisionTotal)+'</td></tr>'
     + '<tr><td colspan="4"></td></tr>'
-    + '<tr><td>SIRA (mes)</td><td></td><td></td><td>-'+num(x.sira)+'</td></tr>'
-    + '<tr><td>Total gastos</td><td></td><td></td><td>-'+num(x.totalGastos)+'</td></tr>'
+    + '<tr><th colspan="4">SIRA — movimientos del mes</th></tr>'
+    + '<tr><td>Compras (valor SIRA)</td><td></td><td></td><td>'+(c.compras!=null?'-'+num(c.compras):'')+'</td></tr>'
+    + '<tr><td>Gastos varios</td><td></td><td></td><td>'+(c.gastosVarios!=null?'-'+num(c.gastosVarios):'')+'</td></tr>'
+    + '<tr><td>Egresos de caja (SIRA)</td><td></td><td></td><td>'+(c.egresos!=null?'-'+num(c.egresos):'')+'</td></tr>'
+    + '<tr><td>Consumo staff (no sale de caja)</td><td></td><td></td><td>'+(c.consumo!=null?num(c.consumo):'')+'</td></tr>'
     + '<tr><td colspan="4"></td></tr>'
-    + '<tr><th colspan="3">TOTAL GENERAL</th><th>'+num(x.totalGeneral)+'</th></tr>'
+    + '<tr><th colspan="3">RESULTADO DE CAJA</th><th>'+(c.caja!=null?num(c.caja):'sin SIRA')+'</th></tr>'
+    + '<tr><th colspan="3">MARGEN OPERATIVO</th><th>'+(c.margen!=null?num(c.margen):'sin dato SIRA')+'</th></tr>'
+    + '<tr><td colspan="4"></td></tr>'
+    + '<tr><td>Inventario · valor actual</td><td></td><td></td><td>'+(c.inventario!=null?num(c.inventario):'')+'</td></tr>'
+    + '<tr><td>Inventario · diferencia vs teórico</td><td></td><td></td><td>'+(c.variacion!=null?num(c.variacion):'sin base')+'</td></tr>'
     + '<tr><td colspan="4"></td></tr>'
     + '<tr><td>Caja chica ('+(d.numGastosCaja||0)+' gastos) — control diario, NO se incluye en el cuadre</td><td></td><td></td><td>'+num(d.gastoCajaChica)+'</td></tr>'
     + '</table>';
@@ -4814,11 +4947,14 @@ window.exportarCierreExcel = exportarCierreExcel;
 async function guardarCierreMes() {
   const d = window._cmData;
   if (!d) return;
-  const inp = document.getElementById('cmSiraInput');
-  const sira = Number(inp && inp.value) || 0;
+  const c = _cmCuadre();
+  if (!c) return;
+  if (c.estado === 'cargando') { alert('Esperá a que termine de cargar SIRA.'); return; }
+  if (c.egresos == null) { alert('Falta el dato de SIRA. Ingresá compras y gastos varios a mano o reintentá.'); return; }
   // Caja chica NO entra en el cuadre guardado (control diario, no gasto del mes).
   // Se sigue guardando d.gastoCajaChica como dato de referencia en la hoja.
-  const totalGeneral = d.generadoTotal - d.comisionTotal - sira;
+  const sira = c.egresos;                 // egresos de caja provenientes de SIRA
+  const totalGeneral = c.caja;            // resultado de caja del mes
   const btn = document.getElementById('cmGuardarBtn');
   const txtOrig = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Guardando…'; }
@@ -4830,12 +4966,16 @@ async function guardarCierreMes() {
       generadoTotal: d.generadoTotal, comisionTotal: d.comisionTotal,
       gastoCajaChica: d.gastoCajaChica, gastoSIRA: sira,
       totalGeneral: totalGeneral, staff: d.staff,
+      mesNombre: CM_MESES[d.mes - 1],
+      comprasMes: c.compras, consumoMes: c.consumo, gastosVariosMes: c.gastosVarios,
+      egresosCajaSira: c.egresos, valorInventario: c.inventario,
+      totalMovimientos: c.totalMovimientos,
+      inventarioInicial: c.inventarioInicial, siraManual: c.manual,
       registradoPor: (window.currentUser && window.currentUser.name) || 'Owner'
     });
     if (r && r.success) {
-      const key = d.mes + '-' + d.anio;
-      window._cmSiraPorMes = window._cmSiraPorMes || {};
-      window._cmSiraPorMes[key] = sira;
+      if (r.siraRegistrado) showToast('✓ Cierre guardado en NexServ y SIRA');
+      else showToast('Guardado en NexServ. SIRA no registró: ' + (r.siraError || 'motivo desconocido') + '. Volvé a guardar para reintentar.');
       const histAbierto = (() => { const hl = document.getElementById('cmHistList'); return hl && hl.style.display !== 'none'; })();
       await loadCierreMes();
       if (histAbierto) { const hl = document.getElementById('cmHistList'); if (hl) { hl.style.display = 'block'; const c = document.getElementById('cmHistCaret'); if (c) c.textContent = '▲'; } loadHistorialCierres(); }
