@@ -2312,7 +2312,7 @@
 
     <div style="background: linear-gradient(135deg, #1a1a1a 0%, #3d2f1f 100%); color: white; padding: 26px 22px; border-radius: 24px; margin-bottom: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow-soft);">
       <div style="position: absolute; top: -50%; right: -20%; width: 200px; height: 200px; background: radial-gradient(circle, rgba(212,165,116,0.3) 0%, transparent 70%);"></div>
-      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación semana <span id="ownerWeekNum">—</span></div>
+      <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 8px; position: relative;">Facturación semana <span id="ownerWeekNum">—</span> <span id="ownerPrivToggle" onclick="toggleOwnerPrivacidad()" title="Ocultar / mostrar montos" style="margin-left:6px;cursor:pointer;opacity:0.85;">👁</span></div>
       <div style="font-size: 48px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; position: relative;" id="ownerTotalFact">$0</div>
       <div style="font-size: 12px; opacity: 0.6; margin-top: 6px; position: relative; font-weight: 500;" id="ownerTrend">—</div>
     </div>
@@ -2863,7 +2863,7 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div>
           <div style="font-size: 11px; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Semana en curso</div>
-          <div style="font-size: 22px; font-weight: 800;" id="payWeekLabel">Semana 17 · Abr 14–19</div>
+          <div style="font-size: 22px; font-weight: 800;" id="payWeekLabel">—</div>
         </div>
         <div style="background: var(--warning); padding: 5px 12px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">Abierta</div>
       </div>
@@ -2874,11 +2874,11 @@
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Comisiones</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$592</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #ff9b9b;" id="payComm">$0</div>
         </div>
         <div style="background: rgba(255,255,255,0.1); border-radius: 14px; padding: 10px; text-align: center;">
           <div style="font-size: 9px; opacity: 0.7; font-weight: 600;">Neto salón</div>
-          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$1,255</div>
+          <div style="font-size: 18px; font-weight: 800; margin-top: 2px; color: #9bffb3;" id="payNet">$0</div>
         </div>
       </div>
     </div>
@@ -2916,7 +2916,7 @@
         <div class="modal-handle"></div>
         <div class="modal-title">🔒 Confirmar cierre semanal</div>
         <div style="text-align: center; color: var(--ink-soft); font-size: 14px; margin-bottom: 16px; line-height: 1.6;">
-          Vas a cerrar la <strong id="closeWeekName">Semana 17</strong>.<br>
+          Vas a cerrar la <strong id="closeWeekName">—</strong>.<br>
           Esto va a:
         </div>
         <div style="background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
@@ -2971,10 +2971,10 @@
   <script src="js/router.js?v=20260916a"></script>
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/evidencias-core.js?v=20260815e"></script>
-  <script src="js/nexserv-main-1.js?v=20260916a"></script>
+  <script src="js/nexserv-main-1.js?v=20260917a"></script>
   <script src="js/nexserv-main-2.js?v=20260914-p0extra1"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
-  <script src="js/nexserv-main-3.js?v=20260902a"></script>
+  <script src="js/nexserv-main-3.js?v=20260917a"></script>
   <script src="js/nexserv-main-4.js?v=20260904a"></script>
   <script src="js/pagos-verificacion.js?v=20260819a"></script>
   <!-- Módulo Recordatorios: independiente. Única dependencia autorizada hacia
