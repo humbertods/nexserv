@@ -3860,6 +3860,34 @@
   async function renderPayments() {
     const list = document.getElementById('payStaffList');
     list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--ink-faint); font-size: 13px;">⏳ Cargando comisiones...</div>';
+
+    // SEMANA EN CURSO — fuente canónica única: getOwnerFinancialSummary
+    // (_ownerSemanaCanonica_, America/Guayaquil). Número, rango y montos salen
+    // del MISMO objeto; openCloseWeek/confirmCloseWeek reusan este mismo dato.
+    window._ownerSemanaActual = null;
+    const _wLbl = document.getElementById('payWeekLabel');
+    const _wTot = document.getElementById('payTotal');
+    const _wCom = document.getElementById('payComm');
+    const _wNet = document.getElementById('payNet');
+    if (_wLbl) _wLbl.textContent = '⏳ Cargando…';
+    if (_wTot) _wTot.textContent = '—';
+    if (_wCom) _wCom.textContent = '—';
+    if (_wNet) _wNet.textContent = '—';
+    // No bloqueante: la lista de saldos de staff carga en paralelo, como antes.
+    apiGet('getOwnerFinancialSummary').then(function (rw) {
+      if (rw && rw.success && rw.week && rw.week.number && rw.week.label) {
+        window._ownerSemanaActual = rw.week;
+        if (_wLbl) _wLbl.textContent = rw.week.label;
+        if (_wTot) _wTot.textContent = '$' + (Number(rw.week.facturado) || 0).toFixed(2);
+        if (_wCom) _wCom.textContent = '$' + (Number(rw.week.comisiones) || 0).toFixed(2);
+        if (_wNet) _wNet.textContent = '$' + (Number(rw.week.neto) || 0).toFixed(2);
+      } else if (_wLbl) {
+        _wLbl.textContent = 'Semana no disponible';
+      }
+    }).catch(function (errW) {
+      console.error('Error semana en curso:', errW);
+      if (_wLbl) _wLbl.textContent = 'Semana no disponible';
+    });
     
     // Cargar comisiones reales del Sheet
     let staffData = PAY_STAFF;
@@ -3984,18 +4012,26 @@
     const staffData = window._payStaffData || PAY_STAFF;
     const unpaid = staffData.filter(p => !p.paid);
     const total = unpaid.reduce((s, p) => s + p.acumulado, 0);
-    const weekNum = new Date().getWeekNumber ? new Date().getWeekNumber() : Math.ceil((new Date().getDate()) / 7) + 14;
-    document.getElementById('closeWeekName').textContent = 'Semana ' + weekNum;
+    const w = window._ownerSemanaActual;
+    if (!w || !w.number || !w.label) {
+      alert('No se pudo obtener la semana en curso. Actualizá la pantalla e intentá de nuevo.');
+      return;
+    }
+    document.getElementById('closeWeekName').textContent = w.label;
     document.getElementById('closeWeekTotal').textContent = '$' + total.toFixed(2);
     document.getElementById('closeWeekModal').classList.add('active');
   }
 
   async function confirmCloseWeek() {
-    const now = new Date();
-    const weekNum = Math.ceil(now.getDate() / 7) + 14;
-    const semana = 'Semana ' + weekNum;
-    const mes = now.toLocaleDateString('es-EC', { month: 'short' });
-    const periodo = mes + ' ' + (now.getDate() - 6) + '-' + now.getDate();
+    // Misma semana canónica que se muestra en pantalla y en el modal.
+    const w = window._ownerSemanaActual;
+    if (!w || !w.number || !w.label) {
+      alert('No se pudo obtener la semana en curso. No se cerró nada.');
+      closeModal();
+      return;
+    }
+    const semana = 'Semana ' + w.number;
+    const periodo = String(w.label).replace(/^Semana\s+\d+\s*·\s*/, '');   // ej. "Sep 14–19"
 
     try {
       await apiPost('cierreSemanal', {
