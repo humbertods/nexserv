@@ -405,6 +405,27 @@
   }
   window.refreshEstadoSalon = refreshEstadoSalon;
 
+  // OWNER HOME · Privacidad de montos (solo visual). El valor real queda en
+  // data-valor; ocultar/mostrar NO recarga ni recalcula nada.
+  function _ownerMontoSet_(id, texto) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.dataset.valor = texto;
+    el.textContent = window._ownerPrivOculto ? '****' : texto;
+  }
+  function toggleOwnerPrivacidad() {
+    window._ownerPrivOculto = !window._ownerPrivOculto;
+    ['ownerTotalFact', 'ownerComm', 'ownerNeto'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.dataset.valor === undefined) el.dataset.valor = el.textContent;
+      el.textContent = window._ownerPrivOculto ? '****' : el.dataset.valor;
+    });
+    const t = document.getElementById('ownerPrivToggle');
+    if (t) t.textContent = window._ownerPrivOculto ? '✱' : '👁';
+  }
+  window.toggleOwnerPrivacidad = toggleOwnerPrivacidad;
+
   async function loadOwnerHome() {
     // Mostrar estado de carga inmediatamente
     const histContainer = document.getElementById('ownerHistorial');
@@ -417,23 +438,30 @@
       document.getElementById('ownerWeekNum').textContent = weekNum;
 
       // Cargar todo en paralelo
-      const [commResult, listaResult, histResult] = await Promise.all([
-        apiGet('getComisiones').catch(() => ({ success: false })),
+      const [listaResult, histResult] = await Promise.all([
         apiGet('getListaCompleta').catch(() => ({ success: false })),
         apiGet('getHistorial', { periodo: 'hoy' }).catch(() => ({ success: false }))
       ]);
 
-      // Comisiones
+      // Facturado / Comisiones / Neto de HOY — fuente: getHistorial(periodo:'hoy').
+      // Solo COBRADO: excluye método vacío o 'Pendiente cobro'. Incluye servicios
+      // de staff y productos; los productos no suman comisión.
       let totalFact = 0, totalComm = 0;
-      if (commResult.success && commResult.comisiones) {
-        commResult.comisiones.forEach(c => {
-          totalFact += Number(c.facturado) || 0;
-          totalComm += Number(c.comision) || 0;
+      if (histResult.success && Array.isArray(histResult.historial)) {
+        histResult.historial.forEach(h => {
+          const metL = String(h.metodoPago || '').trim().toLowerCase();
+          if (!metL || metL.indexOf('pendiente') >= 0) return;             // sin cobro real
+          if (String(h.notaAjuste || '').indexOf('[PILOTO') !== -1) return; // piloto
+          const esProducto = metL === 'producto'
+            || String(h.area || '').toLowerCase() === 'producto'
+            || /^\s*🛍/.test(String(h.servicio || ''));
+          totalFact += Number(h.precio) || 0;
+          if (!esProducto) totalComm += Number(h.comision) || 0;
         });
       }
-      document.getElementById('ownerTotalFact').textContent = '$' + totalFact.toFixed(0);
-      document.getElementById('ownerComm').textContent = '$' + totalComm.toFixed(0);
-      document.getElementById('ownerNeto').textContent = '$' + (totalFact - totalComm).toFixed(0);
+      _ownerMontoSet_('ownerTotalFact', '$' + totalFact.toFixed(0));
+      _ownerMontoSet_('ownerComm', '$' + totalComm.toFixed(0));
+      _ownerMontoSet_('ownerNeto', '$' + (totalFact - totalComm).toFixed(0));
       document.getElementById('ownerTrend').textContent = totalFact > 0 ? '↑ En curso' : '—';
 
       // TOP — clientas que vienen más de 2 veces en el mes (frecuentes)
