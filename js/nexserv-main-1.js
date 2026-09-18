@@ -1833,7 +1833,7 @@
               slotServices[1] = _mias1.map(function (sd) {
                 return { name: sd.servicio || sd.name,
                          price: Number(sd.monto || sd.price || 0),
-                         area: sd.area || a1.area || '', lineaId: String(sd.id || ''),
+                         area: sd.area || a1.area || '', lineaId: String(sd.id || sd.lineaId || ''),
                          estado: String(sd.estado || '') };
               });
             }
@@ -1902,7 +1902,7 @@
                   slotServices[2] = _mias2.map(function (sd) {
                     return { name: sd.servicio || sd.name,
                              price: Number(sd.monto || sd.price || 0),
-                             area: sd.area || a2.area || '', lineaId: String(sd.id || ''),
+                             area: sd.area || a2.area || '', lineaId: String(sd.id || sd.lineaId || ''),
                              estado: String(sd.estado || '') };
                   });
                 }
