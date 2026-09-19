@@ -514,6 +514,18 @@
     await finishAndContinue();
   }
 
+  // ── C3 · Identidad textual de staff (Maria == María) ────────────────────
+  // Mismo criterio que ya usa el resto de NexServ para comparar texto:
+  // trim + lowercase + NFD sin diacríticos + espacios colapsados.
+  // Motivo: la sesión puede decir 'Maria' y la propuesta en LINEAS 'María'.
+  // Con la comparación exacta anterior la staff no reconocía su propia
+  // solicitud pendiente, la daba por perdida y la reenviaba.
+  function _staffCanon(s) {
+    var x = String(s || '').trim().toLowerCase();
+    try { x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+    return x.split(/\s+/).filter(Boolean).join(' ');
+  }
+
   // Normaliza cualquier nombre de área (key, label con emoji/SVG, o texto con acentos)
   // a una clave canónica para comparar de forma confiable.
   function _areaCanon(s) {
@@ -1017,7 +1029,7 @@
       const staffName = user.name || '';
       const myAuths = authResult.autorizaciones.filter(a =>
         a.clienteCodigo === clientCode &&
-        a.staffNombre === staffName &&
+        _staffCanon(a.staffNombre) === _staffCanon(staffName) &&
         (a.estado === 'pendiente' || a.estado === 'aprobado')
       );
 
@@ -1213,7 +1225,7 @@
           if (!authInBackend) {
             authInBackend = result.autorizaciones.find(a =>
               a.servicioNombre === svc.name &&
-              a.staffNombre === staffName &&
+              _staffCanon(a.staffNombre) === _staffCanon(staffName) &&
               a.clienteCodigo === clientCode &&
               (a.estado === 'aprobado' || a.estado === 'rechazado')
             );
@@ -4606,8 +4618,33 @@
       console.log('📥 Backend response:', result);
       
       if (!result.success) {
-        console.error('❌ Error cargando autorizaciones:', result.message);
-        document.getElementById('authorizationsSection').style.display = 'none';
+        // ── CASO B · fallo de CARGA, no ausencia de solicitudes ─────────────
+        // ANTES se escondía la sección entera, así que un backend caído se veía
+        // exactamente igual que "no hay nada pendiente". Central creía que no
+        // había solicitudes mientras la staff reenviaba la suya una y otra vez.
+        // Ahora la sección queda visible con el motivo real y un botón de
+        // reintento. No se rediseña la pantalla: se reusa la misma tarjeta.
+        var _msgAuth = result.message || result.error || 'No se pudieron cargar las autorizaciones.';
+        console.error('❌ Error cargando autorizaciones:', _msgAuth);
+        var _secErr  = document.getElementById('authorizationsSection');
+        var _listErr = document.getElementById('authorizationsList');
+        var _cntErr  = document.getElementById('authCount');
+        if (_secErr && _listErr) {
+          _secErr.style.display = 'block';
+          if (_cntErr) _cntErr.textContent = '!';
+          _listErr.innerHTML =
+            '<div class="card" style="background:#fdecea;border:2px solid #dc3545;padding:14px;">'
+          + '<div style="font-size:14px;font-weight:800;color:#8b1c24;margin-bottom:6px;">'
+          + '&#9888; No se pudieron cargar las autorizaciones</div>'
+          + '<div style="font-size:12px;color:#8b1c24;margin-bottom:10px;">'
+          + 'Puede haber solicitudes pendientes sin mostrar. Motivo: '
+          + String(_msgAuth).replace(/</g, '&lt;') + '</div>'
+          + '<button data-action="retry-auth" style="width:100%;padding:11px;background:#dc3545;'
+          + 'color:white;border:none;border-radius:12px;font-family:inherit;font-size:13px;'
+          + 'font-weight:700;cursor:pointer;">Reintentar</button></div>';
+        } else if (_secErr) {
+          _secErr.style.display = 'none';
+        }
         return;
       }
       
@@ -5763,6 +5800,12 @@
       case 'reject-auth':
         e.stopPropagation();
         if (typeof rejectAuthorization === 'function') rejectAuthorization(id, authTicketRef);
+        break;
+      // Botón de la tarjeta de error de carga (CASO B en renderAuthorizations).
+      case 'retry-auth':
+        e.stopPropagation();
+        window._authRenderPromise = null;   // el guard de reentrada cachea la corrida
+        if (typeof renderAuthorizations === 'function') renderAuthorizations();
         break;
       case 'ac-select':
         e.stopPropagation();
