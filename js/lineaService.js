@@ -264,9 +264,19 @@
       }).then(function(r) {
         // Normalizar al contrato {success, authId} que espera el caller.
         var ok = !!(r && (r.ok === true || r.success === true));
+        // El backend ya es idempotente por lineRequestId
+        // (_lnCrearExtraNativoInterno_): ante un reintento de la MISMA
+        // intención devuelve la línea original con yaExistia/idempotente y
+        // escritura:false. Esas banderas se perdían en esta normalización, así
+        // que la staff veía "Solicitud enviada" y no podía distinguir un envío
+        // nuevo de un reintento ya registrado. Ahora se propagan.
         return { success: ok, authId: (r && (r.linea_id || r.lineaId)) || '',
                  lineaId: (r && (r.linea_id || r.lineaId)) || '',
                  ticketRef: (r && r.ticket_ref) || opts.ticketRef,
+                 yaExistia: !!(r && r.yaExistia),
+                 idempotente: !!(r && r.idempotente),
+                 escritura: !!(r && r.escritura),
+                 lineRequestId: lrid,
                  message: (r && (r.message || r.error)) || '' };
       });
     },
