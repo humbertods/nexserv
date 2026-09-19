@@ -2130,7 +2130,21 @@
     document.getElementById('addSvcPriceDisplay').style.display = 'block';
   }
 
+  // Guard de reentrada del botón "Solicitar autorización". Protección UX
+  // secundaria: NO sustituye la idempotencia del backend por lineRequestId
+  // (_lnCrearExtraNativoInterno_), solo evita el doble POST concurrente del
+  // doble clic o del clic impaciente mientras la red tarda.
+  var _enviandoExtra = false;
+
   async function confirmAddService() {
+    if (_enviandoExtra) return;
+    const _btnExtra = document.getElementById('addSvcConfirmBtn');
+    const _btnTxtExtra = _btnExtra ? _btnExtra.textContent : '';
+    const _liberarBotonExtra = function () {
+      _enviandoExtra = false;
+      if (_btnExtra) { _btnExtra.disabled = false; _btnExtra.textContent = _btnTxtExtra; }
+    };
+
     const val = document.getElementById('addSvcService').value;
     if (!val) { alert('Seleccioná un servicio'); return; }
     
@@ -2174,6 +2188,7 @@
       note = document.getElementById('addSvcNote').value.trim();
       if (!note || note.length < 10) {
         alert('La nota para Central es obligatoria y debe tener al menos 10 caracteres. Explicá por qué la clienta necesita este servicio adicional.');
+        _liberarBotonExtra();
         return;
       }
     }
@@ -2185,9 +2200,13 @@
     if (_esEngancheUI) svc._engancheIdx = window._editEngancheIdx;
     window._editEngancheIdx = undefined;
 
-    if (!addServiceToSlot(slot, svc)) return;
+    if (!addServiceToSlot(slot, svc)) { _liberarBotonExtra(); return; }
     document.getElementById('addSvcNote').value = '';
     closeModal();
+
+    // A partir de acá sale el POST: se cierra la puerta hasta tener respuesta.
+    _enviandoExtra = true;
+    if (_btnExtra) { _btnExtra.disabled = true; _btnExtra.textContent = '⏳ Enviando…'; }
 
     // ── La solicitud manda. NO se confirma nada antes de saber si se registró ──
     const _rAuth = await sendAuthorizationRequest(clientName, svc, slot);
@@ -2210,11 +2229,35 @@
       alert('⚠ NO se pudo enviar la solicitud a Central.\n\n'
           + ((_rAuth && (_rAuth.message || _rAuth.error)) || 'Sin respuesta del servidor.')
           + '\n\nEl servicio NO quedó agregado. Pedile a Central que lo agregue ella.');
+      _liberarBotonExtra();
       return;
     }
 
+    _liberarBotonExtra();
+
+    // ── Reintento reconocido por el backend (CAPA 1 lineRequestId o CAPA 2
+    // propuesta pendiente equivalente): NO se creó nada, así que el renglón
+    // que se agregó de forma optimista se retira para no mostrar un duplicado
+    // que en LINEAS no existe. La propuesta original ya está en pantalla y
+    // recargarAutorizacionesStaff la vuelve a pintar con su estado real.
+    const _fueReintento = (_rAuth.yaExistia === true || _rAuth.idempotente === true);
+    if (_fueReintento) {
+      try {
+        const _ixDup = slotServices[slot].indexOf(svc);
+        if (_ixDup >= 0) slotServices[slot].splice(_ixDup, 1);
+        renderServicesForSlot(slot);
+        const _totDup = slotServices[slot].reduce((a, v) =>
+          a + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
+        document.getElementById('as' + slot + 'Total').textContent = '$' + _totDup;
+        document.getElementById('as' + slot + 'SvcCount').textContent =
+          slotServices[slot].filter(s => s.status !== 'rechazado').length;
+      } catch (eDup) { console.warn('[confirmAddService] retirar renglón duplicado:', eDup); }
+    }
+
     recargarAutorizacionesStaff(slot);
-    alert('⏳ Solicitud enviada a Central. El servicio estará pendiente hasta que Central lo apruebe.');
+    alert(_fueReintento
+      ? '⏳ Esta solicitud ya estaba enviada a Central y sigue pendiente. No se duplicó.'
+      : '⏳ Solicitud enviada a Central. El servicio estará pendiente hasta que Central lo apruebe.');
   }
   
   // ══════════════════════════════════════════════════════════════════════════
