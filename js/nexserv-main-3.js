@@ -17,15 +17,21 @@
     return (r && (r.message || r.error)) || fallback;
   }
 
-  async function approveAuthorization(reqId, ticketRef) {
+  // grupoPromoId (3er parámetro) solo viene en una PROMO extra pedida por staff:
+  // se aprueba el grupo entero con aprobarPromoExtraNativa. Sin él, el extra
+  // normal sigue exactamente por aprobarExtraNativo como siempre.
+  async function approveAuthorization(reqId, ticketRef, grupoPromoId) {
     const lineaId = String(reqId || '').trim();
     const tRef    = String(ticketRef || '').trim();
+    const grupo   = String(grupoPromoId || '').trim();
     if (!lineaId || !tRef) {
       alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
       return;
     }
     try {
-      const result = await apiPost('aprobarExtraNativo', { ticketRef: tRef, lineaId: lineaId });
+      const result = grupo
+        ? await apiPost('aprobarPromoExtraNativa', { ticketRef: tRef, grupoPromoId: grupo })
+        : await apiPost('aprobarExtraNativo', { ticketRef: tRef, lineaId: lineaId });
 
       if (_extraNativoOk(result)) {
         // El sync al Sheet lo hace el staff automáticamente cuando recargarAutorizacionesStaff
@@ -41,9 +47,10 @@
     }
   }
 
-  async function rejectAuthorization(reqId, ticketRef) {
+  async function rejectAuthorization(reqId, ticketRef, grupoPromoId) {
     const lineaId = String(reqId || '').trim();
     const tRef    = String(ticketRef || '').trim();
+    const grupo   = String(grupoPromoId || '').trim();
     if (!lineaId || !tRef) {
       alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
       return;
@@ -53,7 +60,9 @@
     const motivo = String(window.prompt('Motivo del rechazo:') || '').trim();
     if (!motivo) return;
     try {
-      const result = await apiPost('rechazarExtraNativo', { ticketRef: tRef, lineaId: lineaId, motivo: motivo });
+      const result = grupo
+        ? await apiPost('rechazarPromoExtraNativa', { ticketRef: tRef, grupoPromoId: grupo, motivo: motivo })
+        : await apiPost('rechazarExtraNativo', { ticketRef: tRef, lineaId: lineaId, motivo: motivo });
 
       if (_extraNativoOk(result)) {
         alert('✕ Servicio rechazado. El staff será notificado.');
