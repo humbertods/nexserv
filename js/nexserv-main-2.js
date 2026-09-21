@@ -4689,8 +4689,8 @@
           </div>
           
           <div style="display: flex; gap: 8px;">
-            <button data-action="approve-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
-            <button data-action="reject-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
+            <button data-action="approve-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" data-grupo-promo-id="${req.grupoPromoId || ''}" style="flex: 1; padding: 12px; background: #28a745; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✓ Aprobar</button>
+            <button data-action="reject-auth" data-id="${req.id}" data-ticket-ref="${req.ticketRef || ''}" data-grupo-promo-id="${req.grupoPromoId || ''}" style="flex: 1; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;">✕ Rechazar</button>
           </div>
         </div>
       `).join('');
@@ -5766,6 +5766,9 @@
     // El extra nativo se identifica por (ticketRef, lineaId). getAutorizaciones
     // ya manda ticketRef en cada propuesta; el boton lo transporta tal cual.
     var authTicketRef = target.dataset.ticketRef || '';
+    // Promo extra pedida por staff: se aprueba/rechaza el GRUPO completo.
+    // Vacío para un extra normal → el flujo de siempre, sin cambios.
+    var authGrupoPromo = target.dataset.grupoPromoId || '';
 
     switch (action) {
       case 'esperar-cobro':
@@ -5795,11 +5798,11 @@
         break;
       case 'approve-auth':
         e.stopPropagation();
-        if (typeof approveAuthorization === 'function') approveAuthorization(id, authTicketRef);
+        if (typeof approveAuthorization === 'function') approveAuthorization(id, authTicketRef, authGrupoPromo);
         break;
       case 'reject-auth':
         e.stopPropagation();
-        if (typeof rejectAuthorization === 'function') rejectAuthorization(id, authTicketRef);
+        if (typeof rejectAuthorization === 'function') rejectAuthorization(id, authTicketRef, authGrupoPromo);
         break;
       // Botón de la tarjeta de error de carga (CASO B en renderAuthorizations).
       case 'retry-auth':
