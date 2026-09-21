@@ -1377,7 +1377,19 @@
           : (da.includes('ceja') || da.includes('depil'));
       });
       // Mostrar botón "Tomar promo completa" si: promo multi-área con descuento y mi área está incluida
-      var _promoEsMasBarata = _myDivPM && p.division.length > 1 && Number(p.price) < Number(p.regular);
+      // ── Restringido a su ÚNICO caso de negocio (contrato 21/09/2026) ──────
+      // Staff de PESTAÑAS + promo compuesta SOLO por pestañas y depilación de
+      // cejas: la clienta termina haciéndose solo pestañas y esa staff asume
+      // la promo entera. Antes bastaba "multi-área con descuento" para CUALQUIER
+      // área (cejas, facial…), lo que abría la excepción a combinaciones que el
+      // negocio no contempla. Se conserva el criterio original de precio.
+      var _areasDivPM = p.division.map(function (d) { return String(d.area || '').toLowerCase(); });
+      var _esPestanasMasCejas = _myArea_pm === 'pestanas'
+        && _areasDivPM.some(function (a) { return a.includes('pest'); })
+        && _areasDivPM.some(function (a) { return a.includes('ceja') || a.includes('depil'); })
+        && _areasDivPM.every(function (a) { return a.includes('pest') || a.includes('ceja') || a.includes('depil'); });
+      var _promoEsMasBarata = _myDivPM && p.division.length > 1 && Number(p.price) < Number(p.regular)
+        && _esPestanasMasCejas;
 
       var _divisionHtml = p.division.map(function(d) {
         return '<span style="background:var(--bg);font-size:10px;font-weight:700;padding:3px 8px;border-radius:var(--radius-pill);color:var(--ink-soft);">' + d.area + ' $' + d.monto + '</span>';
@@ -1421,31 +1433,15 @@
   // AHORA: se manda primero, se espera, y solo se confirma y repinta si el
   // backend devolvió éxito REAL y completo (creadas === esperadas).
   // Si falla: no se toca la UI, se avisa el error y se recarga el estado real.
-  // ÚNICO motor de "aplicar promo" del lado staff. Las tres entradas de la UI
-  // pasan por acá: la tarjeta / "Solo mi parte" (applyPromo), "🎯 Tomar promo
-  // completa" (applyPromoCompleta) y elegir una promo desde "+ Agregar servicio"
-  // (applyPromoFromAddSvc). Todas registran con aplicarPromoStaff: el servicio
-  // original queda ANULADO como evidencia y la promo nace en líneas NUEVAS.
-  //
-  // ANTES las dos últimas llamaban a updateServiciosAtencion, que renombraba la
-  // línea original en el lugar (servicio := nombre de la promo, monto = regular):
-  // sin anulación con evidencia, sin línea nueva. Incidente SN-9440 (21/09/2026).
-  //
-  // modo: undefined → "Solo mi parte" (comportamiento certificado, sin cambios).
-  //       'completa'  → la staff toma la promo entera: precio total de la promo y
-  //                     TODAS las partes de la división, a su nombre.
-  async function applyPromo(promoIdx, modo) {
+  async function applyPromo(promoIdx) {
     const promo = PROMOS[promoIdx];
-    if (!promo) { alert('⚠ No se encontró la promo seleccionada.'); return; }
-    const _completa = (modo === 'completa');
     const slot = window._promoSlot;
     const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
     const user = window.currentUser;
     const myArea = user?.area || 'cejas';
     
-    // Obtener el precio que le corresponde a esta área (suma todas las partes que puede hacer).
-    // En modo completa la staff cobra el precio TOTAL de la promo.
-    const myPrice = _completa ? Number(promo.price) : getMyPromoPrice(promo, myArea);
+    // Obtener el precio que le corresponde a esta área (suma todas las partes que puede hacer)
+    const myPrice = getMyPromoPrice(promo, myArea);
     
     // Agregar servicio de promo a slotServices.
     // _yaEnLinea: la promo se registra como sus propias líneas en LINEAS (aplicarPromoStaff),
@@ -1461,7 +1457,6 @@
       _yaEnLinea: true,
       lineaIds: []
     };
-    if (_completa) servicioPromo._promoCompleta = true;
 
     // Confirmación visual y repintado: se ejecuta SOLO tras éxito real.
     function _confirmarPromoEnUI(idsCreados) {
@@ -1481,14 +1476,11 @@
 
       // Registrar promo activa usando clave normalizada (igual que finishSlot1)
       const promoClientKey = normalizeClientKey(clientName);
-      activePromos[promoClientKey] = _completa
-        ? { promo: promo, startedBy: myArea,
-            // promo completa: la staff hace todo, no continúa a otras áreas
-            completedAreas: (Array.isArray(promo.division) ? promo.division : []).map(d => d.area),
-            _promoCompleta: true }
-        : { promo: promo, startedBy: myArea,
-            completedAreas: [] };  // vacío: se llena al terminar cada área, no al iniciar
-      saveActivePromos();
+      activePromos[promoClientKey] = {
+        promo: promo,
+        startedBy: myArea,
+        completedAreas: []   // vacío: se llena al terminar cada área, no al iniciar
+      };
 
       // Ocultar banner de promo asignada si existe
       const assignedInfo = document.getElementById('promoAssignedInfo' + slot);
@@ -1497,7 +1489,7 @@
       // Cambiar botón
       const promoBtn = document.getElementById('promoBtn' + slot);
       if (promoBtn) {
-        promoBtn.textContent = _completa ? '✓ Promo completa aplicada' : '✓ Promo aplicada';
+        promoBtn.textContent = '✓ Promo aplicada';
         promoBtn.style.background = 'var(--success)';
       }
     }
@@ -1533,7 +1525,7 @@
       };
       const _caps = _CAPS[myArea] || [myArea];
       const _div = Array.isArray(promo.division) ? promo.division : [];
-      let _mias = _completa ? _div.slice() : _div.filter(function (dd) {
+      let _mias = _div.filter(function (dd) {
         const a = String(dd.area || '').toLowerCase();
         return _caps.some(function (c) { return a.includes(c); });
       });
@@ -1599,11 +1591,6 @@
       _confirmarPromoEnUI(_rPromo.ids || []);
       closeModal();
       alert('✓ Promo "' + promo.name + '" aplicada. Precio actualizado a $' + myPrice);
-      if (_completa) {
-        // Promo completa: la staff hace todo → mostrar "Finalizar servicio" directo.
-        setTimeout(() => { try { updateFinishButtons(slot); } catch (eF) {} }, 200);
-        return;   // no hay otras áreas que asignar
-      }
     } else {
       // Sin idEspera ni código no hay ticket al que aplicar la promo: no se
       // puede registrar en LINEAS, así que tampoco se confirma en pantalla.
@@ -1627,9 +1614,124 @@
 
   // Tomar promo completa: la staff cobra el precio total aunque solo haga su parte
   // Útil cuando precio promo < precio normal del servicio individual
-  // "🎯 Tomar promo completa" → mismo motor certificado, modo 'completa'.
   function applyPromoCompleta(promoIdx) {
-    return applyPromo(promoIdx, 'completa');
+    const promo = PROMOS[promoIdx];
+    const slot = window._promoSlot;
+
+    // ── Ticket NATIVO → completarPromoPorGrupoNativa ────────────────────────
+    // NUNCA updateServiciosAtencion (renombraba la línea en el lugar, incidente
+    // SN-9440) ni aplicarPromoStaff (es sustitución). El motor nativo pasa a
+    // nombre de esta staff el componente de cejas de la MISMA promo que asignó
+    // Central, sin anular ni renombrar ni crear líneas. El backend valida el
+    // caso único autorizado (staff de pestañas · promo pestañas + depilación de
+    // cejas · la promo asignada al ticket) y falla cerrado en cualquier otro.
+    // Los tickets LEGACY siguen exactamente igual que antes.
+    if (typeof window._esSlotNativoLineas === 'function' && window._esSlotNativoLineas(slot)) {
+      if (window._completandoPromoGrupo) return;           // doble clic
+      const _tRefPC = (slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '';
+      const _atenPCn = slot === 1 ? window._as1Aten : window._as2Aten;
+      const _lineaAbsPC = (_atenPCn && _atenPCn.lineaId) || '';
+      if (!_tRefPC || !_lineaAbsPC) {
+        closeModal();
+        alert('⚠ No se pudo identificar tu servicio en el ticket.\n\nNo se cambió nada.');
+        return;
+      }
+      window._completandoPromoGrupo = true;
+      closeModal();
+      (async function () {
+        let _rPC = null;
+        try {
+          _rPC = await apiPost('completarPromoPorGrupoNativa', {
+            ticketRef: _tRefPC, lineaAbsorbenteId: _lineaAbsPC, promoNombre: promo.name
+          });
+        } catch (ePC) { _rPC = null; }
+        window._completandoPromoGrupo = false;
+        if (!(_rPC && (_rPC.ok === true || _rPC.success === true))) {
+          alert('⚠ No se pudo tomar la promo completa.\n\n'
+              + ((_rPC && (_rPC.message || _rPC.error)) || 'Sin respuesta del servidor.')
+              + '\n\nNo se cambió nada.');
+          return;
+        }
+        const _cliPC = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
+        activePromos[normalizeClientKey(_cliPC)] = {
+          promo: promo, startedBy: window.currentUser?.area || 'pestanas',
+          completedAreas: promo.division.map(d => d.area), _promoCompleta: true
+        };
+        saveActivePromos();
+        const _btnPC = document.getElementById('promoBtn' + slot);
+        if (_btnPC) { _btnPC.textContent = '✓ Promo completa aplicada'; _btnPC.style.background = 'var(--success)'; }
+        // Repintar desde LINEAS: ambos componentes ya están a su nombre.
+        try { if (typeof loadStaffHome === 'function') await loadStaffHome(); } catch (eL) {}
+        setTimeout(() => { try { updateFinishButtons(slot); } catch (eF) {} }, 200);
+        showToast(_rPC.yaEstaba ? '🎯 La promo completa ya estaba a tu nombre'
+                                : '🎯 Promo completa a tu nombre · se cobra el total de la promo');
+      })();
+      return;
+    }
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐', '') || 'Clienta';
+    const user = window.currentUser;
+    const myArea = user?.area || 'cejas';
+
+    // Precio TOTAL de la promo (no solo la parte del área)
+    const precioTotal = Number(promo.price);
+
+    // Reemplazar slotServices con la promo al precio total (la clienta cambió a la promo
+    // completa: se reemplaza el servicio asignado, no se suma).
+    slotServices[slot] = [{
+      name: promo.name,
+      area: myArea,
+      price: precioTotal,
+      _promoCompleta: true  // flag para saber que es precio de promo completa
+    }];
+
+    // Actualizar UI
+    renderServicesForSlot(slot);
+    const total = slotServices[slot].reduce((sum, s) => sum + Number(s.price), 0);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + total;
+    document.getElementById('as' + slot + 'SvcCount').textContent = slotServices[slot].length;
+
+    // Registrar promo activa — marcar como completa (no continuar a otras áreas)
+    const promoClientKey = normalizeClientKey(clientName);
+    activePromos[promoClientKey] = {
+      promo: promo,
+      startedBy: myArea,
+      completedAreas: promo.division.map(d => d.area), // marcar todas como "hechas"
+      _promoCompleta: true
+    };
+    saveActivePromos();
+
+    // Cambiar botón
+    const promoBtn = document.getElementById('promoBtn' + slot);
+    if (promoBtn) {
+      promoBtn.textContent = '✓ Promo completa aplicada';
+      promoBtn.style.background = 'var(--success)';
+    }
+
+    // Sincronizar con el backend para que Mikaela vea el valor de la promo completa EN VIVO
+    const _idEsperaPC = slot === 1 ? (window._as1IdEspera || '') : (window._as2IdEspera || '');
+    const _atenPC = slot === 1 ? window._as1Aten : window._as2Aten;
+    const _lineaIdPC = (_atenPC && _atenPC.lineaId) || '';
+    if (_idEsperaPC) {
+      apiPost('updateServiciosAtencion', {
+        idEspera      : _idEsperaPC,
+        lineaId       : _lineaIdPC,
+        chicaNombre   : user?.name || '',
+        clienteNombre : clientName,
+        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+        servicios     : promo.name,
+        total         : String(precioTotal),
+        promoNombre   : promo.name,
+        tipo          : 'SP',
+        precioPromo   : String(precioTotal),
+        precioRegular : String(promo.regular || promo.price || precioTotal)
+      }).then(function (r) { console.log('✅ Promo completa sincronizada con Mikaela:', r); })
+        .catch(function (e) { console.warn('⚠ Error sincronizando promo completa:', e); });
+    }
+
+    closeModal();
+    // Actualizar botones de finalización — debe mostrar "Finalizar servicio" directo
+    setTimeout(() => updateFinishButtons(slot), 200);
+    showToast('🎯 Promo completa aplicada · $' + precioTotal + ' — Se cobra el total de la promo');
   }
 
   function continuePromo() {
@@ -1945,16 +2047,135 @@
     `).join('');
   }
 
-  // Promo elegida desde "+ Agregar servicio" → mismo motor certificado que la
-  // tarjeta de promo. _addSvcPromosList es PROMOS.filter(p => p.active), así que
-  // los objetos son los mismos y el índice en PROMOS se resuelve por referencia.
   function applyPromoFromAddSvc(promoIdx) {
     const promoData = (window._addSvcPromosList || PROMOS.filter(p => p.active))[promoIdx];
     if (!promoData) return;
-    const idxPromos = PROMOS.indexOf(promoData);
-    if (idxPromos < 0) { alert('⚠ No se encontró la promo seleccionada.'); return; }
-    window._promoSlot = window._addServiceSlot || 1;
-    return applyPromo(idxPromos);
+    const slot = window._addServiceSlot || 1;
+
+    // ── Ticket NATIVO → solicitarPromoExtraStaffNativa ──────────────────────
+    // Agregar una promo como servicio EXTRA no es "aplicar promo": NO anula, NO
+    // sustituye y NO modifica ningún servicio existente. Crea la solicitud
+    // (N componentes 'propuesta' con un mismo grupoPromoId) que Central aprueba
+    // o rechaza como UNA sola promo. Nunca por updateServiciosAtencion (renombra
+    // en el lugar) ni por aplicarPromoStaff (sustitución).
+    // Idempotencia: el requestId se conserva por ticket+promo hasta que el
+    // backend confirma (un reintento reusa el mismo → no duplica) y el backend
+    // además rechaza una segunda solicitud pendiente de la misma promo.
+    // Los tickets LEGACY siguen exactamente igual que antes.
+    if (typeof window._esSlotNativoLineas === 'function' && window._esSlotNativoLineas(slot)) {
+      if (window._enviandoPromoExtra) return;              // doble clic
+      const _tRefPE = (slot === 1 ? window._as1IdEspera : window._as2IdEspera) || '';
+      if (!_tRefPE) {
+        closeModal();
+        alert('⚠ No se pudo identificar el ticket de la clienta.\n\nNo se cambió nada.');
+        return;
+      }
+      const _clavePE = _tRefPE + '|' + promoData.name;
+      window._promoExtraReqIds = window._promoExtraReqIds || {};
+      const _reqPE = window._promoExtraReqIds[_clavePE] || (window._promoExtraReqIds[_clavePE] =
+        'PEXTRA-' + _tRefPE.replace(/[^A-Za-z0-9_-]/g, '') + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
+      window._enviandoPromoExtra = true;
+      closeModal();
+      (async function () {
+        let _rPE = null;
+        try {
+          _rPE = await apiPost('solicitarPromoExtraStaffNativa', {
+            ticketRef: _tRefPE, promoCatalogoId: promoData.name, requestId: _reqPE
+          });
+        } catch (ePE) { _rPE = null; }
+        window._enviandoPromoExtra = false;
+        if (!(_rPE && (_rPE.ok === true || _rPE.success === true))) {
+          alert('⚠ No se pudo pedir la promo a Central.\n\n'
+              + ((_rPE && (_rPE.message || _rPE.error)) || 'Sin respuesta del servidor.')
+              + '\n\nTus servicios siguen igual.');
+          return;                        // el requestId se conserva para el reintento
+        }
+        delete window._promoExtraReqIds[_clavePE];
+        const _yaPE = (_rPE.yaExistia === true || _rPE.idempotente === true);
+        // window.currentUser: `user` se declara más abajo (const) y quedaría en TDZ
+        const _myAreaPE = window.currentUser?.area || 'cejas';
+        const _yaEnPantalla = slotServices[slot] && slotServices[slot].some(function (sv) {
+          return sv.name === promoData.name && sv.status === 'pendiente';
+        });
+        if (!_yaEnPantalla) {
+          addServiceToSlot(slot, { name: promoData.name, area: _myAreaPE,
+            price: getMyPromoPrice(promoData, _myAreaPE), esPromo: true, status: 'pendiente',
+            _yaEnLinea: true, lineaIds: Array.isArray(_rPE.componentes_ids) ? _rPE.componentes_ids : [] });
+        }
+        try { if (typeof recargarAutorizacionesStaff === 'function') recargarAutorizacionesStaff(slot); } catch (eR) {}
+        alert(_yaPE ? '⏳ Esta promo ya estaba pedida a Central y sigue pendiente. No se duplicó.'
+                    : '⏳ Promo pedida a Central. Queda pendiente hasta que la apruebe.\n\nTus servicios actuales siguen igual.');
+      })();
+      return;
+    }
+    const user = window.currentUser;
+    const clientName = document.getElementById('as' + slot + 'Name')?.textContent?.replace(' ⭐','') || '';
+    const clientKey = normalizeClientKey(clientName);
+    const idEspera = slot === 1 ? window._as1IdEspera : window._as2IdEspera;
+    const _atenAS = slot === 1 ? window._as1Aten : window._as2Aten;
+    const _lineaIdAS = (_atenAS && _atenAS.lineaId) || '';
+
+    // Limpiar servicios anteriores del slot y aplicar la promo
+    slotServices[slot] = [];
+    const myArea = user?.area || 'cejas';
+    const myPrice = getMyPromoPrice(promoData, myArea);
+
+    slotServices[slot].push({
+      name: promoData.name,
+      area: myArea,
+      price: myPrice,
+      status: undefined
+    });
+
+    // Registrar promo activa usando el clientKey correcto
+    activePromos[clientKey] = {
+      promo: promoData,
+      startedBy: myArea,
+      completedAreas: [],
+      _metadata: { displayName: clientName }
+    };
+    saveActivePromos();
+
+    renderServicesForSlot(slot);
+    document.getElementById('as' + slot + 'Total').textContent = '$' + myPrice;
+    document.getElementById('as' + slot + 'SvcCount').textContent = '1';
+
+    // Actualizar Sheet directamente con promoNombre + precioRegular
+    console.log('🔍 applyPromoFromAddSvc — idEspera:', idEspera, '| clientName:', clientName, '| promo:', promoData.name, '| regular:', promoData.regular);
+    if (idEspera) {
+      apiPost('updateServiciosAtencion', {
+        idEspera      : idEspera,
+        lineaId       : _lineaIdAS,
+        chicaNombre   : user.name,
+        clienteNombre : clientName,
+        clienteCodigo : slot === 1 ? (window._as1Client || '') : (window._as2Client || ''),
+        servicios     : promoData.name,
+        total         : String(myPrice),
+        promoNombre   : promoData.name,
+        tipo          : 'SP',
+        precioPromo   : String(myPrice),
+        precioRegular : String(promoData.regular || promoData.price || myPrice)
+      }).then(r => {
+        console.log('✅ Promo SP actualizada en Sheet:', r);
+      }).catch(e => {
+        console.warn('⚠ Error actualizando promo en Sheet:', e);
+      });
+    }
+
+    closeModal();
+    showToast('🏷 Promo "' + promoData.name + '" aplicada ($' + myPrice + ')');
+
+    // Avisar a Mikaela si la promo incluye áreas que esta staff no hace
+    try {
+      const _otras = getOtherPromoAreas(promoData, myArea);
+      if (_otras.length > 0) {
+        const _LBL = { cejas: 'Cejas', pestanas: 'Pestañas', facial: 'Facial' };
+        const _faltan = _otras.map(a => _LBL[a] || a).join(', ');
+        enviarPushStaff(['Mikaela'], '🔄 Cambio de servicio',
+          (user?.name || 'Una chica') + ' cambió a ' + clientName + ' a la promo "' + promoData.name + '". Falta asignar a otra chica: ' + _faltan + '.');
+        showToast('🔄 Avisado a Central: falta asignar ' + _faltan);
+      }
+    } catch (e) { console.warn('[applyPromoFromAddSvc] aviso Central:', e); }
   }
 
   function openAddService(slot, modoEnganche) {
