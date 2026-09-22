@@ -4625,6 +4625,22 @@
         // Ahora la sección queda visible con el motivo real y un botón de
         // reintento. No se rediseña la pantalla: se reusa la misma tarjeta.
         var _msgAuth = result.message || result.error || 'No se pudieron cargar las autorizaciones.';
+
+        // ── Corte del lado del NAVEGADOR: no se muestra ──────────────────────
+        // apiGet (api.js:217) corta toda lectura que pase de 18 s y, igual que
+        // ante un fallo de red o un HTTP ≠ 200, devuelve { error } SIN el campo
+        // `success`. Eso no es un fallo del backend: la siguiente actualización
+        // del panel (foco / visibilidad / refresco) vuelve a pedir la lista. Se
+        // conserva lo último mostrado y solo queda el rastro en consola.
+        // Los fallos REALES del backend siempre traen `success:false` con su
+        // motivo (router y _errOut_): esos SÍ siguen mostrando la tarjeta roja,
+        // que es la protección del caso María (Central viendo "nada pendiente"
+        // mientras había solicitudes).
+        if (result.success === undefined) {
+          console.warn('⏱ Lectura de autorizaciones cortada en el navegador; se conserva lo mostrado:', _msgAuth);
+          return;
+        }
+
         console.error('❌ Error cargando autorizaciones:', _msgAuth);
         var _secErr  = document.getElementById('authorizationsSection');
         var _listErr = document.getElementById('authorizationsList');
