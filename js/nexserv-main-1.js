@@ -4057,13 +4057,73 @@
     });
   }
 
+  // Monta la ficha facial + el panel de evidencias cuando la pantalla de
+  // atención se RE-RENDERIZA (loadStaffHome). Hasta ahora solo se montaba en
+  // loadClientAfterTake, así que si esa carga fallaba —o la staff volvía a
+  // entrar más tarde— la pantalla quedaba sin ficha y sin el botón de fotos.
+  // NO agrega llamadas en el camino normal: si la ficha ya está en memoria
+  // pinta directo, y la lectura a getFichaFacial se intenta como mucho una vez
+  // cada 30 s por clienta, solo mientras no haya ficha cargada.
+  window._montarFacialStaffSiCorresponde_ = function (codigo, nombre, slot) {
+    try {
+      var user = window.currentUser;
+      if (!user || String(user.area || '').trim().toLowerCase() !== 'facial') return;
+      var cont = document.getElementById('facialFichaQuick' + slot);
+      if (!cont || !codigo) return;
+      var key = String(codigo || '').toLowerCase().replace(/-/g, '');
+      // Ya montado para ESTA clienta: no repintar (evita parpadeo y que
+      // EvidenciasCore se monte dos veces sobre el mismo contenedor).
+      if (cont.getAttribute('data-facial-key') === key && cont.innerHTML) return;
+
+      window._currentFacialClientKey    = key;
+      window._currentFacialClientNombre = nombre || '';
+      window._currentFacialClientCodigo = codigo;
+      window._facialFichaSlot           = slot;
+      try {
+        var _sv = (typeof slotServices !== 'undefined' && slotServices[slot]) ? slotServices[slot] : [];
+        var _ok = _sv.filter(function (s) { return s.status !== 'rechazado'; });
+        window._currentFacialSvcName  = _ok.map(function (s) { return s.name; }).join(' + ') || '';
+        window._currentFacialSvcPrice = _ok.reduce(function (t, v) { return t + Number(v.price || 0); }, 0);
+      } catch (eSv) {}
+
+      var perfil = CLIENT_PROFILES[key];
+      if (perfil && perfil.facial && typeof perfil.facial.ficha !== 'undefined') {
+        cont.setAttribute('data-facial-key', key);
+        loadFacialFichaQuick(key, slot);          // 0 llamadas: ya está en memoria
+        return;
+      }
+      window._facialFichaPedida = window._facialFichaPedida || {};
+      var ahora = Date.now();
+      if (window._facialFichaPedida[key] && (ahora - window._facialFichaPedida[key]) < 30000) return;
+      window._facialFichaPedida[key] = ahora;
+      cont.setAttribute('data-facial-key', key);
+      _cargarFichaFacialStaff(key, codigo, nombre || '', slot);
+    } catch (eMF) { console.warn('[FichaFacial] montaje en re-render:', eMF); }
+  };
+
   async function loadClientAfterTake() {
     const user = window.currentUser;
     const name = user ? user.name : 'Staff';
     
     // Cargar datos actualizados de las atenciones
     try {
-      const atenResult = await apiGet('getAtenciones', { chica: name });
+      // Toda la pantalla (servicios, promo, ficha facial y panel de fotos) se
+      // pinta dentro del if de abajo. Si esta lectura se corta —api.js corta a
+      // los 18 s— la pantalla quedaba a medias y en silencio, típicamente
+      // cuando la staff volvía a la app después de un rato y el teléfono
+      // dispara varias peticiones a la vez.
+      // UN solo reintento, y SOLO cuando la primera no trajo datos: en el
+      // camino normal no se agrega ninguna llamada.
+      let atenResult = await apiGet('getAtenciones', { chica: name });
+      if (!(atenResult && atenResult.success && Array.isArray(atenResult.atenciones) && atenResult.atenciones.length > 0)) {
+        console.warn('[loadClientAfterTake] lectura incompleta, reintentando una vez:', atenResult && (atenResult.message || atenResult.error));
+        await new Promise(function (r) { setTimeout(r, 1200); });
+        atenResult = await apiGet('getAtenciones', { chica: name });
+        if (!(atenResult && atenResult.success && Array.isArray(atenResult.atenciones) && atenResult.atenciones.length > 0)) {
+          try { showToast('⚠ No se pudo cargar la clienta. Tocá el botón de actualizar.'); } catch (eT) {}
+          console.error('[loadClientAfterTake] la pantalla quedó sin datos:', atenResult);
+        }
+      }
       if (atenResult.success && atenResult.atenciones && atenResult.atenciones.length > 0) {
         const aten = atenResult.atenciones;
         const slot = user && user.maxClients === 2 ? aten.length - 1 : 0;
