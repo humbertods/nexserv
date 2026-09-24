@@ -1864,6 +1864,12 @@
         var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = (window._obsDeArea ? window._obsDeArea(a1) : (a1.obsGeneral||'')) || 'Sin observaciones';
         _setNotaRecepcion(1, a1.observaciones);
         renderSecuenciaBanner(1, a1.secuencia || []);
+        // Ficha facial + panel de fotos también en el re-render (idempotente y
+        // sin llamadas extra si la ficha ya está en memoria).
+        try {
+          if (typeof window._montarFacialStaffSiCorresponde_ === 'function')
+            window._montarFacialStaffSiCorresponde_(a1.codigo, a1.nombre, 1);
+        } catch (eMF1) {}
 
         // Solo resetear slotServices si cambio la clienta o si esta completamente vacia
         if (!mismaClienta || !tieneServicios) {
