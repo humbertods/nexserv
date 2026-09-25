@@ -2329,7 +2329,44 @@
     if (_btnExtra) { _btnExtra.disabled = true; _btnExtra.textContent = '⏳ Enviando…'; }
 
     // ── La solicitud manda. NO se confirma nada antes de saber si se registró ──
+    // ── C · el extra va DENTRO del ticket que la staff tiene abierto ────────
+    // El backend hereda el subticket (LX.slot) de la línea padre; sin padre la
+    // línea nace suelta y se ve como un servicio aparte. sendAuthorizationRequest
+    // ya leía service.lineaPadre, pero nadie se la asignaba nunca: se manda la
+    // línea activa de esta staff en este slot.
+    try {
+      var _atenPad = (slot === 1) ? window._as1Aten : window._as2Aten;
+      var _padreId = String((_atenPad && _atenPad.lineaId) || '').trim();
+      if (!_padreId) {
+        var _baseSv = (slotServices[slot] || []).find(function (sv) {
+          if (sv === svc || sv.status === 'pendiente' || sv.status === 'rechazado') return false;
+          return !!String(sv.lineaId || (Array.isArray(sv.lineaIds) && sv.lineaIds[0]) || '').trim();
+        });
+        if (_baseSv) _padreId = String(_baseSv.lineaId || _baseSv.lineaIds[0]).trim();
+      }
+      if (_padreId) svc.lineaPadre = _padreId;
+      else console.warn('[confirmAddService] sin línea padre: el extra quedaría suelto');
+    } catch (ePad) { console.warn('[confirmAddService] línea padre:', ePad); }
+
     const _rAuth = await sendAuthorizationRequest(clientName, svc, slot);
+    // ── A · corte del NAVEGADOR ≠ solicitud no registrada ───────────────────
+    // api.js corta a los 18 s y reintenta; si los intentos se cortan, la
+    // respuesta se pierde pero la escritura PUEDE haberse hecho igual (pasó el
+    // 25/09: la staff vio "no se registró" y Central la tenía pendiente).
+    // En ese caso el estado es DESCONOCIDO: se deja el renglón como pendiente y
+    // se confirma contra el servidor, en vez de afirmar algo falso y borrarlo.
+    var _msgFall = String((_rAuth && (_rAuth.message || _rAuth.error)) || '');
+    var _corteNavegador = (!_rAuth) || /abort|aborted|Failed to fetch|Load failed|NetworkError|timeout/i.test(_msgFall);
+    if (_rAuth && _rAuth.success !== true && _corteNavegador) {
+      _liberarBotonExtra();
+      console.warn('[confirmAddService] respuesta perdida; estado desconocido, se confirma contra el servidor:', _msgFall);
+      try { if (typeof recargarAutorizacionesStaff === 'function') recargarAutorizacionesStaff(slot); } catch (eRA) {}
+      try { if (typeof loadStaffHome === 'function') loadStaffHome(); } catch (eLS) {}
+      alert('⏳ No pudimos confirmar si la solicitud llegó a Central.\n\n'
+          + 'Quedó marcada como pendiente en tu pantalla. Revisá en unos segundos: '
+          + 'si Central la recibió, va a aparecer igual. No la vuelvas a pedir.');
+      return;
+    }
     if (!_rAuth || _rAuth.success !== true) {
       // La solicitud NO quedó registrada en ningún lado. Se retira el renglón
       // pendiente para no dejarle a la staff un servicio fantasma que Central
