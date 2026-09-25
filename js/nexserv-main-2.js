@@ -1734,6 +1734,59 @@
 
   // === RETIRO GRATIS / $10 ===
 
+  // ── Reconciliación de servicios en el refresco (corrección B, 25/09/2026) ──
+  // Agrega a la pantalla las líneas que YA existen en el servidor y no están a
+  // la vista, comparando por lineaId. Resuelve el caso en que Central aprueba
+  // un servicio extra y a la staff no le aparece hasta recargar la página, y
+  // también el de la escritura cuya respuesta se perdió: la línea existe en
+  // LINEAS y el refresco la muestra sola.
+  // No agrega llamadas: usa el serviciosDetalle que el refresco ya trae.
+  // Nunca toca ni pisa lo que ya está en pantalla: solo suma lo que falta.
+  function _reconciliarServiciosSlot_(slot, a) {
+    try {
+      if (!a || !slot) return 0;
+      var codPantalla = (slot === 1) ? window._as1Client : window._as2Client;
+      if (!codPantalla || String(codPantalla).trim() !== String(a.codigo || '').trim()) return 0;
+      var det = Array.isArray(a.serviciosDetalle) ? a.serviciosDetalle : [];
+      if (!det.length) return 0;
+      if (!slotServices[slot]) slotServices[slot] = [];
+      var yaEn = {};
+      slotServices[slot].forEach(function (sv) {
+        var ids = Array.isArray(sv.lineaIds) ? sv.lineaIds : (sv.lineaId ? [sv.lineaId] : []);
+        ids.forEach(function (id) { if (id) yaEn[String(id).trim()] = true; });
+      });
+      var agregados = 0;
+      det.forEach(function (sd) {
+        var id = String((sd && (sd.id || sd.lineaId)) || '').trim();
+        if (!id || yaEn[id]) return;
+        var est = String((sd && sd.estado) || '').trim();
+        if (est === 'anulado') return;
+        slotServices[slot].push({
+          name: sd.servicio || sd.name || 'Servicio',
+          area: sd.area || a.area || '',
+          price: Number(sd.monto || sd.price || 0),
+          esPromo: (sd.esPromo === true || String(sd.esPromo || '').toLowerCase() === 'si'),
+          status: (est === 'propuesta') ? 'pendiente' : 'aprobado',
+          _yaEnLinea: true, lineaId: id, lineaIds: [id]
+        });
+        yaEn[id] = true;
+        agregados++;
+      });
+      if (agregados) {
+        try { renderServicesForSlot(slot); } catch (eR) {}
+        var _t = (slotServices[slot] || []).reduce(function (t, v) {
+          return t + ((v.status === 'pendiente' || v.status === 'rechazado') ? 0 : Number(v.price || 0));
+        }, 0);
+        var _elT = document.getElementById('as' + slot + 'Total'); if (_elT) _elT.textContent = '$' + _t;
+        var _elC = document.getElementById('as' + slot + 'SvcCount');
+        if (_elC) _elC.textContent = String((slotServices[slot] || []).filter(function (v) { return v.status !== 'rechazado'; }).length);
+        try { if (typeof updateFinishButtons === 'function') updateFinishButtons(slot); } catch (eF) {}
+        console.log('[reconciliar] slot ' + slot + ': ' + agregados + ' servicio(s) agregados desde el servidor');
+      }
+      return agregados;
+    } catch (eRec) { console.warn('[reconciliar] slot ' + slot + ':', eRec); return 0; }
+  }
+
   async function loadStaffHome() {
     // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
     if (window._siraActivo || window._resumenBackup) return;
@@ -1809,6 +1862,13 @@
         if (user.maxClients === 2) {
           activeClients[user.name] = result.atenciones.map(a => ({ name: a.nombre, code: a.codigo, service: a.servicio }));
           updateCapacityUI(user.name);
+          // Slot 2 (cejas atiende dos clientas a la vez): hasta ahora solo se
+          // pintaba al iniciar sesión o al tomar, así que la segunda tarjeta no
+          // se reconciliaba nunca mientras la pantalla estaba abierta.
+          var _a2Ref = result.atenciones.find(function (x) {
+            return String(x.codigo || '').trim() === String(window._as2Client || '').trim();
+          });
+          if (_a2Ref) _reconciliarServiciosSlot_(2, _a2Ref);
         }
         
         list.innerHTML = result.atenciones.map((a, idx) => {
@@ -1864,6 +1924,8 @@
         var _od1=document.getElementById('obs1Display'); if(_od1) _od1.textContent = (window._obsDeArea ? window._obsDeArea(a1) : (a1.obsGeneral||'')) || 'Sin observaciones';
         _setNotaRecepcion(1, a1.observaciones);
         renderSecuenciaBanner(1, a1.secuencia || []);
+        // Servicios: sumar lo que el servidor ya tiene y la pantalla no muestra.
+        _reconciliarServiciosSlot_(1, a1);
         // Ficha facial + panel de fotos también en el re-render (idempotente y
         // sin llamadas extra si la ficha ya está en memoria).
         try {
