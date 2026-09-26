@@ -1194,6 +1194,10 @@
     } catch (err) {
       console.error('Error recargando autorizaciones del staff:', err);
     }
+    // Al entrar/volver a la pantalla de atención: sumar lo que el servidor ya
+    // tiene y la pantalla no muestra (throttle de 45 s adentro).
+    try { if (typeof window._reconciliarAtencionDesdeServidor_ === 'function')
+            window._reconciliarAtencionDesdeServidor_(slotNum); } catch (eRc) {}
   }
 
   // Detener polling al salir de pantallas de atención
@@ -1786,6 +1790,34 @@
       return agregados;
     } catch (eRec) { console.warn('[reconciliar] slot ' + slot + ':', eRec); return 0; }
   }
+
+  // ── Reconciliación en la PANTALLA DE ATENCIÓN (26/09/2026) ───────────────
+  // En activeService el refresco es "queue-only": loadStaffHome no corre, así
+  // que la reconciliación de servicios nunca se ejecutaba ahí. Por eso a la
+  // staff no le aparecía el extra que Central ya había aprobado (Samantha
+  // Vacilio, 26/09) mientras seguía en esa pantalla.
+  // Carga acotada: una sola lectura de getAtenciones, como mucho cada 45 s por
+  // slot, solo con la app visible y con clienta en el slot. No entra al latido
+  // de la cola ni se repite en cada refresco.
+  window._recAtencionUltima = window._recAtencionUltima || {};
+  window._reconciliarAtencionDesdeServidor_ = async function (slot) {
+    try {
+      slot = Number(slot) || 1;
+      var user = window.currentUser; if (!user || !user.name) return;
+      var cod = (slot === 1) ? window._as1Client : window._as2Client;
+      if (!cod) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      var ahora = Date.now();
+      if (window._recAtencionUltima[slot] && (ahora - window._recAtencionUltima[slot]) < 45000) return;
+      window._recAtencionUltima[slot] = ahora;
+      var r = await apiGet('getAtenciones', { chica: user.name });
+      if (!r || r.success !== true || !Array.isArray(r.atenciones)) return;
+      var a = r.atenciones.find(function (x) {
+        return String(x.codigo || '').trim() === String(cod).trim();
+      });
+      if (a) _reconciliarServiciosSlot_(slot, a);
+    } catch (eRA) { console.warn('[reconciliar atención] slot ' + slot + ':', eRA); }
+  };
 
   async function loadStaffHome() {
     // Guard: si SIRA o Comisiones están activos, el DOM de staffHome fue reemplazado
