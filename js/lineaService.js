@@ -281,6 +281,42 @@
       });
     },
 
+    // ----------------------------------------------------------
+    // solicitarPromoExtra({ ticketRef, promoNombre, nota, requestId })
+    // SERVICIO EXTRA = SOLO SUMA. La staff pide una PROMO como extra: el backend
+    // (solicitarPromoExtraStaffNativa, ya certificado en PROD) crea las N líneas
+    // del grupo en estado 'propuesta' + auth 'pendiente', como subticket propio
+    // del ticket madre. NUNCA anula ni modifica ninguna línea existente.
+    // Central la aprueba o rechaza COMO GRUPO (aprobarPromoExtraNativa /
+    // rechazarPromoExtraNativa). Es un motor DISTINTO de "aplicar promo"
+    // (aplicarPromoStaff), que sí sustituye.
+    // `staff` NO se envía: el backend la toma de la sesión firmada.
+    // ----------------------------------------------------------
+    solicitarPromoExtra: function(opts) {
+      var rqid = String(opts.requestId || '').trim() || 'PROMOX-' + String(opts.ticketRef || '').replace(/[^A-Za-z0-9_-]/g, '')
+               + '-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+      return apiPost('solicitarPromoExtraStaffNativa', {
+        ticketRef:       opts.ticketRef,
+        promoCatalogoId: opts.promoNombre,
+        obs:             opts.nota || '',
+        requestId:       rqid
+      }).then(function(r) {
+        var ok = !!(r && (r.ok === true || r.success === true));
+        var ids = (r && Array.isArray(r.componentes_ids)) ? r.componentes_ids.slice() : [];
+        return { success: ok,
+                 componentesIds: ids,
+                 authId: ids[0] || '',
+                 grupoPromoId: (r && r.grupo_promo_id) || '',
+                 ticketRef: (r && r.ticket_ref) || opts.ticketRef,
+                 yaExistia: !!(r && r.yaExistia),
+                 idempotente: !!(r && r.idempotente),
+                 escritura: !!(r && r.escritura),
+                 requestId: rqid,
+                 error: (r && r.error) || '',
+                 message: (r && (r.message || r.error)) || '' };
+      });
+    },
+
     // listarPropuestasExtra() → { success, autorizaciones:[...] }
     // Devuelve la MISMA forma que el viejo getAutorizaciones para que
     // renderAuthorizations y los polls del staff funcionen sin cambios.
