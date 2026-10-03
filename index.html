@@ -1850,7 +1850,12 @@
         <!-- TAB: PROMO -->
         <div id="tabPromoContent" style="display: none;">
           <div style="font-size: 12px; color: var(--ink-soft); font-weight: 500; margin-bottom: 14px; text-align: center; line-height: 1.5;">
-            Si la clienta prefiere una promo en lugar del servicio asignado,<br>seleccionala acá. <strong>No requiere autorización.</strong>
+            La promo se <strong>SUMA</strong> al ticket como servicio extra.<br>No reemplaza tu servicio actual. <strong>Requiere autorización de Central.</strong><br>
+            <span style="font-size:11px;">Para cambiar tu servicio por una promo usá el botón <strong>Aplicar promo</strong> de tu panel.</span>
+          </div>
+          <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: 700; margin-bottom: 6px;">Nota para Central (obligatoria)</div>
+            <textarea id="addSvcPromoNote" placeholder="Ej: La clienta quiere sumar la promo de lifting hoy." style="width: 100%; padding: 10px; border: 1.5px solid #ffc107; border-radius: 10px; font-family: inherit; font-size: 12px; min-height: 60px; resize: vertical; box-sizing: border-box;"></textarea>
           </div>
           <div id="addSvcPromoList"></div>
         </div>
@@ -2967,15 +2972,15 @@
   <!-- NEXSERV Core JS — Fase 2 partición -->
   <script src="js/state.js?v=20260706a"></script>
   <script src="js/api.js?v=20260902a"></script>
-  <script src="js/lineaService.js?v=20260919a"></script>
+  <script src="js/lineaService.js?v=20261003a"></script>
   <script src="js/router.js?v=20260916a"></script>
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/evidencias-core.js?v=20260815e"></script>
   <script src="js/nexserv-main-1.js?v=20260923a"></script>
-  <script src="js/nexserv-main-2.js?v=20260926a"></script>
+  <script src="js/nexserv-main-2.js?v=20260925a"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
-  <script src="js/nexserv-main-3.js?v=20260921c"></script>
-  <script src="js/nexserv-main-4.js?v=20260925a"></script>
+  <script src="js/nexserv-main-3.js?v=20261003a"></script>
+  <script src="js/nexserv-main-4.js?v=20261003c"></script>
   <script src="js/pagos-verificacion.js?v=20260819a"></script>
   <!-- Módulo Recordatorios: independiente. Única dependencia autorizada hacia
        main-1..4: abrirHistorialServicios(codigo, areaFiltro) de
