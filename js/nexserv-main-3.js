@@ -17,14 +17,17 @@
     return (r && (r.message || r.error)) || fallback;
   }
 
-  // grupoPromoId (3er parámetro) solo viene en una PROMO extra pedida por staff:
-  // se aprueba el grupo entero con aprobarPromoExtraNativa. Sin él, el extra
-  // normal sigue exactamente por aprobarExtraNativo como siempre.
+  // PROMO EXTRA DE STAFF (03/10/2026): getAutorizaciones agrupa las N líneas de
+  // una promo extra en UNA tarjeta y el botón ya transporta data-grupo-promo-id.
+  // Antes ese tercer argumento se ignoraba y se aprobaba por lineaId una sola
+  // línea del grupo. Con grupo → motor de grupo (aprobarPromoExtraNativa /
+  // rechazarPromoExtraNativa, ya existentes en PROD). Sin grupo → extra normal,
+  // exactamente igual que antes.
   async function approveAuthorization(reqId, ticketRef, grupoPromoId) {
     const lineaId = String(reqId || '').trim();
     const tRef    = String(ticketRef || '').trim();
     const grupo   = String(grupoPromoId || '').trim();
-    if (!lineaId || !tRef) {
+    if ((!lineaId && !grupo) || !tRef) {
       alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
       return;
     }
@@ -51,7 +54,7 @@
     const lineaId = String(reqId || '').trim();
     const tRef    = String(ticketRef || '').trim();
     const grupo   = String(grupoPromoId || '').trim();
-    if (!lineaId || !tRef) {
+    if ((!lineaId && !grupo) || !tRef) {
       alert('No se pudo identificar la solicitud (falta ticket o línea). Actualizá la lista.');
       return;
     }
