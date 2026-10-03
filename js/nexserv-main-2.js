@@ -3022,8 +3022,14 @@
       list.innerHTML = '<div style="text-align:center;color:var(--ink-faint);padding:16px;font-size:13px;">No hay promos activas. Activá alguna en la pantalla de Promociones.</div>';
       return;
     }
-    list.innerHTML = active.map((p, i) => `
-      <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="confirmAssignPromo(${i})">
+    // FIX-INDICE-PROMO-CENTRAL (03/10/2026): la lista muestra solo promos
+    // ACTIVAS, pero confirmAssignPromo lee PROMOS[idx], que incluye las
+    // inactivas. Con el índice de la lista filtrada, si existía una promo
+    // inactiva antes de la elegida, Central asignaba OTRA promo (tanto al
+    // asignar una clienta nueva como al agregar promo extra a un ticket).
+    // Se pasa el índice REAL en PROMOS, resuelto por referencia.
+    list.innerHTML = active.map((p) => `
+      <div style="background: var(--bg-card); border-radius: 20px; padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); cursor: pointer;" onclick="confirmAssignPromo(${PROMOS.indexOf(p)})">
         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
           <div style="flex: 1;">
             <div style="font-weight: 800; font-size: 15px; margin-bottom: 3px;">${p.name}</div>
