@@ -252,7 +252,12 @@
     }
   }
 
-  async function _apiPostReal(action, data, { retries = 2, timeoutMs = 18000 } = {}) {
+  // NET-UNA-LLAMADA (08/10/2026) · Regla de red: una sola llamada por operación.
+  // Antes: 18 s + 2 reintentos → el navegador abortaba mientras el backend seguía
+  // trabajando y reenviaba la MISMA orden hasta 3 veces (duplicados y carga triple
+  // en horas pico). Ahora: 1 envío y se espera la respuesta real. Quien necesite
+  // otra cosa la pasa explícita (login conserva sus opciones propias).
+  async function _apiPostReal(action, data, { retries = 0, timeoutMs = 120000 } = {}) {
     if (!data) data = {};
     data.action = action;
     data._t = Date.now();
