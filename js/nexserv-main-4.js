@@ -1443,6 +1443,16 @@
   //       'completa'  → la staff toma la promo entera: precio total de la promo y
   //                     TODAS las partes de la división, a su nombre.
   async function applyPromo(promoIdx, modo) {
+    // FIX-APLICAR-PROMO-UNA-LLAMADA (08/10/2026) · Regla de red: una sola
+    // llamada por operación. Mientras un aplicarPromoStaff está en vuelo, un
+    // segundo toque (misma u otra tarjeta, "Solo mi parte", "Tomar promo
+    // completa") NO dispara otra sustitución: solo avisa que se está aplicando.
+    if (window._applyPromoEnCurso) {
+      try { showToast('⏳ Aplicando promo, esperá la confirmación…'); } catch (eT) {}
+      return;
+    }
+    window._applyPromoEnCurso = true;
+    try {
     const promo = PROMOS[promoIdx];
     if (!promo) { alert('⚠ No se encontró la promo seleccionada.'); return; }
     const _completa = (modo === 'completa');
@@ -1583,7 +1593,14 @@
           promoNombre   : promo.name,
           precioRegular : String(promo.regular || promo.price || myPrice),
           partes        : JSON.stringify(_partes)
-        });
+        }, { timeoutMs: 120000, retries: 0 });
+        // retries: 0 es OBLIGATORIO — aplicarPromoStaff es una MUTACIÓN no
+        // idempotente (anula lo que la staff tiene en curso y crea la promo).
+        // Con el default de api.js (18 s, 2 reintentos) el navegador abortaba
+        // mientras el backend seguía trabajando y REENVIABA: cada reenvío
+        // anulaba la promo recién creada y creaba otra (SN-9732: 3 líneas
+        // "Combo 1 Pig" en el mismo minuto). Mismo patrón ya certificado en
+        // finalizarComponentesStaff / promoMixtaCompleta.
       } catch (ePromo) {
         console.warn('⚠ Error registrando promo:', ePromo);
         _fallaPromo('No hubo respuesta del servidor.');
@@ -1640,6 +1657,9 @@
         showToast('🔄 Avisado a Central: falta asignar ' + _faltan);
       }
     } catch (e) { console.warn('[applyPromo] aviso Central:', e); }
+    } finally {
+      window._applyPromoEnCurso = false;
+    }
   }
 
   // Tomar promo completa: la staff cobra el precio total aunque solo haga su parte
