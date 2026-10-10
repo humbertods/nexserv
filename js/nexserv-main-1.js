@@ -1638,12 +1638,13 @@
         slotServices[slot] = a.serviciosDetalle.map(sd => ({
           name: sd.servicio || sd.nombre || sd.name || '',
           price: Number(sd.monto || sd.precio || sd.price || 0),
-          area: sd.area || a.area || ''
+          area: sd.area || a.area || '',
+          lineaId: String(sd.lineaId || sd.id || '') // ID-RECONSTRUCCION 10/10/2026
         }));
       } else if (a.servicio && a.servicio !== '—') {
         let nom = a.servicio;
         if (String(nom).trim().startsWith('{')) { try { const p = JSON.parse(nom); nom = p.nombre || p.name || nom; } catch (e) {} }
-        slotServices[slot] = [{ name: nom, price: Number(a.total || 0), area: a.area || '' }];
+        slotServices[slot] = [{ name: nom, price: Number(a.total || 0), area: a.area || '', lineaId: String(a.lineaId || '') }]; // ID-RECONSTRUCCION 10/10/2026
         // VERDE-MIPANEL · identidad explícita LINEAS de la única línea (getAtenciones la entrega en a.lineaId).
         if (_fcRest === 'LINEAS' && String(a.lineaId || '').trim()) slotServices[slot][0].lineaId = String(a.lineaId).trim();
       } else { return; }
@@ -1851,13 +1852,13 @@
                 var _promoMatch = PROMOS.find(function(p){ return p.name === a1.promoNombre || p.promo === a1.promoNombre; });
                 if (_promoMatch) _precioPromo1 = Number(_promoMatch.precio || _promoMatch.price || _promoMatch.precioPromo || 0);
               }
-              slotServices[1] = [{ name: a1.promoNombre, price: _precioPromo1, area: a1.area || '', status: 'aprobado', isPromo: true }];
+              slotServices[1] = [{ name: a1.promoNombre, price: _precioPromo1, area: a1.area || '', status: 'aprobado', isPromo: true, lineaId: String(a1.lineaId || '') }]; // ID-RECONSTRUCCION 10/10/2026
               // También registrar en _availablePromo para el flujo de cobro
               if (!window._availablePromo) {
                 window._availablePromo = { name: a1.promoNombre, price: _precioPromo1, regular: Number(a1.precioRegular || a1.total || 0) };
               }
             } else if (a1.serviciosDetalle && a1.serviciosDetalle.length > 0) {
-              slotServices[1] = a1.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.nombre || sd.name, price: Number(sd.monto || sd.precio || sd.price || 0), area: sd.area || a1.area || '' }; });
+              slotServices[1] = a1.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.nombre || sd.name, price: Number(sd.monto || sd.precio || sd.price || 0), area: sd.area || a1.area || '', lineaId: String(sd.lineaId || sd.id || '') }; }); // ID-RECONSTRUCCION 10/10/2026
             } else if (a1.servicio && a1.servicio !== '—') {
               let _n1 = a1.servicio;
               if (String(_n1).trim().startsWith('{')) { try { const _p1 = JSON.parse(_n1); _n1 = _p1.nombre || _p1.name || _n1; } catch(e){} }
@@ -1907,9 +1908,9 @@
                   });
                 }
               } else if (a2.promoNombre && a2.promoNombre.trim() !== '') {
-                slotServices[2] = [{ name: a2.promoNombre, price: Number(a2.total || 0), area: a2.area || '', status: 'aprobado', isPromo: true }];
+                slotServices[2] = [{ name: a2.promoNombre, price: Number(a2.total || 0), area: a2.area || '', status: 'aprobado', isPromo: true, lineaId: String(a2.lineaId || '') }]; // ID-RECONSTRUCCION 10/10/2026
               } else if (a2.serviciosDetalle && a2.serviciosDetalle.length > 0) {
-                slotServices[2] = a2.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.name, price: Number(sd.monto || sd.price || 0), area: sd.area || '' }; });
+                slotServices[2] = a2.serviciosDetalle.map(function(sd){ return { name: sd.servicio || sd.name, price: Number(sd.monto || sd.price || 0), area: sd.area || '', lineaId: String(sd.lineaId || sd.id || '') }; }); // ID-RECONSTRUCCION 10/10/2026
               } else if (a2.servicio && a2.servicio !== '—') {
                 slotServices[2] = [{ name: a2.servicio, price: Number(a2.total || 0), area: a2.area || '' }];
               }
@@ -4238,7 +4239,8 @@
               slotServices[1] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
                 price: Number(sd.monto || sd.precio || sd.price || 0),
-                area: a.area, status: undefined
+                area: a.area, status: undefined,
+                lineaId: String(sd.lineaId || sd.id || '') // ID-RECONSTRUCCION 10/10/2026
               }));
               const totalCombinado = slotServices[1].reduce((s, v) => s + Number(v.price), 0);
               renderServicesForSlot(1);
@@ -4560,12 +4562,13 @@
                 slotServices[1] = _det1fb.map(sd => ({
                   name: sd.servicio || sd.nombre || sd.name || '',
                   price: Number(sd.monto || sd.precio || sd.price || 0),
-                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true
+                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true,
+                  lineaId: String(sd.lineaId || sd.id || '') // ID-RECONSTRUCCION 10/10/2026
                 }));
               } else {
                 let _nm1 = String(a.servicio || '');
                 if (_nm1.trim().startsWith('{')) { try { _nm1 = JSON.parse(_nm1).nombre || _nm1; } catch(e){} }
-                slotServices[1] = [{ name: _nm1, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true }];
+                slotServices[1] = [{ name: _nm1, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true, lineaId: String(a.lineaId || '') }]; // ID-RECONSTRUCCION 10/10/2026
               }
               renderServicesForSlot(1);
               const _tot1fb = slotServices[1].reduce((s,v) => s + Number(v.price||0), 0);
@@ -4645,7 +4648,8 @@
               slotServices[2] = a.serviciosDetalle.map(sd => ({
                 name: sd.servicio || sd.nombre || sd.name || '',
                 price: Number(sd.monto || sd.precio || sd.price || 0),
-                area: a.area, status: undefined
+                area: a.area, status: undefined,
+                lineaId: String(sd.lineaId || sd.id || '') // ID-RECONSTRUCCION 10/10/2026
               }));
               const totalCombinado2 = slotServices[2].reduce((s, v) => s + Number(v.price), 0);
               renderServicesForSlot(2);
@@ -4928,12 +4932,13 @@
                 slotServices[2] = _det2.map(sd => ({
                   name: sd.servicio || sd.nombre || sd.name || '',
                   price: Number(sd.monto || sd.precio || sd.price || 0),
-                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true
+                  area: sd.area || a.area || '', esPromo: !!sd.esPromo, _yaEnLinea: true,
+                  lineaId: String(sd.lineaId || sd.id || '') // ID-RECONSTRUCCION 10/10/2026
                 }));
               } else {
                 let _nm2 = String(a.servicio || '');
                 if (_nm2.trim().startsWith('{')) { try { _nm2 = JSON.parse(_nm2).nombre || _nm2; } catch(e){} }
-                slotServices[2] = [{ name: _nm2, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true }];
+                slotServices[2] = [{ name: _nm2, price: Number(a.total || 0), area: a.area || '', _yaEnLinea: true, lineaId: String(a.lineaId || '') }]; // ID-RECONSTRUCCION 10/10/2026
               }
               renderServicesForSlot(2);
               const _tot2fb = slotServices[2].reduce((s,v) => s + Number(v.price||0), 0);
@@ -6501,6 +6506,10 @@ async function nativoTerminarMandarCentral(ticketRef, ids) {
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
       await _nativoResolverDesincronizado_('✅ Este ticket ya fue enviado a central');
+    } else if (r && r.sinRespuesta === true) {
+      // CORTE-RED (10/10/2026): no llegó respuesta (conexión cortada). La orden
+      // pudo haberse ejecutado: se confirma el estado real, NUNCA se repite.
+      await _nativoResolverDesincronizado_('⏳ Se cortó la conexión · verificando el estado real');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo finalizar'));
     }
@@ -6540,6 +6549,10 @@ async function nativoYoSigo(ticketRef, sigId) {
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
       await _nativoResolverDesincronizado_('✅ Tu parte ya estaba cerrada');
+    } else if (r && r.sinRespuesta === true) {
+      // CORTE-RED (10/10/2026): no llegó respuesta (conexión cortada). La orden
+      // pudo haberse ejecutado: se confirma el estado real, NUNCA se repite.
+      await _nativoResolverDesincronizado_('⏳ Se cortó la conexión · verificando el estado real');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar tu parte'));
     }
@@ -6577,6 +6590,10 @@ async function nativoPromoCompleta(ticketRef) {
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
       await _nativoResolverDesincronizado_('✅ Esta promo ya fue cerrada y enviada a central');
+    } else if (r && r.sinRespuesta === true) {
+      // CORTE-RED (10/10/2026): no llegó respuesta (conexión cortada). La orden
+      // pudo haberse ejecutado: se confirma el estado real, NUNCA se repite.
+      await _nativoResolverDesincronizado_('⏳ Se cortó la conexión · verificando el estado real');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo tomar la promo completa'));
     }
@@ -6617,6 +6634,10 @@ async function nativoPasarOtraStaff(ticketRef, ids) {
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
       await _nativoResolverDesincronizado_('✅ Tu parte ya estaba cerrada · el resto está en central');
+    } else if (r && r.sinRespuesta === true) {
+      // CORTE-RED (10/10/2026): no llegó respuesta (conexión cortada). La orden
+      // pudo haberse ejecutado: se confirma el estado real, NUNCA se repite.
+      await _nativoResolverDesincronizado_('⏳ Se cortó la conexión · verificando el estado real');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo enviar a central'));
     }
@@ -6652,6 +6673,10 @@ async function nativoTerminarYCancelar(ticketRef, ids, sigLbl) {
       await _nativoRefrescarStaffHome_();
     } else if (_nativoYaNoHayNadaEnCurso_(r)) {
       await _nativoResolverDesincronizado_('✅ Este ticket ya estaba cerrado');
+    } else if (r && r.sinRespuesta === true) {
+      // CORTE-RED (10/10/2026): no llegó respuesta (conexión cortada). La orden
+      // pudo haberse ejecutado: se confirma el estado real, NUNCA se repite.
+      await _nativoResolverDesincronizado_('⏳ Se cortó la conexión · verificando el estado real');
     } else {
       alert('Error: ' + ((r && (r.message || r.error)) || 'No se pudo cerrar el ticket'));
     }
