@@ -1613,6 +1613,14 @@
       const _ok = !!(_rPromo && _rPromo.success === true);
       const _esp = Number((_rPromo && _rPromo.esperadas) != null ? _rPromo.esperadas : _partes.length);
       const _cre = Number((_rPromo && _rPromo.creadas) || 0);
+      if (_rPromo && _rPromo.sinRespuesta === true) {
+        // CORTE-RED (10/10/2026): sin respuesta no se sabe si se aplicó. No se
+        // afirma nada falso ni se repite: se recarga el estado real (1 lectura).
+        closeModal();
+        try { showToast('⏳ Se cortó la conexión · verificando el estado real'); } catch (eT) {}
+        try { if (typeof loadStaffHome === 'function') loadStaffHome(); } catch (eR) {}
+        return;
+      }
       if (!_ok || _cre !== _esp) {
         _fallaPromo((_rPromo && (_rPromo.message || _rPromo.error))
                     || ('Solo se registraron ' + _cre + ' de ' + _esp + ' partes.'));
@@ -2231,7 +2239,60 @@
     if (_btnExtra) { _btnExtra.disabled = true; _btnExtra.textContent = '⏳ Enviando…'; }
 
     // ── La solicitud manda. NO se confirma nada antes de saber si se registró ──
-    const _rAuth = await sendAuthorizationRequest(clientName, svc, slot);
+    let _rAuth = await sendAuthorizationRequest(clientName, svc, slot);
+
+    // ── CORTE-RED (10/10/2026) · regla: si demora, se CONFIRMA, nunca se repite ──
+    // Sin respuesta del servidor no se sabe si la solicitud llegó (caso real:
+    // Keyla vio "NO quedó agregado" y Central ya la tenía). Una sola lectura de
+    // getAtenciones decide: si la propuesta existe en LINEAS, se trata como
+    // enviada; si se confirma que no existe, se informa el fallo real.
+    if (_rAuth && _rAuth.success !== true && _rAuth.sinRespuesta === true) {
+      let _veredicto = 'desconocido', _idHallado = '';
+      try {
+        const _cod = slot === 1 ? window._as1Client : window._as2Client;
+        const _rConf = await apiGet('getAtenciones', { chica: (user && user.name) || '' });
+        if (_rConf && _rConf.success === true && Array.isArray(_rConf.atenciones)) {
+          const _at = _rConf.atenciones.find(a => String(a.codigo || '').trim() === String(_cod || '').trim());
+          const _det = _at ? (Array.isArray(_at.serviciosDetalle) && _at.serviciosDetalle.length
+                               ? _at.serviciosDetalle
+                               : [{ servicio: _at.servicio, estado: _at.estado, lineaId: _at.lineaId }]) : [];
+          const _yaEnPantalla = {};
+          (slotServices[slot] || []).forEach(v => { if (v && v.lineaId) _yaEnPantalla[String(v.lineaId)] = true; });
+          const _hit = _det.find(sd => {
+            const id = String((sd && (sd.lineaId || sd.id)) || '').trim();
+            return id && !_yaEnPantalla[id]
+              && String(sd.servicio || '').trim() === String(svc.name || '').trim()
+              && String(sd.estado || '').trim() !== 'anulado';
+          });
+          if (_hit) { _veredicto = 'llego'; _idHallado = String(_hit.lineaId || _hit.id); }
+          else { _veredicto = 'no_llego'; }
+        }
+      } catch (eConf) { console.warn('[confirmAddService] confirmación tras corte:', eConf); }
+
+      if (_veredicto === 'llego') {
+        svc.lineaId = _idHallado;
+        svc.authId = _idHallado;
+        _rAuth = { success: true, lineaId: _idHallado, authId: _idHallado, confirmadoTrasCorte: true };
+      } else if (_veredicto === 'desconocido') {
+        try {
+          const _ixU = slotServices[slot].indexOf(svc);
+          if (_ixU >= 0) slotServices[slot].splice(_ixU, 1);
+          renderServicesForSlot(slot);
+          const _totU = slotServices[slot].reduce((s, v) =>
+            s + (v.status !== 'rechazado' && v.status !== 'pendiente' ? Number(v.price || 0) : 0), 0);
+          document.getElementById('as' + slot + 'Total').textContent = '$' + _totU;
+          document.getElementById('as' + slot + 'SvcCount').textContent =
+            slotServices[slot].filter(s => s.status !== 'rechazado').length;
+        } catch (eU) {}
+        alert('⏳ Se cortó la conexión y no se pudo confirmar si la solicitud llegó a Central.\n\n'
+            + 'NO la vuelvas a pedir todavía: si llegó, va a aparecer sola en tu pantalla '
+            + 'en menos de un minuto. Si no aparece, avisale a Central.');
+        _liberarBotonExtra();
+        return;
+      }
+      // 'no_llego' → confirmado que no existe: sigue al aviso de fallo real de abajo.
+    }
+
     if (!_rAuth || _rAuth.success !== true) {
       // La solicitud NO quedó registrada en ningún lado. Se retira el renglón
       // pendiente para no dejarle a la staff un servicio fantasma que Central
@@ -2364,7 +2425,8 @@
         success: false,
         error: (resultNative && resultNative.error) || 'SOLICITUD_NO_REGISTRADA',
         message: (resultNative && resultNative.message)
-                 || 'Central no pudo recibir la solicitud para este ticket.'
+                 || 'Central no pudo recibir la solicitud para este ticket.',
+        sinRespuesta: !!(resultNative && resultNative.sinRespuesta === true)   // CORTE-RED 10/10/2026
       };
     } catch (err) {
       console.error('❌ Excepción al enviar autorización:', err);
