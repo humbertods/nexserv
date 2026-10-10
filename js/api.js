@@ -245,11 +245,51 @@
   // intacto: este wrapper solo delega.
   async function apiPost(action, data, opts) {
     _marcarMutacion_();
+    _avisoProcesando_(action, +1);
     try {
       return await _apiPostReal(action, data, opts);
     } finally {
+      _avisoProcesando_(action, -1);
       _marcarMutacion_();
     }
+  }
+
+  // AVISO-ESPERA (10/10/2026) · "⏳ Procesando…" mientras una orden está en
+  // camino, para que nadie crea que la app se colgó ni bloquee el teléfono
+  // (iOS corta la conexión en segundo plano). Solo DOM: no agrega llamadas.
+  // Aparece si la orden tarda más de 0,8 s; las acciones de fondo no lo muestran.
+  var _POST_SILENCIOSOS_ = { pingSesion: true, updateServiciosAtencion: true };
+  var _postsEnVuelo_ = 0, _avisoTimer_ = null;
+  function _avisoProcesando_(action, delta) {
+    try {
+      if (_POST_SILENCIOSOS_[action]) return;
+      _postsEnVuelo_ = Math.max(0, _postsEnVuelo_ + delta);
+      var el = document.getElementById('nexAvisoProcesando');
+      if (_postsEnVuelo_ > 0) {
+        if (_avisoTimer_ || (el && el.style.display === 'block')) return;
+        _avisoTimer_ = setTimeout(function () {
+          _avisoTimer_ = null;
+          if (_postsEnVuelo_ <= 0) return;
+          var e2 = document.getElementById('nexAvisoProcesando');
+          if (!e2) {
+            e2 = document.createElement('div');
+            e2.id = 'nexAvisoProcesando';
+            e2.setAttribute('role', 'status');
+            e2.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);'
+              + 'top:calc(env(safe-area-inset-top, 0px) + 10px);z-index:2147483000;'
+              + 'background:#1f2937;color:#fff;padding:10px 18px;border-radius:999px;'
+              + 'font:600 13px/1.3 system-ui,-apple-system,sans-serif;'
+              + 'box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none;text-align:center;';
+            e2.textContent = '⏳ Procesando… no cierres la app';
+            (document.body || document.documentElement).appendChild(e2);
+          }
+          e2.style.display = 'block';
+        }, 800);
+      } else {
+        if (_avisoTimer_) { clearTimeout(_avisoTimer_); _avisoTimer_ = null; }
+        if (el) el.style.display = 'none';
+      }
+    } catch (eAviso) { /* el aviso nunca debe afectar la operación */ }
   }
 
   // NET-UNA-LLAMADA (08/10/2026) · Regla de red: una sola llamada por operación.
@@ -288,7 +328,10 @@
           continue;
         }
         console.error('API Error final:', err);
-        return { error: err.message };
+        // CORTE-RED (10/10/2026): no hubo respuesta de la app → no se sabe si la
+        // orden se ejecutó. Campo aditivo para que la pantalla CONFIRME en vez de
+        // afirmar que falló. Quien solo lee `error` sigue funcionando igual.
+        return { error: err.message, sinRespuesta: true };
       }
     }
   }
