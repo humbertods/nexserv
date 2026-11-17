@@ -121,6 +121,7 @@
       if (typeof loadRecordatorios === 'function') loadRecordatorios();
     }
     if (id === 'ownerCierreMes') { initCierreMesSelectors(); loadCierreMes(); }
+    if (id === 'ownerControlUtilidad') { initControlUtilidadSelectors(); loadControlUtilidad(); }
     if (id === 'clientDirectory') { CLIENT_DIRECTORY_CACHE = []; renderClientDirectory(); }
     if (id === 'mikaelaHome') {
       // Guard de rol: mikaelaHome (caja chica, por cobrar, autorizaciones, etc.) es
