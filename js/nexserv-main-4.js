@@ -5306,10 +5306,10 @@ async function loadControlUtilidad() {
       renderCurrent();
     });
 
-  controlUtilidadGet_('getCierreMesSira', { mes: mes, anio: anio })
+  controlUtilidadGet_('getControlUtilidadSira', { mes: mes, anio: anio })
     .then(function (result) {
       if (requestToken !== window._cuLoadToken) return;
-      siraResult = result || { success: false, error: 'No hubo respuesta' };
+    siraResult = result || { success: false, error: 'No hubo respuesta' };
       renderCurrent();
     })
     .catch(function (error) {
