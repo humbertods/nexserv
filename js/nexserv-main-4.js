@@ -490,6 +490,56 @@
     'Laura':  { key: 'laura',  area: 'Facial' },
   };
 
+  // Local utility attribution rules. These are explicit owner-approved
+  // correspondences, not a general fuzzy matcher and not a SIRA confirmation.
+  const UTILITY_STAFF_AREA_RULES = {
+    maria: ['cejas', 'depilacion'],
+    lesly: ['cejas', 'depilacion'],
+    keyla: ['cejas', 'depilacion'],
+    melany: ['cejas', 'depilacion'],
+    yadira: ['pestanas'],
+    diana: ['pestanas'],
+    laura: ['facial']
+  };
+
+  function utilityStaffKey_(name) {
+    return String(name || '').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').trim();
+  }
+
+  function utilityAreaKey_(area) {
+    const raw = String(area || '').toLowerCase().normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    if (!raw) return 'SIN_AREA';
+    if (raw === 'coffee') return 'COFFEE';
+    if (raw === 'local') return 'LOCAL';
+    if (raw === 'general') return 'GENERAL';
+    if (raw === 'cejas') return 'cejas';
+    if (raw === 'depilacion' || raw === 'depilaciones') return 'depilacion';
+    if (raw === 'facial' || raw === 'limpieza facial' || raw === 'limpieza faciales') return 'facial';
+    if (raw === 'pestanas') return 'pestanas';
+    // Lifting supplies are explicitly assigned to the Cejas destination.
+    // Retiro Lifting is intentionally not inferred without Owner confirmation.
+    if (raw === 'lifting') return 'cejas';
+    return 'OTRA_AREA';
+  }
+
+  function resolveUtilityGroup_(group) {
+    const areaGroup = String(group && group.areaGrupo || '').toUpperCase();
+    if (['COFFEE', 'LOCAL', 'GENERAL'].indexOf(areaGroup) >= 0) {
+      return { status: 'EXCLUDED_NON_STAFF', area: areaGroup };
+    }
+    const area = utilityAreaKey_(group && group.area);
+    if (area === 'SIN_AREA') return { status: 'PENDING_NO_AREA', area: area };
+    if (area === 'OTRA_AREA') return { status: 'PENDING_AREA_REVIEW', area: String(group && group.area || '') };
+    const staff = utilityStaffKey_(group && group.staff);
+    const allowed = UTILITY_STAFF_AREA_RULES[staff] || [];
+    if (allowed.indexOf(area) < 0) return { status: 'PENDING_STAFF_AREA_REVIEW', area: area, staff: staff };
+    const warnings = Array.isArray(group && group.advertencias) ? group.advertencias : [];
+    if (warnings.length) return { status: 'PENDING_COST_OR_DATA', area: area, staff: staff, warnings: warnings };
+    return { status: 'RESOLVED_LOCAL_RULE', area: area, staff: staff };
+  }
+
   function emptyPeriodData() {
     return { servicios: 0, facturado: 0, comision: 0, clientas: 0, promos: 0, desglose: [], top: [] };
   }
@@ -5169,6 +5219,163 @@ function irACierre(mes, anio) {
   loadCierreMes();
   const scr = document.getElementById('ownerCierreMes');
   if (scr) window.scrollTo(0, 0);
+}
+function initControlUtilidadSelectors() {
+  const mes = document.getElementById('cuMes');
+  const anio = document.getElementById('cuAnio');
+  if (!mes || !anio || (mes.options.length && anio.options.length)) return;
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  mes.innerHTML = CM_MESES.map((name, i) =>
+    '<option value="' + (i + 1) + '"' + ((i + 1) === currentMonth ? ' selected' : '') + '>' + name + '</option>'
+  ).join('');
+  anio.innerHTML = '';
+  for (let year = currentYear; year >= 2024; year--) {
+    anio.innerHTML += '<option value="' + year + '"' + (year === currentYear ? ' selected' : '') + '>' + year + '</option>';
+  }
+}
+
+async function loadControlUtilidad() {
+  const body = document.getElementById('cuBody');
+  if (!body) return;
+  const mes = Number(document.getElementById('cuMes')?.value) || (new Date().getMonth() + 1);
+  const anio = Number(document.getElementById('cuAnio')?.value) || new Date().getFullYear();
+  const requestToken = (window._cuLoadToken = (window._cuLoadToken || 0) + 1);
+  body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);">Cargando datos de Cierre de mes…</div>';
+  try {
+    const results = await Promise.all([
+      apiGet('getCierreMes', { mes: mes, anio: anio }),
+      apiGet('getCierreMesSira', { mes: mes, anio: anio }).catch(function () { return { success: false }; })
+    ]);
+    const result = results[0];
+    const sira = results[1];
+    if (requestToken !== window._cuLoadToken) return;
+    if (!result || result.success !== true) {
+      body.innerHTML = '<div class="card" style="padding:18px;color:var(--danger);">No se pudo cargar el período. SIRA permanece pendiente.</div>';
+      return;
+    }
+    renderControlUtilidad(result, sira);
+  } catch (error) {
+    body.innerHTML = '<div class="card" style="padding:18px;color:var(--danger);">Error cargando el período. SIRA permanece pendiente.</div>';
+  }
+}
+
+function renderControlUtilidad(data, sira) {
+  const body = document.getElementById('cuBody');
+  if (!body) return;
+  const money = value => '$' + (Number(value) || 0).toFixed(2);
+  const esc = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const staffFromMonth = Array.isArray(data.staff) ? data.staff : [];
+  const staffMap = Object.create(null);
+  const isExcludedUtilityStaff = function (name) {
+    return utilityStaffKey_(name) === 'rosa';
+  };
+  Object.keys(STAFF_META).forEach(function (name) {
+    if (isExcludedUtilityStaff(name)) return;
+    const key = utilityStaffKey_(name);
+    if (!staffMap[key]) staffMap[key] = { chica: name, servicios: 0, generado: 0, comision: 0 };
+  });
+  staffFromMonth.forEach(function (item) {
+    if (isExcludedUtilityStaff(item.chica)) return;
+    const key = utilityStaffKey_(item.chica || '');
+    if (!staffMap[key]) staffMap[key] = { chica: item.chica || 'Sin asignar', servicios: 0, generado: 0, comision: 0 };
+    staffMap[key].servicios += Number(item.servicios) || 0;
+    staffMap[key].generado += Number(item.generado) || 0;
+    staffMap[key].comision += Number(item.comision) || 0;
+  });
+  const staff = Object.values(staffMap).sort(function (a, b) { return a.chica.localeCompare(b.chica); });
+  const groups = sira && sira.success && Array.isArray(sira.consumoPorStaffArea)
+    ? sira.consumoPorStaffArea.filter(function (group) { return !isExcludedUtilityStaff(group.staff); }) : [];
+  const breakdownReady = !!(sira && sira.success && sira.desgloseDisponible === true);
+  // The supplied SIRA contract only defines PENDIENTE_CONFIRMAR. No approved
+  // confirmation value was supplied, so utility attribution stays blocked.
+  const resolvedGroups = groups.map(function (group) {
+    return { group: group, resolution: resolveUtilityGroup_(group) };
+  });
+  const groupsWithWarnings = groups.filter(function (g) {
+    return Array.isArray(g.advertencias) && g.advertencias.length > 0;
+  });
+  const reconciliationReady = !!(sira && sira.conciliacionConsumo && sira.conciliacionConsumo.concilia === true);
+  const resolvedAttributionCount = resolvedGroups.filter(function (entry) {
+    return entry.resolution.status === 'RESOLVED_LOCAL_RULE';
+  }).length;
+  const pendingAttributionCount = resolvedGroups.filter(function (entry) {
+    return entry.resolution.status.indexOf('PENDING_') === 0;
+  }).length;
+  const groupedByStaff = {};
+  groups.forEach(function (group) {
+    const key = utilityStaffKey_(group.staff || 'Sin responsable');
+    if (!groupedByStaff[key]) groupedByStaff[key] = [];
+    groupedByStaff[key].push(group);
+  });
+  let html = '';
+  html += '<div class="card" style="padding:14px 16px;margin-bottom:14px;background:var(--bg);">';
+  html += '<div style="font-weight:800;margin-bottom:5px;">Desglose provisional</div>';
+  html += '<div style="font-size:12px;color:var(--ink-soft);line-height:1.45;">';
+  html += 'Fuente local: Cierre de mes. Ingresos, comisiones y subtotal después de comisión se reutilizan sin cambiar sus reglas. ';
+  html += breakdownReady
+    ? 'Desglose SIRA recibido; atribución local resuelta por reglas Owner para <b>' + resolvedAttributionCount + '</b> grupo(s). El estado SIRA original no se modifica.'
+      + (pendingAttributionCount ? ' Quedan <b>' + pendingAttributionCount + '</b> grupo(s) pendientes.' : '')
+      + (!reconciliationReady ? ' Conciliación pendiente.' : '')
+      + (groupsWithWarnings.length ? ' Hay costos/clasificaciones con advertencias.' : '')
+    : '<b>Desglose SIRA pendiente de actualización</b>.';
+  html += '</div></div>';
+  html += '<div class="card" style="padding:6px 14px;overflow-x:auto;">';
+  html += '<div style="display:grid;grid-template-columns:minmax(130px,1fr) repeat(4,minmax(115px,auto));gap:10px;font-size:10px;font-weight:800;color:var(--ink-faint);padding:8px 0;border-bottom:1px solid var(--line);">';
+  html += '<span>Staff</span><span>Ingresos</span><span>Comisión</span><span>Después comisión</span><span>SIRA / utilidad</span></div>';
+  if (!staff.length) {
+    html += '<div style="padding:20px 0;text-align:center;color:var(--ink-faint);font-size:13px;">No hay Staff con movimientos en este período. El catálogo completo de Staff aún no está disponible en el contrato local.</div>';
+  } else {
+    staff.forEach(function (item) {
+      const generated = Number(item.generado) || 0;
+      const commission = Number(item.comision) || 0;
+      const name = String(item.chica || 'Sin asignar');
+      const ownGroups = groupedByStaff[utilityStaffKey_(name)] || [];
+      const ownResolved = resolvedGroups.filter(function (entry) {
+        return utilityStaffKey_(entry.group.staff) === utilityStaffKey_(name);
+      });
+      const ownPending = ownResolved.some(function (entry) {
+        return ['PENDING_NO_AREA', 'PENDING_AREA_REVIEW', 'PENDING_STAFF_AREA_REVIEW', 'PENDING_COST_OR_DATA'].indexOf(entry.resolution.status) >= 0;
+      });
+      const attributed = breakdownReady && reconciliationReady && !ownPending
+        ? ownResolved.filter(function (entry) { return entry.resolution.status === 'RESOLVED_LOCAL_RULE'; })
+          .reduce(function (sum, entry) { return sum + (Number(entry.group.valor) || 0); }, 0)
+        : null;
+      html += '<div style="display:grid;grid-template-columns:minmax(130px,1fr) repeat(4,minmax(115px,auto));gap:10px;align-items:center;font-size:12px;padding:11px 0;border-bottom:1px solid var(--line);">';
+      html += '<span style="font-weight:800;">' + esc(name) + '<small style="display:block;color:var(--ink-faint);font-weight:500;">' + (Number(item.servicios) || 0) + ' servicios</small></span>';
+      html += '<span>' + money(generated) + '</span>';
+      html += '<span style="color:var(--danger);">' + money(commission) + '</span>';
+      html += '<span>' + money(generated - commission) + '</span>';
+      html += attributed == null
+        ? '<span style="color:var(--ink-faint);">' + (breakdownReady ? (ownPending ? 'atribución/costo pendiente' : 'conciliación pendiente') : 'SIRA pendiente') + '<br><small>utilidad no disponible</small></span>'
+        : '<span style="color:var(--ink);">' + money(attributed) + '<br><small>utilidad: ' + money(generated - commission - attributed) + '</small></span>';
+      html += '</div>';
+      if (ownGroups.length) {
+        html += '<div style="margin:0 0 10px 12px;padding:8px 10px;background:var(--bg);border-radius:10px;font-size:11px;color:var(--ink-soft);">';
+        ownGroups.forEach(function (group) {
+          const area = String(group.area || group.areaGrupo || 'Sin área');
+          const warning = Array.isArray(group.advertencias) && group.advertencias.length ? ' · ' + group.advertencias.join(', ') : '';
+          html += '<div style="display:flex;justify-content:space-between;gap:12px;"><span>' + esc(area) + ' · ' + (Number(group.movimientos) || 0) + ' mov.' + esc(warning) + '</span><b>' + money(group.valor) + '</b></div>';
+        });
+        html += '</div>';
+      }
+    });
+  }
+  const nonStaff = groups.filter(function (group) {
+    return ['COFFEE', 'LOCAL', 'GENERAL', 'SIN_AREA'].indexOf(String(group.areaGrupo || '').toUpperCase()) >= 0;
+  });
+  if (nonStaff.length) {
+    html += '<div class="section-title" style="margin-top:16px;">Consumos separados del gasto individual</div><div class="card" style="padding:10px 14px;font-size:12px;">';
+    nonStaff.forEach(function (group) {
+      html += '<div style="display:flex;justify-content:space-between;padding:5px 0;"><span>' + esc(group.areaGrupo || group.area || 'Sin área') + '</span><b>' + money(group.valor) + '</b></div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  body.innerHTML = html;
 }
 /* ========== /CIERRE DE MES ========== */
 
