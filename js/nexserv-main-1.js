@@ -2127,6 +2127,8 @@
     if (cajaBtn) cajaBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const cierreMesBtn = document.getElementById('menuCierreMesBtn');
     if (cierreMesBtn) cierreMesBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
+    const controlUtilidadBtn = document.getElementById('menuControlUtilidadBtn');
+    if (controlUtilidadBtn) controlUtilidadBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const informeServBtn = document.getElementById('menuInformeServiciosBtn');
     if (informeServBtn) informeServBtn.style.display = (user && user.role === 'owner') ? 'flex' : 'none';
     const pushBtn = document.getElementById('menuPushTestBtn');
