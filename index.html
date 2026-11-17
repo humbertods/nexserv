@@ -67,6 +67,9 @@
     <button class="user-menu-item" id="menuCierreMesBtn" style="display:none;" onclick="closeUserMenu(); show('ownerCierreMes');">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg> Cierre mes
     </button>
+    <button class="user-menu-item" id="menuControlUtilidadBtn" style="display:none;" onclick="closeUserMenu(); show('ownerControlUtilidad');">
+      <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l3-4 3 2 4-6"/></svg> Control de utilidad
+    </button>
     <button class="user-menu-item" id="menuInformeServiciosBtn" style="display:none;" onclick="closeUserMenu(); show('ownerInformeServicios'); cargarInformeServicios();">
       <svg class="nx-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M6 20v-6M12 20V6M18 20v-9"/></svg> Informe de servicios
     </button>
@@ -2648,6 +2651,25 @@
     </div>
   </div>
 
+  <!-- OWNER: CONTROL DE UTILIDAD (local, SIRA pendiente) -->
+  <div class="screen" id="ownerControlUtilidad">
+    <div class="header">
+      <button class="back-btn" onclick="show('ownerHome')">← Resumen</button>
+    </div>
+    <div class="section-title" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span>Control de utilidad</span>
+      <span id="cuRefreshBtn" style="margin-left:auto;font-size:10px;color:var(--ink-faint);cursor:pointer;" onclick="loadControlUtilidad()">↻ Actualizar</span>
+    </div>
+    <div style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;">
+      Ingresos y comisiones se reutilizan de Cierre de mes. El desglose SIRA por Staff aún no está disponible en el contrato local, por lo que la utilidad no se presenta como definitiva.
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <select id="cuMes" onchange="loadControlUtilidad()" style="flex:1;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:14px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+      <select id="cuAnio" onchange="loadControlUtilidad()" style="width:110px;padding:11px 12px;border:1.5px solid var(--line);border-radius:14px;font-family:inherit;font-size:14px;font-weight:600;background:var(--bg-card);color:var(--ink);"></select>
+    </div>
+    <div id="cuBody"><div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);">Seleccioná un período.</div></div>
+  </div>
+
   <!-- OWNER: INFORME DE SERVICIOS -->
   <div class="screen" id="ownerInformeServicios">
     <div class="header">
@@ -2975,14 +2997,14 @@
   <script src="js/state.js?v=20260706a"></script>
   <script src="js/api.js?v=20261010a"></script>
   <script src="js/lineaService.js?v=20261003a"></script>
-  <script src="js/router.js?v=20260916a"></script>
+   <script src="js/router.js?v=20261029-util1"></script>
   <script src="js/app.js?v=20260706a"></script>
   <script src="js/evidencias-core.js?v=20260815e"></script>
-  <script src="js/nexserv-main-1.js?v=20261010a"></script>
+   <script src="js/nexserv-main-1.js?v=20261029-util1"></script>
   <script src="js/nexserv-main-2.js?v=20261010a"></script>
   <script src="js/nexserv-nuevacita.js?v=20260711a"></script>
   <script src="js/nexserv-main-3.js?v=20261003a"></script>
-  <script src="js/nexserv-main-4.js?v=20261010a"></script>
+   <script src="js/nexserv-main-4.js?v=20261029-util1"></script>
   <script src="js/pagos-verificacion.js?v=20260819a"></script>
   <!-- Módulo Recordatorios: independiente. Única dependencia autorizada hacia
        main-1..4: abrirHistorialServicios(codigo, areaFiltro) de
