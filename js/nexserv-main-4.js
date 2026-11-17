@@ -534,7 +534,7 @@
     if (area === 'OTRA_AREA') return { status: 'PENDING_AREA_REVIEW', area: String(group && group.area || '') };
     const staff = utilityStaffKey_(group && group.staff);
     const allowed = UTILITY_STAFF_AREA_RULES[staff] || [];
-    if (allowed.indexOf(area) < 0) return { status: 'PENDING_STAFF_AREA_REVIEW', area: area, staff: staff };
+    if (allowed.indexOf(area) < 0) return { status: 'EXCLUDED_STAFF_OTHER_AREA', area: area, staff: staff };
     const warnings = Array.isArray(group && group.advertencias) ? group.advertencias : [];
     if (warnings.length) return { status: 'PENDING_COST_OR_DATA', area: area, staff: staff, warnings: warnings };
     return { status: 'RESOLVED_LOCAL_RULE', area: area, staff: staff };
@@ -5403,7 +5403,10 @@ function renderControlUtilidad(data, sira) {
         return utilityStaffKey_(entry.group.staff) === utilityStaffKey_(name);
       });
       const ownPending = ownResolved.some(function (entry) {
-        return ['PENDING_NO_AREA', 'PENDING_AREA_REVIEW', 'PENDING_STAFF_AREA_REVIEW', 'PENDING_COST_OR_DATA'].indexOf(entry.resolution.status) >= 0;
+        return entry.resolution.status === 'PENDING_COST_OR_DATA';
+      });
+      const ownReviewPending = ownResolved.some(function (entry) {
+        return ['PENDING_NO_AREA', 'PENDING_AREA_REVIEW'].indexOf(entry.resolution.status) >= 0;
       });
       const attributed = breakdownReady && reconciliationReady && !ownPending
         ? ownResolved.filter(function (entry) { return entry.resolution.status === 'RESOLVED_LOCAL_RULE'; })
@@ -5416,7 +5419,11 @@ function renderControlUtilidad(data, sira) {
       html += '<span>' + money(generated - commission) + '</span>';
       html += attributed == null
         ? '<span style="color:var(--ink-faint);">' + (breakdownReady ? (ownPending ? 'atribución/costo pendiente' : 'conciliación pendiente') : 'SIRA pendiente') + '<br><small>utilidad no disponible</small></span>'
-        : '<span style="color:var(--ink);">' + money(attributed) + '<br><small>utilidad: ' + money(generated - commission - attributed) + '</small></span>';
+        : '<span style="color:var(--ink);">' + money(attributed) + '<br><small>'
+          + (ownReviewPending ? 'utilidad parcial: ' : 'utilidad: ')
+          + money(generated - commission - attributed) + '</small>'
+          + (ownReviewPending ? '<br><small>áreas sin correspondencia fuera de selección</small>' : '')
+          + '</span>';
       html += '</div>';
       if (ownGroups.length) {
         html += '<div style="margin:0 0 10px 12px;padding:8px 10px;background:var(--bg);border-radius:10px;font-size:11px;color:var(--ink-soft);">';
