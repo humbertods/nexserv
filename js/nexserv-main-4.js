@@ -5236,29 +5236,87 @@ function initControlUtilidadSelectors() {
   }
 }
 
+function controlUtilidadSiraStatus_(result) {
+  if (!result) return 'SIRA: cargando…';
+  if (result.success !== true) return 'SIRA: error de consulta.';
+  if (result.desgloseDisponible !== true) return 'SIRA: respondió sin desglose Staff-área.';
+  return 'SIRA: desglose recibido; atribución pendiente por grupo.';
+}
+
+function renderControlUtilidadLoading_(siraResult, cierreError) {
+  const body = document.getElementById('cuBody');
+  if (!body) return;
+  const cierreText = cierreError ? 'Cierre de mes: error de consulta.' : 'Cierre de mes: cargando…';
+  body.innerHTML = '<div class="card" style="padding:18px;color:' + (cierreError ? 'var(--danger)' : 'var(--ink-soft)') + ';">'
+    + '<b>' + cierreText + '</b><br><span style="font-size:12px;color:var(--ink-faint);">'
+    + controlUtilidadSiraStatus_(siraResult) + '</span></div>';
+}
+
+function controlUtilidadGet_(action, params) {
+  const startedAt = performance.now();
+  const finish = function (result, outcome) {
+    console.info('[CONTROL_UTILIDAD]', action,
+      'duration_ms=' + Math.round(performance.now() - startedAt),
+      'result=' + outcome);
+    return result;
+  };
+  try {
+    return Promise.resolve(apiGet(action, params))
+      .then(function (result) {
+        return finish(result, result && result.success === true ? 'success' : 'error');
+      })
+      .catch(function (error) {
+        return finish({ success: false, error: error && error.message ? error.message : String(error) }, 'rejected');
+      });
+  } catch (error) {
+    return Promise.resolve(finish({ success: false, error: error && error.message ? error.message : String(error) }, 'rejected'));
+  }
+}
+
 async function loadControlUtilidad() {
   const body = document.getElementById('cuBody');
   if (!body) return;
   const mes = Number(document.getElementById('cuMes')?.value) || (new Date().getMonth() + 1);
   const anio = Number(document.getElementById('cuAnio')?.value) || new Date().getFullYear();
   const requestToken = (window._cuLoadToken = (window._cuLoadToken || 0) + 1);
-  body.innerHTML = '<div class="card" style="text-align:center;padding:24px;color:var(--ink-faint);">Cargando datos de Cierre de mes…</div>';
-  try {
-    const results = await Promise.all([
-      apiGet('getCierreMes', { mes: mes, anio: anio }),
-      apiGet('getCierreMesSira', { mes: mes, anio: anio }).catch(function () { return { success: false }; })
-    ]);
-    const result = results[0];
-    const sira = results[1];
+  let cierreResult = null;
+  let cierreError = null;
+  let siraResult = null;
+  renderControlUtilidadLoading_(null, null);
+
+  const renderCurrent = function () {
     if (requestToken !== window._cuLoadToken) return;
-    if (!result || result.success !== true) {
-      body.innerHTML = '<div class="card" style="padding:18px;color:var(--danger);">No se pudo cargar el período. SIRA permanece pendiente.</div>';
-      return;
+    if (cierreResult && cierreResult.success === true) {
+      renderControlUtilidad(cierreResult, siraResult);
+    } else {
+      renderControlUtilidadLoading_(siraResult, cierreError);
     }
-    renderControlUtilidad(result, sira);
-  } catch (error) {
-    body.innerHTML = '<div class="card" style="padding:18px;color:var(--danger);">Error cargando el período. SIRA permanece pendiente.</div>';
-  }
+  };
+
+  controlUtilidadGet_('getCierreMes', { mes: mes, anio: anio })
+    .then(function (result) {
+      if (requestToken !== window._cuLoadToken) return;
+      if (result && result.success === true) cierreResult = result;
+      else cierreError = result || { success: false, error: 'No hubo respuesta' };
+      renderCurrent();
+    })
+    .catch(function (error) {
+      if (requestToken !== window._cuLoadToken) return;
+      cierreError = error || { success: false, error: 'No hubo respuesta' };
+      renderCurrent();
+    });
+
+  controlUtilidadGet_('getCierreMesSira', { mes: mes, anio: anio })
+    .then(function (result) {
+      if (requestToken !== window._cuLoadToken) return;
+      siraResult = result || { success: false, error: 'No hubo respuesta' };
+      renderCurrent();
+    })
+    .catch(function (error) {
+      if (requestToken !== window._cuLoadToken) return;
+      siraResult = error || { success: false, error: 'No hubo respuesta' };
+      renderCurrent();
+    });
 }
 
 function renderControlUtilidad(data, sira) {
@@ -5316,12 +5374,19 @@ function renderControlUtilidad(data, sira) {
   html += '<div style="font-weight:800;margin-bottom:5px;">Desglose provisional</div>';
   html += '<div style="font-size:12px;color:var(--ink-soft);line-height:1.45;">';
   html += 'Fuente local: Cierre de mes. Ingresos, comisiones y subtotal después de comisión se reutilizan sin cambiar sus reglas. ';
-  html += breakdownReady
-    ? 'Desglose SIRA recibido; atribución local resuelta por reglas Owner para <b>' + resolvedAttributionCount + '</b> grupo(s). El estado SIRA original no se modifica.'
+  const siraStatus = !sira
+    ? 'SIRA: cargando…'
+    : sira.success !== true
+    ? (sira.code === 'TIMEOUT' ? 'Tiempo agotado consultando SIRA.'
+      : sira && sira.code === 'ABORTED' ? 'Consulta SIRA cancelada; se conservan los datos de Cierre de mes.'
+      : 'Error consultando SIRA; se conservan los datos de Cierre de mes.')
+    : (!breakdownReady ? 'SIRA respondió sin desglose Staff-área.'
+      : 'Desglose SIRA recibido; atribución local resuelta por reglas Owner para <b>' + resolvedAttributionCount + '</b> grupo(s). El estado SIRA original no se modifica.');
+  html += siraStatus
       + (pendingAttributionCount ? ' Quedan <b>' + pendingAttributionCount + '</b> grupo(s) pendientes.' : '')
       + (!reconciliationReady ? ' Conciliación pendiente.' : '')
       + (groupsWithWarnings.length ? ' Hay costos/clasificaciones con advertencias.' : '')
-    : '<b>Desglose SIRA pendiente de actualización</b>.';
+      ;
   html += '</div></div>';
   html += '<div class="card" style="padding:6px 14px;overflow-x:auto;">';
   html += '<div style="display:grid;grid-template-columns:minmax(130px,1fr) repeat(4,minmax(115px,auto));gap:10px;font-size:10px;font-weight:800;color:var(--ink-faint);padding:8px 0;border-bottom:1px solid var(--line);">';
